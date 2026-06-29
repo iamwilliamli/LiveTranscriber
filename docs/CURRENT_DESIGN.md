@@ -4,13 +4,13 @@ This document summarizes the current implementation-facing design of LiveTranscr
 
 ## Product Shape
 
-LiveTranscriber is a native iOS 26+ utility for local recording, live transcription, saved-recording review, and lightweight transcript intelligence. iOS 27 devices can use an optional Native Speech Pipeline from Developer Options.
+LiveTranscriber is a native iOS 26+ utility for local recording, live transcription, saved-recording review, and lightweight transcript intelligence. iOS 27 devices can use an optional Native Speech Pipeline from Developer Options. Live recording uses the AVCaptureSession Stereo Capture path.
 
 The app is organized as three tabs:
 
 1. `TranscriptionView`: live recording and current transcript.
 2. `RecordingsView`: saved recording library, search, import, playback, transcript review, sharing, re-transcription, and summary/tag generation.
-3. `SettingsView`: transcription language, recording format, and storage status.
+3. `SettingsView`: transcription language, recording format, storage status, and developer diagnostics.
 
 The product should feel like a focused system tool. It avoids marketing-style layouts, waveform decoration, and explanatory UI copy. The main interface favors direct controls, system symbols, native navigation, and compact information density.
 
@@ -108,21 +108,22 @@ Tapping a transcript row seeks playback to that line's start timestamp. The curr
 
 Toolbar actions:
 
-- Share audio or transcript.
-- Re-transcribe with a selected language.
-- Copy transcript text.
-- Generate or refresh Apple Intelligence summary/tags.
-- Delete recording.
+- Top-right more menu opens audio parameters in a sheet: sample rate, channel count, encoding, processing format, bit depth, duration, frame count, file size, and normalization status.
+- The same menu also supports sharing audio or transcript, re-transcribing with a selected language, copying transcript text, generating or refreshing Apple Intelligence summary/tags, and deleting the recording.
 
 ## Settings
 
 Settings are grouped into card surfaces:
 
 - Transcription: language menu, disabled while recording/preparing.
-- Recording: segmented WAV/M4A format picker and detail text.
+- Recording: WAV/M4A format picker.
 - Files: recording count and storage location.
 
 The current default format is WAV. M4A is available for smaller AAC files.
+
+Microphone mode is not user-selectable. Stereo Capture uses `AVCaptureSession`, sets `AVCaptureDeviceInput.multichannelAudioMode = .stereo`, saves stereo audio, and downmixes the same captured buffers to mono for SpeechAnalyzer.
+
+Developer Options show device/system information, active speech pipeline, supported pipeline types, runtime analyzer input format, and a Loudness Processing toggle for comparing normalized files against raw Stereo Capture recordings.
 
 ## Haptics
 

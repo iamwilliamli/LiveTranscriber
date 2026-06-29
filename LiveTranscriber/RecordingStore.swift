@@ -219,7 +219,11 @@ final class RecordingStore: ObservableObject {
     }
 
     @discardableResult
-    func importRecording(from sourceURL: URL, language: TranscriptionLanguage) async throws -> RecordingItem {
+    func importRecording(
+        from sourceURL: URL,
+        language: TranscriptionLanguage,
+        loudnessProcessingEnabled: Bool
+    ) async throws -> RecordingItem {
         try ensureRecordingsDirectory()
 
         let createdAt = Date()
@@ -276,11 +280,10 @@ final class RecordingStore: ObservableObject {
                     )
                 }
             }
-            updateImportStatus(for: item.id, progress: 0.9, message: String(localized: "正在增强录音音量"), shouldPersist: true)
-
             let outputFormat = RecordingAudioFormat(rawValue: targetAudioURL.pathExtension.lowercased())
             let audioNormalizedAt: Date?
-            if let outputFormat {
+            if loudnessProcessingEnabled, let outputFormat {
+                updateImportStatus(for: item.id, progress: 0.9, message: String(localized: "正在增强录音音量"), shouldPersist: true)
                 try await RecordingFileNormalizer.normalize(url: targetAudioURL, outputFormat: outputFormat)
                 audioNormalizedAt = Date()
             } else {
@@ -407,7 +410,10 @@ final class RecordingStore: ObservableObject {
         (try? String(contentsOf: transcriptURL(for: item), encoding: .utf8)) ?? ""
     }
 
-    func normalizeAudioIfNeeded(for item: RecordingItem) async {
+    func normalizeAudioIfNeeded(for item: RecordingItem, loudnessProcessingEnabled: Bool) async {
+        guard loudnessProcessingEnabled else {
+            return
+        }
         guard item.audioNormalizationVersion != RecordingFileNormalizer.version else {
             return
         }

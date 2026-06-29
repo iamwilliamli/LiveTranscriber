@@ -303,10 +303,29 @@ struct SettingsView: View {
             )
 
             SettingsStatusRow(
-                icon: "curlybraces",
-                text: LocalizedStringKey(pipeline.pipelineParametersText),
+                icon: "waveform.path",
+                text: LocalizedStringKey(pipeline.runtimeAnalyzerFormatText),
                 tint: AppTheme.info
             )
+
+            Toggle(isOn: $transcriber.isLoudnessProcessingEnabled) {
+                HStack(alignment: .top, spacing: 10) {
+                    SettingsIcon(systemImage: "waveform.badge.plus", tint: AppTheme.warning)
+
+                    VStack(alignment: .leading, spacing: 3) {
+                        Text("响度处理")
+                            .font(.redditSans(.subheadline, weight: .semibold))
+                            .foregroundStyle(.primary)
+
+                        Text("开启后会在录音结束、导入和详情页补处理时做文件级响度归一化；关闭时保留 Stereo Capture 原始音量")
+                            .font(.redditSans(.caption))
+                            .foregroundStyle(.secondary)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                }
+            }
+            .toggleStyle(.switch)
+            .disabled(transcriber.isRecording || transcriber.isPreparing)
 
             SettingsMetricRow(
                 icon: "sparkles",

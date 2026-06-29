@@ -48,13 +48,12 @@ LiveTranscriber 是一个 iOS 26+ 的本地录音和实时转录工具。iOS 27 
 
 1. 请求语音识别和麦克风权限。
 2. 配置 `AVAudioSession`。
-3. 获取麦克风输入格式。
+3. 使用 `AVCaptureSession` 立体声采集路径。
 4. 准备 SpeechAnalyzer 模块和语言模型。
-5. 安装 `AVAudioEngine` input tap。
-6. 每个音频 buffer 同时写入本地音频文件并送入 SpeechAnalyzer。
-7. Speech SDK 返回实时结果后更新转录行和 Live Activity。
+5. 启动采集，把音频 buffer 写入本地音频文件并送入 SpeechAnalyzer。
+6. Speech SDK 返回实时结果后更新转录行和 Live Activity。
 
-暂停时会停止 input tap 和 audio engine，并冻结计时。继续录音时重新安装 tap，沿用原来的 analyzer pipeline 和音频 writer。
+暂停时会停止当前采集源并冻结计时。继续录音时重新启动采集，沿用原来的 analyzer pipeline 和音频 writer。
 
 ### 转录行
 
@@ -134,12 +133,24 @@ iCloud 同步设计：
 
 当前这套链路在真机体验上可以稳定工作：录音文件音量足够，播放不再破音。后续不要回到录制阶段实时放大的方案；播放端如果保留增益，也应只是小幅辅助，不能替代文件级归一化。
 
-录音阶段：
+当前只保留 `AVCaptureSession` 立体声采集路径：
 
-1. `AVAudioSession` 使用 `.playAndRecord` + `.voiceChat`，options 为 `.allowBluetoothHFP`、`.defaultToSpeaker`、`.duckOthers`。
-2. `AVAudioEngine` input tap 收到每个 `AVAudioPCMBuffer` 后复制两份。
-3. 第一份原始 buffer 直接写入 `AudioFileWriter`，不做实时增益。
-4. 第二份原始 buffer 送入 `AnalyzerInputPipeline` / `SpeechAnalyzer`，避免音量处理影响转录识别。
+1. `LiveTranscriptionManager` 固定走 `CaptureSessionRecordingPipeline`。
+2. `AVAudioSession` 使用 `.playAndRecord` + `.default`，options 为 `.defaultToSpeaker`、`.duckOthers`，并请求 `preferredInputNumberOfChannels = 2` 用于 route 诊断。
+3. 创建 `AVCaptureDeviceInput(device: AVCaptureDevice.default(for: .audio))`。
+4. 检查 `isMultichannelAudioModeSupported(.stereo)`，成功后设置 `multichannelAudioMode = .stereo`。
+5. 通过 `AVCaptureAudioDataOutput` 接收 `CMSampleBuffer`。iOS 上不能设置 `AVCaptureAudioDataOutput.audioSettings`，所以格式转换在 app 内完成。
+6. 每个 `CMSampleBuffer` 转成源 `AVAudioPCMBuffer` 后分两路：
+   - 转成 `Float32 / stereo / non-interleaved`，写入 `AudioFileWriter`，保存 stereo 文件。
+   - 转成 `Float32 / mono / non-interleaved`，送入 `AnalyzerInputPipeline`，再由当前 Speech Pipeline 转成 SpeechAnalyzer 需要的格式。
+7. 这个路径已经在真机确认可以 work：保存文件是 stereo，转录继续正常工作。
+
+立体声采集限制：
+
+- `AVCaptureDeviceInput.multichannelAudioMode` 默认是 `.none`，必须显式设置 `.stereo`。
+- Apple 的这个属性只对内置麦克风生效；外接麦克风可能被系统忽略。
+- 如果当前输入不支持 `.stereo`，app 会直接报“不支持 AVCapture stereo 采集”，不要静默降级成 mono，否则用户很难判断录音文件到底是什么。
+- 录音详情页会显示保存文件的采样率、声道和编码；capture setup、首个 buffer 格式和转换失败只输出到 Xcode 日志。
 
 实时转录 Pipeline 参数：
 
@@ -148,10 +159,12 @@ iCloud 同步设计：
 
 停止录音后：
 
-1. 停止 input tap 和 audio engine。
+1. 停止 `AVCaptureSession`。
 2. finish analyzer pipeline，等待 SpeechAnalyzer flush。
-3. 用 `RecordingFileNormalizer.normalize(...)` 对刚生成的音频文件做一次离线归一化。
-4. 归一化成功后写入 `audioNormalizedAt` 和 `audioNormalizationVersion`。
+3. 如果开发者选项里的“响度处理”开启，用 `RecordingFileNormalizer.normalize(...)` 对刚生成的音频文件做一次离线归一化。
+4. 只有归一化成功后才写入 `audioNormalizedAt` 和 `audioNormalizationVersion`。
+
+“响度处理”默认关闭。开启后，新录音、导入录音和打开详情页时的补处理会执行文件级归一化；关闭时保留 Stereo Capture 原始音量。已经归一化过的旧文件不会自动恢复成原始文件。
 
 当前归一化版本是 `RecordingFileNormalizer.version = 2`。核心参数：
 
@@ -172,8 +185,8 @@ iCloud 同步设计：
 
 已有录音：
 
-- 打开录音详情页时调用 `RecordingStore.normalizeAudioIfNeeded(for:)`。
-- 如果 `audioNormalizationVersion` 不是当前版本，会重新归一化。
+- 打开录音详情页时调用 `RecordingStore.normalizeAudioIfNeeded(for:loudnessProcessingEnabled:)`。
+- 如果“响度处理”开启且 `audioNormalizationVersion` 不是当前版本，会重新归一化。
 - 如果版本已匹配，则不重复处理，避免反复增益导致破音。
 
 明确不要做：
@@ -214,7 +227,7 @@ iCloud 同步设计：
 
 播放逻辑在 `RecordingPlaybackController`。
 
-当前使用 `AVAudioEngine + AVAudioPlayerNode`，中间接 `AVAudioUnitEQ`，`globalGain = 3`。播放器负责播放、暂停、seek 和轻量播放端增益；长期、可持久的音量增强仍然放在文件级归一化阶段完成。
+当前使用 `AVAudioEngine + AVAudioPlayerNode`，中间接 `AVAudioUnitEQ`，`globalGain = 3`。播放器负责播放、暂停、seek 和轻量播放端增益；长期、可持久的音量增强放在可选的文件级归一化阶段完成。
 
 详情页会把转录文本解析成带时间的行。点击某一行会 `seek(to:)` 到该行的 `startSeconds`。
 

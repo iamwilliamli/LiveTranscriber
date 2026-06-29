@@ -315,7 +315,11 @@ struct RecordingsView: View {
         HapticFeedback.play(.importStart)
         Task {
             do {
-                _ = try await store.importRecording(from: url, language: language)
+                _ = try await store.importRecording(
+                    from: url,
+                    language: language,
+                    loudnessProcessingEnabled: transcriber.isLoudnessProcessingEnabled
+                )
                 HapticFeedback.play(.importComplete)
             } catch {
                 importErrorMessage = error.localizedDescription
@@ -609,6 +613,9 @@ private struct RecordingDetailView: View {
     @State private var isAnalyzing = false
     @State private var analysisErrorMessage: String?
     @State private var deleteErrorMessage: String?
+    @State private var audioFileInfo: RecordingAudioFileInfo?
+    @State private var audioFileInfoError: String?
+    @State private var isShowingAudioFileInfo = false
 
     private var currentItem: RecordingItem {
         store.recording(withID: item.id) ?? item
@@ -634,71 +641,36 @@ private struct RecordingDetailView: View {
         .navigationTitle("录音详情")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
-            ToolbarItemGroup(placement: .topBarTrailing) {
-                Menu {
-                    ShareLink(item: store.audioURL(for: currentItem)) {
-                        Label("分享音频", systemImage: "waveform")
-                    }
-
-                    ShareLink(item: store.transcriptText(for: currentItem)) {
-                        Label("分享转录文字", systemImage: "text.alignleft")
-                    }
-                    .disabled(store.transcriptText(for: currentItem).trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
-                } label: {
-                    Image(systemName: "square.and.arrow.up")
+            ToolbarItem(placement: .topBarTrailing) {
+                detailActionsMenu
+            }
+        }
+        .sheet(isPresented: $isShowingAudioFileInfo) {
+            NavigationStack {
+                ScrollView {
+                    audioParametersCard
+                        .padding()
                 }
-                .accessibilityLabel("分享")
-
-                Menu {
-                    ForEach(transcriber.supportedLanguages) { language in
-                        Button {
-                            retranscribeCurrentItem(language: language)
-                        } label: {
-                            Label(
-                                language.displayName,
-                                systemImage: language.id == currentItem.languageID ? "checkmark" : "globe"
-                            )
+                .background(AppTheme.groupedBackground.ignoresSafeArea())
+                .navigationTitle("音频参数")
+                .navigationBarTitleDisplayMode(.inline)
+                .toolbar {
+                    ToolbarItem(placement: .topBarTrailing) {
+                        Button("完成") {
+                            isShowingAudioFileInfo = false
                         }
                     }
-                } label: {
-                    Image(systemName: isTranscriptionRunning ? "hourglass" : "arrow.triangle.2.circlepath")
                 }
-                .disabled(isTranscriptionRunning)
-                .accessibilityLabel("重新转录")
-
-                Button {
-                    HapticFeedback.play(.copy)
-                    UIPasteboard.general.string = store.transcriptText(for: currentItem)
-                    copied = true
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 1.4) {
-                        copied = false
-                    }
-                } label: {
-                    Image(systemName: copied ? "checkmark" : "doc.on.doc")
-                }
-
-                if store.intelligenceAvailability.isAvailable {
-                    Button {
-                        analyzeCurrentItem()
-                    } label: {
-                        Image(systemName: isAnalyzing ? "hourglass" : "sparkles")
-                    }
-                    .disabled(isAnalyzing)
-                }
-
-                Button(role: .destructive) {
-                    HapticFeedback.play(.deleteRequested)
-                    deleteRequest = RecordingDeleteRequest(item: currentItem)
-                } label: {
-                    Image(systemName: "trash")
-                }
-                .disabled(isTranscriptionRunning)
             }
         }
         .onAppear {
             Task {
                 store.refreshIntelligenceAvailability()
-                await store.normalizeAudioIfNeeded(for: currentItem)
+                await store.normalizeAudioIfNeeded(
+                    for: currentItem,
+                    loudnessProcessingEnabled: transcriber.isLoudnessProcessingEnabled
+                )
+                await refreshAudioFileInfo()
                 player.load(item: currentItem, url: store.audioURL(for: currentItem))
             }
         }
@@ -756,6 +728,80 @@ private struct RecordingDetailView: View {
         } message: {
             Text(deleteErrorMessage ?? "")
         }
+    }
+
+    private var detailActionsMenu: some View {
+        Menu {
+            Button {
+                isShowingAudioFileInfo = true
+            } label: {
+                Label("音频参数", systemImage: "info.circle")
+            }
+
+            Divider()
+
+            Menu {
+                ShareLink(item: store.audioURL(for: currentItem)) {
+                    Label("分享音频", systemImage: "waveform")
+                }
+
+                ShareLink(item: store.transcriptText(for: currentItem)) {
+                    Label("分享转录文字", systemImage: "text.alignleft")
+                }
+                .disabled(store.transcriptText(for: currentItem).trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+            } label: {
+                Label("分享", systemImage: "square.and.arrow.up")
+            }
+
+            Menu {
+                ForEach(transcriber.supportedLanguages) { language in
+                    Button {
+                        retranscribeCurrentItem(language: language)
+                    } label: {
+                        Label(
+                            language.displayName,
+                            systemImage: language.id == currentItem.languageID ? "checkmark" : "globe"
+                        )
+                    }
+                }
+            } label: {
+                Label("重新转录", systemImage: isTranscriptionRunning ? "hourglass" : "arrow.triangle.2.circlepath")
+            }
+            .disabled(isTranscriptionRunning)
+
+            Button {
+                HapticFeedback.play(.copy)
+                UIPasteboard.general.string = store.transcriptText(for: currentItem)
+                copied = true
+                DispatchQueue.main.asyncAfter(deadline: .now() + 1.4) {
+                    copied = false
+                }
+            } label: {
+                Label(copied ? "已复制" : "复制转录文本", systemImage: copied ? "checkmark" : "doc.on.doc")
+            }
+
+            if store.intelligenceAvailability.isAvailable {
+                Button {
+                    analyzeCurrentItem()
+                } label: {
+                    Label("智能分析", systemImage: isAnalyzing ? "hourglass" : "sparkles")
+                }
+                .disabled(isAnalyzing)
+            }
+
+            Divider()
+
+            Button(role: .destructive) {
+                HapticFeedback.play(.deleteRequested)
+                deleteRequest = RecordingDeleteRequest(item: currentItem)
+            } label: {
+                Label("删除录音", systemImage: "trash")
+            }
+            .disabled(isTranscriptionRunning)
+        } label: {
+            Image(systemName: "ellipsis.circle")
+        }
+        .accessibilityLabel("更多")
     }
 
     private var header: some View {
@@ -832,6 +878,44 @@ private struct RecordingDetailView: View {
                 EmptyStateView(icon: "sparkles", title: "暂无摘要")
                     .frame(maxWidth: .infinity)
                     .frame(height: 96)
+            }
+        }
+        .padding(14)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(AppTheme.cardBackground)
+        .overlay {
+            RoundedRectangle(cornerRadius: AppTheme.cornerRadius, style: .continuous)
+                .stroke(AppTheme.cardBorder, lineWidth: 1)
+        }
+        .clipShape(RoundedRectangle(cornerRadius: AppTheme.cornerRadius, style: .continuous))
+    }
+
+    private var audioParametersCard: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Label("音频参数", systemImage: "info.circle")
+                .font(.redditSans(.headline))
+
+            if let audioFileInfo {
+                VStack(spacing: 0) {
+                    RecordingAudioParameterRow(icon: "waveform", title: "采样率", value: audioFileInfo.fileSampleRateText)
+                    RecordingAudioParameterRow(icon: "speaker.wave.2", title: "声道", value: audioFileInfo.channelLayoutText)
+                    RecordingAudioParameterRow(icon: "cpu", title: "编码", value: audioFileInfo.fileFormatText)
+                    RecordingAudioParameterRow(icon: "slider.horizontal.3", title: "处理格式", value: audioFileInfo.processingFormatText)
+                    RecordingAudioParameterRow(icon: "number", title: "PCM 位深", value: audioFileInfo.bitDepthText)
+                    RecordingAudioParameterRow(icon: "timer", title: "音频时长", value: audioFileInfo.durationText)
+                    RecordingAudioParameterRow(icon: "square.stack.3d.up", title: "音频帧数", value: audioFileInfo.frameCountText)
+                    RecordingAudioParameterRow(icon: "doc", title: "文件大小", value: audioFileInfo.fileSizeText)
+                    RecordingAudioParameterRow(icon: "checkmark.seal", title: "音量处理", value: audioFileInfo.normalizationText, showsDivider: false)
+                }
+            } else if let audioFileInfoError {
+                Label(audioFileInfoError, systemImage: "exclamationmark.triangle")
+                    .font(.redditSans(.caption))
+                    .foregroundStyle(AppTheme.warning)
+                    .fixedSize(horizontal: false, vertical: true)
+            } else {
+                Label("正在读取音频参数", systemImage: "waveform")
+                    .font(.redditSans(.caption, weight: .semibold))
+                    .foregroundStyle(AppTheme.info)
             }
         }
         .padding(14)
@@ -987,6 +1071,27 @@ private struct RecordingDetailView: View {
         }
     }
 
+    private func refreshAudioFileInfo() async {
+        let item = currentItem
+        let url = store.audioURL(for: item)
+        let audioNormalizedAt = item.audioNormalizedAt
+        let audioNormalizationVersion = item.audioNormalizationVersion
+        do {
+            let info = try await Task.detached(priority: .utility) {
+                try RecordingAudioFileInfo(
+                    url: url,
+                    audioNormalizedAt: audioNormalizedAt,
+                    audioNormalizationVersion: audioNormalizationVersion
+                )
+            }.value
+            audioFileInfo = info
+            audioFileInfoError = nil
+        } catch {
+            audioFileInfo = nil
+            audioFileInfoError = String(format: String(localized: "无法读取音频参数: %@"), error.localizedDescription)
+        }
+    }
+
     private func deleteCurrentItem(_ item: RecordingItem) {
         do {
             player.unload()
@@ -1021,6 +1126,270 @@ private struct RecordingImportStatusDetail: View {
         .padding(10)
         .frame(maxWidth: .infinity, alignment: .leading)
         .background((status.isFailed ? AppTheme.warning : AppTheme.info).opacity(0.1), in: RoundedRectangle(cornerRadius: AppTheme.compactCornerRadius, style: .continuous))
+    }
+}
+
+private struct RecordingAudioFileInfo: Equatable, Sendable {
+    var fileSampleRate: Double
+    var processingSampleRate: Double
+    var channelCount: UInt32
+    var processingChannelCount: UInt32
+    var fileFormatName: String
+    var fileCommonFormatName: String
+    var processingCommonFormatName: String
+    var bitDepth: Int?
+    var isInterleaved: Bool
+    var frameCount: AVAudioFramePosition
+    var durationSeconds: TimeInterval
+    var fileSize: Int64?
+    var audioNormalizedAt: Date?
+    var audioNormalizationVersion: Int?
+
+    init(url: URL, audioNormalizedAt: Date?, audioNormalizationVersion: Int?) throws {
+        let file = try AVAudioFile(forReading: url)
+        let fileFormat = file.fileFormat
+        let processingFormat = file.processingFormat
+        let resourceValues = try? url.resourceValues(forKeys: [.fileSizeKey])
+
+        self.fileSampleRate = fileFormat.sampleRate
+        self.processingSampleRate = processingFormat.sampleRate
+        self.channelCount = fileFormat.channelCount
+        self.processingChannelCount = processingFormat.channelCount
+        self.fileFormatName = Self.formatName(from: fileFormat.settings[AVFormatIDKey])
+        self.fileCommonFormatName = Self.commonFormatName(fileFormat.commonFormat)
+        self.processingCommonFormatName = Self.commonFormatName(processingFormat.commonFormat)
+        self.bitDepth = Self.bitDepth(settings: fileFormat.settings, format: fileFormat)
+        self.isInterleaved = fileFormat.isInterleaved
+        self.frameCount = file.length
+        self.durationSeconds = processingFormat.sampleRate > 0 ? Double(file.length) / processingFormat.sampleRate : 0
+        self.fileSize = resourceValues?.fileSize.map { Int64($0) }
+        self.audioNormalizedAt = audioNormalizedAt
+        self.audioNormalizationVersion = audioNormalizationVersion
+    }
+
+    var fileSampleRateText: String {
+        Self.sampleRateText(fileSampleRate)
+    }
+
+    var channelLayoutText: String {
+        switch channelCount {
+        case 1:
+            return String(localized: "单声道")
+        case 2:
+            return String(localized: "立体声")
+        default:
+            return String(format: String(localized: "%d 声道"), Int(channelCount))
+        }
+    }
+
+    var fileFormatText: String {
+        if bitDepth == nil {
+            return fileFormatName
+        }
+        return "\(fileFormatName) / \(fileCommonFormatName)"
+    }
+
+    var processingFormatText: String {
+        let channelText: String
+        switch processingChannelCount {
+        case 1:
+            channelText = String(localized: "单声道")
+        case 2:
+            channelText = String(localized: "立体声")
+        default:
+            channelText = String(format: String(localized: "%d 声道"), Int(processingChannelCount))
+        }
+
+        return "\(Self.sampleRateText(processingSampleRate)) / \(channelText) / \(processingCommonFormatName)"
+    }
+
+    var bitDepthText: String {
+        guard let bitDepth else {
+            return String(localized: "不适用")
+        }
+        return String(format: String(localized: "%d-bit"), bitDepth)
+    }
+
+    var durationText: String {
+        TranscriptionLine.formatTimestamp(durationSeconds)
+    }
+
+    var frameCountText: String {
+        Self.integerFormatter.string(from: NSNumber(value: frameCount)) ?? "\(frameCount)"
+    }
+
+    var fileSizeText: String {
+        guard let fileSize else {
+            return String(localized: "未知")
+        }
+        return ByteCountFormatter.string(fromByteCount: fileSize, countStyle: .file)
+    }
+
+    var normalizationText: String {
+        guard let audioNormalizationVersion else {
+            return String(localized: "未归一化")
+        }
+
+        if let audioNormalizedAt {
+            return String(
+                format: String(localized: "已归一化 v%d · %@"),
+                audioNormalizationVersion,
+                audioNormalizedAt.formatted(date: .abbreviated, time: .shortened)
+            )
+        }
+
+        return String(format: String(localized: "已归一化 v%d"), audioNormalizationVersion)
+    }
+
+    private static let integerFormatter: NumberFormatter = {
+        let formatter = NumberFormatter()
+        formatter.numberStyle = .decimal
+        return formatter
+    }()
+
+    private static func sampleRateText(_ sampleRate: Double) -> String {
+        guard sampleRate.isFinite, sampleRate > 0 else {
+            return String(localized: "未知")
+        }
+
+        let kilohertz = sampleRate / 1_000
+        if kilohertz.rounded() == kilohertz {
+            return "\(Int(kilohertz)) kHz"
+        }
+        return String(format: "%.1f kHz", kilohertz)
+    }
+
+    private static func commonFormatName(_ commonFormat: AVAudioCommonFormat) -> String {
+        switch commonFormat {
+        case .pcmFormatFloat32:
+            return "Float32 PCM"
+        case .pcmFormatFloat64:
+            return "Float64 PCM"
+        case .pcmFormatInt16:
+            return "Int16 PCM"
+        case .pcmFormatInt32:
+            return "Int32 PCM"
+        case .otherFormat:
+            return String(localized: "压缩或其他格式")
+        @unknown default:
+            return String(localized: "未知")
+        }
+    }
+
+    private static func formatName(from value: Any?) -> String {
+        guard let formatID = audioFormatID(from: value) else {
+            return String(localized: "未知")
+        }
+
+        switch fourCharacterCode(formatID) {
+        case "lpcm":
+            return "Linear PCM"
+        case "aac ":
+            return "AAC"
+        case "alac":
+            return "Apple Lossless"
+        case "mp4a":
+            return "MPEG-4 Audio"
+        case "caff":
+            return "CAF"
+        default:
+            return fourCharacterCode(formatID)
+        }
+    }
+
+    private static func audioFormatID(from value: Any?) -> UInt32? {
+        if let value = value as? UInt32 {
+            return value
+        }
+        if let value = value as? Int {
+            return UInt32(value)
+        }
+        if let value = value as? NSNumber {
+            return value.uint32Value
+        }
+        return nil
+    }
+
+    private static func intValue(from value: Any?) -> Int? {
+        if let value = value as? Int {
+            return value
+        }
+        if let value = value as? NSNumber {
+            return value.intValue
+        }
+        return nil
+    }
+
+    private static func bitDepth(settings: [String: Any], format: AVAudioFormat) -> Int? {
+        if let explicitBitDepth = intValue(from: settings[AVLinearPCMBitDepthKey]) {
+            return explicitBitDepth
+        }
+
+        guard audioFormatID(from: settings[AVFormatIDKey]) == kAudioFormatLinearPCM else {
+            return nil
+        }
+
+        switch format.commonFormat {
+        case .pcmFormatFloat32, .pcmFormatInt32:
+            return 32
+        case .pcmFormatFloat64:
+            return 64
+        case .pcmFormatInt16:
+            return 16
+        default:
+            return nil
+        }
+    }
+
+    private static func fourCharacterCode(_ rawValue: UInt32) -> String {
+        let bytes = [
+            UInt8((rawValue >> 24) & 0xff),
+            UInt8((rawValue >> 16) & 0xff),
+            UInt8((rawValue >> 8) & 0xff),
+            UInt8(rawValue & 0xff)
+        ]
+
+        guard bytes.allSatisfy({ (32...126).contains($0) }) else {
+            return "0x\(String(rawValue, radix: 16, uppercase: true))"
+        }
+        return String(bytes: bytes, encoding: .ascii) ?? "0x\(String(rawValue, radix: 16, uppercase: true))"
+    }
+}
+
+private struct RecordingAudioParameterRow: View {
+    let icon: String
+    let title: LocalizedStringKey
+    let value: String
+    var showsDivider = true
+
+    var body: some View {
+        VStack(spacing: 0) {
+            HStack(alignment: .firstTextBaseline, spacing: 10) {
+                Image(systemName: icon)
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundStyle(AppTheme.info)
+                    .frame(width: 18)
+
+                Text(title)
+                    .font(.redditSans(.caption, weight: .semibold))
+                    .foregroundStyle(.secondary)
+
+                Spacer(minLength: 12)
+
+                Text(value)
+                    .font(.redditSans(.caption, weight: .semibold).monospacedDigit())
+                    .foregroundStyle(.primary)
+                    .multilineTextAlignment(.trailing)
+                    .lineLimit(2)
+                    .minimumScaleFactor(0.8)
+            }
+            .padding(.vertical, 8)
+
+            if showsDivider {
+                Divider()
+                    .padding(.leading, 28)
+            }
+        }
     }
 }
 

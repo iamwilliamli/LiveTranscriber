@@ -1,19 +1,63 @@
 # Recording Processing Pipeline
 
-This is the current audio pipeline that works well on device. File-level normalization remains the main loudness strategy; avoid returning to input-tap gain or repeated normalization passes.
+This is the current audio pipeline that works well on device. File-level normalization is off by default and available behind the Developer Options loudness-processing toggle; avoid returning to input-tap gain or repeated normalization passes.
 
 ## Recording Stage
 
-1. Configure `AVAudioSession` with `.playAndRecord` and `.voiceChat`.
-2. Use options `.allowBluetoothHFP`, `.defaultToSpeaker`, and `.duckOthers`.
-3. Install an `AVAudioEngine` input tap.
-4. For each input `AVAudioPCMBuffer`, copy the raw buffer into two paths:
-   - Write one raw copy directly to `AudioFileWriter`.
-   - Send the other raw copy to `AnalyzerInputPipeline` / `SpeechAnalyzer`.
-5. Do not apply real-time gain before writing the file.
-6. Do not apply real-time gain before sending audio to SpeechAnalyzer.
+The live recorder uses Stereo Capture as the only microphone capture path. This is the verified way to save a stereo recording while still feeding mono speech input to `SpeechAnalyzer`.
 
-The core reason is stability: the saved file should not clip, and transcription should receive audio that matches the microphone signal as closely as possible.
+Setup:
+
+1. Configure `AVAudioSession` with `.playAndRecord`, `.default`, `.defaultToSpeaker`, and `.duckOthers`.
+2. Request `preferredInputNumberOfChannels = 2` for route diagnostics, but do not rely on `AVAudioSession.maximumInputNumberOfChannels` as the source of truth.
+3. Create an `AVCaptureSession`.
+4. Create `AVCaptureDeviceInput(device: AVCaptureDevice.default(for: .audio))`.
+5. Check `input.isMultichannelAudioModeSupported(.stereo)`.
+6. Set `input.multichannelAudioMode = .stereo`.
+7. Add one `AVCaptureAudioDataOutput` and receive uncompressed `CMSampleBuffer` values on a serial sample queue.
+
+Per-buffer fan-out:
+
+```text
+CMSampleBuffer
+  -> AVAudioPCMBuffer source
+  -> recording converter: 48 kHz or session sample rate / stereo / Float32 / non-interleaved
+     -> AudioFileWriter
+  -> analyzer converter: same sample rate / mono / Float32 / non-interleaved
+     -> AnalyzerInputPipeline
+     -> SpeechAnalyzer
+```
+
+The stereo file path and mono analyzer path are intentionally separate. The app writes the stereo buffer first, then sends the mono buffer to the live SpeechAnalyzer pipeline.
+
+Current target formats:
+
+```text
+recordingFormat:
+  commonFormat = .pcmFormatFloat32
+  sampleRate = AVAudioSession.sampleRate, fallback 48_000
+  channels = 2
+  interleaved = false
+
+analyzerSourceFormat:
+  commonFormat = .pcmFormatFloat32
+  sampleRate = recordingFormat.sampleRate
+  channels = 1
+  interleaved = false
+```
+
+Important constraints:
+
+- `AVCaptureDeviceInput.multichannelAudioMode` defaults to `.none`; it must be set to `.stereo`.
+- The stereo mode only takes effect for the built-in microphone. External microphones may be ignored by the system for this property.
+- If `.stereo` is unsupported, the app fails fast with `stereoCaptureUnavailable` instead of silently saving mono.
+- Do not use `AVCaptureAudioDataOutput.audioSettings` on iOS; it is unavailable there. Convert the received sample buffers in app code.
+- Keep this path free of real-time gain. Optional file-level normalization is the only durable loudness adjustment.
+
+Diagnostics:
+
+- Recording Details shows the saved file parameters, including sample rate and whether the saved file is mono or stereo.
+- Xcode logs include capture setup, first-buffer format, and conversion failures for debugging.
 
 ## Speech Analyzer Pipelines
 
@@ -75,12 +119,12 @@ The important detail is that the app does not pass `nil` audio times into the co
 
 When recording stops:
 
-1. Remove the input tap and stop the audio engine.
+1. Stop the `AVCaptureSession`.
 2. Finish the analyzer pipeline and wait for SpeechAnalyzer to flush final transcript results.
-3. Run `RecordingFileNormalizer.normalize(...)` on the saved audio file.
-4. Save `audioNormalizedAt` and `audioNormalizationVersion` on the recording item.
+3. If Developer Options > Loudness Processing is enabled, run `RecordingFileNormalizer.normalize(...)` on the saved audio file.
+4. Save `audioNormalizedAt` and `audioNormalizationVersion` only when normalization succeeds.
 
-The app briefly shows `正在增强录音音量` while normalization runs. If normalization fails, the recording draft is still returned and can still be saved.
+The app briefly shows `正在增强录音音量` while normalization runs. If normalization is disabled or fails, the recording draft is still returned and can still be saved.
 
 ## Normalization
 
@@ -115,7 +159,7 @@ After writing succeeds, the original file is replaced through a backup-based swa
 
 ## Existing Recordings
 
-`RecordingStore.normalizeAudioIfNeeded(for:)` runs when a recording detail view opens. It only normalizes when the stored version is older than the current normalizer version.
+`RecordingStore.normalizeAudioIfNeeded(for:loudnessProcessingEnabled:)` runs when a recording detail view opens only if Developer Options > Loudness Processing is enabled. It only normalizes when the stored version is older than the current normalizer version.
 
 Do not repeatedly normalize an already-normalized file at the same version. Repeated gain passes can reintroduce distortion.
 
@@ -130,7 +174,7 @@ Imported recordings enter the same library model as live recordings:
 5. `ImportedRecordingTranscriptionService` reads the file in frames and feeds `SpeechAnalyzer` / `SpeechTranscriber`.
 6. Progress is reported as the audio file is consumed.
 7. The finished timed transcript replaces the empty `.txt` file.
-8. Supported output formats are normalized and tagged with `RecordingFileNormalizer.version`.
+8. If Loudness Processing is enabled, supported output formats are normalized and tagged with `RecordingFileNormalizer.version`.
 
 Re-transcription reuses the stored audio file, replaces the transcript text, updates language metadata, clears existing summary/tags, and clears `importStatus` when complete.
 
@@ -148,7 +192,7 @@ Current behavior:
 - Updates current playback time roughly every 120 ms.
 - Tapping a saved transcript row seeks to that row's timestamp.
 
-Normalization is still the durable file-level loudness fix. The playback gain is a small current-code boost, not a replacement for normalization.
+When enabled, normalization is the durable file-level loudness fix. The playback gain is a small current-code boost, not a replacement for normalization.
 
 ## Explicit Non-Goals
 

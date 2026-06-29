@@ -9,6 +9,7 @@ The project is designed as a native iOS utility rather than a cloud transcriptio
 - Tab-based SwiftUI app with recording, file library, and settings areas.
 - Live recording with real-time transcript updates, pause/resume, elapsed timer, and haptic feedback.
 - WAV and M4A recording output.
+- Stereo Capture recording with `AVCaptureSession` and `AVCaptureDeviceInput.multichannelAudioMode = .stereo`.
 - Offline transcription for imported audio files, with language selection and progress/failure state.
 - Re-transcription of saved recordings with any supported Speech locale.
 - iCloud Drive storage under `Live Transcriber/Documents/Recordings/`.
@@ -17,10 +18,19 @@ The project is designed as a native iOS utility rather than a cloud transcriptio
 - Saved recording detail view with audio playback, transcript seek, copy, and share actions.
 - Lock Screen and Dynamic Island Live Activity with elapsed time, latest final transcript, language, line count, and stop action.
 - Local Apple Intelligence summary and topic tag generation for saved transcripts.
-- File-level loudness normalization after recording, with a small playback-side boost in the current player.
+- Optional file-level loudness normalization after recording, controlled from Developer Options, with a small playback-side boost in the current player.
 - Selectable speech processing pipelines: a stable iOS 26/27 compatible pipeline and an iOS 27 native `AnalyzerInputConverter` pipeline.
+- Recording detail audio parameters, including sample rate, channel count, encoding, duration, frame count, file size, and normalization status.
 - Shared visual system based on Reddit Sans, grouped backgrounds, compact card surfaces, red recording actions, and system SF Symbols.
 - Chinese and English localization.
+
+## Recording Capture Mode
+
+LiveTranscriber uses Stereo Capture as its only live microphone capture path.
+
+The recorder uses `AVCaptureSession`, sets `AVCaptureDeviceInput.multichannelAudioMode = .stereo`, writes a stereo file, and downmixes the same captured sample buffers to mono before feeding SpeechAnalyzer.
+
+Stereo Capture only works when the active capture input supports AVCapture stereo mode. On current Apple APIs this mode is intended for the built-in microphone; external microphones may not honor it.
 
 ## Speech Pipeline Modes
 
@@ -76,6 +86,8 @@ For device testing, open `LiveTranscriber.xcodeproj` in Xcode and use a signing 
 - [SpeechAnalyzer](https://developer.apple.com/documentation/speech/speechanalyzer)
 - [SpeechTranscriber](https://developer.apple.com/documentation/speech/speechtranscriber)
 - [AnalyzerInputConverter](https://developer.apple.com/documentation/speech/analyzerinputconverter)
+- [AVCaptureSession](https://developer.apple.com/documentation/avfoundation/avcapturesession)
+- [AVCaptureDeviceInput](https://developer.apple.com/documentation/avfoundation/avcapturedeviceinput)
 - [AVAudioConverter](https://developer.apple.com/documentation/avfaudio/avaudioconverter)
 - [ActivityKit](https://developer.apple.com/documentation/activitykit)
 - [Foundation Models](https://developer.apple.com/documentation/foundationmodels)
