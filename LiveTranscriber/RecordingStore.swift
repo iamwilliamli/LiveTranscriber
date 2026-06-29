@@ -3,6 +3,7 @@ import CoreMedia
 import Foundation
 import FoundationModels
 import Speech
+import OSLog
 
 struct RecordingDraft {
     var audioURL: URL
@@ -47,6 +48,8 @@ struct RecordingImportStatus: Codable, Hashable {
 final class RecordingStore: ObservableObject {
     @Published private(set) var recordings: [RecordingItem] = []
 
+    private static let logger = Logger(subsystem: "com.reddownloader.LiveTranscriber", category: "RecordingStore")
+
     private static let iCloudContainerIdentifier = "iCloud.com.iamwilliamli.LiveTranscriber"
     private static let audioFileExtensions: Set<String> = ["wav", "m4a", "mp3", "aac", "aif", "aiff", "caf"]
 
@@ -67,6 +70,8 @@ final class RecordingStore: ObservableObject {
         let documents = fileManager.urls(for: .documentDirectory, in: .userDomainMask)[0]
         return documents.appendingPathComponent("Recordings", isDirectory: true)
     }
+
+    private let importWorker = RecordingStoreImportWorker()
 
     private var iCloudRecordingsDirectory: URL? {
         fileManager
@@ -178,7 +183,7 @@ final class RecordingStore: ObservableObject {
         try persist()
 
         do {
-            let durationSeconds = try await Self.prepareImportedAudio(
+            let durationSeconds = try await importWorker.prepareImportedAudio(
                 from: sourceURL,
                 to: targetAudioURL,
                 transcriptURL: targetTranscriptURL
@@ -188,7 +193,7 @@ final class RecordingStore: ObservableObject {
                 try persist()
             }
             updateImportStatus(for: item.id, progress: 0.08, message: String(localized: "正在准备转录"), shouldPersist: true)
-            let lines = try await ImportedRecordingTranscriptionService.transcribe(
+            let lines = try await importWorker.transcribe(
                 audioURL: targetAudioURL,
                 language: language
             ) { [weak self] progress in
@@ -239,7 +244,7 @@ final class RecordingStore: ObservableObject {
         updateImportStatus(for: item.id, progress: 0.04, message: String(localized: "正在准备转录"), shouldPersist: true)
 
         do {
-            let lines = try await ImportedRecordingTranscriptionService.transcribe(
+            let lines = try await importWorker.transcribe(
                 audioURL: audioURL,
                 language: language
             ) { [weak self] progress in
@@ -508,11 +513,18 @@ final class RecordingStore: ObservableObject {
         }
     }
 
-    nonisolated private static func prepareImportedAudio(
-        from sourceURL: URL,
-        to destinationURL: URL,
-        transcriptURL: URL
-    ) async throws -> Int {
+    nonisolated fileprivate static func durationSeconds(for audioURL: URL) throws -> Int {
+        let file = try AVAudioFile(forReading: audioURL)
+        let sampleRate = file.processingFormat.sampleRate
+        guard sampleRate > 0 else {
+            return 0
+        }
+        return max(Int((Double(file.length) / sampleRate).rounded()), 0)
+    }
+}
+
+private actor RecordingStoreImportWorker {
+    func prepareImportedAudio(from sourceURL: URL, to destinationURL: URL, transcriptURL: URL) async throws -> Int {
         try await Task.detached(priority: .userInitiated) {
             let fileManager = FileManager.default
             let accessed = sourceURL.startAccessingSecurityScopedResource()
@@ -527,17 +539,20 @@ final class RecordingStore: ObservableObject {
             }
             try fileManager.copyItem(at: sourceURL, to: destinationURL)
             try "".write(to: transcriptURL, atomically: true, encoding: .utf8)
-            return (try? Self.durationSeconds(for: destinationURL)) ?? 0
+            return (try? RecordingStore.durationSeconds(for: destinationURL)) ?? 0
         }.value
     }
 
-    nonisolated private static func durationSeconds(for audioURL: URL) throws -> Int {
-        let file = try AVAudioFile(forReading: audioURL)
-        let sampleRate = file.processingFormat.sampleRate
-        guard sampleRate > 0 else {
-            return 0
-        }
-        return max(Int((Double(file.length) / sampleRate).rounded()), 0)
+    func transcribe(
+        audioURL: URL,
+        language: TranscriptionLanguage,
+        progressHandler: @escaping (Double) -> Void
+    ) async throws -> [TranscriptionLine] {
+        try await ImportedRecordingTranscriptionService.transcribe(
+            audioURL: audioURL,
+            language: language,
+            progressHandler: progressHandler
+        )
     }
 }
 
@@ -565,12 +580,10 @@ private enum RecordingImportError: LocalizedError {
 }
 
 private enum ImportedRecordingTranscriptionService {
-    private static let frameCapacity: AVAudioFrameCount = 4_096
-
     static func transcribe(
         audioURL: URL,
         language: TranscriptionLanguage,
-        progressHandler: @escaping @Sendable (Double) -> Void = { _ in }
+        progressHandler: @escaping (Double) -> Void = { _ in }
     ) async throws -> [TranscriptionLine] {
         try await requestSpeechAuthorization()
         guard SpeechTranscriber.isAvailable else {
@@ -593,21 +606,8 @@ private enum ImportedRecordingTranscriptionService {
         )
         let analyzer = SpeechAnalyzer(modules: modules, options: options)
         try await analyzer.prepareToAnalyze(in: inputFormat)
-        let converter = try await AnalyzerInputConverter.converter(compatibleWith: modules)
 
-        var continuation: AsyncThrowingStream<AnalyzerInput, Error>.Continuation?
-        let stream = AsyncThrowingStream<AnalyzerInput, Error> { createdContinuation in
-            continuation = createdContinuation
-        }
-        guard let continuation else {
-            throw RecordingImportError.analyzerUnavailable
-        }
-
-        let pipeline = ImportedAnalyzerInputPipeline(converter: converter, continuation: continuation)
         let collector = ImportedTranscriptionCollector()
-        let analyzerTask = Task {
-            try await analyzer.start(inputSequence: stream)
-        }
         let resultsTask = Task {
             for try await result in transcriber.results {
                 await collector.handle(result)
@@ -615,16 +615,14 @@ private enum ImportedRecordingTranscriptionService {
         }
 
         do {
-            try await feedAudioFile(url: audioURL, pipeline: pipeline, progressHandler: progressHandler)
-            pipeline.finish()
-            try await analyzer.finalizeAndFinishThroughEndOfInput()
-            try await analyzerTask.value
+            progressHandler(0.05)
+            try await analyzer.start(inputAudioFile: audioFile, finishAfterFile: true)
+            progressHandler(1)
             try? await Task.sleep(nanoseconds: 250_000_000)
             resultsTask.cancel()
             _ = try? await resultsTask.value
         } catch {
-            pipeline.finish()
-            analyzerTask.cancel()
+            await analyzer.cancelAndFinishNow()
             resultsTask.cancel()
             throw error
         }
@@ -660,97 +658,6 @@ private enum ImportedRecordingTranscriptionService {
 
         if let request = try await AssetInventory.assetInstallationRequest(supporting: modules) {
             try await request.downloadAndInstall()
-        }
-    }
-
-    private static func feedAudioFile(
-        url: URL,
-        pipeline: ImportedAnalyzerInputPipeline,
-        progressHandler: @escaping @Sendable (Double) -> Void
-    ) async throws {
-        try await Task.detached(priority: .userInitiated) {
-            let file = try AVAudioFile(forReading: url)
-            let format = file.processingFormat
-            let totalFrames = max(file.length, 1)
-            let minimumProgressDelta = 0.01
-            let minimumReportInterval: TimeInterval = 0.25
-            var lastReportedProgress = -1.0
-            var lastReportDate = Date.distantPast
-
-            while file.framePosition < file.length {
-                guard let buffer = AVAudioPCMBuffer(pcmFormat: format, frameCapacity: Self.frameCapacity) else {
-                    break
-                }
-                let remainingFrames = AVAudioFrameCount(min(AVAudioFramePosition(Self.frameCapacity), file.length - file.framePosition))
-                try file.read(into: buffer, frameCount: remainingFrames)
-                pipeline.process(buffer)
-
-                let progress = min(max(Double(file.framePosition) / Double(totalFrames), 0), 1)
-                let now = Date()
-                if progress >= 1
-                    || progress - lastReportedProgress >= minimumProgressDelta
-                    || now.timeIntervalSince(lastReportDate) >= minimumReportInterval {
-                    progressHandler(progress)
-                    lastReportedProgress = progress
-                    lastReportDate = now
-                }
-            }
-            if lastReportedProgress < 1 {
-                progressHandler(1)
-            }
-        }.value
-    }
-}
-
-private final class ImportedAnalyzerInputPipeline: @unchecked Sendable {
-    private let converter: AnalyzerInputConverter
-    private let continuation: AsyncThrowingStream<AnalyzerInput, Error>.Continuation
-    private let lock = NSLock()
-    private var didFinish = false
-
-    init(
-        converter: AnalyzerInputConverter,
-        continuation: AsyncThrowingStream<AnalyzerInput, Error>.Continuation
-    ) {
-        self.converter = converter
-        self.continuation = continuation
-    }
-
-    func process(_ buffer: AVAudioPCMBuffer) {
-        lock.lock()
-        defer { lock.unlock() }
-        guard !didFinish else {
-            return
-        }
-
-        do {
-            let inputs = try converter.convert(buffer, at: nil)
-            for input in inputs {
-                continuation.yield(input)
-            }
-        } catch {
-            didFinish = true
-            continuation.finish(throwing: error)
-        }
-    }
-
-    func finish() {
-        lock.lock()
-        defer { lock.unlock() }
-        guard !didFinish else {
-            return
-        }
-
-        do {
-            let inputs = try converter.flush()
-            for input in inputs {
-                continuation.yield(input)
-            }
-            didFinish = true
-            continuation.finish()
-        } catch {
-            didFinish = true
-            continuation.finish(throwing: error)
         }
     }
 }
@@ -807,6 +714,7 @@ private struct GeneratedRecordingIntelligence {
 }
 
 private enum RecordingIntelligenceService {
+    private static let logger = Logger(subsystem: "com.reddownloader.LiveTranscriber", category: "RecordingIntelligence")
     static func generate(transcript: String, languageName: String) async throws -> RecordingIntelligence {
         let cleanedTranscript = transcript.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !cleanedTranscript.isEmpty else {
@@ -978,7 +886,8 @@ private enum RecordingIntelligenceService {
 
     private static func debugLog(_ message: @autoclosure () -> String) {
         #if DEBUG
-        print("[RecordingIntelligence] \(message())")
+        let text = message()
+        logger.debug("[RecordingIntelligence] \(text, privacy: .public)")
         #endif
     }
 }

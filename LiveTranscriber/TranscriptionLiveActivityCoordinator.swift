@@ -47,10 +47,6 @@ enum TranscriptionLiveActivityCoordinator {
         lineCount: Int,
         isRecording: Bool
     ) async {
-        guard let activity = Activity<TranscriptionActivityAttributes>.activities.first else {
-            return
-        }
-
         let state = contentState(
             status: status,
             languageName: languageName,
@@ -59,7 +55,10 @@ enum TranscriptionLiveActivityCoordinator {
             lineCount: lineCount,
             isRecording: isRecording
         )
-        await activity.update(ActivityContent(state: state, staleDate: nil))
+
+        for activity in Activity<TranscriptionActivityAttributes>.activities {
+            await activity.update(ActivityContent(state: state, staleDate: nil))
+        }
     }
 
     static func end(

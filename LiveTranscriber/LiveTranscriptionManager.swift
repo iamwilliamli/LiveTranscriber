@@ -39,7 +39,7 @@ final class LiveTranscriptionManager: ObservableObject {
     private var audioWriter: AudioFileWriter?
     private var analyzerTask: Task<Void, Never>?
     private var resultsTask: Task<Void, Never>?
-    private var timer: Timer?
+    private var elapsedTimerTask: Task<Void, Never>?
     private var recordingStartedAt: Date?
     private var activeSegmentStartedAt: Date?
     private var accumulatedRecordingSeconds: TimeInterval = 0
@@ -225,9 +225,16 @@ final class LiveTranscriptionManager: ObservableObject {
         }
 
         analyzerPipeline?.finish()
-        try? await analyzer?.finalizeAndFinishThroughEndOfInput()
-        analyzerTask?.cancel()
-        resultsTask?.cancel()
+        let pendingAnalyzerTask = analyzerTask
+        let pendingResultsTask = resultsTask
+        let pendingAnalyzer = analyzer
+
+        try? await pendingAnalyzer?.finalizeAndFinishThroughEndOfInput()
+        pendingAnalyzerTask?.cancel()
+        pendingResultsTask?.cancel()
+        _ = await pendingAnalyzerTask?.value
+        _ = await pendingResultsTask?.value
+
         analyzerTask = nil
         resultsTask = nil
         analyzer = nil
@@ -559,11 +566,8 @@ final class LiveTranscriptionManager: ObservableObject {
     }
 
     private func scheduleElapsedTimer() {
-        timer = Timer.scheduledTimer(withTimeInterval: 0.5, repeats: true) { [weak self] _ in
-            Task { @MainActor in
-                guard let self else {
-                    return
-                }
+        elapsedTimerTask = Task { @MainActor [weak self] in
+            while let self, !Task.isCancelled {
                 let activeSeconds: TimeInterval
                 if let activeSegmentStartedAt = self.activeSegmentStartedAt {
                     activeSeconds = Date().timeIntervalSince(activeSegmentStartedAt)
@@ -571,17 +575,22 @@ final class LiveTranscriptionManager: ObservableObject {
                     activeSeconds = 0
                 }
                 let newElapsedSeconds = Int((self.accumulatedRecordingSeconds + activeSeconds).rounded(.down))
-                guard newElapsedSeconds != self.elapsedSeconds else {
-                    return
+                if newElapsedSeconds != self.elapsedSeconds {
+                    self.elapsedSeconds = newElapsedSeconds
                 }
-                self.elapsedSeconds = newElapsedSeconds
+
+                do {
+                    try await Task.sleep(for: .milliseconds(500))
+                } catch {
+                    break
+                }
             }
         }
     }
 
     private func stopTimer() {
-        timer?.invalidate()
-        timer = nil
+        elapsedTimerTask?.cancel()
+        elapsedTimerTask = nil
     }
 
     private var liveActivityTranscriptText: String {

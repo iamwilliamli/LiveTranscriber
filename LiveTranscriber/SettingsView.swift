@@ -29,6 +29,7 @@ struct SettingsView: View {
             Menu {
                 ForEach(transcriber.supportedLanguages) { language in
                     Button {
+                        HapticFeedback.play(.menuSelection)
                         transcriber.selectedLanguageID = language.id
                     } label: {
                         Label(
@@ -74,6 +75,9 @@ struct SettingsView: View {
             }
             .pickerStyle(.segmented)
             .disabled(transcriber.isRecording || transcriber.isPreparing)
+            .onChange(of: transcriber.selectedAudioFormat) { _, _ in
+                HapticFeedback.play(.menuSelection)
+            }
 
             SettingsStatusRow(
                 icon: "info.circle",

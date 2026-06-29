@@ -6,6 +6,7 @@ import UniformTypeIdentifiers
 struct RecordingsView: View {
     @ObservedObject var store: RecordingStore
     @ObservedObject var transcriber: LiveTranscriptionManager
+    @StateObject private var player = RecordingPlaybackController()
     @State private var deleteRequest: RecordingDeleteRequest?
     @State private var selectedRecording: RecordingItem?
     @State private var analyzingRecordingID: RecordingItem.ID?
@@ -56,6 +57,7 @@ struct RecordingsView: View {
                             .listRowInsets(EdgeInsets(top: 6, leading: 16, bottom: 6, trailing: 16))
                             .contextMenu {
                                 Button {
+                                    HapticFeedback.play(.copy)
                                     UIPasteboard.general.string = store.transcriptText(for: item)
                                 } label: {
                                     Label("复制转录文本", systemImage: "doc.on.doc")
@@ -131,6 +133,7 @@ struct RecordingsView: View {
                     }
 
                     Button {
+                        HapticFeedback.play(.primaryAction)
                         showsImporter = true
                     } label: {
                         Image(systemName: "square.and.arrow.down")
@@ -140,7 +143,7 @@ struct RecordingsView: View {
                 }
             }
             .navigationDestination(item: $selectedRecording) { item in
-                RecordingDetailView(item: item, store: store, transcriber: transcriber)
+                RecordingDetailView(item: item, store: store, transcriber: transcriber, player: player)
             }
         }
         .searchable(
@@ -236,15 +239,19 @@ struct RecordingsView: View {
 
     private func analyze(_ item: RecordingItem) {
         guard analyzingRecordingID == nil else {
+            HapticFeedback.play(.blocked)
             return
         }
 
         analyzingRecordingID = item.id
         Task {
+            HapticFeedback.play(.analysisStart)
             do {
                 _ = try await store.analyzeIntelligence(for: item)
+                HapticFeedback.play(.analysisComplete)
             } catch {
                 analysisErrorMessage = error.localizedDescription
+                HapticFeedback.play(.failure)
             }
             analyzingRecordingID = nil
         }
@@ -254,26 +261,33 @@ struct RecordingsView: View {
         switch result {
         case .success(let urls):
             guard let url = urls.first else {
+                HapticFeedback.play(.warning)
                 return
             }
             pendingImport = PendingImport(url: url)
+            HapticFeedback.play(.importQueued)
         case .failure(let error):
             importErrorMessage = error.localizedDescription
+            HapticFeedback.play(.failure)
         }
     }
 
     private func importRecording(from url: URL, language: TranscriptionLanguage) {
         guard !isImporting else {
+            HapticFeedback.play(.blocked)
             return
         }
 
         pendingImport = nil
         isImporting = true
+        HapticFeedback.play(.importStart)
         Task {
             do {
                 _ = try await store.importRecording(from: url, language: language)
+                HapticFeedback.play(.importComplete)
             } catch {
                 importErrorMessage = error.localizedDescription
+                HapticFeedback.play(.failure)
             }
             isImporting = false
         }
@@ -281,19 +295,24 @@ struct RecordingsView: View {
 
     private func retranscribe(_ item: RecordingItem, language: TranscriptionLanguage) {
         Task {
+            HapticFeedback.play(.retranscribeStart)
             do {
                 try await store.retranscribe(item, language: language)
+                HapticFeedback.play(.retranscribeComplete)
             } catch {
                 importErrorMessage = error.localizedDescription
+                HapticFeedback.play(.failure)
             }
         }
     }
 
     private func requestDelete(_ item: RecordingItem) {
         guard store.recording(withID: item.id) != nil else {
+            HapticFeedback.play(.warning)
             return
         }
         deleteRequest = RecordingDeleteRequest(item: item)
+        HapticFeedback.play(.deleteRequested)
     }
 
     private func delete(_ item: RecordingItem) {
@@ -304,11 +323,11 @@ struct RecordingsView: View {
             if analyzingRecordingID == item.id {
                 analyzingRecordingID = nil
             }
-            try withAnimation(.snappy(duration: 0.24, extraBounce: 0)) {
-                try store.delete(item)
-            }
+            try store.delete(item)
+            HapticFeedback.play(.deleteConfirmed)
         } catch {
             deleteErrorMessage = error.localizedDescription
+            HapticFeedback.play(.failure)
         }
     }
 
@@ -383,7 +402,10 @@ private struct RecordingRow: View {
                     }
                 }
                 .contentShape(Rectangle())
-                .onTapGesture(perform: onOpen)
+                .onTapGesture {
+                    HapticFeedback.play(.navigation)
+                    onOpen()
+                }
 
                 Spacer(minLength: 8)
 
@@ -430,10 +452,13 @@ private struct RecordingRow: View {
                 Label(item.languageName, systemImage: "globe")
                 Label("\(item.lineCount)", systemImage: "text.alignleft")
             }
-            .font(.redditSans(.caption))
-            .foregroundStyle(.secondary)
-            .contentShape(Rectangle())
-            .onTapGesture(perform: onOpen)
+                .font(.redditSans(.caption))
+                .foregroundStyle(.secondary)
+                .contentShape(Rectangle())
+                .onTapGesture {
+                    HapticFeedback.play(.navigation)
+                    onOpen()
+                }
 
             if let importStatus = item.importStatus {
                 VStack(alignment: .leading, spacing: 6) {
@@ -452,17 +477,26 @@ private struct RecordingRow: View {
                     }
                 }
                 .contentShape(Rectangle())
-                .onTapGesture(perform: onOpen)
+                .onTapGesture {
+                    HapticFeedback.play(.navigation)
+                    onOpen()
+                }
             } else if isAnalyzing {
                 Label("正在分析", systemImage: "sparkles")
                     .font(.redditSans(.caption, weight: .semibold))
                     .foregroundStyle(AppTheme.info)
                     .contentShape(Rectangle())
-                    .onTapGesture(perform: onOpen)
+                    .onTapGesture {
+                        HapticFeedback.play(.navigation)
+                        onOpen()
+                    }
             } else if let intelligence = item.intelligence {
                 RecordingIntelligencePreview(intelligence: intelligence)
                     .contentShape(Rectangle())
-                    .onTapGesture(perform: onOpen)
+                    .onTapGesture {
+                        HapticFeedback.play(.navigation)
+                        onOpen()
+                    }
             } else if !item.transcriptPreview.isEmpty {
                 Text(item.transcriptPreview)
                     .font(.redditSans(.subheadline))
@@ -470,7 +504,10 @@ private struct RecordingRow: View {
                     .lineLimit(2)
                     .fixedSize(horizontal: false, vertical: true)
                     .contentShape(Rectangle())
-                    .onTapGesture(perform: onOpen)
+                    .onTapGesture {
+                        HapticFeedback.play(.navigation)
+                        onOpen()
+                    }
             }
         }
         .padding(14)
@@ -532,8 +569,8 @@ private struct RecordingDetailView: View {
     let item: RecordingItem
     @ObservedObject var store: RecordingStore
     @ObservedObject var transcriber: LiveTranscriptionManager
+    @ObservedObject var player: RecordingPlaybackController
     @Environment(\.dismiss) private var dismiss
-    @StateObject private var player = RecordingPlaybackController()
     @State private var copied = false
     @State private var deleteRequest: RecordingDeleteRequest?
     @State private var isAnalyzing = false
@@ -595,6 +632,7 @@ private struct RecordingDetailView: View {
                 .accessibilityLabel("重新转录")
 
                 Button {
+                    HapticFeedback.play(.copy)
                     UIPasteboard.general.string = store.transcriptText(for: currentItem)
                     copied = true
                     DispatchQueue.main.asyncAfter(deadline: .now() + 1.4) {
@@ -612,6 +650,7 @@ private struct RecordingDetailView: View {
                 .disabled(isAnalyzing)
 
                 Button(role: .destructive) {
+                    HapticFeedback.play(.deleteRequested)
                     deleteRequest = RecordingDeleteRequest(item: currentItem)
                 } label: {
                     Image(systemName: "trash")
@@ -622,7 +661,7 @@ private struct RecordingDetailView: View {
         .onAppear {
             Task {
                 await store.normalizeAudioIfNeeded(for: currentItem)
-                player.load(url: store.audioURL(for: currentItem))
+                player.load(item: currentItem, url: store.audioURL(for: currentItem))
             }
         }
         .onDisappear {
@@ -761,6 +800,7 @@ private struct RecordingDetailView: View {
 
             HStack(spacing: 12) {
                 Button {
+                    HapticFeedback.play(.playbackToggle)
                     player.togglePlayback()
                 } label: {
                     Image(systemName: player.isPlaying ? "pause.fill" : "play.fill")
@@ -834,6 +874,7 @@ private struct RecordingDetailView: View {
                             line: line,
                             isCurrent: line.contains(time: player.currentTime, in: lines)
                         ) {
+                            HapticFeedback.play(.timelineSeek)
                             player.seek(to: line.startSeconds)
                         }
                     }
@@ -853,16 +894,20 @@ private struct RecordingDetailView: View {
 
     private func analyzeCurrentItem() {
         guard !isAnalyzing else {
+            HapticFeedback.play(.blocked)
             return
         }
 
         let item = currentItem
         isAnalyzing = true
+        HapticFeedback.play(.analysisStart)
         Task {
             do {
                 _ = try await store.analyzeIntelligence(for: item)
+                HapticFeedback.play(.analysisComplete)
             } catch {
                 analysisErrorMessage = error.localizedDescription
+                HapticFeedback.play(.failure)
             }
             isAnalyzing = false
         }
@@ -870,15 +915,19 @@ private struct RecordingDetailView: View {
 
     private func retranscribeCurrentItem(language: TranscriptionLanguage) {
         guard !isTranscriptionRunning else {
+            HapticFeedback.play(.blocked)
             return
         }
 
         let item = currentItem
         Task {
+            HapticFeedback.play(.retranscribeStart)
             do {
                 try await store.retranscribe(item, language: language)
+                HapticFeedback.play(.retranscribeComplete)
             } catch {
                 analysisErrorMessage = error.localizedDescription
+                HapticFeedback.play(.failure)
             }
         }
     }
@@ -886,12 +935,12 @@ private struct RecordingDetailView: View {
     private func deleteCurrentItem(_ item: RecordingItem) {
         do {
             player.unload()
-            try withAnimation(.snappy(duration: 0.24, extraBounce: 0)) {
-                try store.delete(item)
-            }
+            try store.delete(item)
+            HapticFeedback.play(.deleteConfirmed)
             dismiss()
         } catch {
             deleteErrorMessage = error.localizedDescription
+            HapticFeedback.play(.failure)
         }
     }
 }
@@ -1013,23 +1062,33 @@ private struct StoredTranscriptLineRow: View {
 
 @MainActor
 private final class RecordingPlaybackController: ObservableObject {
+    @Published private(set) var currentItem: RecordingItem?
     @Published private(set) var isLoaded = false
     @Published private(set) var isPlaying = false
     @Published var currentTime: TimeInterval = 0
     @Published private(set) var duration: TimeInterval = 0
     @Published private(set) var errorText: String?
 
-    private static let playbackGainDecibels: Float = 0
+    private static let playbackGainDecibels: Float = 3
 
     private let audioSessionQueue = DispatchQueue(label: "com.reddownloader.live-transcriber.playback-session", qos: .userInitiated)
     private var audioEngine: AVAudioEngine?
     private var playerNode: AVAudioPlayerNode?
     private var gainUnit: AVAudioUnitEQ?
     private var audioFile: AVAudioFile?
-    private var timer: Timer?
+    private var playbackTimerTask: Task<Void, Never>?
     private var sampleRate: Double = 44_100
     private var scheduledStartFrame: AVAudioFramePosition = 0
     private var playbackScheduleID = 0
+
+    func load(item: RecordingItem, url: URL) {
+        guard currentItem?.id != item.id || !isLoaded else {
+            return
+        }
+
+        load(url: url)
+        currentItem = item
+    }
 
     func load(url: URL) {
         unload()
@@ -1113,6 +1172,7 @@ private final class RecordingPlaybackController: ObservableObject {
         gainUnit = nil
         audioEngine = nil
         audioFile = nil
+        currentItem = nil
         isLoaded = false
         isPlaying = false
         currentTime = 0
@@ -1125,22 +1185,34 @@ private final class RecordingPlaybackController: ObservableObject {
 
     private func startTimer() {
         stopTimer()
-        timer = Timer.scheduledTimer(withTimeInterval: 0.2, repeats: true) { [weak self] _ in
-            Task { @MainActor in
-                guard let self, self.isPlaying else {
-                    return
+        playbackTimerTask = Task { @MainActor [weak self] in
+            while let self, !Task.isCancelled {
+                guard self.isPlaying else {
+                    do {
+                        try await Task.sleep(for: .milliseconds(120))
+                    } catch {
+                        break
+                    }
+                    continue
                 }
+
                 self.currentTime = self.currentPlaybackTime()
                 if self.currentTime >= self.duration {
                     self.finishPlayback()
+                }
+
+                do {
+                    try await Task.sleep(for: .milliseconds(120))
+                } catch {
+                    break
                 }
             }
         }
     }
 
     private func stopTimer() {
-        timer?.invalidate()
-        timer = nil
+        playbackTimerTask?.cancel()
+        playbackTimerTask = nil
     }
 
     private func configurePlaybackEngine(format: AVAudioFormat) throws {
@@ -1280,7 +1352,10 @@ private struct RecordingInfoPill: View {
 
 #if DEBUG
 #Preview("Recordings") {
-    RecordingsView(store: RecordingStore(), transcriber: LiveTranscriptionManager())
+    RecordingsView(
+        store: RecordingStore(),
+        transcriber: LiveTranscriptionManager()
+    )
         .font(.redditSans(.body))
         .tint(AppTheme.brand)
 }

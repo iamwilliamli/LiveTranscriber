@@ -93,3 +93,5 @@
 "正在转录" = "Transcribing";
 "导入录音没有识别到文本" = "No speech text was recognized in the imported recording";
 "导入录音保存失败" = "Imported recording could not be saved";
+"保存录音" = "Saving Recording";
+"已保存到录音文件" = "Saved to Recordings";

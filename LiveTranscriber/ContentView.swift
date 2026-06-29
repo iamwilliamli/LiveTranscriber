@@ -45,9 +45,12 @@ struct ContentView: View {
         }
 
         Task {
+            HapticFeedback.play(.recordingStop)
             if let draft = await transcriber.stopRecording(),
                await recordingStore.save(draft) != nil {
+                HapticFeedback.play(.recordingSaved)
                 await recordingStore.reload()
+                transcriber.clearTranscript()
             }
         }
     }

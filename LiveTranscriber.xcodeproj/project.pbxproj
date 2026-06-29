@@ -31,13 +31,14 @@
 		7B0000000000000000000016 /* TranscriptionLiveActivityCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7B000000000000000000101A /* TranscriptionLiveActivityCoordinator.swift */; };
 		7B0000000000000000000017 /* TranscriptionActivityAttributes.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7B0000000000000000001019 /* TranscriptionActivityAttributes.swift */; };
 		7B0000000000000000000018 /* LiveTranscriberWidgetBundle.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7B000000000000000000101B /* LiveTranscriberWidgetBundle.swift */; };
-		7B0000000000000000000019 /* LiveTranscriberWidget.appex in Embed App Extensions */ = {isa = PBXBuildFile; fileRef = 7B000000000000000000101D /* LiveTranscriberWidget.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+		7B0000000000000000000019 /* LiveTranscriberWidget.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = 7B000000000000000000101D /* LiveTranscriberWidget.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 		7B000000000000000000001A /* RedditSans-Regular.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 7B0000000000000000001010 /* RedditSans-Regular.ttf */; };
 		7B000000000000000000001B /* RedditSans-Medium.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 7B0000000000000000001011 /* RedditSans-Medium.ttf */; };
 		7B000000000000000000001C /* RedditSans-SemiBold.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 7B0000000000000000001012 /* RedditSans-SemiBold.ttf */; };
 		7B000000000000000000001D /* RedditSans-Bold.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 7B0000000000000000001013 /* RedditSans-Bold.ttf */; };
 		7B000000000000000000001E /* RedditSans-Italic.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 7B0000000000000000001014 /* RedditSans-Italic.ttf */; };
 		7B000000000000000000001F /* Localizable.strings in Resources */ = {isa = PBXBuildFile; fileRef = 7B0000000000000000003005 /* Localizable.strings */; };
+		7B0000000000000000000020 /* HapticFeedback.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7B0000000000000000001020 /* HapticFeedback.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -51,15 +52,15 @@
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXCopyFilesBuildPhase section */
-		7B0000000000000000005005 /* Embed App Extensions */ = {
+		7B0000000000000000005005 /* Embed Foundation Extensions */ = {
 			isa = PBXCopyFilesBuildPhase;
 			buildActionMask = 2147483647;
 			dstPath = "";
 			dstSubfolderSpec = 13;
 			files = (
-				7B0000000000000000000019 /* LiveTranscriberWidget.appex in Embed App Extensions */,
+				7B0000000000000000000019 /* LiveTranscriberWidget.appex in Embed Foundation Extensions */,
 			);
-			name = "Embed App Extensions";
+			name = "Embed Foundation Extensions";
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXCopyFilesBuildPhase section */
@@ -95,6 +96,7 @@
 		7B000000000000000000101C /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		7B000000000000000000101D /* LiveTranscriberWidget.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = LiveTranscriberWidget.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 		7B000000000000000000101E /* LiveTranscriber.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = LiveTranscriber.entitlements; sourceTree = "<group>"; };
+		7B0000000000000000001020 /* HapticFeedback.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HapticFeedback.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -134,6 +136,7 @@
 				7B0000000000000000001005 /* TranscriptionView.swift */,
 				7B0000000000000000001006 /* LiveTranscriptionManager.swift */,
 				7B0000000000000000001015 /* TranscriptionLanguage.swift */,
+				7B0000000000000000001020 /* HapticFeedback.swift */,
 				7B0000000000000000001016 /* RecordingStore.swift */,
 				7B0000000000000000001017 /* RecordingsView.swift */,
 				7B0000000000000000001018 /* SettingsView.swift */,
@@ -191,7 +194,7 @@
 				7B0000000000000000005001 /* Sources */,
 				7B0000000000000000002001 /* Frameworks */,
 				7B0000000000000000005002 /* Resources */,
-				7B0000000000000000005005 /* Embed App Extensions */,
+				7B0000000000000000005005 /* Embed Foundation Extensions */,
 			);
 			buildRules = (
 			);
@@ -228,7 +231,7 @@
 			attributes = {
 				BuildIndependentTargetsInParallel = 1;
 				LastSwiftUpdateCheck = 1600;
-				LastUpgradeCheck = 1600;
+				LastUpgradeCheck = 2700;
 				TargetAttributes = {
 					7B0000000000000000004001 = {
 						CreatedOnToolsVersion = 16.0;
@@ -303,6 +306,7 @@
 				7B0000000000000000000006 /* LiveTranscriptionManager.swift in Sources */,
 				7B0000000000000000000011 /* TranscriptionLanguage.swift in Sources */,
 				7B0000000000000000000012 /* RecordingStore.swift in Sources */,
+				7B0000000000000000000020 /* HapticFeedback.swift in Sources */,
 				7B0000000000000000000013 /* RecordingsView.swift in Sources */,
 				7B0000000000000000000014 /* SettingsView.swift in Sources */,
 				7B0000000000000000000015 /* TranscriptionActivityAttributes.swift in Sources */,
@@ -356,6 +360,7 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_LOCALIZABILITY_NONLOCALIZED = YES;
 				CLANG_ANALYZER_NONNULL = YES;
 				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
 				CLANG_CXX_LANGUAGE_STANDARD = "gnu++20";
@@ -386,6 +391,7 @@
 				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
 				COPY_PHASE_STRIP = NO;
 				DEBUG_INFORMATION_FORMAT = dwarf;
+				DEVELOPMENT_TEAM = F8M4T754W4;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
 				ENABLE_TESTABILITY = YES;
 				ENABLE_USER_SCRIPT_SANDBOXING = YES;
@@ -408,6 +414,7 @@
 				MTL_FAST_MATH = YES;
 				ONLY_ACTIVE_ARCH = YES;
 				SDKROOT = iphoneos;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
 				SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;
 				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
 			};
@@ -417,6 +424,7 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_LOCALIZABILITY_NONLOCALIZED = YES;
 				CLANG_ANALYZER_NONNULL = YES;
 				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
 				CLANG_CXX_LANGUAGE_STANDARD = "gnu++20";
@@ -447,6 +455,7 @@
 				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
 				COPY_PHASE_STRIP = NO;
 				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				DEVELOPMENT_TEAM = F8M4T754W4;
 				ENABLE_NS_ASSERTIONS = NO;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
 				ENABLE_USER_SCRIPT_SANDBOXING = YES;
@@ -462,6 +471,7 @@
 				MTL_ENABLE_DEBUG_INFO = NO;
 				MTL_FAST_MATH = YES;
 				SDKROOT = iphoneos;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
 				SWIFT_COMPILATION_MODE = wholemodule;
 				SWIFT_OPTIMIZATION_LEVEL = "-O";
 				VALIDATE_PRODUCT = YES;
@@ -477,7 +487,6 @@
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_ASSET_PATHS = "";
-				DEVELOPMENT_TEAM = F8M4T754W4;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = LiveTranscriber/Info.plist;
 				IPHONEOS_DEPLOYMENT_TARGET = 27.0;
@@ -503,7 +512,6 @@
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_ASSET_PATHS = "";
-				DEVELOPMENT_TEAM = F8M4T754W4;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = LiveTranscriber/Info.plist;
 				IPHONEOS_DEPLOYMENT_TARGET = 27.0;
@@ -526,7 +534,6 @@
 				APPLICATION_EXTENSION_API_ONLY = YES;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
-				DEVELOPMENT_TEAM = F8M4T754W4;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = LiveTranscriberWidget/Info.plist;
 				IPHONEOS_DEPLOYMENT_TARGET = 27.0;
@@ -551,7 +558,6 @@
 				APPLICATION_EXTENSION_API_ONLY = YES;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
-				DEVELOPMENT_TEAM = F8M4T754W4;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = LiveTranscriberWidget/Info.plist;
 				IPHONEOS_DEPLOYMENT_TARGET = 27.0;

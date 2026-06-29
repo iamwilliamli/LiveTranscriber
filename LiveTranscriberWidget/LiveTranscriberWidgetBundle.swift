@@ -13,24 +13,16 @@ struct TranscriptionLiveActivityWidget: Widget {
     var body: some WidgetConfiguration {
         ActivityConfiguration(for: TranscriptionActivityAttributes.self) { context in
             LockScreenLiveActivityView(state: context.state)
-                .containerRelativeFrame(.horizontal, alignment: .leading) { length, _ in
-                    max(0, length - 32)
-                }
-                .padding(16)
+                .padding(.horizontal, LiveActivityLayout.lockScreenHorizontalPadding)
+                .padding(.vertical, LiveActivityLayout.lockScreenVerticalPadding)
                 .activityBackgroundTint(Color(.secondarySystemBackground))
                 .activitySystemActionForegroundColor(context.state.isRecording ? .red : .green)
         } dynamicIsland: { context in
             DynamicIsland {
                 DynamicIslandExpandedRegion(.leading) {
-                    HStack(spacing: 6) {
-                        ActivityStatusDot(state: context.state, size: 8)
-                        Text("Transcribe")
-                            .font(.redditSans(size: 12, weight: .semibold))
-                            .foregroundStyle(.primary)
-                            .lineLimit(1)
-                    }
-                    .padding(.leading, 12)
-                    .frame(minWidth: 82, alignment: .leading)
+                    ActivityStatusLine(state: context.state, font: .redditSans(size: 12, weight: .semibold))
+                        .padding(.leading, LiveActivityLayout.islandHorizontalPadding)
+                        .frame(maxWidth: .infinity, alignment: .leading)
                 }
 
                 DynamicIslandExpandedRegion(.trailing) {
@@ -41,16 +33,16 @@ struct TranscriptionLiveActivityWidget: Widget {
                         .foregroundStyle(.primary)
                         .lineLimit(1)
                         .minimumScaleFactor(0.75)
-                        .frame(width: 52, alignment: .trailing)
-                        .padding(.trailing, 4)
+                        .frame(maxWidth: .infinity, alignment: .trailing)
+                        .padding(.trailing, LiveActivityLayout.islandHorizontalPadding)
                 }
 
                 DynamicIslandExpandedRegion(.bottom) {
                     ExpandedTranscriptionIslandContent(state: context.state)
-            }
-        } compactLeading: {
-            ActivityStatusDot(state: context.state, size: 8, showsRing: false)
-                .padding(.leading, 3)
+                }
+            } compactLeading: {
+                ActivityStatusDot(state: context.state, size: 7, showsRing: false)
+                    .frame(width: 14, height: 14, alignment: .center)
             } compactTrailing: {
                 LiveElapsedText(
                     state: context.state,
@@ -59,7 +51,7 @@ struct TranscriptionLiveActivityWidget: Widget {
                     .foregroundStyle(.secondary)
                     .lineLimit(1)
                     .minimumScaleFactor(0.55)
-                    .frame(width: 36, alignment: .leading)
+                    .frame(width: 36, alignment: .trailing)
             } minimal: {
                 ActivityStatusDot(state: context.state, size: 7, showsRing: false)
             }
@@ -67,53 +59,90 @@ struct TranscriptionLiveActivityWidget: Widget {
     }
 }
 
+private enum LiveActivityLayout {
+    static let islandHorizontalPadding: CGFloat = 14
+    static let lockScreenHorizontalPadding: CGFloat = 14
+    static let lockScreenVerticalPadding: CGFloat = 12
+}
+
 private struct LockScreenLiveActivityView: View {
     let state: TranscriptionActivityAttributes.ContentState
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            LockScreenLiveActivityHeader(state: state)
+        VStack(alignment: .leading, spacing: 9) {
+            HStack(alignment: .center, spacing: 8) {
+                ActivityStatusLine(state: state, font: .redditSans(.caption, weight: .semibold))
+
+                Spacer(minLength: 8)
+
+                LiveElapsedText(
+                    state: state,
+                    font: .redditSans(.headline, weight: .semibold)
+                )
+                .foregroundStyle(.primary)
+                .lineLimit(1)
+                .minimumScaleFactor(0.75)
+                .monospacedDigit()
+                .frame(minWidth: 58, alignment: .trailing)
+            }
 
             ActivityTranscriptPanel(
                 text: state.lockScreenLatestText,
-                lineLimit: 4,
+                lineLimit: 3,
                 font: .redditSans(.subheadline, weight: .medium)
             )
 
-            HStack(alignment: .center, spacing: 10) {
-                ActivityMetricLabel(systemImage: "globe", text: state.languageName)
+            ZStack {
+                HStack(alignment: .center, spacing: 8) {
+                    ActivityMetricLabel(systemImage: "globe", text: state.languageName)
+                        .frame(maxWidth: .infinity, alignment: .leading)
 
-                Spacer(minLength: 10)
+                    ActivityMetricLabel(systemImage: "text.alignleft", text: "\(state.lineCount)")
+                        .frame(maxWidth: .infinity, alignment: .trailing)
+                }
 
                 if state.isRecording {
                     StopRecordingLink()
                 }
-
-                ActivityMetricLabel(systemImage: "text.alignleft", text: "\(state.lineCount)")
             }
+            .frame(maxWidth: .infinity, minHeight: 26)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
-        .overlay(alignment: .topTrailing) {
-            LiveElapsedText(
-                state: state,
-                font: .redditSans(.headline, weight: .semibold)
-            )
-            .foregroundStyle(.primary)
-            .lineLimit(1)
-            .minimumScaleFactor(0.75)
-            .monospacedDigit()
-            .frame(width: 96, height: 28, alignment: .trailing)
-        }
     }
 }
 
-private struct LockScreenLiveActivityHeader: View {
+private struct ActivityStatusLine: View {
+    let state: TranscriptionActivityAttributes.ContentState
+    let font: Font
+
+    var body: some View {
+        HStack(spacing: 6) {
+            ActivityStatusDot(state: state, size: 7)
+            Text(state.status)
+                .font(font)
+                .lineLimit(1)
+                .minimumScaleFactor(0.75)
+        }
+        .foregroundStyle(statusColor)
+    }
+
+    private var statusColor: Color {
+        state.isRecording ? .red : .green
+    }
+}
+
+private struct ActivityMetricsRow: View {
     let state: TranscriptionActivityAttributes.ContentState
 
     var body: some View {
-        ActivityStatusPill(state: state)
-            .padding(.trailing, 108)
-            .frame(maxWidth: .infinity, minHeight: 28, alignment: .leading)
+        HStack(alignment: .center, spacing: 8) {
+            ActivityMetricLabel(systemImage: "globe", text: state.languageName)
+                .frame(maxWidth: .infinity, alignment: .leading)
+
+            ActivityMetricLabel(systemImage: "text.alignleft", text: "\(state.lineCount)")
+                .frame(maxWidth: .infinity, alignment: .trailing)
+        }
+        .frame(maxWidth: .infinity)
     }
 }
 
@@ -137,29 +166,18 @@ private struct ExpandedTranscriptionIslandContent: View {
     let state: TranscriptionActivityAttributes.ContentState
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 9) {
-            HStack(alignment: .center, spacing: 8) {
-                ActivityStatusPill(state: state)
-            }
-            .frame(maxWidth: .infinity, alignment: .leading)
-
+        VStack(alignment: .leading, spacing: 7) {
             ActivityTranscriptPanel(
                 text: state.islandLatestText,
-                lineLimit: 3,
+                lineLimit: 2,
                 font: .redditSans(size: 13, weight: .semibold)
             )
 
-            HStack(alignment: .center, spacing: 8) {
-                ActivityMetricLabel(systemImage: "globe", text: state.languageName)
-
-                Spacer(minLength: 8)
-
-                ActivityMetricLabel(systemImage: "text.alignleft", text: "\(state.lineCount)")
-            }
+            ActivityMetricsRow(state: state)
         }
-        .padding(.horizontal, 8)
-        .padding(.top, 2)
-        .padding(.bottom, 8)
+        .padding(.horizontal, LiveActivityLayout.islandHorizontalPadding)
+        .padding(.top, 1)
+        .padding(.bottom, 7)
         .frame(maxWidth: .infinity, alignment: .leading)
     }
 }
@@ -187,28 +205,6 @@ private struct ActivityStatusDot: View {
     }
 }
 
-private struct ActivityStatusPill: View {
-    let state: TranscriptionActivityAttributes.ContentState
-
-    var body: some View {
-        HStack(spacing: 6) {
-            ActivityStatusDot(state: state, size: 7)
-            Text(state.status)
-                .font(.redditSans(.caption2, weight: .semibold))
-                .lineLimit(1)
-                .minimumScaleFactor(0.8)
-        }
-        .foregroundStyle(statusColor)
-        .padding(.horizontal, 8)
-        .frame(height: 24)
-        .background(statusColor.opacity(0.14), in: Capsule())
-    }
-
-    private var statusColor: Color {
-        state.isRecording ? .red : .green
-    }
-}
-
 private struct ActivityMetricLabel: View {
     let systemImage: String
     let text: String
@@ -228,22 +224,13 @@ private struct ActivityTranscriptPanel: View {
     let font: Font
 
     var body: some View {
-        HStack(alignment: .top, spacing: 8) {
-            Image(systemName: "quote.opening")
-                .font(.system(size: 10, weight: .semibold))
-                .foregroundStyle(.secondary)
-                .frame(width: 14, height: 18)
-
-            LatestTranscriptionText(
-                text: text,
-                font: font,
-                lineLimit: lineLimit
-            )
-        }
-        .padding(.horizontal, 10)
-        .padding(.vertical, 9)
+        LatestTranscriptionText(
+            text: text,
+            font: font,
+            lineLimit: lineLimit
+        )
+        .padding(.vertical, 2)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(Color.primary.opacity(0.06), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
     }
 }
 
@@ -282,11 +269,11 @@ private struct LatestTranscriptionText: View {
 
 private extension TranscriptionActivityAttributes.ContentState {
     var lockScreenLatestText: String {
-        displayText.trailingLines(maxLines: 4, maxCharacters: 260)
+        displayText.trailingLines(maxLines: 3, maxCharacters: 220)
     }
 
     var islandLatestText: String {
-        displayText.trailingLines(maxLines: 3, maxCharacters: 170)
+        displayText.trailingLines(maxLines: 2, maxCharacters: 130)
     }
 
     var compactLatestText: String {
@@ -381,7 +368,7 @@ private extension Font {
         status: "正在录音",
         languageName: "简体中文",
         latestText: "这是一句实时转录文本，会同步显示到灵动岛。",
-        placeholderText: "Waiting for speech",
+        placeholderText: String(localized: "等待语音"),
         elapsedSeconds: 92,
         timerReferenceDate: Date(timeIntervalSinceNow: -92),
         lineCount: 8,

@@ -1,6 +1,6 @@
 # Recording Processing Pipeline
 
-This is the current audio pipeline that works well on device. Avoid returning to multi-stage gain where audio is amplified during recording and again during playback.
+This is the current audio pipeline that works well on device. File-level normalization remains the main loudness strategy; avoid returning to input-tap gain or repeated normalization passes.
 
 ## Recording Stage
 
@@ -23,6 +23,8 @@ When recording stops:
 2. Finish the analyzer pipeline and wait for SpeechAnalyzer to flush final transcript results.
 3. Run `RecordingFileNormalizer.normalize(...)` on the saved audio file.
 4. Save `audioNormalizedAt` and `audioNormalizationVersion` on the recording item.
+
+The app briefly shows `正在增强录音音量` while normalization runs. If normalization fails, the recording draft is still returned and can still be saved.
 
 ## Normalization
 
@@ -61,10 +63,40 @@ After writing succeeds, the original file is replaced through a backup-based swa
 
 Do not repeatedly normalize an already-normalized file at the same version. Repeated gain passes can reintroduce distortion.
 
+## Imported and Re-Transcribed Recordings
+
+Imported recordings enter the same library model as live recordings:
+
+1. The Files picker accepts `UTType.audio`.
+2. The user chooses a transcription language.
+3. `RecordingStore` creates a placeholder `RecordingItem` with `RecordingImportStatus`.
+4. The source file is copied into the recordings directory and an empty transcript file is created.
+5. `ImportedRecordingTranscriptionService` reads the file in frames and feeds `SpeechAnalyzer` / `SpeechTranscriber`.
+6. Progress is reported as the audio file is consumed.
+7. The finished timed transcript replaces the empty `.txt` file.
+8. Supported output formats are normalized and tagged with `RecordingFileNormalizer.version`.
+
+Re-transcription reuses the stored audio file, replaces the transcript text, updates language metadata, clears existing summary/tags, and clears `importStatus` when complete.
+
+Failed import or re-transcription work is represented by `RecordingImportStatus(isFailed: true)` so the list and detail screens can keep the failed item visible.
+
+## Playback
+
+Playback is handled by `RecordingPlaybackController` in `RecordingsView`.
+
+Current behavior:
+
+- Uses `AVAudioEngine + AVAudioPlayerNode`.
+- Inserts an `AVAudioUnitEQ` with `globalGain = 3`.
+- Supports play, pause, unload, and seek.
+- Updates current playback time roughly every 120 ms.
+- Tapping a saved transcript row seeks to that row's timestamp.
+
+Normalization is still the durable file-level loudness fix. The playback gain is a small current-code boost, not a replacement for normalization.
+
 ## Explicit Non-Goals
 
 - No input-tap gain before writing files.
-- No playback gain to compensate for quiet files.
 - No peak-only gain calculation.
 - No repeated normalization for the same version.
-
+- No hidden repeated gain passes that rewrite already-normalized files.
