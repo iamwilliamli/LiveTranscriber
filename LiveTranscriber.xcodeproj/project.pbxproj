@@ -1,0 +1,606 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 56;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		7B0000000000000000000001 /* LiveTranscriberApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7B0000000000000000001001 /* LiveTranscriberApp.swift */; };
+		7B0000000000000000000002 /* AppTheme.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7B0000000000000000001002 /* AppTheme.swift */; };
+		7B0000000000000000000003 /* AppTypography.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7B0000000000000000001003 /* AppTypography.swift */; };
+		7B0000000000000000000004 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7B0000000000000000001004 /* ContentView.swift */; };
+		7B0000000000000000000005 /* TranscriptionView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7B0000000000000000001005 /* TranscriptionView.swift */; };
+		7B0000000000000000000006 /* LiveTranscriptionManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7B0000000000000000001006 /* LiveTranscriptionManager.swift */; };
+		7B0000000000000000000007 /* EmptyStateView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7B0000000000000000001007 /* EmptyStateView.swift */; };
+		7B0000000000000000000008 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 7B0000000000000000001008 /* Assets.xcassets */; };
+		7B0000000000000000000009 /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = 7B0000000000000000001009 /* PrivacyInfo.xcprivacy */; };
+		7B000000000000000000000A /* Localizable.strings in Resources */ = {isa = PBXBuildFile; fileRef = 7B0000000000000000003005 /* Localizable.strings */; };
+		7B000000000000000000000B /* InfoPlist.strings in Resources */ = {isa = PBXBuildFile; fileRef = 7B0000000000000000003006 /* InfoPlist.strings */; };
+		7B000000000000000000000C /* RedditSans-Regular.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 7B0000000000000000001010 /* RedditSans-Regular.ttf */; };
+		7B000000000000000000000D /* RedditSans-Medium.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 7B0000000000000000001011 /* RedditSans-Medium.ttf */; };
+		7B000000000000000000000E /* RedditSans-SemiBold.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 7B0000000000000000001012 /* RedditSans-SemiBold.ttf */; };
+		7B000000000000000000000F /* RedditSans-Bold.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 7B0000000000000000001013 /* RedditSans-Bold.ttf */; };
+		7B0000000000000000000010 /* RedditSans-Italic.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 7B0000000000000000001014 /* RedditSans-Italic.ttf */; };
+		7B0000000000000000000011 /* TranscriptionLanguage.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7B0000000000000000001015 /* TranscriptionLanguage.swift */; };
+		7B0000000000000000000012 /* RecordingStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7B0000000000000000001016 /* RecordingStore.swift */; };
+		7B0000000000000000000013 /* RecordingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7B0000000000000000001017 /* RecordingsView.swift */; };
+		7B0000000000000000000014 /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7B0000000000000000001018 /* SettingsView.swift */; };
+		7B0000000000000000000015 /* TranscriptionActivityAttributes.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7B0000000000000000001019 /* TranscriptionActivityAttributes.swift */; };
+		7B0000000000000000000016 /* TranscriptionLiveActivityCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7B000000000000000000101A /* TranscriptionLiveActivityCoordinator.swift */; };
+		7B0000000000000000000017 /* TranscriptionActivityAttributes.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7B0000000000000000001019 /* TranscriptionActivityAttributes.swift */; };
+		7B0000000000000000000018 /* LiveTranscriberWidgetBundle.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7B000000000000000000101B /* LiveTranscriberWidgetBundle.swift */; };
+		7B0000000000000000000019 /* LiveTranscriberWidget.appex in Embed App Extensions */ = {isa = PBXBuildFile; fileRef = 7B000000000000000000101D /* LiveTranscriberWidget.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+		7B000000000000000000001A /* RedditSans-Regular.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 7B0000000000000000001010 /* RedditSans-Regular.ttf */; };
+		7B000000000000000000001B /* RedditSans-Medium.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 7B0000000000000000001011 /* RedditSans-Medium.ttf */; };
+		7B000000000000000000001C /* RedditSans-SemiBold.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 7B0000000000000000001012 /* RedditSans-SemiBold.ttf */; };
+		7B000000000000000000001D /* RedditSans-Bold.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 7B0000000000000000001013 /* RedditSans-Bold.ttf */; };
+		7B000000000000000000001E /* RedditSans-Italic.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 7B0000000000000000001014 /* RedditSans-Italic.ttf */; };
+		7B000000000000000000001F /* Localizable.strings in Resources */ = {isa = PBXBuildFile; fileRef = 7B0000000000000000003005 /* Localizable.strings */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXContainerItemProxy section */
+		7B000000000000000000A001 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 7B0000000000000000006001 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 7B0000000000000000004002;
+			remoteInfo = LiveTranscriberWidget;
+		};
+/* End PBXContainerItemProxy section */
+
+/* Begin PBXCopyFilesBuildPhase section */
+		7B0000000000000000005005 /* Embed App Extensions */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "";
+			dstSubfolderSpec = 13;
+			files = (
+				7B0000000000000000000019 /* LiveTranscriberWidget.appex in Embed App Extensions */,
+			);
+			name = "Embed App Extensions";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXCopyFilesBuildPhase section */
+
+/* Begin PBXFileReference section */
+		7B0000000000000000001000 /* LiveTranscriber.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = LiveTranscriber.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		7B0000000000000000001001 /* LiveTranscriberApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LiveTranscriberApp.swift; sourceTree = "<group>"; };
+		7B0000000000000000001002 /* AppTheme.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppTheme.swift; sourceTree = "<group>"; };
+		7B0000000000000000001003 /* AppTypography.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppTypography.swift; sourceTree = "<group>"; };
+		7B0000000000000000001004 /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
+		7B0000000000000000001005 /* TranscriptionView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TranscriptionView.swift; sourceTree = "<group>"; };
+		7B0000000000000000001006 /* LiveTranscriptionManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LiveTranscriptionManager.swift; sourceTree = "<group>"; };
+		7B0000000000000000001007 /* EmptyStateView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EmptyStateView.swift; sourceTree = "<group>"; };
+		7B0000000000000000001008 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
+		7B0000000000000000001009 /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; lastKnownFileType = text.xml; path = PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
+		7B000000000000000000100A /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
+		7B000000000000000000100B /* en */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = en; path = en.lproj/Localizable.strings; sourceTree = "<group>"; };
+		7B000000000000000000100C /* zh-Hans */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = "zh-Hans"; path = "zh-Hans.lproj/Localizable.strings"; sourceTree = "<group>"; };
+		7B000000000000000000100D /* en */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = en; path = en.lproj/InfoPlist.strings; sourceTree = "<group>"; };
+		7B000000000000000000100E /* zh-Hans */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = "zh-Hans"; path = "zh-Hans.lproj/InfoPlist.strings"; sourceTree = "<group>"; };
+		7B0000000000000000001010 /* RedditSans-Regular.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = "RedditSans-Regular.ttf"; sourceTree = "<group>"; };
+		7B0000000000000000001011 /* RedditSans-Medium.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = "RedditSans-Medium.ttf"; sourceTree = "<group>"; };
+		7B0000000000000000001012 /* RedditSans-SemiBold.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = "RedditSans-SemiBold.ttf"; sourceTree = "<group>"; };
+		7B0000000000000000001013 /* RedditSans-Bold.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = "RedditSans-Bold.ttf"; sourceTree = "<group>"; };
+		7B0000000000000000001014 /* RedditSans-Italic.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = "RedditSans-Italic.ttf"; sourceTree = "<group>"; };
+		7B0000000000000000001015 /* TranscriptionLanguage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TranscriptionLanguage.swift; sourceTree = "<group>"; };
+		7B0000000000000000001016 /* RecordingStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecordingStore.swift; sourceTree = "<group>"; };
+		7B0000000000000000001017 /* RecordingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecordingsView.swift; sourceTree = "<group>"; };
+		7B0000000000000000001018 /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
+		7B0000000000000000001019 /* TranscriptionActivityAttributes.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TranscriptionActivityAttributes.swift; sourceTree = "<group>"; };
+		7B000000000000000000101A /* TranscriptionLiveActivityCoordinator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TranscriptionLiveActivityCoordinator.swift; sourceTree = "<group>"; };
+		7B000000000000000000101B /* LiveTranscriberWidgetBundle.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LiveTranscriberWidgetBundle.swift; sourceTree = "<group>"; };
+		7B000000000000000000101C /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
+		7B000000000000000000101D /* LiveTranscriberWidget.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = LiveTranscriberWidget.appex; sourceTree = BUILT_PRODUCTS_DIR; };
+		7B000000000000000000101E /* LiveTranscriber.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = LiveTranscriber.entitlements; sourceTree = "<group>"; };
+/* End PBXFileReference section */
+
+/* Begin PBXFrameworksBuildPhase section */
+		7B0000000000000000002001 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		7B0000000000000000002002 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXFrameworksBuildPhase section */
+
+/* Begin PBXGroup section */
+		7B0000000000000000003001 = {
+			isa = PBXGroup;
+			children = (
+				7B0000000000000000003002 /* LiveTranscriber */,
+				7B0000000000000000003004 /* LiveTranscriberWidget */,
+				7B0000000000000000003003 /* Products */,
+			);
+			sourceTree = "<group>";
+		};
+		7B0000000000000000003002 /* LiveTranscriber */ = {
+			isa = PBXGroup;
+			children = (
+				7B0000000000000000001001 /* LiveTranscriberApp.swift */,
+				7B0000000000000000001002 /* AppTheme.swift */,
+				7B0000000000000000001003 /* AppTypography.swift */,
+				7B0000000000000000001004 /* ContentView.swift */,
+				7B0000000000000000001005 /* TranscriptionView.swift */,
+				7B0000000000000000001006 /* LiveTranscriptionManager.swift */,
+				7B0000000000000000001015 /* TranscriptionLanguage.swift */,
+				7B0000000000000000001016 /* RecordingStore.swift */,
+				7B0000000000000000001017 /* RecordingsView.swift */,
+				7B0000000000000000001018 /* SettingsView.swift */,
+				7B0000000000000000001019 /* TranscriptionActivityAttributes.swift */,
+				7B000000000000000000101A /* TranscriptionLiveActivityCoordinator.swift */,
+				7B0000000000000000001007 /* EmptyStateView.swift */,
+				7B0000000000000000001008 /* Assets.xcassets */,
+				7B0000000000000000003010 /* Fonts */,
+				7B0000000000000000003005 /* Localizable.strings */,
+				7B0000000000000000003006 /* InfoPlist.strings */,
+				7B000000000000000000100A /* Info.plist */,
+				7B000000000000000000101E /* LiveTranscriber.entitlements */,
+				7B0000000000000000001009 /* PrivacyInfo.xcprivacy */,
+			);
+			path = LiveTranscriber;
+			sourceTree = "<group>";
+		};
+		7B0000000000000000003003 /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				7B0000000000000000001000 /* LiveTranscriber.app */,
+				7B000000000000000000101D /* LiveTranscriberWidget.appex */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+		7B0000000000000000003004 /* LiveTranscriberWidget */ = {
+			isa = PBXGroup;
+			children = (
+				7B000000000000000000101B /* LiveTranscriberWidgetBundle.swift */,
+				7B000000000000000000101C /* Info.plist */,
+			);
+			path = LiveTranscriberWidget;
+			sourceTree = "<group>";
+		};
+		7B0000000000000000003010 /* Fonts */ = {
+			isa = PBXGroup;
+			children = (
+				7B0000000000000000001010 /* RedditSans-Regular.ttf */,
+				7B0000000000000000001011 /* RedditSans-Medium.ttf */,
+				7B0000000000000000001012 /* RedditSans-SemiBold.ttf */,
+				7B0000000000000000001013 /* RedditSans-Bold.ttf */,
+				7B0000000000000000001014 /* RedditSans-Italic.ttf */,
+			);
+			path = Fonts;
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		7B0000000000000000004001 /* LiveTranscriber */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 7B0000000000000000007002 /* Build configuration list for PBXNativeTarget "LiveTranscriber" */;
+			buildPhases = (
+				7B0000000000000000005001 /* Sources */,
+				7B0000000000000000002001 /* Frameworks */,
+				7B0000000000000000005002 /* Resources */,
+				7B0000000000000000005005 /* Embed App Extensions */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				7B000000000000000000A002 /* PBXTargetDependency */,
+			);
+			name = LiveTranscriber;
+			productName = LiveTranscriber;
+			productReference = 7B0000000000000000001000 /* LiveTranscriber.app */;
+			productType = "com.apple.product-type.application";
+		};
+		7B0000000000000000004002 /* LiveTranscriberWidget */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 7B0000000000000000007003 /* Build configuration list for PBXNativeTarget "LiveTranscriberWidget" */;
+			buildPhases = (
+				7B0000000000000000005003 /* Sources */,
+				7B0000000000000000002002 /* Frameworks */,
+				7B0000000000000000005004 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = LiveTranscriberWidget;
+			productName = LiveTranscriberWidget;
+			productReference = 7B000000000000000000101D /* LiveTranscriberWidget.appex */;
+			productType = "com.apple.product-type.app-extension";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		7B0000000000000000006001 /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				BuildIndependentTargetsInParallel = 1;
+				LastSwiftUpdateCheck = 1600;
+				LastUpgradeCheck = 1600;
+				TargetAttributes = {
+					7B0000000000000000004001 = {
+						CreatedOnToolsVersion = 16.0;
+					};
+					7B0000000000000000004002 = {
+						CreatedOnToolsVersion = 16.0;
+					};
+				};
+			};
+			buildConfigurationList = 7B0000000000000000007001 /* Build configuration list for PBXProject "LiveTranscriber" */;
+			compatibilityVersion = "Xcode 14.0";
+			developmentRegion = en;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				en,
+				"zh-Hans",
+				Base,
+			);
+			mainGroup = 7B0000000000000000003001;
+			productRefGroup = 7B0000000000000000003003 /* Products */;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				7B0000000000000000004001 /* LiveTranscriber */,
+				7B0000000000000000004002 /* LiveTranscriberWidget */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		7B0000000000000000005002 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				7B0000000000000000000008 /* Assets.xcassets in Resources */,
+				7B0000000000000000000009 /* PrivacyInfo.xcprivacy in Resources */,
+				7B000000000000000000000A /* Localizable.strings in Resources */,
+				7B000000000000000000000B /* InfoPlist.strings in Resources */,
+				7B000000000000000000000C /* RedditSans-Regular.ttf in Resources */,
+				7B000000000000000000000D /* RedditSans-Medium.ttf in Resources */,
+				7B000000000000000000000E /* RedditSans-SemiBold.ttf in Resources */,
+				7B000000000000000000000F /* RedditSans-Bold.ttf in Resources */,
+				7B0000000000000000000010 /* RedditSans-Italic.ttf in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		7B0000000000000000005004 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				7B000000000000000000001F /* Localizable.strings in Resources */,
+				7B000000000000000000001A /* RedditSans-Regular.ttf in Resources */,
+				7B000000000000000000001B /* RedditSans-Medium.ttf in Resources */,
+				7B000000000000000000001C /* RedditSans-SemiBold.ttf in Resources */,
+				7B000000000000000000001D /* RedditSans-Bold.ttf in Resources */,
+				7B000000000000000000001E /* RedditSans-Italic.ttf in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
+
+/* Begin PBXSourcesBuildPhase section */
+		7B0000000000000000005001 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				7B0000000000000000000001 /* LiveTranscriberApp.swift in Sources */,
+				7B0000000000000000000002 /* AppTheme.swift in Sources */,
+				7B0000000000000000000003 /* AppTypography.swift in Sources */,
+				7B0000000000000000000004 /* ContentView.swift in Sources */,
+				7B0000000000000000000005 /* TranscriptionView.swift in Sources */,
+				7B0000000000000000000006 /* LiveTranscriptionManager.swift in Sources */,
+				7B0000000000000000000011 /* TranscriptionLanguage.swift in Sources */,
+				7B0000000000000000000012 /* RecordingStore.swift in Sources */,
+				7B0000000000000000000013 /* RecordingsView.swift in Sources */,
+				7B0000000000000000000014 /* SettingsView.swift in Sources */,
+				7B0000000000000000000015 /* TranscriptionActivityAttributes.swift in Sources */,
+				7B0000000000000000000016 /* TranscriptionLiveActivityCoordinator.swift in Sources */,
+				7B0000000000000000000007 /* EmptyStateView.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		7B0000000000000000005003 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				7B0000000000000000000017 /* TranscriptionActivityAttributes.swift in Sources */,
+				7B0000000000000000000018 /* LiveTranscriberWidgetBundle.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin PBXTargetDependency section */
+		7B000000000000000000A002 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 7B0000000000000000004002 /* LiveTranscriberWidget */;
+			targetProxy = 7B000000000000000000A001 /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
+
+/* Begin PBXVariantGroup section */
+		7B0000000000000000003005 /* Localizable.strings */ = {
+			isa = PBXVariantGroup;
+			children = (
+				7B000000000000000000100B /* en */,
+				7B000000000000000000100C /* zh-Hans */,
+			);
+			name = Localizable.strings;
+			sourceTree = "<group>";
+		};
+		7B0000000000000000003006 /* InfoPlist.strings */ = {
+			isa = PBXVariantGroup;
+			children = (
+				7B000000000000000000100D /* en */,
+				7B000000000000000000100E /* zh-Hans */,
+			);
+			name = InfoPlist.strings;
+			sourceTree = "<group>";
+		};
+/* End PBXVariantGroup section */
+
+/* Begin XCBuildConfiguration section */
+		7B0000000000000000008001 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++20";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_TESTABILITY = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu17;
+				GCC_DYNAMIC_NO_PIC = NO;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"DEBUG=1",
+					"$(inherited)",
+				);
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 27.0;
+				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
+				MTL_FAST_MATH = YES;
+				ONLY_ACTIVE_ARCH = YES;
+				SDKROOT = iphoneos;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+			};
+			name = Debug;
+		};
+		7B0000000000000000008002 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++20";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				ENABLE_NS_ASSERTIONS = NO;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu17;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 27.0;
+				MTL_ENABLE_DEBUG_INFO = NO;
+				MTL_FAST_MATH = YES;
+				SDKROOT = iphoneos;
+				SWIFT_COMPILATION_MODE = wholemodule;
+				SWIFT_OPTIMIZATION_LEVEL = "-O";
+				VALIDATE_PRODUCT = YES;
+			};
+			name = Release;
+		};
+		7B0000000000000000008003 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_ENTITLEMENTS = LiveTranscriber/LiveTranscriber.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_ASSET_PATHS = "";
+				DEVELOPMENT_TEAM = F8M4T754W4;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = LiveTranscriber/Info.plist;
+				IPHONEOS_DEPLOYMENT_TARGET = 27.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.iamwilliamli.LiveTranscriber;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+		7B0000000000000000008004 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_ENTITLEMENTS = LiveTranscriber/LiveTranscriber.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_ASSET_PATHS = "";
+				DEVELOPMENT_TEAM = F8M4T754W4;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = LiveTranscriber/Info.plist;
+				IPHONEOS_DEPLOYMENT_TARGET = 27.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.iamwilliamli.LiveTranscriber;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Release;
+		};
+		7B0000000000000000008005 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				APPLICATION_EXTENSION_API_ONLY = YES;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = F8M4T754W4;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = LiveTranscriberWidget/Info.plist;
+				IPHONEOS_DEPLOYMENT_TARGET = 27.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.iamwilliamli.LiveTranscriber.Widget;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SKIP_INSTALL = YES;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+		7B0000000000000000008006 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				APPLICATION_EXTENSION_API_ONLY = YES;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = F8M4T754W4;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = LiveTranscriberWidget/Info.plist;
+				IPHONEOS_DEPLOYMENT_TARGET = 27.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.iamwilliamli.LiveTranscriber.Widget;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SKIP_INSTALL = YES;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Release;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		7B0000000000000000007001 /* Build configuration list for PBXProject "LiveTranscriber" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				7B0000000000000000008001 /* Debug */,
+				7B0000000000000000008002 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		7B0000000000000000007002 /* Build configuration list for PBXNativeTarget "LiveTranscriber" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				7B0000000000000000008003 /* Debug */,
+				7B0000000000000000008004 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		7B0000000000000000007003 /* Build configuration list for PBXNativeTarget "LiveTranscriberWidget" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				7B0000000000000000008005 /* Debug */,
+				7B0000000000000000008006 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+/* End XCConfigurationList section */
+	};
+	rootObject = 7B0000000000000000006001 /* Project object */;
+}

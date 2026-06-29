@@ -1,0 +1,4 @@
+"CFBundleDisplayName" = "实时转录";
+"CFBundleName" = "实时转录";
+"NSMicrophoneUsageDescription" = "用于录音并实时转录文本。";
+"NSSpeechRecognitionUsageDescription" = "用于把录到的语音实时转成文字。";

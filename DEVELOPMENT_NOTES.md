@@ -1,0 +1,401 @@
+# LiveTranscriber 开发笔记
+
+本文档记录当前 app 的开发思路、关键取舍、架构说明、已知限制和后续可扩展方向。它不是用户说明书，而是给后续继续开发、上 TestFlight 前复盘、或者重构时使用的工程笔记。
+
+## 产品定位
+
+LiveTranscriber 是一个 iOS 27-only 的本地录音和实时转录工具。
+
+核心目标：
+
+- 开始录音后实时显示转录文字。
+- 录音结束后保存音频文件和对应文本。
+- 录音文件可播放，点击转录文本行可以跳到对应音频时间。
+- 灵动岛和锁屏 Live Activity 显示录音状态、最新转录内容和持续计时。
+- 尽量使用 Apple 原生 SDK，降低维护成本，保持 iOS 系统风格。
+
+当前 app 不是云转录工具，默认不把音频或文本上传到第三方服务。主要依赖 Apple Speech 本机模型和系统权限。
+
+## 平台和 SDK 取舍
+
+项目明确只支持 iOS 27，因此可以直接使用新 Speech SDK：
+
+- `SpeechAnalyzer` 负责音频分析管线。
+- `SpeechTranscriber` 负责实时转录。
+- `ActivityKit` 和 Widget extension 用于灵动岛与锁屏状态展示。
+
+当前保留简单稳定的 `SpeechTranscriber` 管线，不启用额外识别增强模块。之前尝试过更复杂的组合式管线，但实际识别质量和体验不如简化版本稳定，因此回退。
+
+## 当前能力
+
+### 实时录音和转录
+
+入口在 `LiveTranscriptionManager`。
+
+流程：
+
+1. 请求语音识别和麦克风权限。
+2. 配置 `AVAudioSession`。
+3. 获取麦克风输入格式。
+4. 准备 SpeechAnalyzer 模块和语言模型。
+5. 安装 `AVAudioEngine` input tap。
+6. 每个音频 buffer 同时写入本地音频文件并送入 SpeechAnalyzer。
+7. Speech SDK 返回实时结果后更新转录行和 Live Activity。
+
+暂停时会停止 input tap 和 audio engine，并冻结计时。继续录音时重新安装 tap，沿用原来的 analyzer pipeline 和音频 writer。
+
+### 转录行
+
+`TranscriptionLine` 保存：
+
+- `startSeconds`：从录音开始算起的秒数。
+- `text`：识别文本。
+- `isFinal`：是否最终结果。
+
+文本保存为按行格式：
+
+```text
+[12s] 这是一行转录内容
+[18s] 这是下一行
+```
+
+这个格式方便人读，也方便 `RecordingsView` 解析后实现“点文字跳转音频”。
+
+### 录音文件
+
+当前支持两种原生稳定格式：
+
+- WAV：Linear PCM，无损，文件更大。
+- M4A：AAC 压缩，文件更小。
+
+MP3 没有做成可选项。原因是 iOS 原生 AVFoundation 录音写入链路不提供可靠的 MP3 编码路径。强行显示 MP3 选项会导致用户录完后才遇到失败，体验更差。后续如果确实需要 MP3，可以考虑引入独立编码库或服务端转码，但那会带来体积、授权、性能和隐私成本。
+
+录音保存在：
+
+```text
+iCloud Drive/Live Transcriber/Documents/Recordings/
+```
+
+如果 iCloud Documents 容器不可用，会 fallback 到 app 本地 `Documents/Recordings/`。当 iCloud 后续可用时，`RecordingStore` 会把本地录音文件复制到 iCloud 目录。
+
+索引文件：
+
+```text
+Documents/Recordings/recordings.json
+```
+
+音频和文本成对保存：
+
+```text
+Recording_yyyyMMdd_HHmmss.wav
+Recording_yyyyMMdd_HHmmss.txt
+```
+
+iCloud 同步设计：
+
+- App entitlement 使用 `iCloud.com.iamwilliamli.LiveTranscriber`，服务为 CloudDocuments。
+- Info.plist 声明 `NSUbiquitousContainers`，并把 document scope 设为 public，让文件出现在 iCloud Drive。
+- `RecordingStore.recordingsDirectory` 优先使用 ubiquity container 的 `Documents/Recordings`。
+- `reload()` 不只读 `recordings.json`，还会扫描录音目录，把跨设备同步来的音频文件合并进列表。
+- App 回到前台时会重新 `reload()`，用于接收其他设备同步来的变更。
+
+导入录音设计：
+
+- 录音列表 toolbar 提供“导入录音”按钮，使用系统 Files picker。
+- 支持 `UTType.audio`，实际能否读取由 `AVAudioFile` 决定。
+- 导入后先复制到临时文件，再用 `SpeechAnalyzer` / `SpeechTranscriber` 离线转录。
+- 转录完成后按普通 `RecordingDraft` 保存到录音库，因此导入文件也会进入 iCloud Drive 同步。
+- 导入转录使用当前设置里的转录语言。
+
+### 录音处理 Pipeline
+
+当前这套链路在真机体验上可以稳定工作：录音文件音量足够，播放不再破音。后续不要轻易回到“录制时放大 + 播放时再放大”的多级增益方案。
+
+录音阶段：
+
+1. `AVAudioSession` 使用 `.playAndRecord` + `.voiceChat`，options 为 `.allowBluetoothHFP`、`.defaultToSpeaker`、`.duckOthers`。
+2. `AVAudioEngine` input tap 收到每个 `AVAudioPCMBuffer` 后复制两份。
+3. 第一份原始 buffer 直接写入 `AudioFileWriter`，不做实时增益。
+4. 第二份原始 buffer 送入 `AnalyzerInputPipeline` / `SpeechAnalyzer`，避免音量处理影响转录识别。
+
+停止录音后：
+
+1. 停止 input tap 和 audio engine。
+2. finish analyzer pipeline，等待 SpeechAnalyzer flush。
+3. 用 `RecordingFileNormalizer.normalize(...)` 对刚生成的音频文件做一次离线归一化。
+4. 归一化成功后写入 `audioNormalizedAt` 和 `audioNormalizationVersion`。
+
+当前归一化版本是 `RecordingFileNormalizer.version = 2`。核心参数：
+
+- `targetActiveRMS = 0.20`
+- `maximumGain = 16`
+- `limiterCeiling = 0.94`
+- `activeSampleThreshold = 0.012`
+- `minimumActiveRMS = 0.006`
+- `frameCapacity = 8192`
+
+归一化按“有效语音样本”的 RMS 计算增益，而不是按整段 RMS 或单个最高峰值计算。这样短促爆点不会把整段人声音量压低。写出时使用软限幅，避免硬裁剪造成破音。
+
+归一化写入策略：
+
+- 先读原文件统计 active RMS。
+- 写到同目录临时文件 `.normalized-UUID.ext`。
+- 写完后用 backup 文件做替换，失败时尽量恢复原文件。
+
+已有录音：
+
+- 打开录音详情页时调用 `RecordingStore.normalizeAudioIfNeeded(for:)`。
+- 如果 `audioNormalizationVersion` 不是当前版本，会重新归一化。
+- 如果版本已匹配，则不重复处理，避免反复增益导致破音。
+
+明确不要做：
+
+- 不要在 input tap 写文件前实时放大。
+- 不要在播放器里额外加大增益。
+- 不要用单个 peak 决定整段 gain。
+- 不要每次打开详情页都重复归一化同一个版本的文件。
+
+### 文件管理
+
+`RecordingsView` 使用系统 `List`，而不是 `ScrollView + LazyVStack`，原因是：
+
+- 原生滑动删除更稳定。
+- VoiceOver 和列表交互更符合系统预期。
+- 行为更接近 iOS 文件/录音列表。
+
+删除入口保留：
+
+- 左滑删除。
+- 长按菜单删除。
+- 详情页 toolbar 删除。
+
+列表中不再常显删除按钮，避免视觉噪音和误触。
+
+### 音频播放
+
+播放逻辑在 `RecordingPlaybackController`。
+
+当前使用 `AVAudioEngine + AVAudioPlayerNode`，中间接 `AVAudioUnitEQ`，但 `globalGain = 0`。播放器只负责播放、暂停和 seek，不再承担音量增强。音量增强统一放在文件级归一化阶段完成。
+
+详情页会把转录文本解析成带时间的行。点击某一行会 `seek(to:)` 到该行的 `startSeconds`。
+
+### 灵动岛和锁屏
+
+Live Activity 状态由 `TranscriptionLiveActivityCoordinator` 管理。
+
+关键点：计时不能只显示 `elapsedText` 静态字符串。Widget 不会自己每秒重新计算普通字符串。现在状态里带了 `timerReferenceDate`，Widget 用：
+
+```swift
+Text(state.timerReferenceDate, style: .timer)
+```
+
+录音中系统会自动刷新计时。暂停或结束时显示固定的 `elapsedText`，避免计时继续跳。
+
+最新转录文本会在锁屏和灵动岛 expanded 区域显示。锁屏最多显示 3 行；灵动岛保留 2 行以适配系统区域。超长时从尾部截断，优先保留最新内容。
+
+Live Activity 文本更新策略：
+
+- 录音开始时 start 一次 Activity。
+- 每段转录变成 final 时 update 一次，把最新 final transcript 同步到锁屏/灵动岛。
+- interim 转录不更新 Activity。
+- 不做短时间定时节流刷新，也不按 timer tick 更新 Activity。
+- 暂停、继续、结束仍然更新一次状态。
+
+这样可以避免短时间内 Activity update 过多。计时由 Widget 里的 system timer 自己刷新，不需要 app 持续推送。
+
+## UI/UX 思路
+
+### 总体视觉
+
+设计方向是“像系统工具，不像营销页面”。
+
+关键词：
+
+- 安静。
+- 清晰。
+- 低干扰。
+- 常用操作优先。
+- 接近 Voice Memos 的录音心智。
+
+字体统一使用 Reddit Sans，包括主 app 和 Widget。这样视觉上和原来的 Red Downloader 系列保持一点品牌一致性，但控件行为仍然是 iOS 原生风格。
+
+### 录音页
+
+录音页重点是三件事：
+
+- 当前语言和格式。
+- 大号计时。
+- 开始、暂停、停止。
+
+录音页不显示波形和语音检测状态。前期做过实时波形，但信息价值不高，还会增加视觉噪音；当前保留更接近系统录音机的简洁布局。
+
+### 设置页
+
+设置页分为：
+
+- 转录语言。
+- 录音格式。
+- 转录引擎。
+- 本地文件。
+
+### 文件页
+
+列表行展示：
+
+- 日期时间。
+- 文件名。
+- 时长。
+- 语言。
+- 文本行数。
+- 转录预览。
+
+删除不常显，保持列表干净。真正需要删除时使用滑动或长按。
+
+## 已知限制
+
+### 暂不做多人声区分
+
+当前使用的 Apple SpeechAnalyzer/SpeechTranscriber 管线没有提供稳定的多人声区分 API。因此 app 不应假装能区分不同讲话者。
+
+可行的后续方向：
+
+- 如果 Apple 后续增加系统级多人声区分能力，直接接入 SDK。
+- 使用第三方本地模型，但会增加包体和性能压力。
+- 使用服务端模型，但会改变隐私边界。
+
+### MP3 不作为原生录音格式
+
+MP3 是用户熟悉的格式，但 iOS 原生录音链路不适合直接编码 MP3。当前只在设置里说明原因，不暴露不可用选项。
+
+### Live Activity 文本刷新频率受系统控制
+
+计时可以用系统 timer 实时刷新，但最新转录文本仍然依赖 app 更新 Activity。系统可能会根据电量、锁屏状态和后台策略限制刷新频率。
+
+### 长录音压力
+
+长时间录音会带来：
+
+- 音频文件变大。
+- 转录行增多。
+- 列表和详情解析压力增加。
+- Live Activity 更新频率需要控制。
+
+后续如果支持很长会议录音，需要考虑分段保存、后台任务和更强的索引结构。
+
+## 后续功能想法
+
+### 1. 录音搜索
+
+在录音文件页增加全文搜索：
+
+- 按文件名搜索。
+- 按转录文本搜索。
+- 按语言或日期过滤。
+
+实现上可以先简单读 txt 搜索，录音数量变多后再做索引。
+
+### 2. 转录文本编辑
+
+详情页支持修改某一行文本：
+
+- 点击行进入编辑。
+- 保存后同步更新 `.txt` 和 index preview。
+
+这会让转录结果更适合导出和分享。
+
+### 3. 导出格式
+
+除 txt 外，可以增加：
+
+- Markdown。
+- SRT 字幕。
+- JSON。
+
+SRT 很适合视频字幕场景，当前已有每行时间，可以扩展成字幕格式。
+
+### 4. 标签和收藏
+
+录音文件可以加：
+
+- 星标。
+- 标签。
+- 备注。
+
+这需要扩展 `RecordingItem` 的 index schema，并考虑旧数据迁移。
+
+### 5. iCloud 同步
+
+可以同步：
+
+- 录音索引。
+- 设置。
+- 小文本文件。
+
+但音频文件较大，是否同步要谨慎。可以设计成可选开关：
+
+- 只同步索引和文本。
+- 同步全部录音。
+- 不同步。
+
+### 6. 更强的录音波形
+
+当前主页不显示波形。后续如果要恢复波形，更适合放在录音详情页：保存音频峰值数据，显示完整录音波形，并支持拖动波形 seek。
+
+可以新增一个 `.waveform.json`：
+
+```json
+{
+  "duration": 128,
+  "samples": [0.1, 0.3, 0.2]
+}
+```
+
+录音完成后后台生成，详情页直接读取，避免每次打开都重新分析音频。
+
+### 7. 背景录音
+
+如果要支持锁屏后持续录音，需要认真处理：
+
+- Background Modes。
+- 音频 session。
+- Live Activity 状态。
+- 中断恢复。
+- 来电、耳机、蓝牙设备切换。
+
+这是 TestFlight 前需要重点真机测试的部分。
+
+## TestFlight 前检查清单
+
+- 真机测试麦克风权限首次弹窗。
+- 真机测试语音识别权限首次弹窗。
+- 测试中文、英文语言切换。
+- 测试 WAV 和 M4A 保存、播放、分享。
+- 测试录音暂停、继续、停止。
+- 测试锁屏和灵动岛计时是否持续。
+- 测试无网络或模型未下载时的提示。
+- 测试删除录音后文件是否真的移除。
+- 测试长录音至少 10 到 30 分钟。
+- 检查 PrivacyInfo.xcprivacy 和 Info.plist 权限文案。
+
+## 构建验证命令
+
+暂存项目构建：
+
+```sh
+/Applications/Xcode-beta.app/Contents/Developer/usr/bin/xcodebuild \
+  -quiet \
+  -project LiveTranscriber.xcodeproj \
+  -scheme LiveTranscriber \
+  -destination 'generic/platform=iOS Simulator' \
+  -derivedDataPath /private/tmp/LiveTranscriberDerivedData \
+  CODE_SIGNING_ALLOWED=NO \
+  build
+```
+
+最终项目路径：
+
+```text
+~/workspace/LiveTranscriber
+```
+
+最终项目构建时把 workdir 切到该目录，并使用单独的 DerivedData 路径即可。

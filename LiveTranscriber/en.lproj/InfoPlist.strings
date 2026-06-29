@@ -1,0 +1,4 @@
+"CFBundleDisplayName" = "Live Transcriber";
+"CFBundleName" = "Live Transcriber";
+"NSMicrophoneUsageDescription" = "Used to record audio for live transcription.";
+"NSSpeechRecognitionUsageDescription" = "Used to turn recorded speech into live transcription text.";
