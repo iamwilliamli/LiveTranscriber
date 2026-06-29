@@ -601,8 +601,7 @@ private enum ImportedRecordingTranscriptionService {
 
         let options = SpeechAnalyzer.Options(
             priority: .userInitiated,
-            modelRetention: .whileInUse,
-            ignoresResourceLimits: true
+            modelRetention: .whileInUse
         )
         let analyzer = SpeechAnalyzer(modules: modules, options: options)
         try await analyzer.prepareToAnalyze(in: inputFormat)
@@ -835,6 +834,10 @@ private enum RecordingIntelligenceService {
     }
 
     private static func shouldExportFeedbackAttachment(for error: Error) -> Bool {
+        guard #available(iOS 27.0, *) else {
+            return false
+        }
+
         if let error = error as? LanguageModelError {
             switch error {
             case .guardrailViolation, .refusal:
@@ -856,7 +859,8 @@ private enum RecordingIntelligenceService {
     }
 
     private static func debugDescription(for error: Error) -> String {
-        if let error = error as? LanguageModelError {
+        if #available(iOS 27.0, *),
+           let error = error as? LanguageModelError {
             switch error {
             case .contextSizeExceeded(let context):
                 return "LanguageModelError.contextSizeExceeded contextSize=\(context.contextSize), tokenCount=\(context.tokenCount), debug=\(context.debugDescription), metadata=\(context.metadata)"

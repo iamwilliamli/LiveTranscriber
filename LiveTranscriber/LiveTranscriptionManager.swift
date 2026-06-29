@@ -324,12 +324,10 @@ final class LiveTranscriptionManager: ObservableObject {
 
         let options = SpeechAnalyzer.Options(
             priority: .userInitiated,
-            modelRetention: .whileInUse,
-            ignoresResourceLimits: true
+            modelRetention: .whileInUse
         )
         let analyzer = SpeechAnalyzer(modules: modules, options: options)
         try await analyzer.prepareToAnalyze(in: inputFormat)
-        let converter = try await AnalyzerInputConverter.converter(compatibleWith: modules)
 
         var continuation: AsyncThrowingStream<AnalyzerInput, Error>.Continuation?
         let stream = AsyncThrowingStream<AnalyzerInput, Error> { createdContinuation in
@@ -344,7 +342,7 @@ final class LiveTranscriptionManager: ObservableObject {
             analyzer: analyzer,
             transcriber: transcriber,
             stream: stream,
-            pipeline: AnalyzerInputPipeline(converter: converter, continuation: continuation)
+            pipeline: AnalyzerInputPipeline(continuation: continuation)
         )
     }
 
@@ -467,12 +465,9 @@ final class LiveTranscriptionManager: ObservableObject {
     ) throws {
         let inputNode = audioEngine.inputNode
         inputNode.removeTap(onBus: 0)
-        try inputNode.installAudioTap(onBus: 0, bufferSize: 1024, format: format) { [writer, pipeline] readOnlyBuffer, _ in
-            let recordingBuffer = AVAudioPCMBuffer(copying: readOnlyBuffer)
-            writer.write(recordingBuffer)
-
-            let buffer = AVAudioPCMBuffer(copying: readOnlyBuffer)
-            pipeline.process(buffer)
+        inputNode.installTap(onBus: 0, bufferSize: 1024, format: format) { [writer, pipeline] buffer, audioTime in
+            writer.write(buffer)
+            pipeline.process(buffer, audioTime: audioTime)
         }
 
         audioEngine.prepare()
@@ -687,35 +682,33 @@ private struct PreparedSpeechPipeline {
 }
 
 private final class AnalyzerInputPipeline: @unchecked Sendable {
-    private let converter: AnalyzerInputConverter
     private let continuation: AsyncThrowingStream<AnalyzerInput, Error>.Continuation
     private let lock = NSLock()
     private var didFinish = false
 
-    init(
-        converter: AnalyzerInputConverter,
-        continuation: AsyncThrowingStream<AnalyzerInput, Error>.Continuation
-    ) {
-        self.converter = converter
+    init(continuation: AsyncThrowingStream<AnalyzerInput, Error>.Continuation) {
         self.continuation = continuation
     }
 
-    func process(_ buffer: AVAudioPCMBuffer) {
+    func process(_ buffer: AVAudioPCMBuffer, audioTime: AVAudioTime) {
         lock.lock()
         defer { lock.unlock() }
         guard !didFinish else {
             return
         }
 
-        do {
-            let inputs = try converter.convert(buffer, at: nil)
-            for input in inputs {
-                continuation.yield(input)
-            }
-        } catch {
+        guard let copiedBuffer = buffer.deepCopy() else {
             didFinish = true
-            continuation.finish(throwing: error)
+            continuation.finish(throwing: LiveTranscriptionError.invalidAudioInput)
+            return
         }
+
+        continuation.yield(
+            AnalyzerInput(
+                buffer: copiedBuffer,
+                bufferStartTime: audioTime.analyzerStartTime
+            )
+        )
     }
 
     func finish() {
@@ -725,17 +718,61 @@ private final class AnalyzerInputPipeline: @unchecked Sendable {
             return
         }
 
-        do {
-            let inputs = try converter.flush()
-            for input in inputs {
-                continuation.yield(input)
-            }
-            didFinish = true
-            continuation.finish()
-        } catch {
-            didFinish = true
-            continuation.finish(throwing: error)
+        didFinish = true
+        continuation.finish()
+    }
+}
+
+private extension AVAudioPCMBuffer {
+    func deepCopy() -> AVAudioPCMBuffer? {
+        guard let copiedBuffer = AVAudioPCMBuffer(pcmFormat: format, frameCapacity: frameLength) else {
+            return nil
         }
+
+        copiedBuffer.frameLength = frameLength
+
+        let channelCount = Int(format.channelCount)
+        let frameCount = Int(frameLength)
+        switch format.commonFormat {
+        case .pcmFormatFloat32:
+            guard let source = floatChannelData,
+                  let destination = copiedBuffer.floatChannelData else {
+                return nil
+            }
+            for channel in 0..<channelCount {
+                destination[channel].update(from: source[channel], count: frameCount)
+            }
+        case .pcmFormatInt16:
+            guard let source = int16ChannelData,
+                  let destination = copiedBuffer.int16ChannelData else {
+                return nil
+            }
+            for channel in 0..<channelCount {
+                destination[channel].update(from: source[channel], count: frameCount)
+            }
+        case .pcmFormatInt32:
+            guard let source = int32ChannelData,
+                  let destination = copiedBuffer.int32ChannelData else {
+                return nil
+            }
+            for channel in 0..<channelCount {
+                destination[channel].update(from: source[channel], count: frameCount)
+            }
+        default:
+            return nil
+        }
+
+        return copiedBuffer
+    }
+}
+
+private extension AVAudioTime {
+    var analyzerStartTime: CMTime? {
+        guard sampleTime >= 0, sampleRate > 0 else {
+            return nil
+        }
+
+        return CMTime(value: sampleTime, timescale: CMTimeScale(sampleRate.rounded()))
     }
 }
 

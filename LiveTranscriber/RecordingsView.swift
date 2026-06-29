@@ -164,22 +164,31 @@ struct RecordingsView: View {
         }
         .confirmationDialog(
             "选择转录语言",
-            item: $pendingImport,
+            isPresented: Binding(
+                get: { pendingImport != nil },
+                set: { isPresented in
+                    if !isPresented {
+                        pendingImport = nil
+                    }
+                }
+            ),
             titleVisibility: .visible
-        ) { pendingImport in
-            ForEach(transcriber.supportedLanguages) { language in
-                Button {
-                    importRecording(from: pendingImport.url, language: language)
-                } label: {
-                    Label(
-                        language.displayName,
-                        systemImage: language.id == transcriber.selectedLanguageID ? "checkmark" : "globe"
-                    )
+        ) {
+            if let pendingImport {
+                ForEach(transcriber.supportedLanguages) { language in
+                    Button {
+                        importRecording(from: pendingImport.url, language: language)
+                    } label: {
+                        Label(
+                            language.displayName,
+                            systemImage: language.id == transcriber.selectedLanguageID ? "checkmark" : "globe"
+                        )
+                    }
                 }
             }
 
             Button("取消", role: .cancel) {}
-        } message: { _ in
+        } message: {
             Text("导入录音")
         }
         .alert(
@@ -212,13 +221,26 @@ struct RecordingsView: View {
         } message: {
             Text(importErrorMessage ?? "")
         }
-        .alert("删除录音", item: $deleteRequest) { request in
+        .alert(
+            "删除录音",
+            isPresented: Binding(
+                get: { deleteRequest != nil },
+                set: { isPresented in
+                    if !isPresented {
+                        deleteRequest = nil
+                    }
+                }
+            )
+        ) {
             Button("删除", role: .destructive) {
-                delete(request.item)
+                if let request = deleteRequest {
+                    delete(request.item)
+                    deleteRequest = nil
+                }
             }
             Button("取消", role: .cancel) {}
-        } message: { request in
-            Text(String(format: String(localized: "确定要删除 %@ 吗？"), request.item.audioFileName))
+        } message: {
+            Text(String(format: String(localized: "确定要删除 %@ 吗？"), deleteRequest?.item.audioFileName ?? ""))
         }
         .alert(
             "删除失败",
@@ -682,13 +704,26 @@ private struct RecordingDetailView: View {
         } message: {
             Text(analysisErrorMessage ?? "")
         }
-        .alert("删除录音", item: $deleteRequest) { request in
+        .alert(
+            "删除录音",
+            isPresented: Binding(
+                get: { deleteRequest != nil },
+                set: { isPresented in
+                    if !isPresented {
+                        deleteRequest = nil
+                    }
+                }
+            )
+        ) {
             Button("删除", role: .destructive) {
-                deleteCurrentItem(request.item)
+                if let request = deleteRequest {
+                    deleteCurrentItem(request.item)
+                    deleteRequest = nil
+                }
             }
             Button("取消", role: .cancel) {}
-        } message: { request in
-            Text(String(format: String(localized: "确定要删除 %@ 吗？"), request.item.audioFileName))
+        } message: {
+            Text(String(format: String(localized: "确定要删除 %@ 吗？"), deleteRequest?.item.audioFileName ?? ""))
         }
         .alert(
             "删除失败",
@@ -1129,7 +1164,7 @@ private final class RecordingPlaybackController: ObservableObject {
                     currentTime = 0
                 }
                 schedulePlayback(from: currentTime)
-                try playerNode.playAudio()
+                playerNode.play()
                 isPlaying = true
                 startTimer()
             } catch {
@@ -1155,12 +1190,7 @@ private final class RecordingPlaybackController: ObservableObject {
         currentTime = clampedTime
         if isPlaying {
             schedulePlayback(from: clampedTime)
-            do {
-                try playerNode?.playAudio()
-            } catch {
-                errorText = String(format: String(localized: "播放启动失败: %@"), error.localizedDescription)
-                isPlaying = false
-            }
+            playerNode?.play()
         }
     }
 
@@ -1230,8 +1260,8 @@ private final class RecordingPlaybackController: ObservableObject {
 
         engine.attach(node)
         engine.attach(equalizer)
-        try engine.connectNode(node, to: equalizer, format: format)
-        try engine.connectNode(equalizer, to: engine.mainMixerNode, format: format)
+        engine.connect(node, to: equalizer, format: format)
+        engine.connect(equalizer, to: engine.mainMixerNode, format: format)
         engine.prepare()
 
         audioEngine = engine
