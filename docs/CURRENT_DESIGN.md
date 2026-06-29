@@ -110,6 +110,7 @@ Toolbar actions:
 
 - Top-right more menu opens audio parameters in a sheet: sample rate, channel count, encoding, processing format, bit depth, duration, frame count, file size, and normalization status.
 - The same menu also supports sharing audio or transcript, re-transcribing with a selected language, copying transcript text, generating or refreshing Apple Intelligence summary/tags, and deleting the recording.
+- Audio files can be imported through the in-app file picker or through iOS document handoff/share flows such as Voice Memos exports.
 
 ## Settings
 

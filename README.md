@@ -11,6 +11,7 @@ The project is designed as a native iOS utility rather than a cloud transcriptio
 - WAV and M4A recording output.
 - Stereo Capture recording with `AVCaptureSession` and `AVCaptureDeviceInput.multichannelAudioMode = .stereo`.
 - Offline transcription for imported audio files, with language selection and progress/failure state.
+- Import from Files or the iOS share/Open In menu for audio recordings such as Voice Memos exports.
 - Re-transcription of saved recordings with any supported Speech locale.
 - iCloud Drive storage under `Live Transcriber/Documents/Recordings/`.
 - Search across file names, languages, transcript previews, full transcript text, summaries, and topic tags.

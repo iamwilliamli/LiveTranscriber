@@ -4,23 +4,32 @@ import UIKit
 struct ContentView: View {
     @StateObject private var transcriber = LiveTranscriptionManager()
     @StateObject private var recordingStore = RecordingStore()
+    @State private var selectedTab: AppTab = .transcribe
+    @State private var incomingRecordingImportURL: URL?
 
     var body: some View {
-        TabView {
+        TabView(selection: $selectedTab) {
             TranscriptionView(transcriber: transcriber, recordingStore: recordingStore)
                 .tabItem {
                     Label("转录", systemImage: "waveform.and.mic")
                 }
+                .tag(AppTab.transcribe)
 
-            RecordingsView(store: recordingStore, transcriber: transcriber)
+            RecordingsView(
+                store: recordingStore,
+                transcriber: transcriber,
+                incomingImportURL: $incomingRecordingImportURL
+            )
                 .tabItem {
                     Label("录音文件", systemImage: "folder")
                 }
+                .tag(AppTab.recordings)
 
             SettingsView(transcriber: transcriber, recordingStore: recordingStore)
                 .tabItem {
                     Label("设置", systemImage: "gearshape")
                 }
+                .tag(AppTab.settings)
         }
         .font(.redditSans(.body))
         .tint(AppTheme.brand)
@@ -34,14 +43,29 @@ struct ContentView: View {
             }
         }
         .onOpenURL { url in
-            handleLiveActivityURL(url)
+            handleOpenedURL(url)
         }
     }
 
-    private func handleLiveActivityURL(_ url: URL) {
+    private func handleOpenedURL(_ url: URL) {
+        if handleLiveActivityURL(url) {
+            return
+        }
+
+        guard isSupportedAudioImportURL(url) else {
+            return
+        }
+
+        selectedTab = .recordings
+        incomingRecordingImportURL = url
+        HapticFeedback.play(.importQueued)
+    }
+
+    @discardableResult
+    private func handleLiveActivityURL(_ url: URL) -> Bool {
         guard url.scheme == "livetranscriber",
               url.host == "stop-recording" else {
-            return
+            return false
         }
 
         Task {
@@ -53,7 +77,23 @@ struct ContentView: View {
                 transcriber.clearTranscript()
             }
         }
+        return true
     }
+
+    private func isSupportedAudioImportURL(_ url: URL) -> Bool {
+        guard url.isFileURL else {
+            return false
+        }
+
+        let supportedExtensions: Set<String> = ["wav", "m4a", "mp3", "aac", "aif", "aiff", "caf"]
+        return supportedExtensions.contains(url.pathExtension.lowercased())
+    }
+}
+
+private enum AppTab: Hashable {
+    case transcribe
+    case recordings
+    case settings
 }
 
 #if DEBUG

@@ -6,6 +6,7 @@ import UniformTypeIdentifiers
 struct RecordingsView: View {
     @ObservedObject var store: RecordingStore
     @ObservedObject var transcriber: LiveTranscriptionManager
+    @Binding var incomingImportURL: URL?
     @StateObject private var player = RecordingPlaybackController()
     @State private var deleteRequest: RecordingDeleteRequest?
     @State private var selectedRecording: RecordingItem?
@@ -161,6 +162,14 @@ struct RecordingsView: View {
             await store.reload()
             store.refreshIntelligenceAvailability()
         }
+        .onChange(of: incomingImportURL) { _, newURL in
+            guard let newURL else {
+                return
+            }
+
+            queueImport(from: newURL)
+            incomingImportURL = nil
+        }
         .fileImporter(
             isPresented: $showsImporter,
             allowedContentTypes: [.audio],
@@ -296,12 +305,22 @@ struct RecordingsView: View {
                 HapticFeedback.play(.warning)
                 return
             }
-            pendingImport = PendingImport(url: url)
-            HapticFeedback.play(.importQueued)
+            queueImport(from: url)
         case .failure(let error):
             importErrorMessage = error.localizedDescription
             HapticFeedback.play(.failure)
         }
+    }
+
+    private func queueImport(from url: URL) {
+        guard !isImporting else {
+            HapticFeedback.play(.blocked)
+            return
+        }
+
+        selectedRecording = nil
+        pendingImport = PendingImport(url: url)
+        HapticFeedback.play(.importQueued)
     }
 
     private func importRecording(from url: URL, language: TranscriptionLanguage) {
@@ -1894,7 +1913,8 @@ private struct RecordingInfoPill: View {
 #Preview("Recordings") {
     RecordingsView(
         store: RecordingStore(),
-        transcriber: LiveTranscriptionManager()
+        transcriber: LiveTranscriptionManager(),
+        incomingImportURL: .constant(nil)
     )
         .font(.redditSans(.body))
         .tint(AppTheme.brand)
