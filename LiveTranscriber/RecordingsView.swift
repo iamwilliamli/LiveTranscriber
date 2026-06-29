@@ -620,9 +620,21 @@ private struct RecordingDetailView: View {
     @State private var isShowingRenameAlert = false
     @State private var renameText = ""
     @State private var renameErrorMessage: String?
+    @State private var cachedTranscriptLines: [StoredTranscriptLine] = []
+    @State private var scrubbedPlaybackTime: TimeInterval?
 
     private var currentItem: RecordingItem {
         store.recording(withID: item.id) ?? item
+    }
+
+    private var transcriptCacheIdentifier: String {
+        [
+            currentItem.id.uuidString,
+            currentItem.transcriptFileName,
+            "\(currentItem.lineCount)",
+            "\(currentItem.transcriptPreview.hashValue)",
+            "\(currentItem.importStatus == nil)"
+        ].joined(separator: "-")
     }
 
     private var isTranscriptionRunning: Bool {
@@ -677,6 +689,9 @@ private struct RecordingDetailView: View {
                 await refreshAudioFileInfo()
                 player.load(item: currentItem, url: store.audioURL(for: currentItem))
             }
+        }
+        .task(id: transcriptCacheIdentifier) {
+            await refreshTranscriptCache()
         }
         .onDisappear {
             player.unload()
@@ -969,7 +984,9 @@ private struct RecordingDetailView: View {
     }
 
     private var playerCard: some View {
-        VStack(alignment: .leading, spacing: 12) {
+        let displayedTime = scrubbedPlaybackTime ?? player.currentTime
+
+        return VStack(alignment: .leading, spacing: 12) {
             Label("播放录音", systemImage: "play.circle")
                 .font(.redditSans(.headline))
 
@@ -989,15 +1006,21 @@ private struct RecordingDetailView: View {
                 VStack(spacing: 6) {
                     Slider(
                         value: Binding(
-                            get: { player.currentTime },
-                            set: { player.seek(to: $0) }
+                            get: { scrubbedPlaybackTime ?? player.currentTime },
+                            set: { scrubbedPlaybackTime = $0 }
                         ),
-                        in: 0...max(player.duration, 1)
+                        in: 0...max(player.duration, 1),
+                        onEditingChanged: { isEditing in
+                            if !isEditing, let scrubbedPlaybackTime {
+                                player.seek(to: scrubbedPlaybackTime)
+                                self.scrubbedPlaybackTime = nil
+                            }
+                        }
                     )
                     .disabled(!player.isLoaded)
 
                     HStack {
-                        Text(TranscriptionLine.formatTimestamp(player.currentTime))
+                        Text(TranscriptionLine.formatTimestamp(displayedTime))
                         Spacer()
                         Text(TranscriptionLine.formatTimestamp(player.duration))
                     }
@@ -1025,8 +1048,8 @@ private struct RecordingDetailView: View {
 
     private var transcript: some View {
         let item = currentItem
-        let text = store.transcriptText(for: item)
-        let lines = StoredTranscriptLine.parse(text)
+        let lines = cachedTranscriptLines
+        let currentLineID = StoredTranscriptLine.currentLineID(in: lines, time: player.currentTime)
 
         return VStack(alignment: .leading, spacing: 12) {
             Label("转录文本", systemImage: "text.alignleft")
@@ -1043,13 +1066,14 @@ private struct RecordingDetailView: View {
                         .frame(height: 180)
                 }
             } else {
-                VStack(alignment: .leading, spacing: 8) {
+                LazyVStack(alignment: .leading, spacing: 8) {
                     ForEach(lines) { line in
                         StoredTranscriptLineRow(
                             line: line,
-                            isCurrent: line.contains(time: player.currentTime, in: lines)
+                            isCurrent: line.id == currentLineID
                         ) {
                             HapticFeedback.play(.timelineSeek)
+                            scrubbedPlaybackTime = nil
                             player.seek(to: line.startSeconds)
                         }
                     }
@@ -1132,6 +1156,22 @@ private struct RecordingDetailView: View {
         }
     }
 
+    private func refreshTranscriptCache() async {
+        let item = currentItem
+        let transcriptURL = store.transcriptURL(for: item)
+        let lines = await Task.detached(priority: .utility) {
+            let text = (try? String(contentsOf: transcriptURL, encoding: .utf8)) ?? ""
+            return StoredTranscriptLine.parse(text)
+        }.value
+
+        guard currentItem.id == item.id,
+              currentItem.transcriptFileName == item.transcriptFileName else {
+            return
+        }
+
+        cachedTranscriptLines = lines
+    }
+
     private func renameCurrentItem() {
         guard !isTranscriptionRunning else {
             HapticFeedback.play(.blocked)
@@ -1144,6 +1184,7 @@ private struct RecordingDetailView: View {
             player.load(item: renamedItem, url: store.audioURL(for: renamedItem))
             Task {
                 await refreshAudioFileInfo()
+                await refreshTranscriptCache()
             }
         } catch {
             renameErrorMessage = error.localizedDescription
@@ -1453,15 +1494,16 @@ private struct RecordingAudioParameterRow: View {
 }
 
 private struct StoredTranscriptLine: Identifiable, Hashable {
-    let id = UUID()
+    let id: String
     let startSeconds: TimeInterval
     let timeText: String
     let text: String
 
     static func parse(_ transcript: String) -> [StoredTranscriptLine] {
-        transcript
+        let lines = transcript
             .split(whereSeparator: \.isNewline)
-            .compactMap { rawLine in
+            .enumerated()
+            .compactMap { offset, rawLine -> StoredTranscriptLine? in
                 let line = String(rawLine).trimmingCharacters(in: .whitespacesAndNewlines)
                 guard line.hasPrefix("["),
                       let closingBracket = line.firstIndex(of: "]") else {
@@ -1475,24 +1517,43 @@ private struct StoredTranscriptLine: Identifiable, Hashable {
                     return nil
                 }
 
-                return StoredTranscriptLine(startSeconds: seconds, timeText: timeText, text: text)
+                return StoredTranscriptLine(
+                    id: "\(offset)-\(timeText)",
+                    startSeconds: seconds,
+                    timeText: timeText,
+                    text: text
+                )
             }
+
+        return lines.sorted {
+            if $0.startSeconds == $1.startSeconds {
+                return $0.id < $1.id
+            }
+            return $0.startSeconds < $1.startSeconds
+        }
     }
 
-    func contains(time: TimeInterval, in lines: [StoredTranscriptLine]) -> Bool {
-        guard time >= startSeconds else {
-            return false
+    static func currentLineID(in lines: [StoredTranscriptLine], time: TimeInterval) -> StoredTranscriptLine.ID? {
+        guard !lines.isEmpty else {
+            return nil
         }
 
-        let sorted = lines.sorted { $0.startSeconds < $1.startSeconds }
-        guard let index = sorted.firstIndex(where: { $0.id == id }) else {
-            return false
+        var lowerBound = 0
+        var upperBound = lines.count
+        while lowerBound < upperBound {
+            let midIndex = (lowerBound + upperBound) / 2
+            if lines[midIndex].startSeconds <= time {
+                lowerBound = midIndex + 1
+            } else {
+                upperBound = midIndex
+            }
         }
 
-        if sorted.indices.contains(index + 1) {
-            return time < sorted[index + 1].startSeconds
+        let index = lowerBound - 1
+        guard lines.indices.contains(index) else {
+            return nil
         }
-        return true
+        return lines[index].id
     }
 
     private static func parseSeconds(_ text: String) -> TimeInterval? {
@@ -1553,6 +1614,7 @@ private final class RecordingPlaybackController: ObservableObject {
     @Published private(set) var errorText: String?
 
     private static let playbackGainDecibels: Float = 3
+    private static let playbackUITickMilliseconds = 250
 
     private let audioSessionQueue = DispatchQueue(label: "com.reddownloader.live-transcriber.playback-session", qos: .userInitiated)
     private var audioEngine: AVAudioEngine?
@@ -1667,7 +1729,7 @@ private final class RecordingPlaybackController: ObservableObject {
             while let self, !Task.isCancelled {
                 guard self.isPlaying else {
                     do {
-                        try await Task.sleep(for: .milliseconds(120))
+                        try await Task.sleep(for: .milliseconds(Self.playbackUITickMilliseconds))
                     } catch {
                         break
                     }
@@ -1680,7 +1742,7 @@ private final class RecordingPlaybackController: ObservableObject {
                 }
 
                 do {
-                    try await Task.sleep(for: .milliseconds(120))
+                    try await Task.sleep(for: .milliseconds(Self.playbackUITickMilliseconds))
                 } catch {
                     break
                 }
