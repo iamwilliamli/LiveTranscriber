@@ -70,6 +70,7 @@
 "正在分析" = "Analyzing";
 "分析失败" = "Analysis Failed";
 "好" = "OK";
+"保存" = "Save";
 "智能摘要" = "Summary";
 "暂无摘要" = "No Summary";
 "没有可分析的转录文本" = "No transcript text to analyze";
@@ -81,6 +82,14 @@
 "分享" = "Share";
 "更多" = "More";
 "完成" = "Done";
+"重命名" = "Rename";
+"重命名录音" = "Rename Recording";
+"录音名称" = "Recording Name";
+"会同步修改音频文件和转录文本文件名" = "This will rename both the audio file and transcript text file";
+"重命名失败" = "Rename Failed";
+"录音名称不能为空" = "Recording name cannot be empty";
+"已存在同名录音文件" = "A recording with this file name already exists";
+"找不到录音文件" = "Recording file not found";
 "分享音频" = "Share Audio";
 "分享转录文字" = "Share Transcript Text";
 "已复制" = "Copied";

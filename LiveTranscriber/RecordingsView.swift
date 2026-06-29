@@ -428,14 +428,15 @@ private struct RecordingRow: View {
                     .frame(width: 44, height: 44)
 
                     VStack(alignment: .leading, spacing: 4) {
-                        Text(item.createdAt, format: .dateTime.year().month().day().hour().minute())
+                        Text(item.audioFileName)
                             .font(.redditSans(.headline, weight: .semibold))
                             .foregroundStyle(.primary)
-                        Text(item.audioFileName)
+                            .lineLimit(1)
+                            .truncationMode(.middle)
+                        Text(item.createdAt, format: .dateTime.year().month().day().hour().minute())
                             .font(.redditSans(.caption))
                             .foregroundStyle(.secondary)
                             .lineLimit(1)
-                            .truncationMode(.middle)
                     }
                 }
                 .contentShape(Rectangle())
@@ -616,6 +617,9 @@ private struct RecordingDetailView: View {
     @State private var audioFileInfo: RecordingAudioFileInfo?
     @State private var audioFileInfoError: String?
     @State private var isShowingAudioFileInfo = false
+    @State private var isShowingRenameAlert = false
+    @State private var renameText = ""
+    @State private var renameErrorMessage: String?
 
     private var currentItem: RecordingItem {
         store.recording(withID: item.id) ?? item
@@ -638,7 +642,7 @@ private struct RecordingDetailView: View {
             .padding()
         }
         .background(AppTheme.groupedBackground.ignoresSafeArea())
-        .navigationTitle("录音详情")
+        .navigationTitle(currentItem.audioFileName)
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
@@ -728,10 +732,46 @@ private struct RecordingDetailView: View {
         } message: {
             Text(deleteErrorMessage ?? "")
         }
+        .alert("重命名录音", isPresented: $isShowingRenameAlert) {
+            TextField("录音名称", text: $renameText)
+                .textInputAutocapitalization(.never)
+                .autocorrectionDisabled()
+
+            Button("保存") {
+                renameCurrentItem()
+            }
+
+            Button("取消", role: .cancel) {}
+        } message: {
+            Text("会同步修改音频文件和转录文本文件名")
+        }
+        .alert(
+            "重命名失败",
+            isPresented: Binding(
+                get: { renameErrorMessage != nil },
+                set: { isPresented in
+                    if !isPresented {
+                        renameErrorMessage = nil
+                    }
+                }
+            )
+        ) {
+            Button("好", role: .cancel) {}
+        } message: {
+            Text(renameErrorMessage ?? "")
+        }
     }
 
     private var detailActionsMenu: some View {
         Menu {
+            Button {
+                renameText = (currentItem.audioFileName as NSString).deletingPathExtension
+                isShowingRenameAlert = true
+            } label: {
+                Label("重命名", systemImage: "pencil")
+            }
+            .disabled(isTranscriptionRunning)
+
             Button {
                 isShowingAudioFileInfo = true
             } label: {
@@ -1089,6 +1129,25 @@ private struct RecordingDetailView: View {
         } catch {
             audioFileInfo = nil
             audioFileInfoError = String(format: String(localized: "无法读取音频参数: %@"), error.localizedDescription)
+        }
+    }
+
+    private func renameCurrentItem() {
+        guard !isTranscriptionRunning else {
+            HapticFeedback.play(.blocked)
+            return
+        }
+
+        do {
+            let renamedItem = try store.rename(currentItem, to: renameText)
+            HapticFeedback.play(.primaryAction)
+            player.load(item: renamedItem, url: store.audioURL(for: renamedItem))
+            Task {
+                await refreshAudioFileInfo()
+            }
+        } catch {
+            renameErrorMessage = error.localizedDescription
+            HapticFeedback.play(.failure)
         }
     }
 
@@ -1506,7 +1565,7 @@ private final class RecordingPlaybackController: ObservableObject {
     private var playbackScheduleID = 0
 
     func load(item: RecordingItem, url: URL) {
-        guard currentItem?.id != item.id || !isLoaded else {
+        guard currentItem?.id != item.id || currentItem?.audioFileName != item.audioFileName || !isLoaded else {
             return
         }
 

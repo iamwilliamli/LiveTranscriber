@@ -398,6 +398,81 @@ final class RecordingStore: ObservableObject {
         try persist()
     }
 
+    @discardableResult
+    func rename(_ item: RecordingItem, to proposedName: String) throws -> RecordingItem {
+        try ensureRecordingsDirectory()
+        guard let index = recordings.firstIndex(where: { $0.id == item.id }) else {
+            throw RecordingRenameError.itemMissing
+        }
+
+        let currentItem = recordings[index]
+        let baseName = try Self.sanitizedBaseName(from: proposedName)
+        let audioExtension = (currentItem.audioFileName as NSString).pathExtension
+        let transcriptExtension = (currentItem.transcriptFileName as NSString).pathExtension.isEmpty
+            ? "txt"
+            : (currentItem.transcriptFileName as NSString).pathExtension
+        let newAudioFileName = audioExtension.isEmpty ? baseName : "\(baseName).\(audioExtension)"
+        let newTranscriptFileName = "\(baseName).\(transcriptExtension)"
+
+        if newAudioFileName == currentItem.audioFileName,
+           newTranscriptFileName == currentItem.transcriptFileName {
+            return currentItem
+        }
+
+        let sourceAudioURL = audioURL(for: currentItem)
+        let sourceTranscriptURL = transcriptURL(for: currentItem)
+        let targetAudioURL = recordingsDirectory.appendingPathComponent(newAudioFileName)
+        let targetTranscriptURL = recordingsDirectory.appendingPathComponent(newTranscriptFileName)
+
+        if sourceAudioURL.path != targetAudioURL.path,
+           fileManager.fileExists(atPath: targetAudioURL.path) {
+            throw RecordingRenameError.nameAlreadyExists
+        }
+        if sourceTranscriptURL.path != targetTranscriptURL.path,
+           fileManager.fileExists(atPath: targetTranscriptURL.path) {
+            throw RecordingRenameError.nameAlreadyExists
+        }
+
+        var movedAudio = false
+        var movedTranscript = false
+        let originalItem = currentItem
+
+        do {
+            if sourceAudioURL.path != targetAudioURL.path {
+                try moveItem(from: sourceAudioURL, to: targetAudioURL)
+                movedAudio = true
+            }
+            if fileManager.fileExists(atPath: sourceTranscriptURL.path),
+               sourceTranscriptURL.path != targetTranscriptURL.path {
+                try moveItem(from: sourceTranscriptURL, to: targetTranscriptURL)
+                movedTranscript = true
+            }
+
+            var updatedItem = currentItem
+            updatedItem.audioFileName = newAudioFileName
+            updatedItem.transcriptFileName = newTranscriptFileName
+
+            var updatedRecordings = recordings
+            updatedRecordings[index] = updatedItem
+            recordings = updatedRecordings
+            try persist()
+            return updatedItem
+        } catch {
+            if movedTranscript {
+                try? moveItem(from: targetTranscriptURL, to: sourceTranscriptURL)
+            }
+            if movedAudio {
+                try? moveItem(from: targetAudioURL, to: sourceAudioURL)
+            }
+            var restoredRecordings = recordings
+            if restoredRecordings.indices.contains(index) {
+                restoredRecordings[index] = originalItem
+                recordings = restoredRecordings
+            }
+            throw error
+        }
+    }
+
     func audioURL(for item: RecordingItem) -> URL {
         recordingsDirectory.appendingPathComponent(item.audioFileName)
     }
@@ -590,6 +665,23 @@ final class RecordingStore: ObservableObject {
         }
     }
 
+    private static func sanitizedBaseName(from proposedName: String) throws -> String {
+        let invalidCharacters = CharacterSet(charactersIn: "/:")
+            .union(.newlines)
+            .union(.controlCharacters)
+        let components = proposedName
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+            .components(separatedBy: invalidCharacters)
+        let sanitized = components
+            .joined(separator: " ")
+            .trimmingCharacters(in: CharacterSet.whitespacesAndNewlines.union(CharacterSet(charactersIn: ".")))
+
+        guard !sanitized.isEmpty else {
+            throw RecordingRenameError.emptyName
+        }
+        return sanitized
+    }
+
     nonisolated fileprivate static func durationSeconds(for audioURL: URL) throws -> Int {
         let file = try AVAudioFile(forReading: audioURL)
         let sampleRate = file.processingFormat.sampleRate
@@ -597,6 +689,23 @@ final class RecordingStore: ObservableObject {
             return 0
         }
         return max(Int((Double(file.length) / sampleRate).rounded()), 0)
+    }
+}
+
+private enum RecordingRenameError: LocalizedError {
+    case emptyName
+    case nameAlreadyExists
+    case itemMissing
+
+    var errorDescription: String? {
+        switch self {
+        case .emptyName:
+            return String(localized: "录音名称不能为空")
+        case .nameAlreadyExists:
+            return String(localized: "已存在同名录音文件")
+        case .itemMissing:
+            return String(localized: "找不到录音文件")
+        }
     }
 }
 
