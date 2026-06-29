@@ -4,7 +4,7 @@
 
 ## 产品定位
 
-LiveTranscriber 是一个 iOS 27-only 的本地录音和实时转录工具。
+LiveTranscriber 是一个 iOS 26+ 的本地录音和实时转录工具。iOS 27 上保留 Native Speech Pipeline 作为可选开发者模式。
 
 核心目标：
 
@@ -18,13 +18,19 @@ LiveTranscriber 是一个 iOS 27-only 的本地录音和实时转录工具。
 
 ## 平台和 SDK 取舍
 
-项目明确只支持 iOS 27，因此可以直接使用新 Speech SDK：
+项目当前兼容 iOS 26+，但使用 iOS 27 SDK 构建，以便在 iOS 27 设备上保留新的 Speech Pipeline：
 
 - `SpeechAnalyzer` 负责音频分析管线。
 - `SpeechTranscriber` 负责实时转录。
+- `AnalyzerInputConverter` 只在 iOS 27 Native Pipeline 中使用。
 - `ActivityKit` 和 Widget extension 用于灵动岛与锁屏状态展示。
 
-当前保留简单稳定的 `SpeechTranscriber` 管线，不启用额外识别增强模块。之前尝试过更复杂的组合式管线，但实际识别质量和体验不如简化版本稳定，因此回退。
+当前保留两条实时转录 Pipeline：
+
+- Compatible Pipeline：iOS 26/27 默认稳定路径，`AVAudioConverter -> 16 kHz / mono / Int16 PCM`，再送入 `SpeechAnalyzer.prepareToAnalyze(in: analyzerInputFormat)`。
+- iOS 27 Native Pipeline：使用 `AnalyzerInputConverter.converter(compatibleWith: modules)` 和 `SpeechAnalyzer.prepareToAnalyze(in: nil)`，让系统选择输入格式。
+
+两条 Pipeline 都使用 `SpeechTranscriber(preset: .timeIndexedProgressiveTranscription)`，并对 `AnalyzerInput.bufferStartTime` 使用严格单调的 frame-based `CMTime` 累加，避免时间戳重叠。
 
 ## 当前能力
 
@@ -134,6 +140,11 @@ iCloud 同步设计：
 2. `AVAudioEngine` input tap 收到每个 `AVAudioPCMBuffer` 后复制两份。
 3. 第一份原始 buffer 直接写入 `AudioFileWriter`，不做实时增益。
 4. 第二份原始 buffer 送入 `AnalyzerInputPipeline` / `SpeechAnalyzer`，避免音量处理影响转录识别。
+
+实时转录 Pipeline 参数：
+
+- Compatible：`SpeechAnalyzer.Options(priority: .userInitiated, modelRetention: .whileInUse)`；iOS 27 上额外设置 `ignoresResourceLimits: true`；输入格式固定为 `16 kHz / mono / Int16 PCM`；转换器为 `AVAudioConverter`。
+- iOS 27 Native：`SpeechAnalyzer.Options(priority: .userInitiated, modelRetention: .whileInUse, ignoresResourceLimits: true)`；`AnalyzerInputConverter.converter(compatibleWith: modules)`；`SpeechAnalyzer.prepareToAnalyze(in: nil)`；给 converter 传入合成的连续 `AVAudioTime`。
 
 停止录音后：
 

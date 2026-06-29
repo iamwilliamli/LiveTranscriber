@@ -46,6 +46,7 @@ struct RecordingsView: View {
                             RecordingRow(
                                 item: item,
                                 isAnalyzing: analyzingRecordingID == item.id,
+                                showsIntelligence: store.intelligenceAvailability.isAvailable,
                                 languages: transcriber.supportedLanguages
                             ) {
                                 selectedRecording = item
@@ -63,12 +64,14 @@ struct RecordingsView: View {
                                     Label("复制转录文本", systemImage: "doc.on.doc")
                                 }
 
-                                Button {
-                                    analyze(item)
-                                } label: {
-                                    Label(item.intelligence == nil ? "生成标签和总结" : "重新分析", systemImage: "sparkles")
+                                if store.intelligenceAvailability.isAvailable {
+                                    Button {
+                                        analyze(item)
+                                    } label: {
+                                        Label(item.intelligence == nil ? "生成标签和总结" : "重新分析", systemImage: "sparkles")
+                                    }
+                                    .disabled(analyzingRecordingID != nil)
                                 }
-                                .disabled(analyzingRecordingID != nil)
 
                                 Menu {
                                     ForEach(transcriber.supportedLanguages) { language in
@@ -94,13 +97,15 @@ struct RecordingsView: View {
                                 .disabled(item.importStatus?.isFailed == false)
                             }
                             .swipeActions(edge: .leading, allowsFullSwipe: false) {
-                                Button {
-                                    analyze(item)
-                                } label: {
-                                    Label("分析", systemImage: "sparkles")
+                                if store.intelligenceAvailability.isAvailable {
+                                    Button {
+                                        analyze(item)
+                                    } label: {
+                                        Label("分析", systemImage: "sparkles")
+                                    }
+                                    .tint(AppTheme.info)
+                                    .disabled(analyzingRecordingID != nil)
                                 }
-                                .tint(AppTheme.info)
-                                .disabled(analyzingRecordingID != nil)
                             }
                             .swipeActions(edge: .trailing, allowsFullSwipe: false) {
                                 Button {
@@ -154,6 +159,7 @@ struct RecordingsView: View {
         .task {
             await transcriber.refreshSupportedLanguages()
             await store.reload()
+            store.refreshIntelligenceAvailability()
         }
         .fileImporter(
             isPresented: $showsImporter,
@@ -260,6 +266,10 @@ struct RecordingsView: View {
     }
 
     private func analyze(_ item: RecordingItem) {
+        guard store.intelligenceAvailability.isAvailable else {
+            HapticFeedback.play(.blocked)
+            return
+        }
         guard analyzingRecordingID == nil else {
             HapticFeedback.play(.blocked)
             return
@@ -391,6 +401,7 @@ private struct RecordingDeleteRequest: Identifiable {
 private struct RecordingRow: View {
     let item: RecordingItem
     let isAnalyzing: Bool
+    let showsIntelligence: Bool
     let languages: [TranscriptionLanguage]
     let onOpen: () -> Void
     let onRetranscribe: (TranscriptionLanguage) -> Void
@@ -503,7 +514,7 @@ private struct RecordingRow: View {
                     HapticFeedback.play(.navigation)
                     onOpen()
                 }
-            } else if isAnalyzing {
+            } else if showsIntelligence && isAnalyzing {
                 Label("正在分析", systemImage: "sparkles")
                     .font(.redditSans(.caption, weight: .semibold))
                     .foregroundStyle(AppTheme.info)
@@ -512,7 +523,7 @@ private struct RecordingRow: View {
                         HapticFeedback.play(.navigation)
                         onOpen()
                     }
-            } else if let intelligence = item.intelligence {
+            } else if showsIntelligence, let intelligence = item.intelligence {
                 RecordingIntelligencePreview(intelligence: intelligence)
                     .contentShape(Rectangle())
                     .onTapGesture {
@@ -612,7 +623,9 @@ private struct RecordingDetailView: View {
             VStack(alignment: .leading, spacing: 16) {
                 header
                 playerCard
-                intelligenceCard
+                if store.intelligenceAvailability.isAvailable {
+                    intelligenceCard
+                }
                 transcript
             }
             .padding()
@@ -664,12 +677,14 @@ private struct RecordingDetailView: View {
                     Image(systemName: copied ? "checkmark" : "doc.on.doc")
                 }
 
-                Button {
-                    analyzeCurrentItem()
-                } label: {
-                    Image(systemName: isAnalyzing ? "hourglass" : "sparkles")
+                if store.intelligenceAvailability.isAvailable {
+                    Button {
+                        analyzeCurrentItem()
+                    } label: {
+                        Image(systemName: isAnalyzing ? "hourglass" : "sparkles")
+                    }
+                    .disabled(isAnalyzing)
                 }
-                .disabled(isAnalyzing)
 
                 Button(role: .destructive) {
                     HapticFeedback.play(.deleteRequested)
@@ -682,6 +697,7 @@ private struct RecordingDetailView: View {
         }
         .onAppear {
             Task {
+                store.refreshIntelligenceAvailability()
                 await store.normalizeAudioIfNeeded(for: currentItem)
                 player.load(item: currentItem, url: store.audioURL(for: currentItem))
             }
@@ -928,6 +944,10 @@ private struct RecordingDetailView: View {
     }
 
     private func analyzeCurrentItem() {
+        guard store.intelligenceAvailability.isAvailable else {
+            HapticFeedback.play(.blocked)
+            return
+        }
         guard !isAnalyzing else {
             HapticFeedback.play(.blocked)
             return

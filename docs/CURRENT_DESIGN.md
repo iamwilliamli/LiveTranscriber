@@ -4,7 +4,7 @@ This document summarizes the current implementation-facing design of LiveTranscr
 
 ## Product Shape
 
-LiveTranscriber is a native iOS 27 utility for local recording, live transcription, saved-recording review, and lightweight transcript intelligence.
+LiveTranscriber is a native iOS 26+ utility for local recording, live transcription, saved-recording review, and lightweight transcript intelligence. iOS 27 devices can use an optional Native Speech Pipeline from Developer Options.
 
 The app is organized as three tabs:
 

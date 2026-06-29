@@ -15,6 +15,62 @@ This is the current audio pipeline that works well on device. File-level normali
 
 The core reason is stability: the saved file should not clip, and transcription should receive audio that matches the microphone signal as closely as possible.
 
+## Speech Analyzer Pipelines
+
+The app currently supports two live transcription pipelines. Both use `SpeechTranscriber(locale:preset:)` with `preset: .timeIndexedProgressiveTranscription`, and both retime analyzer inputs with a strictly monotonic frame-based `CMTime` accumulator.
+
+### Compatible Pipeline
+
+Use this as the stable default on iOS 26 and iOS 27.
+
+```text
+SpeechAnalyzer.Options:
+  priority = .userInitiated
+  modelRetention = .whileInUse
+  ignoresResourceLimits = true on iOS 27 only
+
+SpeechAnalyzer.prepareToAnalyze(in: analyzerInputFormat)
+
+analyzerInputFormat:
+  commonFormat = .pcmFormatInt16
+  sampleRate = 16_000
+  channels = 1
+  interleaved = false
+
+conversion:
+  AVAudioConverter(source microphone format -> analyzerInputFormat)
+```
+
+This path intentionally avoids the iOS 27 native converter so it remains a controlled fallback when native SDK behavior changes.
+
+### iOS 27 Native Pipeline
+
+Use this when testing the iOS 27 Speech stack directly.
+
+```text
+SpeechAnalyzer.Options:
+  priority = .userInitiated
+  modelRetention = .whileInUse
+  ignoresResourceLimits = true
+
+SpeechTranscriber:
+  preset = .timeIndexedProgressiveTranscription
+
+AnalyzerInputConverter:
+  converter = try await AnalyzerInputConverter.converter(compatibleWith: modules)
+
+SpeechAnalyzer:
+  try await analyzer.prepareToAnalyze(in: nil)
+
+converter input time:
+  synthetic AVAudioTime(sampleTime: accumulatedSourceFrames, atRate: sourceSampleRate)
+
+AnalyzerInput retiming:
+  bufferStartTime = accumulated CMTime by output frameLength and output sampleRate
+```
+
+The important detail is that the app does not pass `nil` audio times into the converter during live recording. It supplies a synthetic monotonic `AVAudioTime`, then rebuilds each emitted `AnalyzerInput.bufferStartTime` with exact frame-count accumulation. This avoids `Audio input timestamp overlaps or precedes prior audio input` failures when the input tap or converter emits buffers with ambiguous timestamps.
+
 ## Stop Stage
 
 When recording stops:

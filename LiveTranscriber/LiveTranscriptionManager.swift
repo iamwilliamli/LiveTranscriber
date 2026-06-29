@@ -2,7 +2,10 @@ import AVFoundation
 import Combine
 import CoreMedia
 import Foundation
+import OSLog
 import Speech
+
+private let liveTranscriptionLogger = Logger(subsystem: "com.reddownloader.LiveTranscriber", category: "LiveTranscription")
 
 @MainActor
 final class LiveTranscriptionManager: ObservableObject {
@@ -27,9 +30,16 @@ final class LiveTranscriptionManager: ObservableObject {
             }
         }
     }
+    @Published var selectedSpeechPipelineMode: SpeechPipelineMode {
+        didSet {
+            UserDefaults.standard.set(selectedSpeechPipelineMode.rawValue, forKey: Self.speechPipelineModeDefaultsKey)
+        }
+    }
 
     private static let languageDefaultsKey = "transcription.language"
     private static let audioFormatDefaultsKey = "recording.audioFormat"
+    private static let speechPipelineModeDefaultsKey = "speech.pipelineMode"
+    private static let analyzerSampleRate: Double = 16_000
 
     private let audioEngine = AVAudioEngine()
     private let audioSessionQueue = DispatchQueue(label: "com.reddownloader.live-transcription.audio-session", qos: .userInitiated)
@@ -68,8 +78,19 @@ final class LiveTranscriptionManager: ObservableObject {
         !plainTranscript.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
     }
 
+    var speechPipelineDiagnostics: SpeechProcessingPipelineDiagnostics {
+        .current(configuredMode: selectedSpeechPipelineMode)
+    }
+
     init() {
         selectedLanguageID = UserDefaults.standard.string(forKey: Self.languageDefaultsKey) ?? TranscriptionLanguage.defaultLanguageID
+        if let rawMode = UserDefaults.standard.string(forKey: Self.speechPipelineModeDefaultsKey),
+           let storedMode = SpeechPipelineMode(rawValue: rawMode) {
+            selectedSpeechPipelineMode = storedMode
+        } else {
+            selectedSpeechPipelineMode = .compatible
+        }
+
         if let rawFormat = UserDefaults.standard.string(forKey: Self.audioFormatDefaultsKey),
            let storedFormat = RecordingAudioFormat(rawValue: rawFormat) {
             selectedAudioFormat = storedFormat
@@ -132,7 +153,7 @@ final class LiveTranscriptionManager: ObservableObject {
 
             let language = selectedLanguage
             let audioFormat = selectedAudioFormat
-            let prepared = try await prepareSpeechPipeline(language: language, inputFormat: recordingFormat)
+            let prepared = try await prepareSpeechPipeline(language: language, audioInputFormat: recordingFormat)
             let recordingURL = try Self.makeTemporaryRecordingURL(format: audioFormat)
             let writer = try AudioFileWriter(url: recordingURL, inputFormat: recordingFormat, outputFormat: audioFormat)
 
@@ -305,7 +326,7 @@ final class LiveTranscriptionManager: ObservableObject {
 
     private func prepareSpeechPipeline(
         language: TranscriptionLanguage,
-        inputFormat: AVAudioFormat
+        audioInputFormat: AVAudioFormat
     ) async throws -> PreparedSpeechPipeline {
         statusText = String(localized: "正在准备语言模型")
         guard SpeechTranscriber.isAvailable else {
@@ -322,12 +343,8 @@ final class LiveTranscriptionManager: ObservableObject {
 
         try await ensureAssets(for: modules)
 
-        let options = SpeechAnalyzer.Options(
-            priority: .userInitiated,
-            modelRetention: .whileInUse
-        )
+        let options = Self.makeSpeechAnalyzerOptions()
         let analyzer = SpeechAnalyzer(modules: modules, options: options)
-        try await analyzer.prepareToAnalyze(in: inputFormat)
 
         var continuation: AsyncThrowingStream<AnalyzerInput, Error>.Continuation?
         let stream = AsyncThrowingStream<AnalyzerInput, Error> { createdContinuation in
@@ -338,11 +355,56 @@ final class LiveTranscriptionManager: ObservableObject {
             throw LiveTranscriptionError.analyzerUnavailable
         }
 
+        let pipeline: AnalyzerInputPipeline
+        if #available(iOS 27.0, *), selectedSpeechPipelineMode == .nativeIOS27 {
+            let converter = try await AnalyzerInputConverter.converter(compatibleWith: modules)
+            try await analyzer.prepareToAnalyze(in: nil)
+            pipeline = AnalyzerInputPipeline(
+                continuation: continuation,
+                converter: converter
+            )
+        } else {
+            let analyzerInputFormat = try Self.makeAnalyzerInputFormat()
+            try await analyzer.prepareToAnalyze(in: analyzerInputFormat)
+            pipeline = try AnalyzerInputPipeline(
+                continuation: continuation,
+                sourceFormat: audioInputFormat,
+                analyzerFormat: analyzerInputFormat
+            )
+        }
+
         return PreparedSpeechPipeline(
             analyzer: analyzer,
             transcriber: transcriber,
             stream: stream,
-            pipeline: AnalyzerInputPipeline(continuation: continuation)
+            pipeline: pipeline
+        )
+    }
+
+    private static func makeAnalyzerInputFormat() throws -> AVAudioFormat {
+        guard let format = AVAudioFormat(
+            commonFormat: .pcmFormatInt16,
+            sampleRate: analyzerSampleRate,
+            channels: 1,
+            interleaved: false
+        ) else {
+            throw LiveTranscriptionError.invalidAudioInput
+        }
+        return format
+    }
+
+    private static func makeSpeechAnalyzerOptions() -> SpeechAnalyzer.Options {
+        if #available(iOS 27.0, *) {
+            return SpeechAnalyzer.Options(
+                priority: .userInitiated,
+                modelRetention: .whileInUse,
+                ignoresResourceLimits: true
+            )
+        }
+
+        return SpeechAnalyzer.Options(
+            priority: .userInitiated,
+            modelRetention: .whileInUse
         )
     }
 
@@ -681,13 +743,158 @@ private struct PreparedSpeechPipeline {
     var pipeline: AnalyzerInputPipeline
 }
 
+private enum AnalyzerInputConversionResult {
+    case inputs([AnalyzerInput])
+    case noData
+    case failure(Error)
+}
+
+private final class AnalyzerInputTimeline: @unchecked Sendable {
+    private var nextStartTime = CMTime.zero
+
+    func consume(frameLength: AVAudioFrameCount, sampleRate: Double) -> CMTime {
+        let startTime = nextStartTime
+        let roundedSampleRate = Int32(max(sampleRate.rounded(), 1))
+        let duration = CMTime(
+            value: CMTimeValue(Int64(frameLength)),
+            timescale: CMTimeScale(roundedSampleRate)
+        )
+        nextStartTime = CMTimeAdd(nextStartTime, duration)
+        return startTime
+    }
+}
+
+private final class AnalyzerSourceAudioTimeline: @unchecked Sendable {
+    private var nextSampleTime: AVAudioFramePosition = 0
+    private var sampleRate: Double?
+
+    func consume(buffer: AVAudioPCMBuffer) -> AVAudioTime? {
+        let bufferSampleRate = buffer.format.sampleRate
+        guard buffer.frameLength > 0, bufferSampleRate > 0 else {
+            return nil
+        }
+
+        if let sampleRate, sampleRate != bufferSampleRate {
+            let currentSeconds = Double(nextSampleTime) / sampleRate
+            nextSampleTime = AVAudioFramePosition((currentSeconds * bufferSampleRate).rounded())
+            self.sampleRate = bufferSampleRate
+        } else if sampleRate == nil {
+            sampleRate = bufferSampleRate
+        }
+
+        let audioTime = AVAudioTime(sampleTime: nextSampleTime, atRate: bufferSampleRate)
+        nextSampleTime += AVAudioFramePosition(Int64(buffer.frameLength))
+        return audioTime
+    }
+}
+
 private final class AnalyzerInputPipeline: @unchecked Sendable {
     private let continuation: AsyncThrowingStream<AnalyzerInput, Error>.Continuation
+    private let convertBuffer: (AVAudioPCMBuffer, AVAudioTime) -> AnalyzerInputConversionResult
+    private let flushInputs: () -> AnalyzerInputConversionResult
     private let lock = NSLock()
     private var didFinish = false
 
-    init(continuation: AsyncThrowingStream<AnalyzerInput, Error>.Continuation) {
+    private init(
+        continuation: AsyncThrowingStream<AnalyzerInput, Error>.Continuation,
+        convertBuffer: @escaping (AVAudioPCMBuffer, AVAudioTime) -> AnalyzerInputConversionResult,
+        flushInputs: @escaping () -> AnalyzerInputConversionResult
+    ) {
         self.continuation = continuation
+        self.convertBuffer = convertBuffer
+        self.flushInputs = flushInputs
+    }
+
+    @available(iOS 27.0, *)
+    convenience init(
+        continuation: AsyncThrowingStream<AnalyzerInput, Error>.Continuation,
+        converter: AnalyzerInputConverter
+    ) {
+        let timeline = AnalyzerInputTimeline()
+        let sourceTimeline = AnalyzerSourceAudioTimeline()
+        self.init(
+            continuation: continuation,
+            convertBuffer: { buffer, _ in
+                do {
+                    let inputs = try converter.convert(buffer, at: sourceTimeline.consume(buffer: buffer))
+                    return Self.retimeAnalyzerInputs(inputs, timeline: timeline)
+                } catch {
+                    return .failure(error)
+                }
+            },
+            flushInputs: {
+                do {
+                    let inputs = try converter.flush()
+                    return Self.retimeAnalyzerInputs(inputs, timeline: timeline)
+                } catch {
+                    return .failure(error)
+                }
+            }
+        )
+    }
+
+    init(
+        continuation: AsyncThrowingStream<AnalyzerInput, Error>.Continuation,
+        sourceFormat: AVAudioFormat,
+        analyzerFormat: AVAudioFormat
+    ) throws {
+        let timeline = AnalyzerInputTimeline()
+        if sourceFormat.isEquivalentForAnalyzerInput(to: analyzerFormat) {
+            self.convertBuffer = { buffer, _ in
+                guard let copiedBuffer = buffer.deepCopy() else {
+                    return .failure(LiveTranscriptionError.invalidAudioInput)
+                }
+                guard copiedBuffer.frameLength > 0 else {
+                    return .noData
+                }
+                return .inputs([
+                    AnalyzerInput(
+                        buffer: copiedBuffer,
+                        bufferStartTime: timeline.consume(
+                            frameLength: copiedBuffer.frameLength,
+                            sampleRate: copiedBuffer.format.sampleRate
+                        )
+                    )
+                ])
+            }
+            self.flushInputs = { .noData }
+        } else {
+            guard let converter = AVAudioConverter(from: sourceFormat, to: analyzerFormat) else {
+                throw LiveTranscriptionError.invalidAudioInput
+            }
+            self.convertBuffer = { buffer, _ in
+                Self.convertWithAVAudioConverter(
+                    converter,
+                    buffer: buffer,
+                    analyzerFormat: analyzerFormat,
+                    timeline: timeline
+                )
+            }
+            self.flushInputs = { .noData }
+        }
+        self.continuation = continuation
+    }
+
+    @available(iOS 27.0, *)
+    private static func retimeAnalyzerInputs(
+        _ inputs: [AnalyzerInput],
+        timeline: AnalyzerInputTimeline
+    ) -> AnalyzerInputConversionResult {
+        let retimedInputs = inputs.compactMap { input -> AnalyzerInput? in
+            let buffer = input.buffer
+            guard buffer.frameLength > 0 else {
+                return nil
+            }
+            return AnalyzerInput(
+                buffer: buffer,
+                bufferStartTime: timeline.consume(
+                    frameLength: buffer.frameLength,
+                    sampleRate: buffer.format.sampleRate
+                )
+            )
+        }
+
+        return retimedInputs.isEmpty ? .noData : .inputs(retimedInputs)
     }
 
     func process(_ buffer: AVAudioPCMBuffer, audioTime: AVAudioTime) {
@@ -697,18 +904,77 @@ private final class AnalyzerInputPipeline: @unchecked Sendable {
             return
         }
 
-        guard let copiedBuffer = buffer.deepCopy() else {
+        switch convertBuffer(buffer, audioTime) {
+        case .inputs(let inputs):
+            for input in inputs {
+                continuation.yield(input)
+            }
+        case .noData:
+            return
+        case .failure(let error):
             didFinish = true
-            continuation.finish(throwing: LiveTranscriptionError.invalidAudioInput)
+            liveTranscriptionLogger.error("Analyzer input conversion failed: \(error.localizedDescription, privacy: .public)")
+            continuation.finish(throwing: error)
             return
         }
+    }
 
-        continuation.yield(
-            AnalyzerInput(
-                buffer: copiedBuffer,
-                bufferStartTime: audioTime.analyzerStartTime
+    private static func convertWithAVAudioConverter(
+        _ converter: AVAudioConverter,
+        buffer: AVAudioPCMBuffer,
+        analyzerFormat: AVAudioFormat,
+        timeline: AnalyzerInputTimeline
+    ) -> AnalyzerInputConversionResult {
+        guard buffer.format.sampleRate > 0 else {
+            return .failure(LiveTranscriptionError.invalidAudioInput)
+        }
+
+        let outputCapacity = AVAudioFrameCount(
+            max(
+                1,
+                Int(ceil(Double(buffer.frameLength) * analyzerFormat.sampleRate / buffer.format.sampleRate))
             )
         )
+        guard let outputBuffer = AVAudioPCMBuffer(pcmFormat: analyzerFormat, frameCapacity: outputCapacity) else {
+            return .failure(LiveTranscriptionError.invalidAudioInput)
+        }
+
+        var didProvideInput = false
+        var conversionError: NSError?
+        let status = converter.convert(to: outputBuffer, error: &conversionError) { _, inputStatus in
+            if didProvideInput {
+                inputStatus.pointee = .noDataNow
+                return nil
+            }
+
+            didProvideInput = true
+            inputStatus.pointee = .haveData
+            return buffer
+        }
+
+        guard conversionError == nil else {
+            return .failure(conversionError ?? LiveTranscriptionError.invalidAudioInput)
+        }
+
+        switch status {
+        case .haveData, .inputRanDry, .endOfStream:
+            guard outputBuffer.frameLength > 0 else {
+                return .noData
+            }
+            return .inputs([
+                AnalyzerInput(
+                    buffer: outputBuffer,
+                    bufferStartTime: timeline.consume(
+                        frameLength: outputBuffer.frameLength,
+                        sampleRate: outputBuffer.format.sampleRate
+                    )
+                )
+            ])
+        case .error:
+            return .failure(conversionError ?? LiveTranscriptionError.invalidAudioInput)
+        @unknown default:
+            return .failure(LiveTranscriptionError.invalidAudioInput)
+        }
     }
 
     func finish() {
@@ -719,6 +985,18 @@ private final class AnalyzerInputPipeline: @unchecked Sendable {
         }
 
         didFinish = true
+        switch flushInputs() {
+        case .inputs(let inputs):
+            for input in inputs {
+                continuation.yield(input)
+            }
+        case .noData:
+            break
+        case .failure(let error):
+            liveTranscriptionLogger.error("Analyzer input flush failed: \(error.localizedDescription, privacy: .public)")
+            continuation.finish(throwing: error)
+            return
+        }
         continuation.finish()
     }
 }
@@ -766,13 +1044,12 @@ private extension AVAudioPCMBuffer {
     }
 }
 
-private extension AVAudioTime {
-    var analyzerStartTime: CMTime? {
-        guard sampleTime >= 0, sampleRate > 0 else {
-            return nil
-        }
-
-        return CMTime(value: sampleTime, timescale: CMTimeScale(sampleRate.rounded()))
+private extension AVAudioFormat {
+    func isEquivalentForAnalyzerInput(to other: AVAudioFormat) -> Bool {
+        commonFormat == other.commonFormat &&
+        sampleRate == other.sampleRate &&
+        channelCount == other.channelCount &&
+        isInterleaved == other.isInterleaved
     }
 }
 
@@ -1164,6 +1441,83 @@ private extension AVAudioPCMBuffer {
         let normalized = Float(sample) / Float(Int16.max)
         let limitedSample = limited(normalized * gain, ceiling: limiterCeiling)
         return Int16(max(Float(Int16.min), min(Float(Int16.max), limitedSample * Float(Int16.max))))
+    }
+}
+
+enum SpeechPipelineMode: String, CaseIterable, Identifiable {
+    case compatible
+    case nativeIOS27
+
+    var id: String {
+        rawValue
+    }
+
+    var title: String {
+        switch self {
+        case .compatible:
+            return String(localized: "Compatible Pipeline")
+        case .nativeIOS27:
+            return String(localized: "iOS 27 Native Pipeline")
+        }
+    }
+
+    var detail: String {
+        switch self {
+        case .compatible:
+            return String(localized: "使用 16 kHz mono Int16 输入，优先保证 iOS 26/27 时间戳一致")
+        case .nativeIOS27:
+            return String(localized: "使用 iOS 27 compatibleWith 转换器，让系统选择语音输入 Pipeline")
+        }
+    }
+
+    var isSupportedOnCurrentOS: Bool {
+        switch self {
+        case .compatible:
+            return true
+        case .nativeIOS27:
+            if #available(iOS 27.0, *) {
+                return true
+            }
+            return false
+        }
+    }
+}
+
+struct SpeechProcessingPipelineDiagnostics: Equatable {
+    var configuredPipelineName: String
+    var activePipelineName: String
+    var supportedPipelinesText: String
+    var analyzerFormatText: String
+    var pipelineParametersText: String
+
+    static func current(configuredMode: SpeechPipelineMode) -> SpeechProcessingPipelineDiagnostics {
+        if #available(iOS 27.0, *), configuredMode == .nativeIOS27 {
+            return SpeechProcessingPipelineDiagnostics(
+                configuredPipelineName: configuredMode.title,
+                activePipelineName: String(localized: "iOS 27 Native compatibleWith"),
+                supportedPipelinesText: String(localized: "支持 Pipeline: iOS 27 Native AnalyzerInputConverter；Compatible AVAudioConverter"),
+                analyzerFormatText: String(localized: "Analyzer 输入: iOS 27 系统自适应"),
+                pipelineParametersText: String(localized: "Native 参数: SpeechTranscriber preset=timeIndexedProgressiveTranscription；SpeechAnalyzer priority=userInitiated, modelRetention=whileInUse, ignoresResourceLimits=true；AnalyzerInputConverter=compatibleWith(modules)；prepareToAnalyze(in: nil)")
+            )
+        }
+
+        if #available(iOS 27.0, *) {
+            return SpeechProcessingPipelineDiagnostics(
+                configuredPipelineName: configuredMode.title,
+                activePipelineName: String(localized: "iOS 27 Compatible AVAudioConverter"),
+                supportedPipelinesText: String(localized: "支持 Pipeline: iOS 27 Native AnalyzerInputConverter；Compatible AVAudioConverter"),
+                analyzerFormatText: String(localized: "Analyzer 输入: 16 kHz / mono / Int16 PCM"),
+                pipelineParametersText: String(localized: "Compatible 参数: SpeechTranscriber preset=timeIndexedProgressiveTranscription；SpeechAnalyzer priority=userInitiated, modelRetention=whileInUse, ignoresResourceLimits=true；AVAudioConverter -> 16 kHz mono Int16")
+            )
+        }
+
+        return SpeechProcessingPipelineDiagnostics(
+            configuredPipelineName: configuredMode.title,
+            activePipelineName: String(localized: "iOS 26 AVAudioConverter"),
+            supportedPipelinesText: String(localized: "支持 Pipeline: iOS 26 AVAudioConverter fallback"),
+            analyzerFormatText: String(localized: "Analyzer 输入: 16 kHz / mono / Int16 PCM"),
+            pipelineParametersText: String(localized: "Compatible 参数: SpeechTranscriber preset=timeIndexedProgressiveTranscription；SpeechAnalyzer priority=userInitiated, modelRetention=whileInUse；AVAudioConverter -> 16 kHz mono Int16")
+        )
     }
 }
 

@@ -38,6 +38,71 @@ struct RecordingIntelligence: Codable, Hashable {
     var generatedAt: Date
 }
 
+enum RecordingIntelligenceAvailability: Equatable {
+    case available
+    case unavailable(UnavailableReason)
+
+    enum UnavailableReason: Equatable {
+        case deviceNotEligible
+        case appleIntelligenceNotEnabled
+        case modelNotReady
+        case unknown
+    }
+
+    var isAvailable: Bool {
+        self == .available
+    }
+
+    var statusText: String {
+        switch self {
+        case .available:
+            return String(localized: "可用")
+        case .unavailable(.deviceNotEligible):
+            return String(localized: "设备不支持")
+        case .unavailable(.appleIntelligenceNotEnabled):
+            return String(localized: "未开启")
+        case .unavailable(.modelNotReady):
+            return String(localized: "模型未准备好")
+        case .unavailable(.unknown):
+            return String(localized: "不可用")
+        }
+    }
+
+    var detailText: String {
+        switch self {
+        case .available:
+            return String(localized: "Apple Intelligence 本地高端模型可用于智能摘要")
+        case .unavailable(.deviceNotEligible):
+            return String(localized: "当前设备不支持 Apple Intelligence 本地高端模型")
+        case .unavailable(.appleIntelligenceNotEnabled):
+            return String(localized: "Apple Intelligence 未开启")
+        case .unavailable(.modelNotReady):
+            return String(localized: "Apple Intelligence 本地模型尚未准备好")
+        case .unavailable(.unknown):
+            return String(localized: "Apple Intelligence 本地模型不可用")
+        }
+    }
+
+    static func current() -> RecordingIntelligenceAvailability {
+        let model = SystemLanguageModel(
+            useCase: .contentTagging,
+            guardrails: .permissiveContentTransformations
+        )
+        switch model.availability {
+        case .available:
+            return .available
+        case .unavailable(.deviceNotEligible):
+            return .unavailable(.deviceNotEligible)
+        case .unavailable(.appleIntelligenceNotEnabled):
+            return .unavailable(.appleIntelligenceNotEnabled)
+        case .unavailable(.modelNotReady):
+            return .unavailable(.modelNotReady)
+        @unknown default:
+            return .unavailable(.unknown)
+        }
+    }
+}
+
 struct RecordingImportStatus: Codable, Hashable {
     var progress: Double
     var message: String
@@ -47,6 +112,7 @@ struct RecordingImportStatus: Codable, Hashable {
 @MainActor
 final class RecordingStore: ObservableObject {
     @Published private(set) var recordings: [RecordingItem] = []
+    @Published private(set) var intelligenceAvailability: RecordingIntelligenceAvailability = .current()
 
     private static let logger = Logger(subsystem: "com.reddownloader.LiveTranscriber", category: "RecordingStore")
 
@@ -92,6 +158,7 @@ final class RecordingStore: ObservableObject {
     }
 
     func reload() async {
+        refreshIntelligenceAvailability()
         do {
             try ensureRecordingsDirectory()
             let indexedRecordings = try loadIndexedRecordings()
@@ -101,6 +168,10 @@ final class RecordingStore: ObservableObject {
         } catch {
             recordings = []
         }
+    }
+
+    func refreshIntelligenceAvailability() {
+        intelligenceAvailability = .current()
     }
 
     @discardableResult
