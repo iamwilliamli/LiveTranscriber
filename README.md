@@ -94,4 +94,9 @@ For device testing, open `LiveTranscriber.xcodeproj` in Xcode and use a signing 
 
 ## Privacy Model
 
-LiveTranscriber is built around local processing. Recording, transcription, summary, and tagging use Apple system frameworks on device when available. The app does not upload audio or transcript text to third-party transcription services.
+LiveTranscriber is built around local processing. Recording, transcription, summary, and tagging use Apple system frameworks on device when available.
+
+- The app does not use developer-operated servers, third-party analytics, ads, tracking, or custom network requests.
+- Audio and transcript text are not uploaded to developer servers.
+- Files are stored in the local app container by default. When iCloud Drive is available, app-managed recording files sync through the user's Apple iCloud Drive.
+- The camera is not used for photos or video. `NSCameraUsageDescription` is present because Apple static review requires it when the app uses `AVCaptureSession` / `AVCaptureDeviceInput` for microphone recording.

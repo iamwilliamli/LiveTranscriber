@@ -33,6 +33,8 @@
 	<string>$(CURRENT_PROJECT_VERSION)</string>
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
+	<key>NSCameraUsageDescription</key>
+	<string>Live Transcriber does not use the camera. Apple's capture framework is used only for microphone recording. 不使用相机；录音功能仅使用 Apple 采集框架获取麦克风音频。</string>
 	<key>NSMicrophoneUsageDescription</key>
 	<string>Used to record audio for live transcription. 用于录音并实时转录文本。</string>
 	<key>NSSpeechRecognitionUsageDescription</key>

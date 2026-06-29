@@ -7,6 +7,7 @@ private enum SettingsRoute: Hashable {
     case recording
     case recordingFormat
     case files
+    case privacy
     case developer
     case speechPipelineMode
 }
@@ -55,6 +56,18 @@ struct SettingsView: View {
                     .buttonStyle(.plain)
                     .settingsSurface()
 
+                    NavigationLink(value: SettingsRoute.privacy) {
+                        SettingsNavigationRow(
+                            icon: "lock.shield",
+                            title: "隐私",
+                            value: String(localized: "本地处理"),
+                            subtitle: "数据边界和权限用途",
+                            tint: AppTheme.success
+                        )
+                    }
+                    .buttonStyle(.plain)
+                    .settingsSurface()
+
                     NavigationLink(value: SettingsRoute.developer) {
                         SettingsNavigationRow(
                             icon: "wrench.and.screwdriver",
@@ -96,6 +109,8 @@ struct SettingsView: View {
             recordingFormatPage
         case .files:
             fileSettingsPage
+        case .privacy:
+            privacySettingsPage
         case .developer:
             developerSettingsPage
         case .speechPipelineMode:
@@ -202,6 +217,77 @@ struct SettingsView: View {
     private var developerSettingsPage: some View {
         SettingsDetailPage(title: "开发者选项") {
             developerSection
+        }
+    }
+
+    private var privacySettingsPage: some View {
+        SettingsDetailPage(title: "隐私") {
+            SettingsSection(title: "本地处理", systemImage: "lock.shield", tint: AppTheme.success) {
+                SettingsStatusRow(
+                    icon: "server.rack",
+                    text: "不使用开发者服务器、第三方分析、广告、追踪或自定义网络请求。",
+                    tint: AppTheme.success
+                )
+
+                SettingsStatusRow(
+                    icon: "waveform.badge.mic",
+                    text: "录音、转录文本、摘要和标签使用 Apple 系统框架在设备上处理。",
+                    tint: AppTheme.info
+                )
+
+                SettingsStatusRow(
+                    icon: "person.crop.circle.badge.xmark",
+                    text: "音频和转录不会上传到开发者服务器，开发者无法访问用户内容。",
+                    tint: AppTheme.success
+                )
+            }
+
+            SettingsSection(title: "存储", systemImage: "internaldrive", tint: AppTheme.info) {
+                SettingsMetricRow(
+                    icon: "folder",
+                    title: "当前位置",
+                    value: recordingStore.storageDisplayName,
+                    tint: AppTheme.info
+                )
+
+                SettingsStatusRow(
+                    icon: "icloud",
+                    text: "文件默认保存在本机 app 容器；启用 iCloud Drive 时通过 Apple iCloud 同步。",
+                    tint: AppTheme.info
+                )
+
+                SettingsStatusRow(
+                    icon: "trash",
+                    text: "删除录音会删除 app 管理的音频文件和转录文本。",
+                    tint: AppTheme.danger
+                )
+            }
+
+            SettingsSection(title: "权限用途", systemImage: "checkmark.shield", tint: AppTheme.brand) {
+                SettingsStatusRow(
+                    icon: "mic",
+                    text: "麦克风权限只用于录音和实时转录。",
+                    tint: AppTheme.brand
+                )
+
+                SettingsStatusRow(
+                    icon: "captions.bubble",
+                    text: "语音识别权限只用于把用户选择的录音转成文本。",
+                    tint: AppTheme.brand
+                )
+
+                SettingsStatusRow(
+                    icon: "camera",
+                    text: "相机不用于拍照或录像；相机权限说明仅用于满足 Apple capture framework 的审核要求。",
+                    tint: AppTheme.info
+                )
+
+                SettingsStatusRow(
+                    icon: "waveform.circle",
+                    text: "后台音频只用于录音或播放继续进行，不用于其他后台任务。",
+                    tint: AppTheme.warning
+                )
+            }
         }
     }
 

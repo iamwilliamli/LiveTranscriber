@@ -123,6 +123,8 @@ The current default format is WAV. M4A is available for smaller AAC files.
 
 Microphone mode is not user-selectable. Stereo Capture uses `AVCaptureSession`, sets `AVCaptureDeviceInput.multichannelAudioMode = .stereo`, saves stereo audio, and downmixes the same captured buffers to mono for SpeechAnalyzer.
 
+Privacy shows the app's local-processing boundary, no developer server/analytics/tracking policy, iCloud Drive storage behavior, and the purpose of microphone, speech recognition, camera purpose-string, and background audio permissions.
+
 Developer Options show device/system information, active speech pipeline, supported pipeline types, runtime analyzer input format, and a Loudness Processing toggle for comparing normalized files against raw Stereo Capture recordings.
 
 ## Haptics
