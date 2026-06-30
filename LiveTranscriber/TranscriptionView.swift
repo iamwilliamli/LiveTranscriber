@@ -42,36 +42,34 @@ struct TranscriptionView: View {
     }
 
     var body: some View {
-        NavigationStack {
-            ZStack(alignment: .bottom) {
-                AppTheme.groupedBackground
-                    .ignoresSafeArea()
+        ZStack(alignment: .bottom) {
+            AppTheme.groupedBackground
+                .ignoresSafeArea()
 
-                VStack(alignment: .leading, spacing: 14) {
-                    recorderCard
+            VStack(alignment: .leading, spacing: 14) {
+                recorderCard
 
-                    transcriptCard
-                }
-                .padding(.horizontal, 16)
-                .padding(.top, 12)
-                .padding(.bottom, transcriber.isRecording ? 126 : 112)
-                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
-
-                floatingRecorderDock
-                    .padding(.horizontal, 18)
-                    .padding(.bottom, 12)
-
-                savedRecordingBanner
-                    .padding(.top, 10)
-                    .padding(.horizontal, 20)
-                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
-                    .allowsHitTesting(false)
-                    .zIndex(20)
+                transcriptCard
             }
-            .toolbar(.hidden, for: .navigationBar)
-            .animation(.snappy(duration: 0.22, extraBounce: 0.02), value: transcriber.isRecording)
-            .animation(.snappy(duration: 0.2, extraBounce: 0.02), value: transcriber.isPaused)
+            .padding(.horizontal, 16)
+            .padding(.top, 12)
+            .padding(.bottom, transcriber.isRecording ? 126 : 112)
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+
+            floatingRecorderDock
+                .padding(.horizontal, 18)
+                .padding(.bottom, 12)
+
+            savedRecordingBanner
+                .padding(.top, 10)
+                .padding(.horizontal, 20)
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+                .allowsHitTesting(false)
+                .zIndex(20)
         }
+        .toolbar(.hidden, for: .navigationBar)
+        .animation(.snappy(duration: 0.22, extraBounce: 0.02), value: transcriber.isRecording)
+        .animation(.snappy(duration: 0.2, extraBounce: 0.02), value: transcriber.isPaused)
         .task {
             await transcriber.refreshSupportedLanguages()
         }
@@ -1316,6 +1314,14 @@ private struct RollingRecorderDigit: View {
     let color: Color
 
     @State private var rollingValue = 0
+
+    init(value: Int, width: CGFloat, height: CGFloat, color: Color) {
+        self.value = value
+        self.width = width
+        self.height = height
+        self.color = color
+        _rollingValue = State(initialValue: 10 + (value % 10))
+    }
 
     var body: some View {
         VStack(spacing: 0) {

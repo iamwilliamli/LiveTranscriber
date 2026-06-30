@@ -1254,6 +1254,10 @@ extension String {
 }
 
 private actor RecordingStoreImportWorker {
+    private static let transcriptionSlotRetryDelayNanoseconds: UInt64 = 120_000_000
+
+    private var isTranscribingAudio = false
+
     func prepareImportedAudio(from sourceURL: URL, to destinationURL: URL, transcriptURL: URL) async throws -> Int {
         try await Task.detached(priority: .userInitiated) {
             let fileManager = FileManager.default
@@ -1278,11 +1282,24 @@ private actor RecordingStoreImportWorker {
         language: TranscriptionLanguage,
         progressHandler: @escaping (Double) -> Void
     ) async throws -> [TranscriptionLine] {
-        try await ImportedRecordingTranscriptionService.transcribe(
+        try await waitForTranscriptionSlot()
+        defer {
+            isTranscribingAudio = false
+        }
+
+        return try await ImportedRecordingTranscriptionService.transcribe(
             audioURL: audioURL,
             language: language,
             progressHandler: progressHandler
         )
+    }
+
+    private func waitForTranscriptionSlot() async throws {
+        while isTranscribingAudio {
+            try Task.checkCancellation()
+            try await Task.sleep(nanoseconds: Self.transcriptionSlotRetryDelayNanoseconds)
+        }
+        isTranscribingAudio = true
     }
 }
 
@@ -1322,6 +1339,12 @@ private enum ImportedRecordingTranscriptionService {
 
         let audioFile = try AVAudioFile(forReading: audioURL)
         let inputFormat = audioFile.processingFormat
+        let durationSeconds: Double
+        if inputFormat.sampleRate > 0 {
+            durationSeconds = max(Double(audioFile.length) / inputFormat.sampleRate, 1)
+        } else {
+            durationSeconds = 1
+        }
         let preferredLocale = Locale(identifier: language.id)
         let locale = await SpeechTranscriber.supportedLocale(equivalentTo: preferredLocale) ?? preferredLocale
         let transcriber = SpeechTranscriber(locale: locale, preset: .timeIndexedProgressiveTranscription)
@@ -1333,26 +1356,36 @@ private enum ImportedRecordingTranscriptionService {
             priority: .userInitiated,
             modelRetention: .whileInUse
         )
+        let progressReporter = ImportedTranscriptionProgressReporter(
+            audioDurationSeconds: durationSeconds,
+            progressHandler: progressHandler
+        )
         let analyzer = SpeechAnalyzer(modules: modules, options: options)
+        await analyzer.setVolatileRangeChangedHandler { range, _, _ in
+            let rangeEndSeconds = CMTimeRangeGetEnd(range).seconds
+            Task {
+                await progressReporter.update(analyzerEndSeconds: rangeEndSeconds)
+            }
+        }
         try await analyzer.prepareToAnalyze(in: inputFormat)
 
         let collector = ImportedTranscriptionCollector()
         let resultsTask = Task {
             for try await result in transcriber.results {
-                await collector.handle(result)
+                let resultEndSeconds = await collector.handle(result)
+                await progressReporter.update(finalResultEndSeconds: resultEndSeconds)
             }
         }
 
         do {
             progressHandler(0.05)
             try await analyzer.start(inputAudioFile: audioFile, finishAfterFile: true)
+            try await resultsTask.value
             progressHandler(1)
-            try? await Task.sleep(nanoseconds: 250_000_000)
-            resultsTask.cancel()
-            _ = try? await resultsTask.value
         } catch {
             await analyzer.cancelAndFinishNow()
             resultsTask.cancel()
+            _ = try? await resultsTask.value
             throw error
         }
 
@@ -1391,14 +1424,49 @@ private enum ImportedRecordingTranscriptionService {
     }
 }
 
+private actor ImportedTranscriptionProgressReporter {
+    private let audioDurationSeconds: Double
+    private let progressHandler: (Double) -> Void
+    private var latestProgress: Double = 0.05
+
+    init(audioDurationSeconds: Double, progressHandler: @escaping (Double) -> Void) {
+        self.audioDurationSeconds = max(audioDurationSeconds, 1)
+        self.progressHandler = progressHandler
+    }
+
+    func update(analyzerEndSeconds: Double) {
+        report(endSeconds: analyzerEndSeconds, maximumProgress: 0.86)
+    }
+
+    func update(finalResultEndSeconds: Double) {
+        report(endSeconds: finalResultEndSeconds, maximumProgress: 0.92)
+    }
+
+    private func report(endSeconds: Double, maximumProgress: Double) {
+        guard endSeconds.isFinite else {
+            return
+        }
+
+        let audioProgress = min(max(endSeconds / audioDurationSeconds, 0), 1)
+        let progress = 0.05 + audioProgress * (maximumProgress - 0.05)
+        guard progress > latestProgress + 0.005 else {
+            return
+        }
+
+        latestProgress = progress
+        progressHandler(progress)
+    }
+}
+
 private actor ImportedTranscriptionCollector {
     private var finalizedLines: [TranscriptionLine] = []
     private var interimLine: TranscriptionLine?
 
-    func handle(_ result: SpeechTranscriber.Result) {
+    func handle(_ result: SpeechTranscriber.Result) -> Double {
+        let resultEndSeconds = CMTimeRangeGetEnd(result.range).seconds
         let text = String(result.text.characters).trimmingCharacters(in: .whitespacesAndNewlines)
         guard !text.isEmpty else {
-            return
+            return resultEndSeconds.isFinite ? resultEndSeconds : 0
         }
 
         let startSeconds = result.range.start.seconds.isFinite ? result.range.start.seconds : 0
@@ -1418,6 +1486,8 @@ private actor ImportedTranscriptionCollector {
             }
             interimLine = line
         }
+
+        return resultEndSeconds.isFinite ? resultEndSeconds : startSeconds
     }
 
     func lines() -> [TranscriptionLine] {

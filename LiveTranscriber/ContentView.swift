@@ -1,48 +1,57 @@
 import SwiftUI
 import UIKit
+import UniformTypeIdentifiers
 
 struct ContentView: View {
     @StateObject private var transcriber = LiveTranscriptionManager()
     @StateObject private var recordingStore = RecordingStore()
     @StateObject private var recordingPlayer = RecordingPlaybackController()
     @State private var selectedTab: AppTab = .transcribe
-    @State private var incomingRecordingImportURL: URL?
     @State private var pendingRecordingDraftFromLiveActivity: RecordingDraft?
     @State private var selectedRecordingForDetail: RecordingItem?
+    @State private var recordingsSearchText = ""
+    @State private var showsRecordingImporter = false
+    @State private var isImportingRecording = false
+    @State private var pendingRecordingImport: PendingRecordingImport?
+    @State private var recordingImportErrorMessage: String?
+    @State private var isShowingRecordingsMap = false
 
     var body: some View {
         NavigationStack {
             TabView(selection: tabSelection) {
-                TranscriptionView(
-                    transcriber: transcriber,
-                    recordingStore: recordingStore,
-                    externalPendingRecordingDraft: $pendingRecordingDraftFromLiveActivity
-                )
-                    .tabItem {
-                        Label("转录", systemImage: "waveform.and.mic")
-                    }
-                    .tag(AppTab.transcribe)
+                Tab("转录", systemImage: "waveform.and.mic", value: AppTab.transcribe) {
+                    TranscriptionView(
+                        transcriber: transcriber,
+                        recordingStore: recordingStore,
+                        externalPendingRecordingDraft: $pendingRecordingDraftFromLiveActivity
+                    )
+                }
 
-                RecordingsView(
-                    store: recordingStore,
-                    transcriber: transcriber,
-                    incomingImportURL: $incomingRecordingImportURL,
-                    selectedRecording: $selectedRecordingForDetail,
-                    player: recordingPlayer
-                )
-                    .tabItem {
-                        Label("录音文件", systemImage: "folder")
-                    }
-                    .tag(AppTab.recordings)
+                Tab("录音文件", systemImage: "folder", value: AppTab.recordings) {
+                    RecordingsView(
+                        store: recordingStore,
+                        transcriber: transcriber,
+                        searchText: $recordingsSearchText,
+                        selectedRecording: $selectedRecordingForDetail,
+                        player: recordingPlayer
+                    )
+                }
 
-                SettingsView(transcriber: transcriber, recordingStore: recordingStore)
-                    .tabItem {
-                        Label("设置", systemImage: "gearshape")
-                    }
-                    .tag(AppTab.settings)
+                Tab("设置", systemImage: "gearshape", value: AppTab.settings) {
+                    SettingsView(transcriber: transcriber, recordingStore: recordingStore)
+                }
             }
+            .tabBarMinimizeBehavior(.onScrollDown)
             .font(.redditSans(.body))
             .tint(AppTheme.brand)
+            .toolbar(selectedTab == .transcribe ? .hidden : .visible, for: .navigationBar)
+            .navigationTitle(rootNavigationTitle)
+            .navigationBarTitleDisplayMode(selectedTab == .settings ? .inline : .large)
+            .toolbar {
+                if selectedTab == .recordings {
+                    recordingsToolbar
+                }
+            }
             .navigationDestination(item: $selectedRecordingForDetail) { item in
                 RecordingDetailView(
                     item: item,
@@ -51,6 +60,60 @@ struct ContentView: View {
                     player: recordingPlayer
                 )
             }
+        }
+        .fileImporter(
+            isPresented: $showsRecordingImporter,
+            allowedContentTypes: [.audio],
+            allowsMultipleSelection: false
+        ) { result in
+            handleRecordingImportResult(result)
+        }
+        .sheet(isPresented: $isShowingRecordingsMap) {
+            RecordingMapView(store: recordingStore, transcriber: transcriber, player: recordingPlayer)
+        }
+        .confirmationDialog(
+            "选择转录语言",
+            isPresented: Binding(
+                get: { pendingRecordingImport != nil },
+                set: { isPresented in
+                    if !isPresented {
+                        pendingRecordingImport = nil
+                    }
+                }
+            ),
+            titleVisibility: .visible
+        ) {
+            if let pendingRecordingImport {
+                ForEach(transcriber.supportedLanguages) { language in
+                    Button {
+                        importRecording(from: pendingRecordingImport.url, language: language)
+                    } label: {
+                        Label(
+                            language.displayName,
+                            systemImage: language.id == transcriber.selectedLanguageID ? "checkmark" : "globe"
+                        )
+                    }
+                }
+            }
+
+            Button("取消", role: .cancel) {}
+        } message: {
+            Text("导入录音")
+        }
+        .alert(
+            "导入失败",
+            isPresented: Binding(
+                get: { recordingImportErrorMessage != nil },
+                set: { isPresented in
+                    if !isPresented {
+                        recordingImportErrorMessage = nil
+                    }
+                }
+            )
+        ) {
+            Button("好", role: .cancel) {}
+        } message: {
+            Text(recordingImportErrorMessage ?? "")
         }
         .task {
             await recordingStore.reload()
@@ -93,8 +156,7 @@ struct ContentView: View {
         }
 
         selectedTab = .recordings
-        incomingRecordingImportURL = url
-        HapticFeedback.play(.importQueued)
+        queueRecordingImport(from: url)
     }
 
     @discardableResult
@@ -172,12 +234,116 @@ struct ContentView: View {
         let supportedExtensions: Set<String> = ["wav", "m4a", "mp3", "aac", "aif", "aiff", "caf"]
         return supportedExtensions.contains(url.pathExtension.lowercased())
     }
+
+    private var rootNavigationTitle: LocalizedStringKey {
+        switch selectedTab {
+        case .transcribe:
+            return ""
+        case .recordings:
+            return "录音文件"
+        case .settings:
+            return "设置"
+        }
+    }
+
+    @ToolbarContentBuilder
+    private var recordingsToolbar: some ToolbarContent {
+        ToolbarItem(placement: .topBarTrailing) {
+            HStack(spacing: 8) {
+                if isImportingRecording {
+                    ProgressView()
+                        .controlSize(.small)
+                }
+
+                HStack(spacing: 0) {
+                    Button {
+                        HapticFeedback.play(.navigation)
+                        isShowingRecordingsMap = true
+                    } label: {
+                        Image(systemName: "map")
+                            .frame(width: 32, height: 28)
+                    }
+                    .accessibilityLabel("地图")
+
+                    Divider()
+                        .frame(height: 18)
+                        .fixedSize()
+
+                    Button {
+                        HapticFeedback.play(.primaryAction)
+                        showsRecordingImporter = true
+                    } label: {
+                        Image(systemName: "square.and.arrow.down")
+                            .frame(width: 32, height: 28)
+                    }
+                    .disabled(isImportingRecording || pendingRecordingImport != nil || transcriber.isRecording || transcriber.isPreparing)
+                    .accessibilityLabel("导入录音")
+                }
+                .fixedSize()
+            }
+        }
+    }
+
+    private func handleRecordingImportResult(_ result: Result<[URL], Error>) {
+        switch result {
+        case .success(let urls):
+            guard let url = urls.first else {
+                HapticFeedback.play(.warning)
+                return
+            }
+            queueRecordingImport(from: url)
+        case .failure(let error):
+            recordingImportErrorMessage = error.localizedDescription
+            HapticFeedback.play(.failure)
+        }
+    }
+
+    private func queueRecordingImport(from url: URL) {
+        guard !isImportingRecording else {
+            HapticFeedback.play(.blocked)
+            return
+        }
+
+        selectedRecordingForDetail = nil
+        pendingRecordingImport = PendingRecordingImport(url: url)
+        HapticFeedback.play(.importQueued)
+    }
+
+    private func importRecording(from url: URL, language: TranscriptionLanguage) {
+        guard !isImportingRecording else {
+            HapticFeedback.play(.blocked)
+            return
+        }
+
+        pendingRecordingImport = nil
+        isImportingRecording = true
+        HapticFeedback.play(.importStart)
+        Task {
+            do {
+                _ = try await recordingStore.importRecording(
+                    from: url,
+                    language: language,
+                    loudnessProcessingEnabled: transcriber.isLoudnessProcessingEnabled
+                )
+                HapticFeedback.play(.importComplete)
+            } catch {
+                recordingImportErrorMessage = error.localizedDescription
+                HapticFeedback.play(.failure)
+            }
+            isImportingRecording = false
+        }
+    }
 }
 
 private enum AppTab: Hashable {
     case transcribe
     case recordings
     case settings
+}
+
+private struct PendingRecordingImport: Identifiable {
+    let id = UUID()
+    let url: URL
 }
 
 #if DEBUG

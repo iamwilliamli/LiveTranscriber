@@ -9,19 +9,15 @@ import UniformTypeIdentifiers
 struct RecordingsView: View {
     @ObservedObject var store: RecordingStore
     @ObservedObject var transcriber: LiveTranscriptionManager
-    @Binding var incomingImportURL: URL?
+    @Binding var searchText: String
     @Binding var selectedRecording: RecordingItem?
     @ObservedObject var player: RecordingPlaybackController
     @State private var deleteRequest: RecordingDeleteRequest?
     @State private var analyzingRecordingID: RecordingItem.ID?
     @State private var analysisErrorMessage: String?
-    @State private var showsImporter = false
-    @State private var isImporting = false
-    @State private var importErrorMessage: String?
+    @State private var transcriptionErrorMessage: String?
     @State private var deleteErrorMessage: String?
-    @State private var pendingImport: PendingImport?
-    @State private var searchText = ""
-    @State private var isShowingRecordingsMap = false
+    @FocusState private var searchFieldIsFocused: Bool
 
     private var filteredRecordings: [RecordingItem] {
         let query = normalizedSearchText(searchText)
@@ -35,185 +31,12 @@ struct RecordingsView: View {
     }
 
     var body: some View {
-        NavigationStack {
-            Group {
-                if store.recordings.isEmpty {
-                    EmptyStateView(icon: "waveform.path.badge.plus", title: "暂无录音文件")
-                        .frame(maxWidth: .infinity, maxHeight: .infinity)
-                        .background(AppTheme.groupedBackground)
-                } else if filteredRecordings.isEmpty {
-                    EmptyStateView(icon: "magnifyingglass", title: "没有找到录音")
-                        .frame(maxWidth: .infinity, maxHeight: .infinity)
-                        .background(AppTheme.groupedBackground)
-                } else {
-                    List {
-                        ForEach(filteredRecordings) { item in
-                            RecordingRow(
-                                item: item,
-                                isAnalyzing: analyzingRecordingID == item.id,
-                                showsIntelligence: store.intelligenceAvailability.isAvailable
-                            ) {
-                                openRecording(item)
-                            }
-                            .listRowSeparator(.hidden)
-                            .listRowBackground(Color.clear)
-                            .listRowInsets(EdgeInsets(top: 6, leading: 16, bottom: 6, trailing: 16))
-                            .contextMenu {
-                                Button {
-                                    HapticFeedback.play(.copy)
-                                    UIPasteboard.general.string = store.transcriptText(for: item)
-                                } label: {
-                                    Label("复制转录文本", systemImage: "doc.on.doc")
-                                }
-
-                                if store.intelligenceAvailability.isAvailable {
-                                    Button {
-                                        analyze(item)
-                                    } label: {
-                                        Label(item.intelligence == nil ? "生成标签和总结" : "重新分析", systemImage: "sparkles")
-                                    }
-                                    .disabled(analyzingRecordingID != nil)
-                                }
-
-                                Menu {
-                                    ForEach(transcriber.supportedLanguages) { language in
-                                        Button {
-                                            retranscribe(item, language: language)
-                                        } label: {
-                                            Label(
-                                                language.displayName,
-                                                systemImage: language.id == item.languageID ? "checkmark" : "globe"
-                                            )
-                                        }
-                                    }
-                                } label: {
-                                    Label("重新转录", systemImage: "arrow.triangle.2.circlepath")
-                                }
-                                .disabled(item.importStatus?.isFailed == false)
-
-                                Button(role: .destructive) {
-                                    requestDelete(item)
-                                } label: {
-                                    Label("删除", systemImage: "trash")
-                                }
-                                .disabled(item.importStatus?.isFailed == false)
-                            }
-                            .swipeActions(edge: .leading, allowsFullSwipe: false) {
-                                if store.intelligenceAvailability.isAvailable {
-                                    Button {
-                                        analyze(item)
-                                    } label: {
-                                        Label("分析", systemImage: "sparkles")
-                                    }
-                                    .tint(AppTheme.info)
-                                    .disabled(analyzingRecordingID != nil)
-                                }
-                            }
-                            .swipeActions(edge: .trailing, allowsFullSwipe: false) {
-                                Button {
-                                    requestDelete(item)
-                                } label: {
-                                    Label("删除", systemImage: "trash")
-                                }
-                                .tint(AppTheme.danger)
-                                .disabled(item.importStatus?.isFailed == false)
-                            }
-                        }
-                    }
-                    .listStyle(.plain)
-                    .scrollContentBackground(.hidden)
-                    .background(AppTheme.groupedBackground)
-                    .safeAreaInset(edge: .top) {
-                        Color.clear.frame(height: 4)
-                    }
-                    .safeAreaInset(edge: .bottom) {
-                        Color.clear.frame(height: 8)
-                    }
-                }
-            }
-            .navigationTitle("录音文件")
-            .toolbar {
-                ToolbarItemGroup(placement: .topBarTrailing) {
-                    if isImporting {
-                        ProgressView()
-                            .controlSize(.small)
-                    }
-
-                    Button {
-                        HapticFeedback.play(.navigation)
-                        isShowingRecordingsMap = true
-                    } label: {
-                        Image(systemName: "map")
-                    }
-                    .accessibilityLabel("地图")
-
-                    Button {
-                        HapticFeedback.play(.primaryAction)
-                        showsImporter = true
-                    } label: {
-                        Image(systemName: "square.and.arrow.down")
-                    }
-                    .disabled(isImporting || pendingImport != nil)
-                    .accessibilityLabel("导入录音")
-                }
-            }
-        }
-        .searchable(
-            text: $searchText,
-            placement: .navigationBarDrawer(displayMode: .always),
-            prompt: Text("搜索录音或转录")
-        )
+        recordingsList
+        .background(AppTheme.groupedBackground)
         .task {
             await transcriber.refreshSupportedLanguages()
             await store.reload()
             store.refreshIntelligenceAvailability()
-        }
-        .onChange(of: incomingImportURL) { _, newURL in
-            guard let newURL else {
-                return
-            }
-
-            queueImport(from: newURL)
-            incomingImportURL = nil
-        }
-        .fileImporter(
-            isPresented: $showsImporter,
-            allowedContentTypes: [.audio],
-            allowsMultipleSelection: false
-        ) { result in
-            handleImportResult(result)
-        }
-        .sheet(isPresented: $isShowingRecordingsMap) {
-            RecordingMapView(store: store, transcriber: transcriber, player: player)
-        }
-        .confirmationDialog(
-            "选择转录语言",
-            isPresented: Binding(
-                get: { pendingImport != nil },
-                set: { isPresented in
-                    if !isPresented {
-                        pendingImport = nil
-                    }
-                }
-            ),
-            titleVisibility: .visible
-        ) {
-            if let pendingImport {
-                ForEach(transcriber.supportedLanguages) { language in
-                    Button {
-                        importRecording(from: pendingImport.url, language: language)
-                    } label: {
-                        Label(
-                            language.displayName,
-                            systemImage: language.id == transcriber.selectedLanguageID ? "checkmark" : "globe"
-                        )
-                    }
-                }
-            }
-
-            Button("取消", role: .cancel) {}
-        } message: {
-            Text("导入录音")
         }
         .alert(
             "分析失败",
@@ -231,19 +54,19 @@ struct RecordingsView: View {
             Text(analysisErrorMessage ?? "")
         }
         .alert(
-            "导入失败",
+            "转录失败",
             isPresented: Binding(
-                get: { importErrorMessage != nil },
+                get: { transcriptionErrorMessage != nil },
                 set: { isPresented in
                     if !isPresented {
-                        importErrorMessage = nil
+                        transcriptionErrorMessage = nil
                     }
                 }
             )
         ) {
             Button("好", role: .cancel) {}
         } message: {
-            Text(importErrorMessage ?? "")
+            Text(transcriptionErrorMessage ?? "")
         }
         .alert(
             "删除录音",
@@ -283,6 +106,154 @@ struct RecordingsView: View {
         }
     }
 
+    @ViewBuilder
+    private var recordingsList: some View {
+        List {
+            recordingsSearchField
+                .listRowSeparator(.hidden)
+                .listRowBackground(Color.clear)
+                .listRowInsets(EdgeInsets(top: 8, leading: 16, bottom: 6, trailing: 16))
+
+            if store.recordings.isEmpty {
+                EmptyStateView(icon: "waveform.path.badge.plus", title: "暂无录音文件")
+                    .frame(maxWidth: .infinity, minHeight: 360)
+                    .listRowSeparator(.hidden)
+                    .listRowBackground(Color.clear)
+            } else if filteredRecordings.isEmpty {
+                EmptyStateView(icon: "magnifyingglass", title: "没有找到录音")
+                    .frame(maxWidth: .infinity, minHeight: 360)
+                    .listRowSeparator(.hidden)
+                    .listRowBackground(Color.clear)
+            } else {
+                ForEach(filteredRecordings) { item in
+                    recordingRow(for: item)
+                }
+            }
+        }
+        .listStyle(.plain)
+        .scrollContentBackground(.hidden)
+        .background(AppTheme.groupedBackground)
+        .scrollDismissesKeyboard(.interactively)
+        .safeAreaInset(edge: .bottom) {
+            Color.clear.frame(height: 8)
+        }
+    }
+
+    private func recordingRow(for item: RecordingItem) -> some View {
+        RecordingRow(
+            item: item,
+            isAnalyzing: analyzingRecordingID == item.id,
+            showsIntelligence: store.intelligenceAvailability.isAvailable
+        ) {
+            openRecording(item)
+        }
+        .listRowSeparator(.hidden)
+        .listRowBackground(Color.clear)
+        .listRowInsets(EdgeInsets(top: 6, leading: 16, bottom: 6, trailing: 16))
+        .contextMenu {
+            Button {
+                HapticFeedback.play(.copy)
+                UIPasteboard.general.string = store.transcriptText(for: item)
+            } label: {
+                Label("复制转录文本", systemImage: "doc.on.doc")
+            }
+
+            if store.intelligenceAvailability.isAvailable {
+                Button {
+                    analyze(item)
+                } label: {
+                    Label(item.intelligence == nil ? "生成标签和总结" : "重新分析", systemImage: "sparkles")
+                }
+                .disabled(analyzingRecordingID != nil)
+            }
+
+            Menu {
+                ForEach(transcriber.supportedLanguages) { language in
+                    Button {
+                        retranscribe(item, language: language)
+                    } label: {
+                        Label(
+                            language.displayName,
+                            systemImage: language.id == item.languageID ? "checkmark" : "globe"
+                        )
+                    }
+                }
+            } label: {
+                Label("重新转录", systemImage: "arrow.triangle.2.circlepath")
+            }
+            .disabled(item.importStatus?.isFailed == false || transcriber.isRecording || transcriber.isPreparing)
+
+            Button(role: .destructive) {
+                requestDelete(item)
+            } label: {
+                Label("删除", systemImage: "trash")
+            }
+            .disabled(item.importStatus?.isFailed == false)
+        }
+        .swipeActions(edge: .leading, allowsFullSwipe: false) {
+            if store.intelligenceAvailability.isAvailable {
+                Button {
+                    analyze(item)
+                } label: {
+                    Label("分析", systemImage: "sparkles")
+                }
+                .tint(AppTheme.info)
+                .disabled(analyzingRecordingID != nil)
+            }
+        }
+        .swipeActions(edge: .trailing, allowsFullSwipe: false) {
+            Button {
+                requestDelete(item)
+            } label: {
+                Label("删除", systemImage: "trash")
+            }
+            .tint(AppTheme.danger)
+            .disabled(item.importStatus?.isFailed == false)
+        }
+    }
+
+    private var recordingsSearchField: some View {
+        HStack(spacing: 9) {
+            Image(systemName: "magnifyingglass")
+                .font(.system(size: 15, weight: .semibold))
+                .foregroundStyle(.secondary)
+
+            TextField("搜索录音或转录", text: $searchText)
+                .font(.redditSans(.subheadline))
+                .textInputAutocapitalization(.never)
+                .autocorrectionDisabled()
+                .submitLabel(.search)
+                .focused($searchFieldIsFocused)
+                .onSubmit {
+                    searchFieldIsFocused = false
+                }
+
+            if searchFieldIsFocused || !searchText.isEmpty {
+                Button {
+                    HapticFeedback.play(.menuSelection)
+                    if searchText.isEmpty {
+                        searchFieldIsFocused = false
+                    } else {
+                        searchText = ""
+                    }
+                } label: {
+                    Image(systemName: "xmark.circle.fill")
+                        .font(.system(size: 16, weight: .semibold))
+                        .foregroundStyle(.tertiary)
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("清除搜索")
+            }
+        }
+        .padding(.horizontal, 12)
+        .frame(height: 40)
+        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+        .overlay {
+            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                .stroke(.quaternary, lineWidth: 1)
+        }
+    }
+
     private func analyze(_ item: RecordingItem) {
         guard store.intelligenceAvailability.isAvailable else {
             HapticFeedback.play(.blocked)
@@ -307,68 +278,23 @@ struct RecordingsView: View {
         }
     }
 
-    private func handleImportResult(_ result: Result<[URL], Error>) {
-        switch result {
-        case .success(let urls):
-            guard let url = urls.first else {
-                HapticFeedback.play(.warning)
-                return
-            }
-            queueImport(from: url)
-        case .failure(let error):
-            importErrorMessage = error.localizedDescription
-            HapticFeedback.play(.failure)
-        }
-    }
-
-    private func queueImport(from url: URL) {
-        guard !isImporting else {
-            HapticFeedback.play(.blocked)
-            return
-        }
-
-        selectedRecording = nil
-        pendingImport = PendingImport(url: url)
-        HapticFeedback.play(.importQueued)
-    }
-
-    private func importRecording(from url: URL, language: TranscriptionLanguage) {
-        guard !isImporting else {
-            HapticFeedback.play(.blocked)
-            return
-        }
-
-        pendingImport = nil
-        isImporting = true
-        HapticFeedback.play(.importStart)
-        Task {
-            do {
-                _ = try await store.importRecording(
-                    from: url,
-                    language: language,
-                    loudnessProcessingEnabled: transcriber.isLoudnessProcessingEnabled
-                )
-                HapticFeedback.play(.importComplete)
-            } catch {
-                importErrorMessage = error.localizedDescription
-                HapticFeedback.play(.failure)
-            }
-            isImporting = false
-        }
-    }
-
     private func openRecording(_ item: RecordingItem) {
         selectedRecording = item
     }
 
     private func retranscribe(_ item: RecordingItem, language: TranscriptionLanguage) {
+        guard !transcriber.isRecording, !transcriber.isPreparing else {
+            HapticFeedback.play(.blocked)
+            return
+        }
+
         Task {
             HapticFeedback.play(.retranscribeStart)
             do {
                 try await store.retranscribe(item, language: language)
                 HapticFeedback.play(.retranscribeComplete)
             } catch {
-                importErrorMessage = error.localizedDescription
+                transcriptionErrorMessage = error.localizedDescription
                 HapticFeedback.play(.failure)
             }
         }
@@ -408,11 +334,6 @@ struct RecordingsView: View {
     }
 }
 
-private struct PendingImport: Identifiable {
-    let id = UUID()
-    let url: URL
-}
-
 private struct RecordingDeleteRequest: Identifiable {
     let item: RecordingItem
 
@@ -421,7 +342,7 @@ private struct RecordingDeleteRequest: Identifiable {
     }
 }
 
-private struct RecordingMapView: View {
+struct RecordingMapView: View {
     @ObservedObject var store: RecordingStore
     @ObservedObject var transcriber: LiveTranscriptionManager
     @ObservedObject var player: RecordingPlaybackController
@@ -974,11 +895,14 @@ struct RecordingDetailView: View {
         }
         .safeAreaInset(edge: .bottom) {
             playerCard
-                .padding(.horizontal, 14)
+                .frame(maxWidth: 390)
+                .frame(maxWidth: .infinity)
+                .padding(.horizontal, 18)
                 .padding(.top, 6)
                 .padding(.bottom, 6)
         }
         .background(AppTheme.groupedBackground)
+        .toolbar(.visible, for: .navigationBar)
         .navigationTitle(currentItem.audioFileName)
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
@@ -1173,7 +1097,7 @@ struct RecordingDetailView: View {
             } label: {
                 Label("重新转录", systemImage: isTranscriptionRunning ? "hourglass" : "arrow.triangle.2.circlepath")
             }
-            .disabled(isTranscriptionRunning)
+            .disabled(isTranscriptionRunning || transcriber.isRecording || transcriber.isPreparing)
 
             Button {
                 HapticFeedback.play(.copy)
@@ -1349,35 +1273,38 @@ struct RecordingDetailView: View {
         let displayedTime = scrubbedPlaybackTime ?? player.currentTime
         let shape = RoundedRectangle(cornerRadius: 26, style: .continuous)
 
-        return VStack(spacing: 8) {
-            Slider(
-                value: Binding(
-                    get: { scrubbedPlaybackTime ?? player.currentTime },
-                    set: { scrubbedPlaybackTime = $0 }
-                ),
-                in: 0...max(player.duration, 1),
-                onEditingChanged: { isEditing in
-                    if !isEditing, let scrubbedPlaybackTime {
-                        player.seek(to: scrubbedPlaybackTime)
-                        self.scrubbedPlaybackTime = nil
+        return VStack(spacing: 10) {
+            HStack(alignment: .center, spacing: 8) {
+                Text(TranscriptionLine.formatTimestamp(displayedTime))
+                    .font(.redditSans(.caption2, weight: .semibold).monospacedDigit())
+                    .foregroundStyle(.primary)
+                    .lineLimit(1)
+                    .frame(minWidth: 50, alignment: .leading)
+
+                Slider(
+                    value: Binding(
+                        get: { scrubbedPlaybackTime ?? player.currentTime },
+                        set: { scrubbedPlaybackTime = $0 }
+                    ),
+                    in: 0...max(player.duration, 1),
+                    onEditingChanged: { isEditing in
+                        if !isEditing, let scrubbedPlaybackTime {
+                            player.seek(to: scrubbedPlaybackTime)
+                            self.scrubbedPlaybackTime = nil
+                        }
                     }
-                }
-            )
-            .disabled(!player.isLoaded)
+                )
+                .disabled(!player.isLoaded)
+                .frame(maxWidth: .infinity)
 
-            HStack(alignment: .center, spacing: 10) {
-                HStack(alignment: .firstTextBaseline, spacing: 4) {
-                    Text(TranscriptionLine.formatTimestamp(displayedTime))
-                        .foregroundStyle(.primary)
-                    Text("/")
-                        .foregroundStyle(.tertiary)
-                    Text(TranscriptionLine.formatTimestamp(player.duration))
-                        .foregroundStyle(.secondary)
-                }
-                .font(.redditSans(.caption2, weight: .semibold).monospacedDigit())
-                .lineLimit(1)
-                .frame(maxWidth: .infinity, alignment: .leading)
+                Text(TranscriptionLine.formatTimestamp(player.duration))
+                    .font(.redditSans(.caption2, weight: .semibold).monospacedDigit())
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+                    .frame(minWidth: 50, alignment: .trailing)
+            }
 
+            ZStack {
                 HStack(spacing: 8) {
                     PlaybackRoundButton(systemImage: "gobackward.5", title: "-5s") {
                         HapticFeedback.play(.timelineSeek)
@@ -1401,9 +1328,12 @@ struct RecordingDetailView: View {
                 }
                 .frame(width: 168)
 
-                playbackSpeedMenu
-                    .frame(maxWidth: .infinity, alignment: .trailing)
+                HStack {
+                    Spacer(minLength: 0)
+                    playbackSpeedMenu
+                }
             }
+            .frame(height: 58)
 
             if let errorText = player.errorText {
                 Label(errorText, systemImage: "exclamationmark.triangle")
@@ -1633,6 +1563,10 @@ struct RecordingDetailView: View {
 
     private func retranscribeCurrentItem(language: TranscriptionLanguage) {
         guard !isTranscriptionRunning else {
+            HapticFeedback.play(.blocked)
+            return
+        }
+        guard !transcriber.isRecording, !transcriber.isPreparing else {
             HapticFeedback.play(.blocked)
             return
         }
@@ -3080,7 +3014,7 @@ private struct RecordingInfoPill: View {
     RecordingsView(
         store: RecordingStore(),
         transcriber: LiveTranscriptionManager(),
-        incomingImportURL: .constant(nil),
+        searchText: .constant(""),
         selectedRecording: .constant(nil),
         player: RecordingPlaybackController()
     )

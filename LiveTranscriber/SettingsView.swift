@@ -1,94 +1,89 @@
 import SwiftUI
 import UIKit
 
-private enum SettingsRoute: Hashable {
-    case transcription
-    case transcriptionLanguage
-    case recording
-    case recordingFormat
-    case files
-    case privacy
-    case developer
-    case speechPipelineMode
-}
-
 struct SettingsView: View {
     @ObservedObject var transcriber: LiveTranscriptionManager
     @ObservedObject var recordingStore: RecordingStore
 
     var body: some View {
-        NavigationStack {
-            ScrollView {
-                VStack(alignment: .leading, spacing: 14) {
-                    NavigationLink(value: SettingsRoute.transcription) {
-                        SettingsNavigationRow(
-                            icon: "captions.bubble",
-                            title: "转录",
-                            value: transcriber.selectedLanguage.displayName,
-                            subtitle: "语言和转录模型",
-                            tint: AppTheme.info
-                        )
-                    }
-                    .buttonStyle(.plain)
-                    .settingsSurface()
-
-                    NavigationLink(value: SettingsRoute.recording) {
-                        SettingsNavigationRow(
-                            icon: "waveform.badge.mic",
-                            title: "录音",
-                            value: transcriber.selectedAudioFormat.title,
-                            subtitle: "音频格式和录音行为",
-                            tint: AppTheme.brand
-                        )
-                    }
-                    .buttonStyle(.plain)
-                    .settingsSurface()
-
-                    NavigationLink(value: SettingsRoute.files) {
-                        SettingsNavigationRow(
-                            icon: "folder",
-                            title: "文件",
-                            value: recordingStore.storageDisplayName,
-                            subtitle: "保存位置和录音数量",
-                            tint: AppTheme.success
-                        )
-                    }
-                    .buttonStyle(.plain)
-                    .settingsSurface()
-
-                    NavigationLink(value: SettingsRoute.privacy) {
-                        SettingsNavigationRow(
-                            icon: "lock.shield",
-                            title: "隐私",
-                            value: String(localized: "本地处理"),
-                            subtitle: "数据边界和权限用途",
-                            tint: AppTheme.success
-                        )
-                    }
-                    .buttonStyle(.plain)
-                    .settingsSurface()
-
-                    NavigationLink(value: SettingsRoute.developer) {
-                        SettingsNavigationRow(
-                            icon: "wrench.and.screwdriver",
-                            title: "开发者选项",
-                            value: transcriber.speechPipelineDiagnostics.activePipelineName,
-                            subtitle: "设备和 Pipeline 诊断",
-                            tint: AppTheme.purple
-                        )
-                    }
-                    .buttonStyle(.plain)
-                    .settingsSurface()
+        ScrollView {
+            VStack(alignment: .leading, spacing: 14) {
+                NavigationLink {
+                    transcriptionSettingsPage
+                } label: {
+                    SettingsNavigationRow(
+                        icon: "captions.bubble",
+                        title: "转录",
+                        value: transcriber.selectedLanguage.displayName,
+                        subtitle: "语言和转录模型",
+                        tint: AppTheme.info
+                    )
                 }
-                .padding()
+                .buttonStyle(.plain)
+                .settingsSurface()
+
+                NavigationLink {
+                    recordingSettingsPage
+                } label: {
+                    SettingsNavigationRow(
+                        icon: "waveform.badge.mic",
+                        title: "录音",
+                        value: transcriber.selectedAudioFormat.title,
+                        subtitle: "音频格式和录音行为",
+                        tint: AppTheme.brand
+                    )
+                }
+                .buttonStyle(.plain)
+                .settingsSurface()
+
+                NavigationLink {
+                    fileSettingsPage
+                } label: {
+                    SettingsNavigationRow(
+                        icon: "folder",
+                        title: "文件",
+                        value: recordingStore.storageDisplayName,
+                        subtitle: "保存位置和录音数量",
+                        tint: AppTheme.success
+                    )
+                }
+                .buttonStyle(.plain)
+                .settingsSurface()
+
+                NavigationLink {
+                    privacySettingsPage
+                } label: {
+                    SettingsNavigationRow(
+                        icon: "lock.shield",
+                        title: "隐私",
+                        value: String(localized: "本地处理"),
+                        subtitle: "数据边界和权限用途",
+                        tint: AppTheme.success
+                    )
+                }
+                .buttonStyle(.plain)
+                .settingsSurface()
+
+                NavigationLink {
+                    developerSettingsPage
+                } label: {
+                    SettingsNavigationRow(
+                        icon: "wrench.and.screwdriver",
+                        title: "开发者选项",
+                        value: transcriber.speechPipelineDiagnostics.activePipelineName,
+                        subtitle: "设备和 Pipeline 诊断",
+                        tint: AppTheme.purple
+                    )
+                }
+                .buttonStyle(.plain)
+                .settingsSurface()
             }
-            .background(AppTheme.groupedBackground.ignoresSafeArea())
-            .navigationTitle("设置")
-            .navigationBarTitleDisplayMode(.inline)
-            .navigationDestination(for: SettingsRoute.self) { route in
-                destination(for: route)
-            }
+            .padding()
         }
+        .background(AppTheme.groupedBackground.ignoresSafeArea())
+        .toolbar(.visible, for: .navigationBar)
+        .navigationTitle("设置")
+        .navigationBarTitleDisplayMode(.inline)
         .task {
             await transcriber.refreshSupportedLanguages()
             await recordingStore.reload()
@@ -96,32 +91,12 @@ struct SettingsView: View {
         }
     }
 
-    @ViewBuilder
-    private func destination(for route: SettingsRoute) -> some View {
-        switch route {
-        case .transcription:
-            transcriptionSettingsPage
-        case .transcriptionLanguage:
-            transcriptionLanguagePage
-        case .recording:
-            recordingSettingsPage
-        case .recordingFormat:
-            recordingFormatPage
-        case .files:
-            fileSettingsPage
-        case .privacy:
-            privacySettingsPage
-        case .developer:
-            developerSettingsPage
-        case .speechPipelineMode:
-            speechPipelineModePage
-        }
-    }
-
     private var transcriptionSettingsPage: some View {
         SettingsDetailPage(title: "转录") {
             SettingsSection(title: "转录", systemImage: "captions.bubble", tint: AppTheme.info) {
-                NavigationLink(value: SettingsRoute.transcriptionLanguage) {
+                NavigationLink {
+                    transcriptionLanguagePage
+                } label: {
                     SettingsNavigationRow(
                         icon: "globe",
                         title: "转录语言",
@@ -166,7 +141,9 @@ struct SettingsView: View {
     private var recordingSettingsPage: some View {
         SettingsDetailPage(title: "录音") {
             SettingsSection(title: "录音", systemImage: "waveform.badge.mic", tint: AppTheme.brand) {
-                NavigationLink(value: SettingsRoute.recordingFormat) {
+                NavigationLink {
+                    recordingFormatPage
+                } label: {
                     SettingsNavigationRow(
                         icon: "waveform.badge.mic",
                         title: "录音格式",
@@ -376,7 +353,9 @@ struct SettingsView: View {
                 tint: AppTheme.brand
             )
 
-            NavigationLink(value: SettingsRoute.speechPipelineMode) {
+            NavigationLink {
+                speechPipelineModePage
+            } label: {
                 SettingsNavigationRow(
                     icon: "slider.horizontal.3",
                     title: "语音 Pipeline 模式",
