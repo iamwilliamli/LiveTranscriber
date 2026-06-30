@@ -512,14 +512,19 @@ struct TranscriptionView: View {
 
             Divider()
 
-            ForEach(liveTranscriptTranslationLanguages) { language in
-                Button {
-                    requestLiveTranscriptTranslation(to: language)
-                } label: {
-                    Label(
-                        language.displayName,
-                        systemImage: selectedLiveTranslationLanguage?.id == language.id ? "checkmark" : "translate"
-                    )
+            if liveTranscriptTranslationLanguages.isEmpty {
+                Text("暂无可翻译语言")
+            } else {
+                ForEach(liveTranscriptTranslationLanguages) { language in
+                    Button {
+                        requestLiveTranscriptTranslation(to: language)
+                    } label: {
+                        Label(
+                            language.displayName,
+                            systemImage: selectedLiveTranslationLanguage?.id == language.id ? "checkmark" : "translate"
+                        )
+                    }
+                    .disabled(false)
                 }
             }
         } label: {
@@ -535,7 +540,7 @@ struct TranscriptionView: View {
             .background((selectedLiveTranslationLanguage == nil ? AppTheme.info : AppTheme.brand).opacity(0.11), in: Capsule())
         }
         .buttonStyle(.plain)
-        .disabled(liveTranscriptTranslationLanguages.isEmpty)
+        .environment(\.isEnabled, true)
     }
 
     @ViewBuilder
