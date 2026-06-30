@@ -23,6 +23,7 @@ struct TranscriptionView: View {
     @State private var liveTranslatedLineSignatures: [TranscriptionLine.ID: String] = [:]
     @State private var isTranslatingLiveTranscript = false
     @State private var liveTranslationErrorMessage: String?
+    @State private var isShowingLiveTranslationLanguagePicker = false
 
     private var isCompletingRecording: Bool {
         pendingRecordingSave != nil || isSavingPendingRecording
@@ -88,6 +89,22 @@ struct TranscriptionView: View {
         }
         .onChange(of: externalPendingRecordingDraft?.audioURL) { _, _ in
             consumeExternalPendingRecordingDraftIfNeeded()
+        }
+        .sheet(isPresented: $isShowingLiveTranslationLanguagePicker) {
+            LiveTranslationLanguagePicker(
+                selectedLanguageID: selectedLiveTranslationLanguage?.id,
+                languages: liveTranscriptTranslationLanguages,
+                onSelectOriginal: {
+                    clearLiveTranscriptTranslation()
+                    isShowingLiveTranslationLanguagePicker = false
+                },
+                onSelectLanguage: { language in
+                    requestLiveTranscriptTranslation(to: language)
+                    isShowingLiveTranslationLanguagePicker = false
+                }
+            )
+            .presentationDetents([.medium, .large])
+            .presentationDragIndicator(.visible)
         }
         .sheet(item: $pendingRecordingSave) { pendingSave in
             RecordingSaveSheet(
@@ -507,30 +524,9 @@ struct TranscriptionView: View {
     }
 
     private var liveTranscriptTranslationMenu: some View {
-        Menu {
-            Button {
-                clearLiveTranscriptTranslation()
-            } label: {
-                Label("原文", systemImage: selectedLiveTranslationLanguage == nil ? "checkmark" : "text.alignleft")
-            }
-
-            Divider()
-
-            if liveTranscriptTranslationLanguages.isEmpty {
-                Text("暂无可翻译语言")
-            } else {
-                ForEach(liveTranscriptTranslationLanguages) { language in
-                    Button {
-                        requestLiveTranscriptTranslation(to: language)
-                    } label: {
-                        Label(
-                            language.displayName,
-                            systemImage: selectedLiveTranslationLanguage?.id == language.id ? "checkmark" : "translate"
-                        )
-                    }
-                    .disabled(false)
-                }
-            }
+        Button {
+            HapticFeedback.play(.navigation)
+            isShowingLiveTranslationLanguagePicker = true
         } label: {
             HStack(spacing: 5) {
                 Image(systemName: "translate")
@@ -544,7 +540,6 @@ struct TranscriptionView: View {
             .background((selectedLiveTranslationLanguage == nil ? AppTheme.info : AppTheme.brand).opacity(0.11), in: Capsule())
         }
         .buttonStyle(.plain)
-        .environment(\.isEnabled, true)
     }
 
     @ViewBuilder
@@ -750,6 +745,97 @@ struct TranscriptionView: View {
 private struct PendingRecordingSave: Identifiable {
     let id = UUID()
     let draft: RecordingDraft
+}
+
+private struct LiveTranslationLanguagePicker: View {
+    @Environment(\.dismiss) private var dismiss
+    let selectedLanguageID: String?
+    let languages: [TranscriptionLanguage]
+    let onSelectOriginal: () -> Void
+    let onSelectLanguage: (TranscriptionLanguage) -> Void
+
+    var body: some View {
+        NavigationStack {
+            List {
+                Section {
+                    Button {
+                        onSelectOriginal()
+                        dismiss()
+                    } label: {
+                        languageRow(
+                            title: String(localized: "原文"),
+                            subtitle: String(localized: "停止实时翻译"),
+                            systemImage: "text.alignleft",
+                            isSelected: selectedLanguageID == nil
+                        )
+                    }
+                    .foregroundStyle(.primary)
+                }
+
+                Section("翻译语言") {
+                    if languages.isEmpty {
+                        Text("暂无可翻译语言")
+                            .foregroundStyle(.secondary)
+                    } else {
+                        ForEach(languages) { language in
+                            Button {
+                                onSelectLanguage(language)
+                                dismiss()
+                            } label: {
+                                languageRow(
+                                    title: language.displayName,
+                                    subtitle: language.id,
+                                    systemImage: "translate",
+                                    isSelected: selectedLanguageID == language.id
+                                )
+                            }
+                            .foregroundStyle(.primary)
+                        }
+                    }
+                }
+            }
+            .listStyle(.insetGrouped)
+            .navigationTitle("实时翻译")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button("完成") {
+                        dismiss()
+                    }
+                }
+            }
+        }
+    }
+
+    private func languageRow(
+        title: String,
+        subtitle: String,
+        systemImage: String,
+        isSelected: Bool
+    ) -> some View {
+        HStack(spacing: 12) {
+            Image(systemName: systemImage)
+                .font(.system(size: 16, weight: .semibold))
+                .foregroundStyle(isSelected ? AppTheme.brand : .secondary)
+                .frame(width: 24)
+
+            VStack(alignment: .leading, spacing: 2) {
+                Text(title)
+                    .font(.redditSans(.body, weight: .semibold))
+                Text(subtitle)
+                    .font(.redditSans(.caption))
+                    .foregroundStyle(.secondary)
+            }
+
+            Spacer()
+
+            if isSelected {
+                Image(systemName: "checkmark.circle.fill")
+                    .foregroundStyle(AppTheme.brand)
+            }
+        }
+        .contentShape(Rectangle())
+    }
 }
 
 private struct RecordingSaveSheet: View {
