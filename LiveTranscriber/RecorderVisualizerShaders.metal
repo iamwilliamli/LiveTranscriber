@@ -110,19 +110,19 @@ fragment float4 recorderVisualizerFragment(
     float3 reelColor = mix(float3(0.18, 0.18, 0.19), uniforms.tint.rgb, 0.34 + active * 0.22);
     color = mix(color, reelColor, reelMask * 0.72);
 
-    float waveBase = 0.755;
+    float waveBase = 0.785;
     float historyLevel = sampleHistory(uv.x, levelHistory, uniforms.historyCount);
     float previousLevel = sampleHistory(max(uv.x - 0.010, 0.0), levelHistory, uniforms.historyCount);
     float nextLevel = sampleHistory(min(uv.x + 0.010, 1.0), levelHistory, uniforms.historyCount);
     float localPeak = max(historyLevel, max(previousLevel, nextLevel));
-    float traceY = waveBase - localPeak * 0.205;
-    float waveLine = 1.0 - smoothstep(0.004, 0.019, abs(uv.y - traceY));
-    float waveGlow = 1.0 - smoothstep(0.008, 0.074, abs(uv.y - traceY));
+    float traceY = waveBase - localPeak * 0.320;
+    float waveLine = 1.0 - smoothstep(0.004, 0.021, abs(uv.y - traceY));
+    float waveGlow = 1.0 - smoothstep(0.010, 0.092, abs(uv.y - traceY));
     float timelineFloor = smoothstep(waveBase + 0.015, waveBase - 0.010, uv.y) *
-        smoothstep(waveBase - 0.250, waveBase - 0.160, uv.y);
-    color += uniforms.tint.rgb * timelineFloor * (0.020 + active * 0.026);
-    color += uniforms.tint.rgb * waveGlow * (0.050 + active * 0.060);
-    color = mix(color, float3(1.0, 0.34, 0.22), waveLine * (0.40 + active * 0.50));
+        smoothstep(waveBase - 0.385, waveBase - 0.250, uv.y);
+    color += uniforms.tint.rgb * timelineFloor * (0.024 + active * 0.032);
+    color += uniforms.tint.rgb * waveGlow * (0.062 + active * 0.074);
+    color = mix(color, float3(1.0, 0.34, 0.22), waveLine * (0.46 + active * 0.50));
 
     float scanline = 0.5 + 0.5 * sin(uv.y * uniforms.size.y * 0.62);
     color -= scanline * 0.010;
