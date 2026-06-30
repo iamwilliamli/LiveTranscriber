@@ -158,25 +158,20 @@ struct TranscriptionView: View {
                 color: recorderDeckPrimaryColor
             )
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
-            .padding(.top, 6)
+            .padding(.top, 18)
             .allowsHitTesting(false)
 
-            HStack(alignment: .top, spacing: 12) {
-                VStack(alignment: .leading, spacing: 5) {
+            VStack(alignment: .leading, spacing: 0) {
+                HStack(alignment: .top, spacing: 12) {
                     Label("实时转录", systemImage: "waveform.and.mic")
-                        .font(.redditSans(.headline, weight: .semibold))
-                        .foregroundStyle(recorderDeckPrimaryColor)
+                        .font(.redditSans(.caption, weight: .bold))
+                        .foregroundStyle(recorderDeckSecondaryColor)
+                        .labelStyle(.titleAndIcon)
                         .lineLimit(1)
+                        .frame(maxWidth: 150, alignment: .leading)
 
-                    Text(transcriber.statusText)
-                        .font(.redditSans(.caption, weight: .semibold))
-                        .foregroundStyle(transcriber.isRecording && !transcriber.isPaused ? AppTheme.brandSoft : recorderDeckSecondaryColor)
-                        .lineLimit(1)
-                }
+                    Spacer(minLength: 8)
 
-                Spacer(minLength: 8)
-
-                VStack(alignment: .trailing, spacing: 8) {
                     Text(transcriber.selectedAudioFormat.badgeText)
                         .font(.redditSans(.caption2, weight: .bold))
                         .foregroundStyle(recorderDeckPrimaryColor)
@@ -184,8 +179,16 @@ struct TranscriptionView: View {
                         .frame(height: 25)
                         .background(recorderDeckPillColor, in: Capsule())
                 }
+
+                Spacer(minLength: 0)
+
+                Text(transcriber.statusText)
+                    .font(.redditSans(.caption, weight: .semibold))
+                    .foregroundStyle(transcriber.isRecording && !transcriber.isPaused ? AppTheme.brandSoft : recorderDeckSecondaryColor)
+                    .lineLimit(1)
+                    .frame(maxWidth: 180, alignment: .leading)
             }
-            .padding(14)
+            .padding(12)
         }
         .frame(height: 138)
         .clipShape(RoundedRectangle(cornerRadius: AppTheme.cornerRadius, style: .continuous))
