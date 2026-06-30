@@ -846,7 +846,7 @@ private struct RecordingSaveSheet: View {
     @ObservedObject var locationProvider: RecordingLocationProvider
     let isSaving: Bool
     let showsTitleGeneration: Bool
-    let onGenerateTitle: () async throws -> String
+    let onGenerateTitle: () async throws -> RecordingTitleSuggestion
     let onSave: () -> Void
     let onDiscard: () -> Void
     @State private var isGeneratingTitle = false
@@ -921,7 +921,7 @@ private struct RecordingSaveSheet: View {
 
                 if showsTitleGeneration {
                     Button {
-                        generateTitle()
+                        generateTitleAndTags()
                     } label: {
                         Group {
                             if isGeneratingTitle {
@@ -938,7 +938,7 @@ private struct RecordingSaveSheet: View {
                     }
                     .buttonStyle(.plain)
                     .disabled(!canGenerateTitle)
-                    .accessibilityLabel("AI 生成标题")
+                    .accessibilityLabel("AI 生成标题和标签")
                 }
             }
                 .padding(.leading, 12)
@@ -955,7 +955,7 @@ private struct RecordingSaveSheet: View {
             && !draft.lines.plainTranscriptText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
     }
 
-    private func generateTitle() {
+    private func generateTitleAndTags() {
         guard canGenerateTitle else {
             HapticFeedback.play(.blocked)
             return
@@ -966,8 +966,8 @@ private struct RecordingSaveSheet: View {
         HapticFeedback.play(.analysisStart)
         Task {
             do {
-                let title = try await onGenerateTitle()
-                let cleanedTitle = title.trimmingCharacters(in: .whitespacesAndNewlines)
+                let suggestion = try await onGenerateTitle()
+                let cleanedTitle = suggestion.title.trimmingCharacters(in: .whitespacesAndNewlines)
                 guard !cleanedTitle.isEmpty else {
                     titleGenerationErrorMessage = String(localized: "没有生成有效的标题")
                     HapticFeedback.play(.failure)
@@ -975,6 +975,7 @@ private struct RecordingSaveSheet: View {
                     return
                 }
                 recordingName = cleanedTitle
+                tags = RecordingItem.mergedTags(tags, suggestion.tags)
                 HapticFeedback.play(.analysisComplete)
             } catch {
                 titleGenerationErrorMessage = error.localizedDescription
