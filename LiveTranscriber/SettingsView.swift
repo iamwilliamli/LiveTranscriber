@@ -252,7 +252,7 @@ struct SettingsView: View {
 
                 SettingsStatusRow(
                     icon: "icloud",
-                    text: "录音文件保存在 app 私有容器；启用 iCloud 时通过 app 私有 iCloud container 同步，不暴露到 iCloud Drive 文件夹。",
+                    text: "录音文件保存在 app 私有存储；启用 iCloud 时同步到 app 私有 iCloud container 的 Data 目录，不暴露到 iCloud Drive 文件夹。",
                     tint: AppTheme.info
                 )
 

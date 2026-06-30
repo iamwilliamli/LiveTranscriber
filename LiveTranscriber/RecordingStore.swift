@@ -338,23 +338,34 @@ final class RecordingStore: ObservableObject {
     private var searchIndexCache: [RecordingItem.ID: RecordingSearchIndexCacheEntry] = [:]
     private var searchIndexWarmupTask: Task<Void, Never>?
 
+    private var applicationSupportDirectory: URL {
+        fileManager.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
+    }
+
     private var localRecordingsDirectory: URL {
+        applicationSupportDirectory.appendingPathComponent("Recordings", isDirectory: true)
+    }
+
+    private var legacyLocalRecordingsDirectory: URL {
         let documents = fileManager.urls(for: .documentDirectory, in: .userDomainMask)[0]
         return documents.appendingPathComponent("Recordings", isDirectory: true)
     }
 
     private let importWorker = RecordingStoreImportWorker()
 
-    private var iCloudRecordingsDirectory: URL? {
-        fileManager
-            .url(forUbiquityContainerIdentifier: Self.iCloudContainerIdentifier)?
-            .appendingPathComponent("Recordings", isDirectory: true)
+    private var iCloudContainerURL: URL? {
+        fileManager.url(forUbiquityContainerIdentifier: Self.iCloudContainerIdentifier)
     }
 
-    private var legacyICloudRecordingsDirectory: URL? {
-        fileManager
-            .url(forUbiquityContainerIdentifier: Self.iCloudContainerIdentifier)?
-            .appendingPathComponent("Documents/Recordings", isDirectory: true)
+    private var iCloudRecordingsDirectory: URL? {
+        iCloudContainerURL?.appendingPathComponent("Data/Recordings", isDirectory: true)
+    }
+
+    private var legacyICloudRecordingsDirectories: [URL] {
+        [
+            iCloudContainerURL?.appendingPathComponent("Recordings", isDirectory: true),
+            iCloudContainerURL?.appendingPathComponent("Documents/Recordings", isDirectory: true)
+        ].compactMap { $0 }
     }
 
     var recordingsDirectory: URL {
@@ -366,11 +377,15 @@ final class RecordingStore: ObservableObject {
     }
 
     private var legacyIndexURLs: [URL] {
-        [
+        var urls = [
             localRecordingsDirectory.appendingPathComponent("recordings.json"),
-            legacyICloudRecordingsDirectory?.appendingPathComponent("recordings.json"),
+            legacyLocalRecordingsDirectory.appendingPathComponent("recordings.json"),
             recordingsDirectory.appendingPathComponent("recordings.json")
-        ].compactMap { $0 }
+        ]
+        urls.append(contentsOf: legacyICloudRecordingsDirectories.map { directory in
+            directory.appendingPathComponent("recordings.json")
+        })
+        return urls
     }
 
     init() {
@@ -840,8 +855,8 @@ final class RecordingStore: ObservableObject {
     }
 
     private func ensureRecordingsDirectory() throws {
-        try migrateLocalRecordingsToICloudIfAvailable()
         try fileManager.createDirectory(at: recordingsDirectory, withIntermediateDirectories: true)
+        try migrateLegacyRecordingFilesIfNeeded()
     }
 
     private func loadIndexedRecordings() throws -> [RecordingItem] {
@@ -957,20 +972,13 @@ final class RecordingStore: ObservableObject {
         )
     }
 
-    private func migrateLocalRecordingsToICloudIfAvailable() throws {
-        guard let iCloudDirectory = iCloudRecordingsDirectory,
-              iCloudDirectory.path != localRecordingsDirectory.path else {
-            return
+    private func migrateLegacyRecordingFilesIfNeeded() throws {
+        let destinationDirectory = recordingsDirectory
+        let sourceDirectories = ([legacyLocalRecordingsDirectory, localRecordingsDirectory] + legacyICloudRecordingsDirectories)
+            .filter { $0.path != destinationDirectory.path }
+        for sourceDirectory in sourceDirectories {
+            try migrateRecordingFiles(from: sourceDirectory, to: destinationDirectory)
         }
-
-        try fileManager.createDirectory(at: iCloudDirectory, withIntermediateDirectories: true)
-
-        if let legacyICloudRecordingsDirectory,
-           legacyICloudRecordingsDirectory.path != iCloudDirectory.path {
-            try migrateRecordingFiles(from: legacyICloudRecordingsDirectory, to: iCloudDirectory)
-        }
-
-        try migrateRecordingFiles(from: localRecordingsDirectory, to: iCloudDirectory)
     }
 
     private func migrateRecordingFiles(from sourceDirectory: URL, to destinationDirectory: URL) throws {
