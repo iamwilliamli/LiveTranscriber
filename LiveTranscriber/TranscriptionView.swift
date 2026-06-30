@@ -97,6 +97,7 @@ struct TranscriptionView: View {
                 includesLocation: $pendingRecordingIncludesLocation,
                 locationProvider: locationProvider,
                 isSaving: isSavingPendingRecording,
+                showsTitleGeneration: recordingStore.intelligenceAvailability.isAvailable,
                 onGenerateTitle: {
                     try await recordingStore.generateSuggestedTitle(for: pendingSave.draft)
                 },
@@ -758,6 +759,7 @@ private struct RecordingSaveSheet: View {
     @Binding var includesLocation: Bool
     @ObservedObject var locationProvider: RecordingLocationProvider
     let isSaving: Bool
+    let showsTitleGeneration: Bool
     let onGenerateTitle: () async throws -> String
     let onSave: () -> Void
     let onDiscard: () -> Void
@@ -831,28 +833,30 @@ private struct RecordingSaveSheet: View {
                     .textInputAutocapitalization(.never)
                     .autocorrectionDisabled()
 
-                Button {
-                    generateTitle()
-                } label: {
-                    Group {
-                        if isGeneratingTitle {
-                            ProgressView()
-                                .controlSize(.small)
-                        } else {
-                            Image(systemName: "sparkles")
-                                .font(.system(size: 15, weight: .semibold))
+                if showsTitleGeneration {
+                    Button {
+                        generateTitle()
+                    } label: {
+                        Group {
+                            if isGeneratingTitle {
+                                ProgressView()
+                                    .controlSize(.small)
+                            } else {
+                                Image(systemName: "sparkles")
+                                    .font(.system(size: 15, weight: .semibold))
+                            }
                         }
+                        .frame(width: 34, height: 34)
+                        .foregroundStyle(AppTheme.brand)
+                        .background(AppTheme.brand.opacity(0.11), in: Circle())
                     }
-                    .frame(width: 34, height: 34)
-                    .foregroundStyle(AppTheme.brand)
-                    .background(AppTheme.brand.opacity(0.11), in: Circle())
+                    .buttonStyle(.plain)
+                    .disabled(!canGenerateTitle)
+                    .accessibilityLabel("AI 生成标题")
                 }
-                .buttonStyle(.plain)
-                .disabled(!canGenerateTitle)
-                .accessibilityLabel("AI 生成标题")
             }
                 .padding(.leading, 12)
-                .padding(.trailing, 7)
+                .padding(.trailing, showsTitleGeneration ? 7 : 12)
                 .frame(height: 48)
                 .background(AppTheme.elevatedBackground, in: RoundedRectangle(cornerRadius: AppTheme.compactCornerRadius, style: .continuous))
         }
