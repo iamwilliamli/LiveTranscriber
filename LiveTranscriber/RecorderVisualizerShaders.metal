@@ -5,6 +5,7 @@ struct RecorderVisualizerUniforms {
     float time;
     float level;
     float active;
+    uint historyCount;
     float2 size;
     float4 tint;
 };
@@ -46,6 +47,17 @@ static float ringMask(float2 point, float radius, float width, float softness) {
     return 1.0 - smoothstep(width, width + softness, distanceFromRing);
 }
 
+static float sampleHistory(float normalizedX, constant float *history, uint count) {
+    if (count == 0) {
+        return 0.0;
+    }
+
+    float scaledIndex = clamp(normalizedX, 0.0, 1.0) * float(count - 1);
+    uint leftIndex = uint(floor(scaledIndex));
+    uint rightIndex = min(leftIndex + 1, count - 1);
+    return mix(history[leftIndex], history[rightIndex], fract(scaledIndex));
+}
+
 static float tapeReel(float2 uv, float2 center, float aspect, float time, float level, float active) {
     float2 point = uv - center;
     point.x *= aspect;
@@ -68,7 +80,8 @@ static float tapeReel(float2 uv, float2 center, float aspect, float time, float 
 
 fragment float4 recorderVisualizerFragment(
     RecorderVisualizerVertexOut in [[stage_in]],
-    constant RecorderVisualizerUniforms &uniforms [[buffer(0)]]
+    constant RecorderVisualizerUniforms &uniforms [[buffer(0)]],
+    constant float *levelHistory [[buffer(1)]]
 ) {
     float2 uv = clamp(in.uv, 0.0, 1.0);
     float aspect = max(uniforms.size.x / max(uniforms.size.y, 1.0), 1.0);
@@ -97,22 +110,26 @@ fragment float4 recorderVisualizerFragment(
     float3 reelColor = mix(float3(0.18, 0.18, 0.19), uniforms.tint.rgb, 0.34 + active * 0.22);
     color = mix(color, reelColor, reelMask * 0.72);
 
-    float waveBase = 0.735;
-    float wave = sin(uv.x * 31.0 + time * 3.0) * 0.018;
-    wave += sin(uv.x * 69.0 - time * 2.1) * 0.010;
-    wave += sin(uv.x * 107.0 + time * 1.35) * 0.006;
-    wave *= (0.20 + active * (0.52 + level * 1.55));
-    float waveLine = 1.0 - smoothstep(0.004, 0.018, abs(uv.y - (waveBase + wave)));
-    float waveGlow = 1.0 - smoothstep(0.008, 0.070, abs(uv.y - (waveBase + wave)));
-    color += uniforms.tint.rgb * waveGlow * (0.055 + active * 0.070);
+    float waveBase = 0.755;
+    float historyLevel = sampleHistory(uv.x, levelHistory, uniforms.historyCount);
+    float previousLevel = sampleHistory(max(uv.x - 0.010, 0.0), levelHistory, uniforms.historyCount);
+    float nextLevel = sampleHistory(min(uv.x + 0.010, 1.0), levelHistory, uniforms.historyCount);
+    float localPeak = max(historyLevel, max(previousLevel, nextLevel));
+    float traceY = waveBase - localPeak * 0.205;
+    float waveLine = 1.0 - smoothstep(0.004, 0.019, abs(uv.y - traceY));
+    float waveGlow = 1.0 - smoothstep(0.008, 0.074, abs(uv.y - traceY));
+    float timelineFloor = smoothstep(waveBase + 0.015, waveBase - 0.010, uv.y) *
+        smoothstep(waveBase - 0.250, waveBase - 0.160, uv.y);
+    color += uniforms.tint.rgb * timelineFloor * (0.020 + active * 0.026);
+    color += uniforms.tint.rgb * waveGlow * (0.050 + active * 0.060);
     color = mix(color, float3(1.0, 0.34, 0.22), waveLine * (0.40 + active * 0.50));
 
     float columns = 34.0;
     float column = floor(uv.x * columns);
     float localX = fract(uv.x * columns);
-    float randomHeight = hash11(column + 9.0);
-    float pulse = 0.5 + 0.5 * sin(time * 4.2 + column * 0.63);
-    float barHeight = 0.022 + active * (0.030 + level * 0.135 + randomHeight * pulse * 0.030);
+    float columnLevel = sampleHistory((column + 0.5) / columns, levelHistory, uniforms.historyCount);
+    float randomHeight = hash11(column + 9.0) * 0.012;
+    float barHeight = 0.022 + active * (0.020 + columnLevel * 0.155 + randomHeight);
     float barX = step(0.24, localX) * step(localX, 0.76) * step(0.075, uv.x) * step(uv.x, 0.925);
     float barY = step(abs(uv.y - 0.885), barHeight);
     float bars = barX * barY;

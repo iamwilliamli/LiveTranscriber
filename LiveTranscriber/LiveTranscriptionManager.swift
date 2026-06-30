@@ -52,6 +52,7 @@ final class LiveTranscriptionManager: ObservableObject {
     @Published private(set) var errorText: String?
     @Published private(set) var elapsedSeconds: Int = 0
     @Published private(set) var inputLevel: Float = 0
+    @Published private(set) var inputLevelHistory: [Float] = Array(repeating: 0, count: 72)
     @Published private(set) var supportedLanguages: [TranscriptionLanguage] = TranscriptionLanguage.fallbackOptions
     @Published private(set) var speechPipelineRuntimeFormatText = String(localized: "Runtime Analyzer 输入: 等待录音")
     @Published var selectedAudioFormat: RecordingAudioFormat {
@@ -83,6 +84,8 @@ final class LiveTranscriptionManager: ObservableObject {
     private static let loudnessProcessingDefaultsKey = "developer.loudnessProcessingEnabled"
     private static let speechPipelineModeDefaultsKey = "speech.pipelineMode"
     private static let analyzerSampleRate: Double = 16_000
+    private static let inputLevelHistoryCount = 72
+    private static let inputLevelHistorySampleInterval: TimeInterval = 0.08
 
     private let audioSessionQueue = DispatchQueue(label: "com.reddownloader.live-transcription.audio-session", qos: .userInitiated)
     private var analyzer: SpeechAnalyzer?
@@ -100,6 +103,7 @@ final class LiveTranscriptionManager: ObservableObject {
     private var currentRecordingFormat: AVAudioFormat?
     private var currentAudioOutputFormat: RecordingAudioFormat?
     private var smoothedInputLevel: Float = 0
+    private var lastInputLevelHistorySampleAt: TimeInterval = 0
     private var finalizedLines: [TranscriptionLine] = []
     private var interimLine: TranscriptionLine?
     private var lastLiveActivitySnapshot: LiveActivitySnapshot?
@@ -188,7 +192,7 @@ final class LiveTranscriptionManager: ObservableObject {
 
         isPreparing = true
         errorText = nil
-        resetInputLevel()
+        resetInputLevel(clearHistory: true)
         lastSpeechPipelineRuntimeFormat = nil
         speechPipelineRuntimeFormatText = String(localized: "Runtime Analyzer 输入: 等待首个 buffer")
         resetTranscriptStorage()
@@ -389,7 +393,7 @@ final class LiveTranscriptionManager: ObservableObject {
         if !isRecording {
             statusText = String(localized: "准备就绪")
             elapsedSeconds = 0
-            resetInputLevel()
+            resetInputLevel(clearHistory: true)
             accumulatedRecordingSeconds = 0
             recordingStartedAt = nil
             activeSegmentStartedAt = nil
@@ -470,11 +474,29 @@ final class LiveTranscriptionManager: ObservableObject {
         let response: Float = clampedLevel > smoothedInputLevel ? 0.42 : 0.16
         smoothedInputLevel += (clampedLevel - smoothedInputLevel) * response
         inputLevel = smoothedInputLevel
+        appendInputLevelHistoryIfNeeded(smoothedInputLevel)
     }
 
-    private func resetInputLevel() {
+    private func resetInputLevel(clearHistory: Bool = false) {
         smoothedInputLevel = 0
         inputLevel = 0
+        if clearHistory {
+            inputLevelHistory = Array(repeating: 0, count: Self.inputLevelHistoryCount)
+            lastInputLevelHistorySampleAt = 0
+        }
+    }
+
+    private func appendInputLevelHistoryIfNeeded(_ level: Float) {
+        let now = Date().timeIntervalSinceReferenceDate
+        guard now - lastInputLevelHistorySampleAt >= Self.inputLevelHistorySampleInterval else {
+            return
+        }
+
+        lastInputLevelHistorySampleAt = now
+        inputLevelHistory.append(level)
+        if inputLevelHistory.count > Self.inputLevelHistoryCount {
+            inputLevelHistory.removeFirst(inputLevelHistory.count - Self.inputLevelHistoryCount)
+        }
     }
 
     private static func makeAnalyzerInputFormat() throws -> AVAudioFormat {

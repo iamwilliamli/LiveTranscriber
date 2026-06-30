@@ -117,13 +117,13 @@ struct TranscriptionView: View {
             recorderDeck
 
             HStack(spacing: 10) {
-                languageMenu
-
-                StatusPill(
-                    systemImage: "text.alignleft",
-                    title: "\(transcriber.transcriptLines.count)",
-                    tint: AppTheme.info
+                RecordingStateBadge(
+                    isRecording: transcriber.isRecording,
+                    isPaused: transcriber.isPaused,
+                    isPreparing: transcriber.isPreparing
                 )
+
+                languageMenu
 
                 Spacer(minLength: 0)
             }
@@ -144,7 +144,8 @@ struct TranscriptionView: View {
         ZStack {
             RecorderMetalVisualizer(
                 isActive: transcriber.isRecording && !transcriber.isPaused,
-                level: transcriber.inputLevel
+                level: transcriber.inputLevel,
+                levelHistory: transcriber.inputLevelHistory
             )
 
             RoundedRectangle(cornerRadius: AppTheme.cornerRadius, style: .continuous)
@@ -161,15 +162,6 @@ struct TranscriptionView: View {
                         .font(.redditSans(.caption, weight: .semibold))
                         .foregroundStyle(transcriber.isRecording && !transcriber.isPaused ? AppTheme.brandSoft : .white.opacity(0.72))
                         .lineLimit(1)
-
-                    Spacer(minLength: 0)
-
-                    RecordingStateBadge(
-                        isRecording: transcriber.isRecording,
-                        isPaused: transcriber.isPaused,
-                        isPreparing: transcriber.isPreparing
-                    )
-                    .colorScheme(.dark)
                 }
 
                 Spacer(minLength: 8)

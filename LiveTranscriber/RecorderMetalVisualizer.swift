@@ -6,6 +6,9 @@ import UIKit
 struct RecorderMetalVisualizer: UIViewRepresentable {
     var isActive: Bool
     var level: Float
+    var levelHistory: [Float]
+
+    private static let historySampleCount = 72
 
     func makeUIView(context: Context) -> MTKView {
         let view = MTKView(frame: .zero, device: MTLCreateSystemDefaultDevice())
@@ -24,7 +27,7 @@ struct RecorderMetalVisualizer: UIViewRepresentable {
 
     func updateUIView(_ view: MTKView, context: Context) {
         view.preferredFramesPerSecond = isActive ? 30 : 12
-        context.coordinator.update(isActive: isActive, level: level)
+        context.coordinator.update(isActive: isActive, level: level, levelHistory: levelHistory)
     }
 
     func makeCoordinator() -> Coordinator {
@@ -38,6 +41,8 @@ struct RecorderMetalVisualizer: UIViewRepresentable {
         private var isActive = false
         private var targetLevel: Float = 0
         private var displayedLevel: Float = 0
+        private var targetHistory: [Float] = Array(repeating: 0, count: RecorderMetalVisualizer.historySampleCount)
+        private var displayedHistory: [Float] = Array(repeating: 0, count: RecorderMetalVisualizer.historySampleCount)
 
         func configure(with device: MTLDevice?, colorPixelFormat: MTLPixelFormat) {
             guard let device,
@@ -62,9 +67,10 @@ struct RecorderMetalVisualizer: UIViewRepresentable {
             commandQueue = device.makeCommandQueue()
         }
 
-        func update(isActive: Bool, level: Float) {
+        func update(isActive: Bool, level: Float, levelHistory: [Float]) {
             self.isActive = isActive
             targetLevel = min(max(level, 0), 1)
+            targetHistory = Self.normalizedHistory(levelHistory)
         }
 
         func draw(in view: MTKView) {
@@ -81,11 +87,16 @@ struct RecorderMetalVisualizer: UIViewRepresentable {
             let fall: Float = isActive ? 0.12 : 0.20
             let smoothing = targetLevel > displayedLevel ? rise : fall
             displayedLevel += (targetLevel - displayedLevel) * smoothing
+            let historySmoothing: Float = isActive ? 0.44 : 0.20
+            for index in displayedHistory.indices {
+                displayedHistory[index] += (targetHistory[index] - displayedHistory[index]) * historySmoothing
+            }
 
             var uniforms = RecorderVisualizerUniforms(
                 time: Float(CACurrentMediaTime() - startTime),
                 level: displayedLevel,
                 active: isActive ? 1 : 0,
+                historyCount: UInt32(displayedHistory.count),
                 size: SIMD2<Float>(
                     Float(max(view.drawableSize.width, 1)),
                     Float(max(view.drawableSize.height, 1))
@@ -95,13 +106,32 @@ struct RecorderMetalVisualizer: UIViewRepresentable {
 
             encoder.setRenderPipelineState(pipelineState)
             encoder.setFragmentBytes(&uniforms, length: MemoryLayout<RecorderVisualizerUniforms>.stride, index: 0)
-            encoder.drawPrimitives(type: .triangle, vertexStart: 0, vertexCount: 3)
+            displayedHistory.withUnsafeBufferPointer { buffer in
+                if let baseAddress = buffer.baseAddress {
+                    encoder.setFragmentBytes(baseAddress, length: MemoryLayout<Float>.stride * buffer.count, index: 1)
+                }
+                encoder.drawPrimitives(type: .triangle, vertexStart: 0, vertexCount: 3)
+            }
             encoder.endEncoding()
             commandBuffer.present(drawable)
             commandBuffer.commit()
         }
 
         func mtkView(_ view: MTKView, drawableSizeWillChange size: CGSize) {}
+
+        private static func normalizedHistory(_ source: [Float]) -> [Float] {
+            let sampleCount = RecorderMetalVisualizer.historySampleCount
+            guard !source.isEmpty else {
+                return Array(repeating: 0, count: sampleCount)
+            }
+
+            let clamped = source.suffix(sampleCount).map { min(max($0, 0), 1) }
+            if clamped.count == sampleCount {
+                return clamped
+            }
+
+            return Array(repeating: 0, count: sampleCount - clamped.count) + clamped
+        }
     }
 }
 
@@ -109,6 +139,7 @@ private struct RecorderVisualizerUniforms {
     var time: Float
     var level: Float
     var active: Float
+    var historyCount: UInt32
     var size: SIMD2<Float>
     var tint: SIMD4<Float>
 }
