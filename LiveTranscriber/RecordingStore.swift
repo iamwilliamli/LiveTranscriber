@@ -877,20 +877,34 @@ final class RecordingStore: ObservableObject {
     }
 
     private func mergedRecordings(with indexedRecordings: [RecordingItem]) throws -> [RecordingItem] {
-        var itemsByAudioFileName = Dictionary(uniqueKeysWithValues: indexedRecordings.map { ($0.audioFileName, $0) })
         let fileURLs = try fileManager.contentsOfDirectory(
             at: recordingsDirectory,
             includingPropertiesForKeys: [.creationDateKey, .contentModificationDateKey, .isRegularFileKey],
             options: [.skipsHiddenFiles]
         )
-
-        for fileURL in fileURLs {
+        let audioFileURLs = fileURLs.filter { fileURL in
             let fileExtension = fileURL.pathExtension.lowercased()
-            guard Self.audioFileExtensions.contains(fileExtension),
-                  fileURL.lastPathComponent.hasPrefix(".") == false else {
+            return Self.audioFileExtensions.contains(fileExtension)
+                && fileURL.lastPathComponent.hasPrefix(".") == false
+        }
+        let availableAudioFileNames = Set(audioFileURLs.map(\.lastPathComponent))
+        var itemsByAudioFileName: [String: RecordingItem] = [:]
+
+        for item in indexedRecordings {
+            let hasAudioFile = availableAudioFileNames.contains(item.audioFileName)
+            guard hasAudioFile || item.importStatus != nil else {
+                Self.logger.info("Pruning stale recording index for missing audio file: \(item.audioFileName, privacy: .public)")
                 continue
             }
 
+            if let existing = itemsByAudioFileName[item.audioFileName],
+               existing.createdAt >= item.createdAt {
+                continue
+            }
+            itemsByAudioFileName[item.audioFileName] = item
+        }
+
+        for fileURL in audioFileURLs {
             if var existing = itemsByAudioFileName[fileURL.lastPathComponent] {
                 existing = refreshedItem(existing, audioURL: fileURL)
                 itemsByAudioFileName[fileURL.lastPathComponent] = existing
