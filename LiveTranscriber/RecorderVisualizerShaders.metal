@@ -124,17 +124,6 @@ fragment float4 recorderVisualizerFragment(
     color += uniforms.tint.rgb * waveGlow * (0.050 + active * 0.060);
     color = mix(color, float3(1.0, 0.34, 0.22), waveLine * (0.40 + active * 0.50));
 
-    float columns = 34.0;
-    float column = floor(uv.x * columns);
-    float localX = fract(uv.x * columns);
-    float columnLevel = sampleHistory((column + 0.5) / columns, levelHistory, uniforms.historyCount);
-    float randomHeight = hash11(column + 9.0) * 0.012;
-    float barHeight = 0.022 + active * (0.020 + columnLevel * 0.155 + randomHeight);
-    float barX = step(0.24, localX) * step(localX, 0.76) * step(0.075, uv.x) * step(uv.x, 0.925);
-    float barY = step(abs(uv.y - 0.885), barHeight);
-    float bars = barX * barY;
-    color = mix(color, mix(float3(0.95, 0.22, 0.12), float3(1.0, 0.74, 0.32), level), bars * 0.82);
-
     float scanline = 0.5 + 0.5 * sin(uv.y * uniforms.size.y * 0.62);
     color -= scanline * 0.010;
     color += (hash11(uv.x * uniforms.size.x + uv.y * uniforms.size.y * 17.0 + time) - 0.5) * 0.018;
