@@ -143,12 +143,8 @@ struct TranscriptionView: View {
 
     private var recorderDeck: some View {
         ZStack {
-            RecorderMetalVisualizer(
-                isActive: transcriber.isRecording && !transcriber.isPaused,
-                level: transcriber.inputLevel,
-                levelHistory: transcriber.inputLevelHistory,
-                colorScheme: colorScheme
-            )
+            RoundedRectangle(cornerRadius: AppTheme.cornerRadius, style: .continuous)
+                .fill(recorderDeckBackgroundColor)
 
             RoundedRectangle(cornerRadius: AppTheme.cornerRadius, style: .continuous)
                 .stroke(recorderDeckBorderColor, lineWidth: 1)
@@ -192,6 +188,10 @@ struct TranscriptionView: View {
         }
         .frame(height: 138)
         .clipShape(RoundedRectangle(cornerRadius: AppTheme.cornerRadius, style: .continuous))
+    }
+
+    private var recorderDeckBackgroundColor: Color {
+        AppTheme.elevatedBackground
     }
 
     private var recorderDeckPrimaryColor: Color {
