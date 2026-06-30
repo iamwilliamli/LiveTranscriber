@@ -97,6 +97,9 @@ struct TranscriptionView: View {
                 includesLocation: $pendingRecordingIncludesLocation,
                 locationProvider: locationProvider,
                 isSaving: isSavingPendingRecording,
+                onGenerateTitle: {
+                    try await recordingStore.generateSuggestedTitle(for: pendingSave.draft)
+                },
                 onSave: savePendingRecording,
                 onDiscard: discardPendingRecording
             )
@@ -755,8 +758,11 @@ private struct RecordingSaveSheet: View {
     @Binding var includesLocation: Bool
     @ObservedObject var locationProvider: RecordingLocationProvider
     let isSaving: Bool
+    let onGenerateTitle: () async throws -> String
     let onSave: () -> Void
     let onDiscard: () -> Void
+    @State private var isGeneratingTitle = false
+    @State private var titleGenerationErrorMessage: String?
 
     var body: some View {
         NavigationStack {
@@ -796,6 +802,21 @@ private struct RecordingSaveSheet: View {
                 }
             }
         }
+        .alert(
+            "生成标题失败",
+            isPresented: Binding(
+                get: { titleGenerationErrorMessage != nil },
+                set: { isPresented in
+                    if !isPresented {
+                        titleGenerationErrorMessage = nil
+                    }
+                }
+            )
+        ) {
+            Button("好", role: .cancel) {}
+        } message: {
+            Text(titleGenerationErrorMessage ?? "")
+        }
     }
 
     private var nameSection: some View {
@@ -804,15 +825,73 @@ private struct RecordingSaveSheet: View {
                 .font(.redditSans(.caption, weight: .semibold))
                 .foregroundStyle(.secondary)
 
-            TextField("录音名称", text: $recordingName)
-                .font(.redditSans(.headline, weight: .semibold))
-                .textInputAutocapitalization(.never)
-                .autocorrectionDisabled()
-                .padding(.horizontal, 12)
+            HStack(spacing: 8) {
+                TextField("录音名称", text: $recordingName)
+                    .font(.redditSans(.headline, weight: .semibold))
+                    .textInputAutocapitalization(.never)
+                    .autocorrectionDisabled()
+
+                Button {
+                    generateTitle()
+                } label: {
+                    Group {
+                        if isGeneratingTitle {
+                            ProgressView()
+                                .controlSize(.small)
+                        } else {
+                            Image(systemName: "sparkles")
+                                .font(.system(size: 15, weight: .semibold))
+                        }
+                    }
+                    .frame(width: 34, height: 34)
+                    .foregroundStyle(AppTheme.brand)
+                    .background(AppTheme.brand.opacity(0.11), in: Circle())
+                }
+                .buttonStyle(.plain)
+                .disabled(!canGenerateTitle)
+                .accessibilityLabel("AI 生成标题")
+            }
+                .padding(.leading, 12)
+                .padding(.trailing, 7)
                 .frame(height: 48)
                 .background(AppTheme.elevatedBackground, in: RoundedRectangle(cornerRadius: AppTheme.compactCornerRadius, style: .continuous))
         }
         .recordingSaveSectionSurface()
+    }
+
+    private var canGenerateTitle: Bool {
+        !isSaving
+            && !isGeneratingTitle
+            && !draft.lines.plainTranscriptText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    }
+
+    private func generateTitle() {
+        guard canGenerateTitle else {
+            HapticFeedback.play(.blocked)
+            return
+        }
+
+        isGeneratingTitle = true
+        titleGenerationErrorMessage = nil
+        HapticFeedback.play(.analysisStart)
+        Task {
+            do {
+                let title = try await onGenerateTitle()
+                let cleanedTitle = title.trimmingCharacters(in: .whitespacesAndNewlines)
+                guard !cleanedTitle.isEmpty else {
+                    titleGenerationErrorMessage = String(localized: "没有生成有效的标题")
+                    HapticFeedback.play(.failure)
+                    isGeneratingTitle = false
+                    return
+                }
+                recordingName = cleanedTitle
+                HapticFeedback.play(.analysisComplete)
+            } catch {
+                titleGenerationErrorMessage = error.localizedDescription
+                HapticFeedback.play(.failure)
+            }
+            isGeneratingTitle = false
+        }
     }
 
     private var tagsEntry: some View {
