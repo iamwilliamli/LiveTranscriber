@@ -10,9 +10,9 @@ struct RecordingsView: View {
     @ObservedObject var store: RecordingStore
     @ObservedObject var transcriber: LiveTranscriptionManager
     @Binding var incomingImportURL: URL?
-    @StateObject private var player = RecordingPlaybackController()
+    @Binding var selectedRecording: RecordingItem?
+    @ObservedObject var player: RecordingPlaybackController
     @State private var deleteRequest: RecordingDeleteRequest?
-    @State private var selectedRecording: RecordingItem?
     @State private var analyzingRecordingID: RecordingItem.ID?
     @State private var analysisErrorMessage: String?
     @State private var showsImporter = false
@@ -53,7 +53,7 @@ struct RecordingsView: View {
                                 isAnalyzing: analyzingRecordingID == item.id,
                                 showsIntelligence: store.intelligenceAvailability.isAvailable
                             ) {
-                                selectedRecording = item
+                                openRecording(item)
                             }
                             .listRowSeparator(.hidden)
                             .listRowBackground(Color.clear)
@@ -122,7 +122,7 @@ struct RecordingsView: View {
                     }
                     .listStyle(.plain)
                     .scrollContentBackground(.hidden)
-                    .background(AppTheme.groupedBackground.ignoresSafeArea())
+                    .background(AppTheme.groupedBackground)
                     .safeAreaInset(edge: .top) {
                         Color.clear.frame(height: 4)
                     }
@@ -156,9 +156,6 @@ struct RecordingsView: View {
                     .disabled(isImporting || pendingImport != nil)
                     .accessibilityLabel("导入录音")
                 }
-            }
-            .navigationDestination(item: $selectedRecording) { item in
-                RecordingDetailView(item: item, store: store, transcriber: transcriber, player: player)
             }
         }
         .searchable(
@@ -358,6 +355,10 @@ struct RecordingsView: View {
             }
             isImporting = false
         }
+    }
+
+    private func openRecording(_ item: RecordingItem) {
+        selectedRecording = item
     }
 
     private func retranscribe(_ item: RecordingItem, language: TranscriptionLanguage) {
@@ -911,11 +912,12 @@ private struct FlowTags: View {
     }
 }
 
-private struct RecordingDetailView: View {
+struct RecordingDetailView: View {
     let item: RecordingItem
     @ObservedObject var store: RecordingStore
     @ObservedObject var transcriber: LiveTranscriptionManager
     @ObservedObject var player: RecordingPlaybackController
+    var onClose: (() -> Void)? = nil
     @Environment(\.dismiss) private var dismiss
     @State private var copied = false
     @State private var deleteRequest: RecordingDeleteRequest?
@@ -963,7 +965,6 @@ private struct RecordingDetailView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 16) {
                 header
-                playerCard
                 if store.intelligenceAvailability.isAvailable {
                     intelligenceCard
                 }
@@ -971,10 +972,27 @@ private struct RecordingDetailView: View {
             }
             .padding()
         }
-        .background(AppTheme.groupedBackground.ignoresSafeArea())
+        .safeAreaInset(edge: .bottom) {
+            playerCard
+                .padding(.horizontal, 14)
+                .padding(.top, 6)
+                .padding(.bottom, 6)
+        }
+        .background(AppTheme.groupedBackground)
         .navigationTitle(currentItem.audioFileName)
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
+            if let onClose {
+                ToolbarItem(placement: .topBarLeading) {
+                    Button {
+                        onClose()
+                    } label: {
+                        Image(systemName: "chevron.left")
+                    }
+                    .accessibilityLabel("返回")
+                }
+            }
+
             ToolbarItem(placement: .topBarTrailing) {
                 detailActionsMenu
             }
@@ -1329,19 +1347,38 @@ private struct RecordingDetailView: View {
 
     private var playerCard: some View {
         let displayedTime = scrubbedPlaybackTime ?? player.currentTime
+        let shape = RoundedRectangle(cornerRadius: 26, style: .continuous)
 
-        return VStack(alignment: .leading, spacing: 12) {
-            HStack(spacing: 10) {
-                Label("播放录音", systemImage: "play.circle")
-                    .font(.redditSans(.headline))
+        return VStack(spacing: 8) {
+            Slider(
+                value: Binding(
+                    get: { scrubbedPlaybackTime ?? player.currentTime },
+                    set: { scrubbedPlaybackTime = $0 }
+                ),
+                in: 0...max(player.duration, 1),
+                onEditingChanged: { isEditing in
+                    if !isEditing, let scrubbedPlaybackTime {
+                        player.seek(to: scrubbedPlaybackTime)
+                        self.scrubbedPlaybackTime = nil
+                    }
+                }
+            )
+            .disabled(!player.isLoaded)
 
-                Spacer()
+            HStack(alignment: .center, spacing: 10) {
+                HStack(alignment: .firstTextBaseline, spacing: 4) {
+                    Text(TranscriptionLine.formatTimestamp(displayedTime))
+                        .foregroundStyle(.primary)
+                    Text("/")
+                        .foregroundStyle(.tertiary)
+                    Text(TranscriptionLine.formatTimestamp(player.duration))
+                        .foregroundStyle(.secondary)
+                }
+                .font(.redditSans(.caption2, weight: .semibold).monospacedDigit())
+                .lineLimit(1)
+                .frame(maxWidth: .infinity, alignment: .leading)
 
-                playbackSpeedMenu
-            }
-
-            VStack(spacing: 10) {
-                HStack(spacing: 14) {
+                HStack(spacing: 8) {
                     PlaybackRoundButton(systemImage: "gobackward.5", title: "-5s") {
                         HapticFeedback.play(.timelineSeek)
                         scrubbedPlaybackTime = nil
@@ -1362,31 +1399,11 @@ private struct RecordingDetailView: View {
                     }
                     .disabled(!player.isLoaded)
                 }
+                .frame(width: 168)
 
-                Slider(
-                    value: Binding(
-                        get: { scrubbedPlaybackTime ?? player.currentTime },
-                        set: { scrubbedPlaybackTime = $0 }
-                    ),
-                    in: 0...max(player.duration, 1),
-                    onEditingChanged: { isEditing in
-                        if !isEditing, let scrubbedPlaybackTime {
-                            player.seek(to: scrubbedPlaybackTime)
-                            self.scrubbedPlaybackTime = nil
-                        }
-                    }
-                )
-                .disabled(!player.isLoaded)
-
-                HStack {
-                    Text(TranscriptionLine.formatTimestamp(displayedTime))
-                    Spacer()
-                    Text(TranscriptionLine.formatTimestamp(player.duration))
-                }
-                .font(.redditSans(.caption2).monospacedDigit())
-                .foregroundStyle(.secondary)
+                playbackSpeedMenu
+                    .frame(maxWidth: .infinity, alignment: .trailing)
             }
-            .frame(maxWidth: .infinity)
 
             if let errorText = player.errorText {
                 Label(errorText, systemImage: "exclamationmark.triangle")
@@ -1395,14 +1412,11 @@ private struct RecordingDetailView: View {
                     .fixedSize(horizontal: false, vertical: true)
             }
         }
-        .padding(14)
+        .padding(.horizontal, 12)
+        .padding(.vertical, 10)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(AppTheme.cardBackground)
-        .overlay {
-            RoundedRectangle(cornerRadius: AppTheme.cornerRadius, style: .continuous)
-                .stroke(AppTheme.cardBorder, lineWidth: 1)
-        }
-        .clipShape(RoundedRectangle(cornerRadius: AppTheme.cornerRadius, style: .continuous))
+        .glassEffect(.regular.tint(AppTheme.brand.opacity(0.08)).interactive(), in: shape)
+        .shadow(color: Color.black.opacity(0.14), radius: 18, y: 8)
     }
 
     private var playbackSpeedMenu: some View {
@@ -1419,18 +1433,14 @@ private struct RecordingDetailView: View {
                 }
             }
         } label: {
-            HStack(spacing: 5) {
-                Image(systemName: "speedometer")
-                    .font(.system(size: 12, weight: .semibold))
-                Text(RecordingPlaybackController.playbackRateLabel(player.playbackRate))
-                    .font(.redditSans(.caption, weight: .bold).monospacedDigit())
-            }
+            Text(RecordingPlaybackController.playbackRateLabel(player.playbackRate))
+                .font(.redditSans(.caption2, weight: .bold).monospacedDigit())
+                .lineLimit(1)
             .foregroundStyle(AppTheme.brand)
-            .padding(.horizontal, 10)
-            .frame(height: 30)
-            .background(AppTheme.brand.opacity(0.11), in: Capsule())
+            .padding(.horizontal, 7)
+            .frame(height: 24)
         }
-        .buttonStyle(.plain)
+        .buttonStyle(.glass)
         .disabled(!player.isLoaded)
     }
 
@@ -1885,7 +1895,11 @@ private struct RecordingDetailView: View {
             player.unload()
             try store.delete(item)
             HapticFeedback.play(.deleteConfirmed)
-            dismiss()
+            if let onClose {
+                onClose()
+            } else {
+                dismiss()
+            }
         } catch {
             deleteErrorMessage = error.localizedDescription
             HapticFeedback.play(.failure)
@@ -2552,8 +2566,17 @@ private struct PlaybackRoundButton: View {
                     in: Circle()
                 )
         }
-        .buttonStyle(.plain)
+        .buttonStyle(PlaybackRoundButtonStyle())
         .accessibilityLabel(title)
+    }
+}
+
+private struct PlaybackRoundButtonStyle: ButtonStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .scaleEffect(configuration.isPressed ? 0.94 : 1)
+            .opacity(configuration.isPressed ? 0.82 : 1)
+            .animation(.snappy(duration: 0.12, extraBounce: 0), value: configuration.isPressed)
     }
 }
 
@@ -2731,7 +2754,7 @@ private struct StoredTranscriptLineRow: View {
 }
 
 @MainActor
-private final class RecordingPlaybackController: ObservableObject {
+final class RecordingPlaybackController: ObservableObject {
     @Published private(set) var currentItem: RecordingItem?
     @Published private(set) var isLoaded = false
     @Published private(set) var isPlaying = false
@@ -3057,7 +3080,9 @@ private struct RecordingInfoPill: View {
     RecordingsView(
         store: RecordingStore(),
         transcriber: LiveTranscriptionManager(),
-        incomingImportURL: .constant(nil)
+        incomingImportURL: .constant(nil),
+        selectedRecording: .constant(nil),
+        player: RecordingPlaybackController()
     )
         .font(.redditSans(.body))
         .tint(AppTheme.brand)

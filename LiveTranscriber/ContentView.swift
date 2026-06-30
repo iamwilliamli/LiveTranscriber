@@ -4,40 +4,54 @@ import UIKit
 struct ContentView: View {
     @StateObject private var transcriber = LiveTranscriptionManager()
     @StateObject private var recordingStore = RecordingStore()
+    @StateObject private var recordingPlayer = RecordingPlaybackController()
     @State private var selectedTab: AppTab = .transcribe
     @State private var incomingRecordingImportURL: URL?
     @State private var pendingRecordingDraftFromLiveActivity: RecordingDraft?
+    @State private var selectedRecordingForDetail: RecordingItem?
 
     var body: some View {
-        TabView(selection: tabSelection) {
-            TranscriptionView(
-                transcriber: transcriber,
-                recordingStore: recordingStore,
-                externalPendingRecordingDraft: $pendingRecordingDraftFromLiveActivity
-            )
-                .tabItem {
-                    Label("转录", systemImage: "waveform.and.mic")
-                }
-                .tag(AppTab.transcribe)
+        NavigationStack {
+            TabView(selection: tabSelection) {
+                TranscriptionView(
+                    transcriber: transcriber,
+                    recordingStore: recordingStore,
+                    externalPendingRecordingDraft: $pendingRecordingDraftFromLiveActivity
+                )
+                    .tabItem {
+                        Label("转录", systemImage: "waveform.and.mic")
+                    }
+                    .tag(AppTab.transcribe)
 
-            RecordingsView(
-                store: recordingStore,
-                transcriber: transcriber,
-                incomingImportURL: $incomingRecordingImportURL
-            )
-                .tabItem {
-                    Label("录音文件", systemImage: "folder")
-                }
-                .tag(AppTab.recordings)
+                RecordingsView(
+                    store: recordingStore,
+                    transcriber: transcriber,
+                    incomingImportURL: $incomingRecordingImportURL,
+                    selectedRecording: $selectedRecordingForDetail,
+                    player: recordingPlayer
+                )
+                    .tabItem {
+                        Label("录音文件", systemImage: "folder")
+                    }
+                    .tag(AppTab.recordings)
 
-            SettingsView(transcriber: transcriber, recordingStore: recordingStore)
-                .tabItem {
-                    Label("设置", systemImage: "gearshape")
-                }
-                .tag(AppTab.settings)
+                SettingsView(transcriber: transcriber, recordingStore: recordingStore)
+                    .tabItem {
+                        Label("设置", systemImage: "gearshape")
+                    }
+                    .tag(AppTab.settings)
+            }
+            .font(.redditSans(.body))
+            .tint(AppTheme.brand)
+            .navigationDestination(item: $selectedRecordingForDetail) { item in
+                RecordingDetailView(
+                    item: item,
+                    store: recordingStore,
+                    transcriber: transcriber,
+                    player: recordingPlayer
+                )
+            }
         }
-        .font(.redditSans(.body))
-        .tint(AppTheme.brand)
         .task {
             await recordingStore.reload()
             await transcriber.refreshSupportedLanguages()
