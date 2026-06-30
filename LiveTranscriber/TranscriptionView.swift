@@ -1277,12 +1277,17 @@ private struct RecordingStateBadge: View {
 
     var body: some View {
         Label(title, systemImage: isRecording && !isPaused ? "record.circle" : "checkmark.circle")
-            .font(.redditSans(.caption2, weight: .bold))
+            .font(.redditSans(.caption, weight: .semibold))
             .foregroundStyle(tint)
             .lineLimit(1)
-            .padding(.horizontal, 9)
-            .frame(height: 28)
+            .minimumScaleFactor(0.78)
+            .padding(.horizontal, 10)
+            .frame(height: 32)
             .background(tint.opacity(0.12), in: Capsule())
+            .overlay {
+                Capsule()
+                    .stroke(tint.opacity(0.18), lineWidth: 1)
+            }
     }
 }
 
