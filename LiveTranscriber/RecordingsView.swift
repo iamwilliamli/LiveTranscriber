@@ -2,6 +2,7 @@ import AVFoundation
 import CoreLocation
 import MapKit
 import SwiftUI
+import Translation
 import UIKit
 import UniformTypeIdentifiers
 
@@ -933,6 +934,12 @@ private struct RecordingDetailView: View {
     @State private var renameErrorMessage: String?
     @State private var cachedTranscriptLines: [StoredTranscriptLine] = []
     @State private var scrubbedPlaybackTime: TimeInterval?
+    @State private var translationConfiguration: TranslationSession.Configuration?
+    @State private var selectedTranslationLanguage: TranscriptionLanguage?
+    @State private var translatedTranscriptByLineID: [StoredTranscriptLine.ID: String] = [:]
+    @State private var translatedTranscriptCache: [String: [StoredTranscriptLine.ID: String]] = [:]
+    @State private var isTranslatingTranscript = false
+    @State private var translationErrorMessage: String?
 
     private var currentItem: RecordingItem {
         store.recording(withID: item.id) ?? item
@@ -1027,6 +1034,9 @@ private struct RecordingDetailView: View {
         }
         .task(id: transcriptCacheIdentifier) {
             await refreshTranscriptCache()
+        }
+        .translationTask(translationConfiguration) { session in
+            await translateTranscript(using: session)
         }
         .onDisappear {
             player.unload()
@@ -1430,8 +1440,17 @@ private struct RecordingDetailView: View {
         let currentLineID = StoredTranscriptLine.currentLineID(in: lines, time: player.currentTime)
 
         return VStack(alignment: .leading, spacing: 12) {
-            Label("转录文本", systemImage: "text.alignleft")
-                .font(.redditSans(.headline))
+            HStack(alignment: .center, spacing: 12) {
+                Label("转录文本", systemImage: "text.alignleft")
+                    .font(.redditSans(.headline))
+
+                Spacer(minLength: 8)
+
+                transcriptTranslationMenu
+                    .disabled(lines.isEmpty || isTranscriptionRunning)
+            }
+
+            transcriptTranslationStatus
 
             if let importStatus = item.importStatus {
                 RecordingImportStatusDetail(status: importStatus)
@@ -1448,6 +1467,8 @@ private struct RecordingDetailView: View {
                     ForEach(lines) { line in
                         StoredTranscriptLineRow(
                             line: line,
+                            translatedText: translatedTranscriptByLineID[line.id],
+                            isShowingTranslation: selectedTranslationLanguage != nil,
                             isCurrent: line.id == currentLineID
                         ) {
                             HapticFeedback.play(.timelineSeek)
@@ -1467,6 +1488,69 @@ private struct RecordingDetailView: View {
                 .stroke(AppTheme.cardBorder, lineWidth: 1)
         }
         .clipShape(RoundedRectangle(cornerRadius: AppTheme.cornerRadius, style: .continuous))
+    }
+
+    private var transcriptTranslationMenu: some View {
+        Menu {
+            Button {
+                clearTranscriptTranslation()
+            } label: {
+                Label("原文", systemImage: selectedTranslationLanguage == nil ? "checkmark" : "text.alignleft")
+            }
+
+            Divider()
+
+            ForEach(transcriptTranslationLanguages) { language in
+                Button {
+                    requestTranscriptTranslation(to: language)
+                } label: {
+                    Label(
+                        language.displayName,
+                        systemImage: selectedTranslationLanguage?.id == language.id ? "checkmark" : "translate"
+                    )
+                }
+            }
+        } label: {
+            HStack(spacing: 5) {
+                Image(systemName: "translate")
+                    .font(.system(size: 12, weight: .semibold))
+                Text(selectedTranslationLanguage?.shortName ?? String(localized: "翻译"))
+                    .font(.redditSans(.caption, weight: .bold))
+            }
+            .foregroundStyle(selectedTranslationLanguage == nil ? AppTheme.info : AppTheme.brand)
+            .padding(.horizontal, 10)
+            .frame(height: 30)
+            .background((selectedTranslationLanguage == nil ? AppTheme.info : AppTheme.brand).opacity(0.11), in: Capsule())
+        }
+        .buttonStyle(.plain)
+    }
+
+    @ViewBuilder
+    private var transcriptTranslationStatus: some View {
+        if let selectedTranslationLanguage {
+            HStack(spacing: 8) {
+                if isTranslatingTranscript {
+                    ProgressView()
+                        .controlSize(.small)
+                } else {
+                    Image(systemName: translationErrorMessage == nil ? "translate" : "exclamationmark.triangle")
+                        .font(.system(size: 12, weight: .semibold))
+                }
+
+                Text(translationErrorMessage ?? String(format: String(localized: "翻译成 %@"), selectedTranslationLanguage.displayName))
+                    .font(.redditSans(.caption, weight: .semibold))
+                    .foregroundStyle(translationErrorMessage == nil ? .secondary : AppTheme.warning)
+                    .lineLimit(2)
+
+                Spacer(minLength: 0)
+            }
+        }
+    }
+
+    private var transcriptTranslationLanguages: [TranscriptionLanguage] {
+        transcriber.supportedLanguages.filter { language in
+            !Self.sameBaseLanguage(language.id, currentItem.languageID)
+        }
     }
 
     private func analyzeCurrentItem() {
@@ -1548,6 +1632,169 @@ private struct RecordingDetailView: View {
         }
 
         cachedTranscriptLines = lines
+        translatedTranscriptByLineID = [:]
+        translatedTranscriptCache = translatedTranscriptCache.filter { key, _ in
+            key.hasPrefix(transcriptTranslationCachePrefix)
+        }
+
+        if let selectedTranslationLanguage {
+            requestTranscriptTranslation(to: selectedTranslationLanguage)
+        }
+    }
+
+    private func requestTranscriptTranslation(to language: TranscriptionLanguage) {
+        guard !cachedTranscriptLines.isEmpty else {
+            HapticFeedback.play(.blocked)
+            return
+        }
+        guard !Self.sameBaseLanguage(language.id, currentItem.languageID) else {
+            clearTranscriptTranslation()
+            return
+        }
+
+        HapticFeedback.play(.menuSelection)
+        selectedTranslationLanguage = language
+        translationErrorMessage = nil
+
+        let cacheKey = transcriptTranslationCacheKey(for: language)
+        if let cachedTranslation = translatedTranscriptCache[cacheKey] {
+            translatedTranscriptByLineID = cachedTranslation
+            isTranslatingTranscript = false
+            return
+        }
+
+        translatedTranscriptByLineID = [:]
+        isTranslatingTranscript = true
+
+        let sourceLanguage = Self.localeLanguage(for: currentItem.languageID)
+        let targetLanguage = Self.localeLanguage(for: language.id)
+        let nextConfiguration = TranslationSession.Configuration(
+            source: sourceLanguage,
+            target: targetLanguage
+        )
+
+        if var existingConfiguration = translationConfiguration,
+           existingConfiguration == nextConfiguration {
+            existingConfiguration.invalidate()
+            translationConfiguration = existingConfiguration
+        } else {
+            translationConfiguration = nextConfiguration
+        }
+    }
+
+    private func clearTranscriptTranslation() {
+        HapticFeedback.play(.menuSelection)
+        selectedTranslationLanguage = nil
+        translatedTranscriptByLineID = [:]
+        translationErrorMessage = nil
+        isTranslatingTranscript = false
+        translationConfiguration = nil
+    }
+
+    private func translateTranscript(using session: TranslationSession) async {
+        guard let targetTranslationLanguage = selectedTranslationLanguage,
+              !cachedTranscriptLines.isEmpty else {
+            isTranslatingTranscript = false
+            return
+        }
+
+        let cacheKey = transcriptTranslationCacheKey(for: targetTranslationLanguage)
+        if let cachedTranslation = translatedTranscriptCache[cacheKey] {
+            translatedTranscriptByLineID = cachedTranslation
+            isTranslatingTranscript = false
+            return
+        }
+
+        let lines = cachedTranscriptLines
+        let targetLanguageID = targetTranslationLanguage.id
+        let requests = lines.map { line in
+            TranslationSession.Request(sourceText: line.text, clientIdentifier: line.id)
+        }
+
+        do {
+            try await session.prepareTranslation()
+            var translatedByLineID: [StoredTranscriptLine.ID: String] = [:]
+            for try await response in session.translate(batch: requests) {
+                guard let currentTargetLanguage = selectedTranslationLanguage,
+                      currentTargetLanguage.id == targetLanguageID,
+                      transcriptTranslationCacheKey(for: currentTargetLanguage) == cacheKey,
+                      let lineID = response.clientIdentifier else {
+                    continue
+                }
+
+                let translatedText = response.targetText.trimmingCharacters(in: .whitespacesAndNewlines)
+                guard !translatedText.isEmpty else {
+                    continue
+                }
+
+                translatedByLineID[lineID] = translatedText
+                translatedTranscriptByLineID = translatedByLineID
+            }
+
+            guard !translatedByLineID.isEmpty else {
+                throw TranscriptTranslationError.emptyResponse
+            }
+
+            guard selectedTranslationLanguage?.id == targetLanguageID else {
+                return
+            }
+
+            translatedTranscriptCache[cacheKey] = translatedByLineID
+            translatedTranscriptByLineID = translatedByLineID
+            isTranslatingTranscript = false
+            translationErrorMessage = nil
+        } catch {
+            guard selectedTranslationLanguage?.id == targetLanguageID else {
+                return
+            }
+
+            translatedTranscriptByLineID = [:]
+            isTranslatingTranscript = false
+            translationErrorMessage = error.localizedDescription
+            HapticFeedback.play(.failure)
+        }
+    }
+
+    private var transcriptTranslationCachePrefix: String {
+        [
+            currentItem.id.uuidString,
+            currentItem.transcriptFileName,
+            "\(currentItem.lineCount)",
+            "\(currentItem.transcriptPreview.hashValue)"
+        ].joined(separator: "|")
+    }
+
+    private func transcriptTranslationCacheKey(for language: TranscriptionLanguage) -> String {
+        "\(transcriptTranslationCachePrefix)|\(language.id)"
+    }
+
+    private static func localeLanguage(for identifier: String) -> Locale.Language? {
+        let language = Locale(identifier: identifier).language
+        guard language.languageCode != nil else {
+            return nil
+        }
+        return language
+    }
+
+    private static func sameBaseLanguage(_ firstIdentifier: String, _ secondIdentifier: String) -> Bool {
+        let firstLanguage = Locale(identifier: firstIdentifier).language
+        let secondLanguage = Locale(identifier: secondIdentifier).language
+        let firstCode = firstLanguage.languageCode?.identifier
+        let secondCode = secondLanguage.languageCode?.identifier
+        guard let firstCode, let secondCode else {
+            return firstIdentifier == secondIdentifier
+        }
+        guard firstCode == secondCode else {
+            return false
+        }
+
+        let firstScript = firstLanguage.script?.identifier
+        let secondScript = secondLanguage.script?.identifier
+        if firstScript != nil || secondScript != nil {
+            return firstScript == secondScript
+        }
+
+        return true
     }
 
     private func prepareRecordingEditSheet() {
@@ -2389,6 +2636,8 @@ private struct StoredTranscriptLine: Identifiable, Hashable {
 
 private struct StoredTranscriptLineRow: View {
     let line: StoredTranscriptLine
+    let translatedText: String?
+    let isShowingTranslation: Bool
     let isCurrent: Bool
     let onTap: () -> Void
 
@@ -2402,12 +2651,28 @@ private struct StoredTranscriptLineRow: View {
                     .frame(height: 24)
                     .background(isCurrent ? AppTheme.brand : AppTheme.brand.opacity(0.12), in: Capsule())
 
-                Text(line.text)
-                    .font(.redditSans(.body))
-                    .foregroundStyle(.primary)
-                    .lineSpacing(4)
-                    .fixedSize(horizontal: false, vertical: true)
-                    .frame(maxWidth: .infinity, alignment: .leading)
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(translatedText ?? line.text)
+                        .font(.redditSans(.body))
+                        .foregroundStyle(.primary)
+                        .lineSpacing(4)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+
+                    if translatedText != nil {
+                        Text(line.text)
+                            .font(.redditSans(.caption))
+                            .foregroundStyle(.secondary)
+                            .lineSpacing(3)
+                            .fixedSize(horizontal: false, vertical: true)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .accessibilityHidden(true)
+                    } else if isShowingTranslation {
+                        Text("正在翻译")
+                            .font(.redditSans(.caption, weight: .semibold))
+                            .foregroundStyle(.secondary)
+                    }
+                }
             }
             .padding(.vertical, 4)
             .padding(.horizontal, 6)
@@ -2415,7 +2680,25 @@ private struct StoredTranscriptLineRow: View {
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
-        .accessibilityLabel("\(line.timeText) \(line.text)")
+        .accessibilityLabel(accessibilityText)
+    }
+
+    private var accessibilityText: String {
+        if let translatedText {
+            return "\(line.timeText) \(translatedText) \(line.text)"
+        }
+        return "\(line.timeText) \(line.text)"
+    }
+}
+
+private enum TranscriptTranslationError: LocalizedError {
+    case emptyResponse
+
+    var errorDescription: String? {
+        switch self {
+        case .emptyResponse:
+            return String(localized: "没有生成有效的翻译")
+        }
     }
 }
 

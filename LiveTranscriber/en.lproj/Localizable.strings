@@ -208,3 +208,8 @@
 "已归一化 v%d" = "Normalized v%d";
 "已归一化 v%d · %@" = "Normalized v%d · %@";
 "压缩或其他格式" = "Compressed or other format";
+"翻译" = "Translate";
+"原文" = "Original";
+"翻译成 %@" = "Translate to %@";
+"正在翻译" = "Translating";
+"没有生成有效的翻译" = "No valid translation was generated";
