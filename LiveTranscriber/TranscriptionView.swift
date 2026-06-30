@@ -476,7 +476,7 @@ struct TranscriptionView: View {
                                 TranscriptionLineRow(
                                     line: line,
                                     translatedText: line.isFinal ? translatedLiveTranscriptByLineID[line.id] : nil,
-                                    isShowingTranslation: selectedLiveTranslationLanguage != nil && line.isFinal
+                                    isShowingTranslation: isShowingLiveTranslationPlaceholder(for: line)
                                 )
                             }
                         }
@@ -652,7 +652,6 @@ struct TranscriptionView: View {
 
         do {
             try await session.prepareTranslation()
-            var translatedAnyLine = false
             for try await response in session.translate(batch: requests) {
                 guard selectedLiveTranslationLanguage?.id == targetLanguageID,
                       let lineIDText = response.clientIdentifier,
@@ -665,12 +664,12 @@ struct TranscriptionView: View {
 
                 let translatedText = response.targetText.trimmingCharacters(in: .whitespacesAndNewlines)
                 guard !translatedText.isEmpty else {
+                    liveTranslatedLineSignatures[lineID] = signature
                     continue
                 }
 
                 translatedLiveTranscriptByLineID[lineID] = translatedText
                 liveTranslatedLineSignatures[lineID] = signature
-                translatedAnyLine = true
             }
 
             guard selectedLiveTranslationLanguage?.id == targetLanguageID else {
@@ -678,7 +677,7 @@ struct TranscriptionView: View {
             }
 
             isTranslatingLiveTranscript = false
-            liveTranslationErrorMessage = translatedAnyLine ? nil : String(localized: "没有生成有效的翻译")
+            liveTranslationErrorMessage = nil
         } catch {
             guard selectedLiveTranslationLanguage?.id == targetLanguageID else {
                 return
@@ -694,6 +693,15 @@ struct TranscriptionView: View {
         finalTranscriptLines.filter { line in
             liveTranslatedLineSignatures[line.id] != liveTranslationSignature(for: line, language: language)
         }
+    }
+
+    private func isShowingLiveTranslationPlaceholder(for line: TranscriptionLine) -> Bool {
+        guard line.isFinal,
+              isTranslatingLiveTranscript,
+              let language = selectedLiveTranslationLanguage else {
+            return false
+        }
+        return liveTranslatedLineSignatures[line.id] != liveTranslationSignature(for: line, language: language)
     }
 
     private func pruneLiveTranslationState() {

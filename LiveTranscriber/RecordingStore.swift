@@ -837,11 +837,15 @@ final class RecordingStore: ObservableObject {
     }
 
     @discardableResult
-    func analyzeIntelligence(for item: RecordingItem) async throws -> RecordingIntelligence {
-        let transcript = transcriptText(for: item).plainTranscriptTextForIntelligence
+    func analyzeIntelligence(
+        for item: RecordingItem,
+        transcriptOverride: String? = nil,
+        languageNameOverride: String? = nil
+    ) async throws -> RecordingIntelligence {
+        let transcript = (transcriptOverride ?? transcriptText(for: item)).plainTranscriptTextForIntelligence
         let intelligence = try await RecordingIntelligenceService.generate(
             transcript: transcript,
-            languageName: item.languageName
+            languageName: languageNameOverride ?? item.languageName
         )
 
         guard let index = recordings.firstIndex(where: { $0.id == item.id }) else {

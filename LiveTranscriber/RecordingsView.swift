@@ -1468,7 +1468,7 @@ private struct RecordingDetailView: View {
                         StoredTranscriptLineRow(
                             line: line,
                             translatedText: translatedTranscriptByLineID[line.id],
-                            isShowingTranslation: selectedTranslationLanguage != nil,
+                            isShowingTranslation: isTranslatingTranscript && selectedTranslationLanguage != nil && translatedTranscriptByLineID[line.id] == nil,
                             isCurrent: line.id == currentLineID
                         ) {
                             HapticFeedback.play(.timelineSeek)
@@ -1564,11 +1564,27 @@ private struct RecordingDetailView: View {
         }
 
         let item = currentItem
+        if selectedTranslationLanguage != nil, isTranslatingTranscript {
+            analysisErrorMessage = String(localized: "请等待翻译完成后再生成智能摘要")
+            HapticFeedback.play(.blocked)
+            return
+        }
+        let translatedAnalysisInput = translatedTranscriptAnalysisInput()
+        if selectedTranslationLanguage != nil, translatedAnalysisInput == nil {
+            analysisErrorMessage = String(localized: "没有可用于智能摘要的翻译文本")
+            HapticFeedback.play(.blocked)
+            return
+        }
+
         isAnalyzing = true
         HapticFeedback.play(.analysisStart)
         Task {
             do {
-                _ = try await store.analyzeIntelligence(for: item)
+                _ = try await store.analyzeIntelligence(
+                    for: item,
+                    transcriptOverride: translatedAnalysisInput?.transcript,
+                    languageNameOverride: translatedAnalysisInput?.languageName
+                )
                 HapticFeedback.play(.analysisComplete)
             } catch {
                 analysisErrorMessage = error.localizedDescription
@@ -1576,6 +1592,33 @@ private struct RecordingDetailView: View {
             }
             isAnalyzing = false
         }
+    }
+
+    private func translatedTranscriptAnalysisInput() -> (transcript: String, languageName: String)? {
+        guard let selectedTranslationLanguage else {
+            return nil
+        }
+
+        let translatedLineCount = cachedTranscriptLines.reduce(0) { count, line in
+            let translatedText = translatedTranscriptByLineID[line.id]?.trimmingCharacters(in: .whitespacesAndNewlines)
+            return translatedText?.isEmpty == false ? count + 1 : count
+        }
+        guard translatedLineCount > 0 else {
+            return nil
+        }
+
+        let transcript = cachedTranscriptLines
+            .map { line in
+                translatedTranscriptByLineID[line.id]?.trimmingCharacters(in: .whitespacesAndNewlines)
+                    ?? line.text.trimmingCharacters(in: .whitespacesAndNewlines)
+            }
+            .filter { !$0.isEmpty }
+            .joined(separator: "\n")
+        guard !transcript.isEmpty else {
+            return nil
+        }
+
+        return (transcript, selectedTranslationLanguage.displayName)
     }
 
     private func retranscribeCurrentItem(language: TranscriptionLanguage) {
@@ -1729,10 +1772,6 @@ private struct RecordingDetailView: View {
 
                 translatedByLineID[lineID] = translatedText
                 translatedTranscriptByLineID = translatedByLineID
-            }
-
-            guard !translatedByLineID.isEmpty else {
-                throw TranscriptTranslationError.emptyResponse
             }
 
             guard selectedTranslationLanguage?.id == targetLanguageID else {
@@ -2688,17 +2727,6 @@ private struct StoredTranscriptLineRow: View {
             return "\(line.timeText) \(translatedText) \(line.text)"
         }
         return "\(line.timeText) \(line.text)"
-    }
-}
-
-private enum TranscriptTranslationError: LocalizedError {
-    case emptyResponse
-
-    var errorDescription: String? {
-        switch self {
-        case .emptyResponse:
-            return String(localized: "没有生成有效的翻译")
-        }
     }
 }
 
