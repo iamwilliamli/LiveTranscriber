@@ -1,6 +1,7 @@
 import CoreLocation
 import MapKit
 import SwiftUI
+import Translation
 
 struct TranscriptionView: View {
     @Environment(\.colorScheme) private var colorScheme
@@ -16,9 +17,27 @@ struct TranscriptionView: View {
     @State private var pendingRecordingTags: [String] = []
     @State private var pendingRecordingIncludesLocation = false
     @State private var isSavingPendingRecording = false
+    @State private var liveTranslationConfiguration: TranslationSession.Configuration?
+    @State private var selectedLiveTranslationLanguage: TranscriptionLanguage?
+    @State private var translatedLiveTranscriptByLineID: [TranscriptionLine.ID: String] = [:]
+    @State private var liveTranslatedLineSignatures: [TranscriptionLine.ID: String] = [:]
+    @State private var isTranslatingLiveTranscript = false
+    @State private var liveTranslationErrorMessage: String?
 
     private var isCompletingRecording: Bool {
         pendingRecordingSave != nil || isSavingPendingRecording
+    }
+
+    private var finalTranscriptLines: [TranscriptionLine] {
+        transcriber.transcriptLines.filter { line in
+            line.isFinal && !line.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        }
+    }
+
+    private var finalTranscriptSignature: String {
+        finalTranscriptLines
+            .map { "\($0.id.uuidString)|\($0.startSeconds)|\($0.text.hashValue)" }
+            .joined(separator: "\n")
     }
 
     var body: some View {
@@ -55,8 +74,17 @@ struct TranscriptionView: View {
         .task {
             await transcriber.refreshSupportedLanguages()
         }
+        .translationTask(liveTranslationConfiguration) { session in
+            await translateFinalTranscriptLines(using: session)
+        }
         .onAppear {
             consumeExternalPendingRecordingDraftIfNeeded()
+        }
+        .onChange(of: finalTranscriptSignature) { _, _ in
+            scheduleFinalTranscriptTranslationIfNeeded()
+        }
+        .onChange(of: transcriber.selectedLanguageID) { _, _ in
+            clearLiveTranscriptTranslation(playsHaptic: false)
         }
         .onChange(of: externalPendingRecordingDraft?.audioURL) { _, _ in
             consumeExternalPendingRecordingDraftIfNeeded()
@@ -428,10 +456,13 @@ struct TranscriptionView: View {
                 Label("转录文本", systemImage: "text.alignleft")
                     .font(.redditSans(.headline))
                 Spacer()
+                liveTranscriptTranslationMenu
                 Text("\(transcriber.transcriptLines.count)")
                     .font(.redditSans(.caption2).monospacedDigit())
                     .foregroundStyle(.secondary)
             }
+
+            liveTranscriptTranslationStatus
 
             if !transcriber.transcriptLines.isEmpty {
                 ScrollViewReader { scrollProxy in
@@ -442,7 +473,11 @@ struct TranscriptionView: View {
                                 .id("transcript-top")
 
                             ForEach(transcriber.transcriptLines.reversed()) { line in
-                                TranscriptionLineRow(line: line)
+                                TranscriptionLineRow(
+                                    line: line,
+                                    translatedText: line.isFinal ? translatedLiveTranscriptByLineID[line.id] : nil,
+                                    isShowingTranslation: selectedLiveTranslationLanguage != nil && line.isFinal
+                                )
                             }
                         }
                         .padding(.vertical, 2)
@@ -465,6 +500,229 @@ struct TranscriptionView: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .frame(maxHeight: .infinity)
         .cardSurface()
+    }
+
+    private var liveTranscriptTranslationMenu: some View {
+        Menu {
+            Button {
+                clearLiveTranscriptTranslation()
+            } label: {
+                Label("原文", systemImage: selectedLiveTranslationLanguage == nil ? "checkmark" : "text.alignleft")
+            }
+
+            Divider()
+
+            ForEach(liveTranscriptTranslationLanguages) { language in
+                Button {
+                    requestLiveTranscriptTranslation(to: language)
+                } label: {
+                    Label(
+                        language.displayName,
+                        systemImage: selectedLiveTranslationLanguage?.id == language.id ? "checkmark" : "translate"
+                    )
+                }
+            }
+        } label: {
+            HStack(spacing: 5) {
+                Image(systemName: "translate")
+                    .font(.system(size: 12, weight: .semibold))
+                Text(selectedLiveTranslationLanguage?.shortName ?? String(localized: "翻译"))
+                    .font(.redditSans(.caption, weight: .bold))
+            }
+            .foregroundStyle(selectedLiveTranslationLanguage == nil ? AppTheme.info : AppTheme.brand)
+            .padding(.horizontal, 10)
+            .frame(height: 30)
+            .background((selectedLiveTranslationLanguage == nil ? AppTheme.info : AppTheme.brand).opacity(0.11), in: Capsule())
+        }
+        .buttonStyle(.plain)
+        .disabled(liveTranscriptTranslationLanguages.isEmpty)
+    }
+
+    @ViewBuilder
+    private var liveTranscriptTranslationStatus: some View {
+        if let selectedLiveTranslationLanguage {
+            HStack(spacing: 8) {
+                if isTranslatingLiveTranscript {
+                    ProgressView()
+                        .controlSize(.small)
+                } else {
+                    Image(systemName: liveTranslationErrorMessage == nil ? "translate" : "exclamationmark.triangle")
+                        .font(.system(size: 12, weight: .semibold))
+                }
+
+                Text(liveTranslationStatusText(for: selectedLiveTranslationLanguage))
+                    .font(.redditSans(.caption, weight: .semibold))
+                    .foregroundStyle(liveTranslationErrorMessage == nil ? .secondary : AppTheme.warning)
+                    .lineLimit(2)
+
+                Spacer(minLength: 0)
+            }
+        }
+    }
+
+    private var liveTranscriptTranslationLanguages: [TranscriptionLanguage] {
+        transcriber.supportedLanguages.filter { language in
+            !Self.sameBaseLanguage(language.id, transcriber.selectedLanguageID)
+        }
+    }
+
+    private func liveTranslationStatusText(for language: TranscriptionLanguage) -> String {
+        if let liveTranslationErrorMessage {
+            return liveTranslationErrorMessage
+        }
+        if finalTranscriptLines.isEmpty {
+            return String(localized: "等待已完成段落")
+        }
+        if isTranslatingLiveTranscript {
+            return String(localized: "正在翻译已完成段落")
+        }
+        return String(format: String(localized: "翻译成 %@"), language.displayName)
+    }
+
+    private func requestLiveTranscriptTranslation(to language: TranscriptionLanguage) {
+        guard !Self.sameBaseLanguage(language.id, transcriber.selectedLanguageID) else {
+            clearLiveTranscriptTranslation()
+            return
+        }
+
+        HapticFeedback.play(.menuSelection)
+        selectedLiveTranslationLanguage = language
+        liveTranslationErrorMessage = nil
+        scheduleFinalTranscriptTranslationIfNeeded()
+    }
+
+    private func clearLiveTranscriptTranslation(playsHaptic: Bool = true) {
+        if playsHaptic {
+            HapticFeedback.play(.menuSelection)
+        }
+        selectedLiveTranslationLanguage = nil
+        translatedLiveTranscriptByLineID = [:]
+        liveTranslatedLineSignatures = [:]
+        liveTranslationErrorMessage = nil
+        isTranslatingLiveTranscript = false
+        liveTranslationConfiguration = nil
+    }
+
+    private func scheduleFinalTranscriptTranslationIfNeeded() {
+        pruneLiveTranslationState()
+        guard let language = selectedLiveTranslationLanguage else {
+            return
+        }
+        guard !pendingFinalTranscriptLines(for: language).isEmpty else {
+            isTranslatingLiveTranscript = false
+            return
+        }
+
+        isTranslatingLiveTranscript = true
+        liveTranslationErrorMessage = nil
+
+        let nextConfiguration = TranslationSession.Configuration(
+            source: Self.localeLanguage(for: transcriber.selectedLanguageID),
+            target: Self.localeLanguage(for: language.id)
+        )
+
+        if var existingConfiguration = liveTranslationConfiguration,
+           existingConfiguration == nextConfiguration {
+            existingConfiguration.invalidate()
+            liveTranslationConfiguration = existingConfiguration
+        } else {
+            liveTranslationConfiguration = nextConfiguration
+        }
+    }
+
+    private func translateFinalTranscriptLines(using session: TranslationSession) async {
+        guard let targetLanguage = selectedLiveTranslationLanguage else {
+            isTranslatingLiveTranscript = false
+            return
+        }
+
+        let targetLanguageID = targetLanguage.id
+        let lines = pendingFinalTranscriptLines(for: targetLanguage)
+        guard !lines.isEmpty else {
+            isTranslatingLiveTranscript = false
+            return
+        }
+
+        let signatures = Dictionary(uniqueKeysWithValues: lines.map { line in
+            (line.id, liveTranslationSignature(for: line, language: targetLanguage))
+        })
+        let requests = lines.map { line in
+            TranslationSession.Request(sourceText: line.text, clientIdentifier: line.id.uuidString)
+        }
+
+        do {
+            try await session.prepareTranslation()
+            var translatedAnyLine = false
+            for try await response in session.translate(batch: requests) {
+                guard selectedLiveTranslationLanguage?.id == targetLanguageID,
+                      let lineIDText = response.clientIdentifier,
+                      let lineID = UUID(uuidString: lineIDText),
+                      let signature = signatures[lineID],
+                      let currentLine = transcriber.transcriptLines.first(where: { $0.id == lineID && $0.isFinal }),
+                      liveTranslationSignature(for: currentLine, language: targetLanguage) == signature else {
+                    continue
+                }
+
+                let translatedText = response.targetText.trimmingCharacters(in: .whitespacesAndNewlines)
+                guard !translatedText.isEmpty else {
+                    continue
+                }
+
+                translatedLiveTranscriptByLineID[lineID] = translatedText
+                liveTranslatedLineSignatures[lineID] = signature
+                translatedAnyLine = true
+            }
+
+            guard selectedLiveTranslationLanguage?.id == targetLanguageID else {
+                return
+            }
+
+            isTranslatingLiveTranscript = false
+            liveTranslationErrorMessage = translatedAnyLine ? nil : String(localized: "没有生成有效的翻译")
+        } catch {
+            guard selectedLiveTranslationLanguage?.id == targetLanguageID else {
+                return
+            }
+
+            isTranslatingLiveTranscript = false
+            liveTranslationErrorMessage = error.localizedDescription
+            HapticFeedback.play(.failure)
+        }
+    }
+
+    private func pendingFinalTranscriptLines(for language: TranscriptionLanguage) -> [TranscriptionLine] {
+        finalTranscriptLines.filter { line in
+            liveTranslatedLineSignatures[line.id] != liveTranslationSignature(for: line, language: language)
+        }
+    }
+
+    private func pruneLiveTranslationState() {
+        let finalLineIDs = Set(finalTranscriptLines.map(\.id))
+        translatedLiveTranscriptByLineID = translatedLiveTranscriptByLineID.filter { finalLineIDs.contains($0.key) }
+        liveTranslatedLineSignatures = liveTranslatedLineSignatures.filter { finalLineIDs.contains($0.key) }
+    }
+
+    private func liveTranslationSignature(for line: TranscriptionLine, language: TranscriptionLanguage) -> String {
+        "\(language.id)|\(line.id.uuidString)|\(line.text.hashValue)"
+    }
+
+    private static func localeLanguage(for identifier: String) -> Locale.Language? {
+        let language = Locale(identifier: identifier).language
+        guard language.languageCode != nil else {
+            return nil
+        }
+        return language
+    }
+
+    private static func sameBaseLanguage(_ firstIdentifier: String, _ secondIdentifier: String) -> Bool {
+        let firstLanguage = Locale(identifier: firstIdentifier).language
+        let secondLanguage = Locale(identifier: secondIdentifier).language
+        let firstCode = firstLanguage.languageCode?.identifier
+        let secondCode = secondLanguage.languageCode?.identifier
+        guard let firstCode, let secondCode else {
+            return firstIdentifier == secondIdentifier
+        }
+        return firstCode == secondCode
     }
 
     private func formatDuration(_ seconds: Int) -> String {
@@ -937,6 +1195,8 @@ private extension View {
 
 private struct TranscriptionLineRow: View {
     let line: TranscriptionLine
+    let translatedText: String?
+    let isShowingTranslation: Bool
 
     var body: some View {
         HStack(alignment: .top, spacing: 10) {
@@ -947,14 +1207,38 @@ private struct TranscriptionLineRow: View {
                 .frame(height: 24)
                 .background((line.isFinal ? AppTheme.brand : AppTheme.warning).opacity(0.12), in: Capsule())
 
-            Text(line.text)
-                .font(.redditSans(.body))
-                .foregroundStyle(.primary)
-                .lineSpacing(4)
-                .fixedSize(horizontal: false, vertical: true)
-                .frame(maxWidth: .infinity, alignment: .leading)
+            VStack(alignment: .leading, spacing: 4) {
+                Text(translatedText ?? line.text)
+                    .font(.redditSans(.body))
+                    .foregroundStyle(.primary)
+                    .lineSpacing(4)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+
+                if let translatedText, !translatedText.isEmpty {
+                    Text(line.text)
+                        .font(.redditSans(.caption))
+                        .foregroundStyle(.secondary)
+                        .lineSpacing(3)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .accessibilityHidden(true)
+                } else if isShowingTranslation {
+                    Text("正在翻译")
+                        .font(.redditSans(.caption, weight: .semibold))
+                        .foregroundStyle(.secondary)
+                }
+            }
         }
         .padding(.vertical, 2)
+        .accessibilityLabel(accessibilityText)
+    }
+
+    private var accessibilityText: String {
+        if let translatedText {
+            return "\(line.timestampText) \(translatedText) \(line.text)"
+        }
+        return "\(line.timestampText) \(line.text)"
     }
 }
 
