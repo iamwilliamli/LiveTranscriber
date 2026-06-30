@@ -844,9 +844,10 @@ private struct RollingRecorderTimeText: View {
 
     private let digitHeight: CGFloat = 46
     private let digitWidth: CGFloat = 27
+    private let separatorWidth: CGFloat = 18
 
     var body: some View {
-        HStack(alignment: .center, spacing: 1) {
+        HStack(alignment: .center, spacing: 2) {
             ForEach(Array(text.enumerated()), id: \.offset) { _, character in
                 if let value = character.wholeNumberValue {
                     RollingRecorderDigit(
@@ -859,7 +860,7 @@ private struct RollingRecorderTimeText: View {
                     Text(String(character))
                         .font(.system(size: 36, weight: .semibold, design: .monospaced))
                         .foregroundStyle(color)
-                        .frame(width: 12, height: digitHeight)
+                        .frame(width: separatorWidth, height: digitHeight)
                 }
             }
         }
