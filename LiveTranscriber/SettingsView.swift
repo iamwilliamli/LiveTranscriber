@@ -6,84 +6,86 @@ struct SettingsView: View {
     @ObservedObject var recordingStore: RecordingStore
 
     var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 14) {
-                NavigationLink {
-                    transcriptionSettingsPage
-                } label: {
-                    SettingsNavigationRow(
-                        icon: "captions.bubble",
-                        title: "转录",
-                        value: transcriber.selectedLanguage.displayName,
-                        subtitle: "语言和转录模型",
-                        tint: AppTheme.info
-                    )
-                }
-                .buttonStyle(.plain)
-                .settingsSurface()
+        NavigationStack {
+            ScrollView {
+                VStack(alignment: .leading, spacing: 14) {
+                    NavigationLink {
+                        transcriptionSettingsPage
+                    } label: {
+                        SettingsNavigationRow(
+                            icon: "captions.bubble",
+                            title: "转录",
+                            value: transcriber.selectedLanguage.displayName,
+                            subtitle: "语言和转录模型",
+                            tint: AppTheme.info
+                        )
+                    }
+                    .buttonStyle(.plain)
+                    .settingsSurface()
 
-                NavigationLink {
-                    recordingSettingsPage
-                } label: {
-                    SettingsNavigationRow(
-                        icon: "waveform.badge.mic",
-                        title: "录音",
-                        value: transcriber.selectedAudioFormat.title,
-                        subtitle: "音频格式和录音行为",
-                        tint: AppTheme.brand
-                    )
-                }
-                .buttonStyle(.plain)
-                .settingsSurface()
+                    NavigationLink {
+                        recordingSettingsPage
+                    } label: {
+                        SettingsNavigationRow(
+                            icon: "waveform.badge.mic",
+                            title: "录音",
+                            value: transcriber.selectedAudioFormat.title,
+                            subtitle: "音频格式和录音行为",
+                            tint: AppTheme.brand
+                        )
+                    }
+                    .buttonStyle(.plain)
+                    .settingsSurface()
 
-                NavigationLink {
-                    fileSettingsPage
-                } label: {
-                    SettingsNavigationRow(
-                        icon: "folder",
-                        title: "文件",
-                        value: recordingStore.storageDisplayName,
-                        subtitle: "保存位置和录音数量",
-                        tint: AppTheme.success
-                    )
-                }
-                .buttonStyle(.plain)
-                .settingsSurface()
+                    NavigationLink {
+                        fileSettingsPage
+                    } label: {
+                        SettingsNavigationRow(
+                            icon: "folder",
+                            title: "文件",
+                            value: recordingStore.storageDisplayName,
+                            subtitle: "保存位置和录音数量",
+                            tint: AppTheme.success
+                        )
+                    }
+                    .buttonStyle(.plain)
+                    .settingsSurface()
 
-                NavigationLink {
-                    privacySettingsPage
-                } label: {
-                    SettingsNavigationRow(
-                        icon: "lock.shield",
-                        title: "隐私",
-                        value: String(localized: "本地处理"),
-                        subtitle: "数据边界和权限用途",
-                        tint: AppTheme.success
-                    )
-                }
-                .buttonStyle(.plain)
-                .settingsSurface()
+                    NavigationLink {
+                        privacySettingsPage
+                    } label: {
+                        SettingsNavigationRow(
+                            icon: "lock.shield",
+                            title: "隐私",
+                            value: String(localized: "本地处理"),
+                            subtitle: "数据边界和权限用途",
+                            tint: AppTheme.success
+                        )
+                    }
+                    .buttonStyle(.plain)
+                    .settingsSurface()
 
-                NavigationLink {
-                    developerSettingsPage
-                } label: {
-                    SettingsNavigationRow(
-                        icon: "wrench.and.screwdriver",
-                        title: "开发者选项",
-                        value: transcriber.speechPipelineDiagnostics.activePipelineName,
-                        subtitle: "设备和 Pipeline 诊断",
-                        tint: AppTheme.purple
-                    )
+                    NavigationLink {
+                        developerSettingsPage
+                    } label: {
+                        SettingsNavigationRow(
+                            icon: "wrench.and.screwdriver",
+                            title: "开发者选项",
+                            value: transcriber.speechPipelineDiagnostics.activePipelineName,
+                            subtitle: "设备和 Pipeline 诊断",
+                            tint: AppTheme.purple
+                        )
+                    }
+                    .buttonStyle(.plain)
+                    .settingsSurface()
                 }
-                .buttonStyle(.plain)
-                .settingsSurface()
+                .padding()
             }
-            .padding()
+            .background(AppTheme.groupedBackground.ignoresSafeArea())
+            .toolbar(.visible, for: .navigationBar)
+            .navigationTitle("设置")
+            .navigationBarTitleDisplayMode(.inline)
         }
-        .background(AppTheme.groupedBackground.ignoresSafeArea())
-        .toolbar(.visible, for: .navigationBar)
-        .navigationTitle("设置")
-        .navigationBarTitleDisplayMode(.inline)
         .task {
             await transcriber.refreshSupportedLanguages()
             await recordingStore.reload()

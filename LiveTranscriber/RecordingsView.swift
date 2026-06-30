@@ -1,6 +1,8 @@
 import AVFoundation
 import CoreLocation
 import MapKit
+import MediaPlayer
+import OSLog
 import SwiftUI
 import Translation
 import UIKit
@@ -9,15 +11,22 @@ import UniformTypeIdentifiers
 struct RecordingsView: View {
     @ObservedObject var store: RecordingStore
     @ObservedObject var transcriber: LiveTranscriptionManager
-    @Binding var searchText: String
-    @Binding var selectedRecording: RecordingItem?
+    @Binding var incomingImportURL: URL?
     @ObservedObject var player: RecordingPlaybackController
     @State private var deleteRequest: RecordingDeleteRequest?
+    @State private var selectedRecording: RecordingItem?
     @State private var analyzingRecordingID: RecordingItem.ID?
     @State private var analysisErrorMessage: String?
+    @State private var showsImporter = false
+    @State private var isImporting = false
+    @State private var importErrorMessage: String?
     @State private var transcriptionErrorMessage: String?
     @State private var deleteErrorMessage: String?
-    @FocusState private var searchFieldIsFocused: Bool
+    @State private var pendingImport: PendingImport?
+    @State private var searchText = ""
+    @State private var isShowingRecordingsMap = false
+    @State private var hidesTabBarForRecordingDetail = false
+    @State private var tabBarRestoreTask: Task<Void, Never>?
 
     private var filteredRecordings: [RecordingItem] {
         let query = normalizedSearchText(searchText)
@@ -31,12 +40,83 @@ struct RecordingsView: View {
     }
 
     var body: some View {
-        recordingsList
-        .background(AppTheme.groupedBackground)
+        NavigationStack {
+            recordingsList
+                .navigationTitle("录音文件")
+                .navigationBarTitleDisplayMode(.large)
+                .toolbar {
+                    recordingsToolbar
+                }
+                .navigationDestination(item: $selectedRecording) { item in
+                    RecordingDetailView(item: item, store: store, transcriber: transcriber, player: player)
+                }
+        }
+        .toolbar(hidesTabBarForRecordingDetail ? .hidden : .visible, for: .tabBar)
+        .searchable(
+            text: $searchText,
+            placement: .navigationBarDrawer(displayMode: .always),
+            prompt: Text("搜索录音或转录")
+        )
         .task {
             await transcriber.refreshSupportedLanguages()
             await store.reload()
             store.refreshIntelligenceAvailability()
+        }
+        .onAppear {
+            consumeIncomingImportURLIfNeeded()
+        }
+        .onChange(of: incomingImportURL) { _, newURL in
+            guard let newURL else {
+                return
+            }
+
+            consumeIncomingImportURL(newURL)
+        }
+        .onChange(of: selectedRecording?.id) { _, newValue in
+            if newValue == nil {
+                scheduleTabBarRestoreAfterPop()
+            } else {
+                hideTabBarForDetail()
+            }
+        }
+        .fileImporter(
+            isPresented: $showsImporter,
+            allowedContentTypes: [.audio],
+            allowsMultipleSelection: false
+        ) { result in
+            handleImportResult(result)
+        }
+        .sheet(isPresented: $isShowingRecordingsMap) {
+            RecordingMapView(store: store, transcriber: transcriber, player: player)
+        }
+        .confirmationDialog(
+            "选择转录语言",
+            isPresented: Binding(
+                get: { pendingImport != nil },
+                set: { isPresented in
+                    if !isPresented {
+                        pendingImport = nil
+                    }
+                }
+            ),
+            titleVisibility: .visible
+        ) {
+            if let pendingImport {
+                ForEach(transcriber.supportedLanguages) { language in
+                    Button {
+                        importRecording(from: pendingImport.url, language: language)
+                    } label: {
+                        Label(
+                            language.displayName,
+                            systemImage: language.id == transcriber.selectedLanguageID ? "checkmark" : "globe"
+                        )
+                    }
+                }
+            }
+
+            Button("取消", role: .cancel) {}
+        } message: {
+            Text("导入录音")
         }
         .alert(
             "分析失败",
@@ -52,6 +132,21 @@ struct RecordingsView: View {
             Button("好", role: .cancel) {}
         } message: {
             Text(analysisErrorMessage ?? "")
+        }
+        .alert(
+            "导入失败",
+            isPresented: Binding(
+                get: { importErrorMessage != nil },
+                set: { isPresented in
+                    if !isPresented {
+                        importErrorMessage = nil
+                    }
+                }
+            )
+        ) {
+            Button("好", role: .cancel) {}
+        } message: {
+            Text(importErrorMessage ?? "")
         }
         .alert(
             "转录失败",
@@ -109,11 +204,6 @@ struct RecordingsView: View {
     @ViewBuilder
     private var recordingsList: some View {
         List {
-            recordingsSearchField
-                .listRowSeparator(.hidden)
-                .listRowBackground(Color.clear)
-                .listRowInsets(EdgeInsets(top: 8, leading: 16, bottom: 6, trailing: 16))
-
             if store.recordings.isEmpty {
                 EmptyStateView(icon: "waveform.path.badge.plus", title: "暂无录音文件")
                     .frame(maxWidth: .infinity, minHeight: 360)
@@ -136,6 +226,44 @@ struct RecordingsView: View {
         .scrollDismissesKeyboard(.interactively)
         .safeAreaInset(edge: .bottom) {
             Color.clear.frame(height: 8)
+        }
+    }
+
+    @ToolbarContentBuilder
+    private var recordingsToolbar: some ToolbarContent {
+        ToolbarItem(placement: .topBarTrailing) {
+            HStack(spacing: 8) {
+                if isImporting {
+                    ProgressView()
+                        .controlSize(.small)
+                }
+
+                HStack(spacing: 0) {
+                    Button {
+                        HapticFeedback.play(.navigation)
+                        isShowingRecordingsMap = true
+                    } label: {
+                        Image(systemName: "map")
+                            .frame(width: 32, height: 28)
+                    }
+                    .accessibilityLabel("地图")
+
+                    Divider()
+                        .frame(height: 18)
+                        .fixedSize()
+
+                    Button {
+                        HapticFeedback.play(.primaryAction)
+                        showsImporter = true
+                    } label: {
+                        Image(systemName: "square.and.arrow.down")
+                            .frame(width: 32, height: 28)
+                    }
+                    .disabled(isImporting || pendingImport != nil || transcriber.isRecording || transcriber.isPreparing)
+                    .accessibilityLabel("导入录音")
+                }
+                .fixedSize()
+            }
         }
     }
 
@@ -212,45 +340,66 @@ struct RecordingsView: View {
         }
     }
 
-    private var recordingsSearchField: some View {
-        HStack(spacing: 9) {
-            Image(systemName: "magnifyingglass")
-                .font(.system(size: 15, weight: .semibold))
-                .foregroundStyle(.secondary)
-
-            TextField("搜索录音或转录", text: $searchText)
-                .font(.redditSans(.subheadline))
-                .textInputAutocapitalization(.never)
-                .autocorrectionDisabled()
-                .submitLabel(.search)
-                .focused($searchFieldIsFocused)
-                .onSubmit {
-                    searchFieldIsFocused = false
-                }
-
-            if searchFieldIsFocused || !searchText.isEmpty {
-                Button {
-                    HapticFeedback.play(.menuSelection)
-                    if searchText.isEmpty {
-                        searchFieldIsFocused = false
-                    } else {
-                        searchText = ""
-                    }
-                } label: {
-                    Image(systemName: "xmark.circle.fill")
-                        .font(.system(size: 16, weight: .semibold))
-                        .foregroundStyle(.tertiary)
-                }
-                .buttonStyle(.plain)
-                .accessibilityLabel("清除搜索")
+    private func handleImportResult(_ result: Result<[URL], Error>) {
+        switch result {
+        case .success(let urls):
+            guard let url = urls.first else {
+                HapticFeedback.play(.warning)
+                return
             }
+            queueImport(from: url)
+        case .failure(let error):
+            importErrorMessage = error.localizedDescription
+            HapticFeedback.play(.failure)
         }
-        .padding(.horizontal, 12)
-        .frame(height: 40)
-        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
-        .overlay {
-            RoundedRectangle(cornerRadius: 12, style: .continuous)
-                .stroke(.quaternary, lineWidth: 1)
+    }
+
+    private func consumeIncomingImportURLIfNeeded() {
+        guard let incomingImportURL else {
+            return
+        }
+
+        consumeIncomingImportURL(incomingImportURL)
+    }
+
+    private func consumeIncomingImportURL(_ url: URL) {
+        queueImport(from: url)
+        incomingImportURL = nil
+    }
+
+    private func queueImport(from url: URL) {
+        guard !isImporting else {
+            HapticFeedback.play(.blocked)
+            return
+        }
+
+        selectedRecording = nil
+        pendingImport = PendingImport(url: url)
+        HapticFeedback.play(.importQueued)
+    }
+
+    private func importRecording(from url: URL, language: TranscriptionLanguage) {
+        guard !isImporting else {
+            HapticFeedback.play(.blocked)
+            return
+        }
+
+        pendingImport = nil
+        isImporting = true
+        HapticFeedback.play(.importStart)
+        Task {
+            do {
+                _ = try await store.importRecording(
+                    from: url,
+                    language: language,
+                    loudnessProcessingEnabled: transcriber.isLoudnessProcessingEnabled
+                )
+                HapticFeedback.play(.importComplete)
+            } catch {
+                importErrorMessage = error.localizedDescription
+                HapticFeedback.play(.failure)
+            }
+            isImporting = false
         }
     }
 
@@ -279,7 +428,35 @@ struct RecordingsView: View {
     }
 
     private func openRecording(_ item: RecordingItem) {
+        hideTabBarForDetail()
         selectedRecording = item
+    }
+
+    private func hideTabBarForDetail() {
+        tabBarRestoreTask?.cancel()
+        tabBarRestoreTask = nil
+        guard !hidesTabBarForRecordingDetail else {
+            return
+        }
+
+        withAnimation(.easeInOut(duration: 0.16)) {
+            hidesTabBarForRecordingDetail = true
+        }
+    }
+
+    private func scheduleTabBarRestoreAfterPop() {
+        tabBarRestoreTask?.cancel()
+        tabBarRestoreTask = Task { @MainActor in
+            try? await Task.sleep(for: .milliseconds(180))
+            guard selectedRecording == nil else {
+                return
+            }
+
+            withAnimation(.easeInOut(duration: 0.24)) {
+                hidesTabBarForRecordingDetail = false
+            }
+            tabBarRestoreTask = nil
+        }
     }
 
     private func retranscribe(_ item: RecordingItem, language: TranscriptionLanguage) {
@@ -332,6 +509,11 @@ struct RecordingsView: View {
     private func normalizedSearchText(_ text: String) -> String {
         text.normalizedForRecordingSearch
     }
+}
+
+private struct PendingImport: Identifiable {
+    let id = UUID()
+    let url: URL
 }
 
 private struct RecordingDeleteRequest: Identifiable {
@@ -840,6 +1022,7 @@ struct RecordingDetailView: View {
     @ObservedObject var player: RecordingPlaybackController
     var onClose: (() -> Void)? = nil
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.scenePhase) private var scenePhase
     @State private var copied = false
     @State private var deleteRequest: RecordingDeleteRequest?
     @State private var isAnalyzing = false
@@ -980,8 +1163,17 @@ struct RecordingDetailView: View {
         .translationTask(translationConfiguration) { session in
             await translateTranscript(using: session)
         }
+        .onChange(of: scenePhase) { _, newPhase in
+            if newPhase != .active {
+                player.prepareForBackgroundPlayback()
+            }
+        }
         .onDisappear {
-            player.unload()
+            if scenePhase == .active {
+                player.unload()
+            } else {
+                player.prepareForBackgroundPlayback()
+            }
         }
         .alert(
             "分析失败",
@@ -2699,6 +2891,7 @@ final class RecordingPlaybackController: ObservableObject {
 
     private static let playbackGainDecibels: Float = 3
     private static let playbackUITickMilliseconds = 250
+    private static let logger = Logger(subsystem: "com.reddownloader.LiveTranscriber", category: "RecordingPlayback")
     static let availablePlaybackRates: [Float] = [0.75, 1, 1.25, 1.5, 2]
 
     private let audioSessionQueue = DispatchQueue(label: "com.reddownloader.live-transcriber.playback-session", qos: .userInitiated)
@@ -2711,6 +2904,25 @@ final class RecordingPlaybackController: ObservableObject {
     private var sampleRate: Double = 44_100
     private var scheduledStartFrame: AVAudioFramePosition = 0
     private var playbackScheduleID = 0
+    private var playbackCommandID = 0
+    private var hasScheduledPlayback = false
+    private var needsPlaybackReschedule = true
+    private var remoteCommandTargets: [RemoteCommandTarget] = []
+    private var isReceivingRemoteControlEvents = false
+
+    init() {
+        configureRemoteCommands()
+        updateRemoteCommandAvailability(isEnabled: false)
+    }
+
+    deinit {
+        let targets = remoteCommandTargets
+        Task { @MainActor in
+            for target in targets {
+                target.command.removeTarget(target.token)
+            }
+        }
+    }
 
     func load(item: RecordingItem, url: URL) {
         guard currentItem?.id != item.id || currentItem?.audioFileName != item.audioFileName || !isLoaded else {
@@ -2719,6 +2931,8 @@ final class RecordingPlaybackController: ObservableObject {
 
         load(url: url)
         currentItem = item
+        updateNowPlayingInfo()
+        updateRemoteCommandAvailability(isEnabled: isLoaded)
     }
 
     func load(url: URL) {
@@ -2738,8 +2952,11 @@ final class RecordingPlaybackController: ObservableObject {
             try configurePlaybackEngine(format: file.processingFormat)
             currentTime = 0
             isLoaded = true
+            updateNowPlayingInfo()
+            updateRemoteCommandAvailability(isEnabled: true)
         } catch {
             errorText = String(format: String(localized: "无法播放录音: %@"), error.localizedDescription)
+            updateRemoteCommandAvailability(isEnabled: false)
         }
     }
 
@@ -2759,17 +2976,41 @@ final class RecordingPlaybackController: ObservableObject {
             return
         }
 
+        guard !isPlaying else {
+            updateNowPlayingInfo()
+            return
+        }
+
+        playbackCommandID += 1
+        let commandID = playbackCommandID
         Task {
             do {
                 try await configurePlaybackSession()
+                guard commandID == playbackCommandID, isLoaded else {
+                    return
+                }
+
+                beginReceivingRemoteControlEventsIfNeeded()
                 try startPlaybackEngineIfNeeded()
+                guard commandID == playbackCommandID, isLoaded else {
+                    return
+                }
+
                 if currentTime >= duration {
                     currentTime = 0
+                    needsPlaybackReschedule = true
                 }
-                schedulePlayback(from: currentTime)
+                if !hasScheduledPlayback || needsPlaybackReschedule {
+                    schedulePlayback(from: currentTime)
+                }
+                guard commandID == playbackCommandID, isLoaded else {
+                    return
+                }
+
                 playerNode.play()
                 isPlaying = true
                 startTimer()
+                updateNowPlayingInfo()
             } catch {
                 errorText = String(format: String(localized: "播放启动失败: %@"), error.localizedDescription)
             }
@@ -2777,11 +3018,15 @@ final class RecordingPlaybackController: ObservableObject {
     }
 
     func pause() {
-        currentTime = currentPlaybackTime()
-        playbackScheduleID += 1
-        playerNode?.stop()
+        playbackCommandID += 1
+        let pausedTime = currentPlaybackTime()
         isPlaying = false
+        playerNode?.pause()
+        audioEngine?.pause()
+        currentTime = pausedTime
         stopTimer()
+        updateNowPlayingInfo()
+        Self.logger.debug("[RecordingPlayback] Paused at \(pausedTime, privacy: .public)")
     }
 
     func seek(to time: TimeInterval) {
@@ -2791,10 +3036,16 @@ final class RecordingPlaybackController: ObservableObject {
 
         let clampedTime = min(max(time, 0), duration)
         currentTime = clampedTime
+        needsPlaybackReschedule = true
         if isPlaying {
+            playbackCommandID += 1
+            let commandID = playbackCommandID
             schedulePlayback(from: clampedTime)
-            playerNode?.play()
+            if commandID == playbackCommandID {
+                playerNode?.play()
+            }
         }
+        updateNowPlayingInfo()
     }
 
     func skip(by seconds: TimeInterval) {
@@ -2810,16 +3061,14 @@ final class RecordingPlaybackController: ObservableObject {
         currentTime = currentPlaybackTime()
         playbackRate = clampedRate
         timePitchUnit?.rate = clampedRate
-
-        if isPlaying {
-            schedulePlayback(from: currentTime)
-            playerNode?.play()
-        }
+        updateNowPlayingInfo()
     }
 
     func unload() {
+        playbackCommandID += 1
         playbackScheduleID += 1
         playerNode?.stop()
+        playerNode?.reset()
         audioEngine?.stop()
         playerNode = nil
         timePitchUnit = nil
@@ -2827,14 +3076,30 @@ final class RecordingPlaybackController: ObservableObject {
         audioEngine = nil
         audioFile = nil
         currentItem = nil
+        hasScheduledPlayback = false
+        needsPlaybackReschedule = true
         isLoaded = false
         isPlaying = false
         currentTime = 0
         duration = 0
         stopTimer()
+        clearNowPlayingInfo()
+        updateRemoteCommandAvailability(isEnabled: false)
+        endReceivingRemoteControlEventsIfNeeded()
         Task {
             await deactivatePlaybackSession()
         }
+    }
+
+    func prepareForBackgroundPlayback() {
+        guard isLoaded else {
+            return
+        }
+
+        beginReceivingRemoteControlEventsIfNeeded()
+        updateRemoteCommandAvailability(isEnabled: true)
+        updateNowPlayingInfo()
+        Self.logger.debug("[RecordingPlayback] Prepared for background playback playing=\(self.isPlaying, privacy: .public)")
     }
 
     private func startTimer() {
@@ -2850,10 +3115,7 @@ final class RecordingPlaybackController: ObservableObject {
                     continue
                 }
 
-                self.currentTime = self.currentPlaybackTime()
-                if self.currentTime >= self.duration {
-                    self.finishPlayback()
-                }
+                self.currentTime = min(self.currentPlaybackTime(), self.duration)
 
                 do {
                     try await Task.sleep(for: .milliseconds(Self.playbackUITickMilliseconds))
@@ -2913,6 +3175,7 @@ final class RecordingPlaybackController: ObservableObject {
         playbackScheduleID += 1
         let completionID = playbackScheduleID
         playerNode.stop()
+        hasScheduledPlayback = false
 
         let startFrame = framePosition(for: time)
         let remainingFrames = max(audioFile.length - startFrame, 0)
@@ -2923,10 +3186,21 @@ final class RecordingPlaybackController: ObservableObject {
 
         scheduledStartFrame = startFrame
         currentTime = Double(startFrame) / sampleRate
+        needsPlaybackReschedule = false
+        hasScheduledPlayback = true
         let frameCount = AVAudioFrameCount(min(remainingFrames, AVAudioFramePosition(AVAudioFrameCount.max)))
-        playerNode.scheduleSegment(audioFile, startingFrame: startFrame, frameCount: frameCount, at: nil) { [weak self] in
+        playerNode.scheduleSegment(
+            audioFile,
+            startingFrame: startFrame,
+            frameCount: frameCount,
+            at: nil,
+            completionCallbackType: .dataPlayedBack
+        ) { [weak self] callbackType in
             Task { @MainActor in
-                guard let self, self.playbackScheduleID == completionID, self.isPlaying else {
+                guard let self,
+                      callbackType == .dataPlayedBack,
+                      self.playbackScheduleID == completionID,
+                      self.isPlaying else {
                     return
                 }
                 self.finishPlayback()
@@ -2958,11 +3232,16 @@ final class RecordingPlaybackController: ObservableObject {
     }
 
     private func finishPlayback() {
+        playbackCommandID += 1
         playbackScheduleID += 1
         playerNode?.stop()
+        playerNode?.reset()
+        hasScheduledPlayback = false
+        needsPlaybackReschedule = true
         currentTime = duration
         isPlaying = false
         stopTimer()
+        updateNowPlayingInfo()
         Task {
             await deactivatePlaybackSession()
         }
@@ -2973,7 +3252,12 @@ final class RecordingPlaybackController: ObservableObject {
             audioSessionQueue.async {
                 do {
                     let session = AVAudioSession.sharedInstance()
-                    try session.setCategory(.playback, mode: .default, options: [.duckOthers])
+                    try session.setCategory(
+                        .playback,
+                        mode: .spokenAudio,
+                        policy: .longFormAudio,
+                        options: []
+                    )
                     try session.setActive(true, options: .notifyOthersOnDeactivation)
                     continuation.resume(returning: ())
                 } catch {
@@ -2991,6 +3275,153 @@ final class RecordingPlaybackController: ObservableObject {
             }
         }
     }
+
+    private func configureRemoteCommands() {
+        let commandCenter = MPRemoteCommandCenter.shared()
+        commandCenter.skipForwardCommand.preferredIntervals = [5]
+        commandCenter.skipBackwardCommand.preferredIntervals = [5]
+
+        remoteCommandTargets = [
+            RemoteCommandTarget(command: commandCenter.playCommand, token: commandCenter.playCommand.addTarget { [weak self] _ in
+                Task { @MainActor in
+                    self?.play()
+                }
+                return .success
+            }),
+            RemoteCommandTarget(command: commandCenter.pauseCommand, token: commandCenter.pauseCommand.addTarget { [weak self] _ in
+                Task { @MainActor in
+                    self?.pause()
+                }
+                return .success
+            }),
+            RemoteCommandTarget(command: commandCenter.togglePlayPauseCommand, token: commandCenter.togglePlayPauseCommand.addTarget { [weak self] _ in
+                Task { @MainActor in
+                    self?.togglePlayback()
+                }
+                return .success
+            }),
+            RemoteCommandTarget(command: commandCenter.stopCommand, token: commandCenter.stopCommand.addTarget { [weak self] _ in
+                Task { @MainActor in
+                    guard let self else {
+                        return
+                    }
+                    self.pause()
+                    self.seek(to: 0)
+                }
+                return .success
+            }),
+            RemoteCommandTarget(command: commandCenter.skipForwardCommand, token: commandCenter.skipForwardCommand.addTarget { [weak self] event in
+                let interval = (event as? MPSkipIntervalCommandEvent)?.interval ?? 5
+                Task { @MainActor in
+                    self?.skip(by: interval)
+                }
+                return .success
+            }),
+            RemoteCommandTarget(command: commandCenter.skipBackwardCommand, token: commandCenter.skipBackwardCommand.addTarget { [weak self] event in
+                let interval = (event as? MPSkipIntervalCommandEvent)?.interval ?? 5
+                Task { @MainActor in
+                    self?.skip(by: -interval)
+                }
+                return .success
+            }),
+            RemoteCommandTarget(command: commandCenter.changePlaybackPositionCommand, token: commandCenter.changePlaybackPositionCommand.addTarget { [weak self] event in
+                guard let event = event as? MPChangePlaybackPositionCommandEvent else {
+                    return .commandFailed
+                }
+                Task { @MainActor in
+                    self?.seek(to: event.positionTime)
+                }
+                return .success
+            })
+        ]
+    }
+
+    private func updateRemoteCommandAvailability(isEnabled: Bool) {
+        let commandCenter = MPRemoteCommandCenter.shared()
+        commandCenter.playCommand.isEnabled = isEnabled
+        commandCenter.pauseCommand.isEnabled = isEnabled
+        commandCenter.togglePlayPauseCommand.isEnabled = isEnabled
+        commandCenter.stopCommand.isEnabled = isEnabled
+        commandCenter.skipForwardCommand.isEnabled = isEnabled
+        commandCenter.skipBackwardCommand.isEnabled = isEnabled
+        commandCenter.changePlaybackPositionCommand.isEnabled = isEnabled
+        commandCenter.nextTrackCommand.isEnabled = false
+        commandCenter.previousTrackCommand.isEnabled = false
+    }
+
+    private func updateNowPlayingInfo() {
+        guard isLoaded else {
+            clearNowPlayingInfo()
+            return
+        }
+
+        let elapsedTime = min(max(currentPlaybackTime(), 0), duration)
+        var info: [String: Any] = [
+            MPMediaItemPropertyTitle: nowPlayingTitle,
+            MPMediaItemPropertyArtist: String(localized: "LiveTranscriber"),
+            MPMediaItemPropertyAlbumTitle: nowPlayingSubtitle,
+            MPMediaItemPropertyPlaybackDuration: duration,
+            MPNowPlayingInfoPropertyElapsedPlaybackTime: elapsedTime,
+            MPNowPlayingInfoPropertyPlaybackRate: isPlaying ? playbackRate : 0,
+            MPNowPlayingInfoPropertyDefaultPlaybackRate: playbackRate
+        ]
+
+        if #available(iOS 10.0, *) {
+            info[MPNowPlayingInfoPropertyMediaType] = MPNowPlayingInfoMediaType.audio.rawValue
+        }
+
+        let center = MPNowPlayingInfoCenter.default()
+        center.nowPlayingInfo = info
+        center.playbackState = isPlaying ? .playing : .paused
+        Self.logger.debug(
+            "[RecordingPlayback] NowPlaying updated title=\(self.nowPlayingTitle, privacy: .public) elapsed=\(elapsedTime, privacy: .public) duration=\(self.duration, privacy: .public) rate=\(self.playbackRate, privacy: .public) playing=\(self.isPlaying, privacy: .public)"
+        )
+    }
+
+    private func clearNowPlayingInfo() {
+        let center = MPNowPlayingInfoCenter.default()
+        center.nowPlayingInfo = nil
+        center.playbackState = .stopped
+        Self.logger.debug("[RecordingPlayback] NowPlaying cleared")
+    }
+
+    private func beginReceivingRemoteControlEventsIfNeeded() {
+        guard !isReceivingRemoteControlEvents else {
+            return
+        }
+
+        UIApplication.shared.beginReceivingRemoteControlEvents()
+        isReceivingRemoteControlEvents = true
+        Self.logger.debug("[RecordingPlayback] Began receiving remote control events")
+    }
+
+    private func endReceivingRemoteControlEventsIfNeeded() {
+        guard isReceivingRemoteControlEvents else {
+            return
+        }
+
+        UIApplication.shared.endReceivingRemoteControlEvents()
+        isReceivingRemoteControlEvents = false
+        Self.logger.debug("[RecordingPlayback] Ended receiving remote control events")
+    }
+
+    private var nowPlayingTitle: String {
+        currentItem?.audioFileName ?? String(localized: "录音")
+    }
+
+    private var nowPlayingSubtitle: String {
+        guard let item = currentItem else {
+            return String(localized: "录音播放")
+        }
+
+        let formattedDate = item.createdAt.formatted(date: .abbreviated, time: .shortened)
+        return "\(item.languageName) · \(formattedDate)"
+    }
+}
+
+private struct RemoteCommandTarget {
+    let command: MPRemoteCommand
+    let token: Any
 }
 
 private struct RecordingInfoPill: View {
@@ -3014,8 +3445,7 @@ private struct RecordingInfoPill: View {
     RecordingsView(
         store: RecordingStore(),
         transcriber: LiveTranscriptionManager(),
-        searchText: .constant(""),
-        selectedRecording: .constant(nil),
+        incomingImportURL: .constant(nil),
         player: RecordingPlaybackController()
     )
         .font(.redditSans(.body))
