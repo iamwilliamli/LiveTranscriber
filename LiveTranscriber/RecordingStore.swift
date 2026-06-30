@@ -1690,7 +1690,7 @@ private enum RecordingIntelligenceService {
     }
 
     private static func exportFeedbackAttachmentIfNeeded(from session: LanguageModelSession, error: Error) {
-        #if DEBUG
+        #if DEBUG && HAS_IOS27_SDK
         guard shouldExportFeedbackAttachment(for: error) else {
             return
         }
@@ -1724,6 +1724,7 @@ private enum RecordingIntelligenceService {
     }
 
     private static func shouldExportFeedbackAttachment(for error: Error) -> Bool {
+        #if HAS_IOS27_SDK
         guard #available(iOS 27.0, *) else {
             return false
         }
@@ -1737,6 +1738,9 @@ private enum RecordingIntelligenceService {
             }
         }
         return false
+        #else
+        return false
+        #endif
     }
 
     private static func availabilityDescription(_ availability: SystemLanguageModel.Availability) -> String {
@@ -1749,6 +1753,7 @@ private enum RecordingIntelligenceService {
     }
 
     private static func debugDescription(for error: Error) -> String {
+        #if HAS_IOS27_SDK
         if #available(iOS 27.0, *),
            let error = error as? LanguageModelError {
             switch error {
@@ -1774,6 +1779,7 @@ private enum RecordingIntelligenceService {
                 return "LanguageModelError.unknown localized=\(error.localizedDescription), debug=\(error.debugDescription)"
             }
         }
+        #endif
 
         return "\(type(of: error)): \(error.localizedDescription)"
     }

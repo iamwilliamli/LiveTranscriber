@@ -137,7 +137,8 @@ final class LiveTranscriptionManager: ObservableObject {
     init() {
         selectedLanguageID = UserDefaults.standard.string(forKey: Self.languageDefaultsKey) ?? TranscriptionLanguage.defaultLanguageID
         if let rawMode = UserDefaults.standard.string(forKey: Self.speechPipelineModeDefaultsKey),
-           let storedMode = SpeechPipelineMode(rawValue: rawMode) {
+           let storedMode = SpeechPipelineMode(rawValue: rawMode),
+           storedMode.isSupportedOnCurrentOS {
             selectedSpeechPipelineMode = storedMode
         } else {
             selectedSpeechPipelineMode = .compatible
@@ -431,30 +432,38 @@ final class LiveTranscriptionManager: ObservableObject {
             throw LiveTranscriptionError.analyzerUnavailable
         }
 
-        let pipeline: AnalyzerInputPipeline
         let formatObserver: @Sendable (SpeechPipelineRuntimeFormat) -> Void = { [weak self] observation in
             Task { @MainActor [weak self] in
                 self?.handleSpeechPipelineRuntimeFormat(observation)
             }
         }
+
+        #if HAS_IOS27_SDK
         if #available(iOS 27.0, *), selectedSpeechPipelineMode == .nativeIOS27 {
             let converter = try await AnalyzerInputConverter.converter(compatibleWith: modules)
             try await analyzer.prepareToAnalyze(in: nil)
-            pipeline = AnalyzerInputPipeline(
+            let pipeline = AnalyzerInputPipeline(
                 continuation: continuation,
                 converter: converter,
                 formatObserver: formatObserver
             )
-        } else {
-            let analyzerInputFormat = try Self.makeAnalyzerInputFormat()
-            try await analyzer.prepareToAnalyze(in: analyzerInputFormat)
-            pipeline = try AnalyzerInputPipeline(
-                continuation: continuation,
-                sourceFormat: audioInputFormat,
-                analyzerFormat: analyzerInputFormat,
-                formatObserver: formatObserver
+            return PreparedSpeechPipeline(
+                analyzer: analyzer,
+                transcriber: transcriber,
+                stream: stream,
+                pipeline: pipeline
             )
         }
+        #endif
+
+        let analyzerInputFormat = try Self.makeAnalyzerInputFormat()
+        try await analyzer.prepareToAnalyze(in: analyzerInputFormat)
+        let pipeline = try AnalyzerInputPipeline(
+            continuation: continuation,
+            sourceFormat: audioInputFormat,
+            analyzerFormat: analyzerInputFormat,
+            formatObserver: formatObserver
+        )
 
         return PreparedSpeechPipeline(
             analyzer: analyzer,
@@ -538,6 +547,7 @@ final class LiveTranscriptionManager: ObservableObject {
     }
 
     private static func makeSpeechAnalyzerOptions() -> SpeechAnalyzer.Options {
+        #if HAS_IOS27_SDK
         if #available(iOS 27.0, *) {
             return SpeechAnalyzer.Options(
                 priority: .userInitiated,
@@ -545,6 +555,7 @@ final class LiveTranscriptionManager: ObservableObject {
                 ignoresResourceLimits: true
             )
         }
+        #endif
 
         return SpeechAnalyzer.Options(
             priority: .userInitiated,
@@ -1046,6 +1057,7 @@ private final class AnalyzerInputPipeline: @unchecked Sendable {
         self.flushInputs = flushInputs
     }
 
+    #if HAS_IOS27_SDK
     @available(iOS 27.0, *)
     convenience init(
         continuation: AsyncThrowingStream<AnalyzerInput, Error>.Continuation,
@@ -1085,6 +1097,7 @@ private final class AnalyzerInputPipeline: @unchecked Sendable {
             formatObserver: formatObserver
         )
     }
+    #endif
 
     init(
         continuation: AsyncThrowingStream<AnalyzerInput, Error>.Continuation,
@@ -1131,6 +1144,7 @@ private final class AnalyzerInputPipeline: @unchecked Sendable {
         self.continuation = continuation
     }
 
+    #if HAS_IOS27_SDK
     @available(iOS 27.0, *)
     private static func retimeAnalyzerInputs(
         _ inputs: [AnalyzerInput],
@@ -1155,6 +1169,7 @@ private final class AnalyzerInputPipeline: @unchecked Sendable {
 
         return retimedInputs.isEmpty ? .noData : .inputs(retimedInputs)
     }
+    #endif
 
     func process(_ buffer: AVAudioPCMBuffer, audioTime: AVAudioTime) {
         lock.lock()
@@ -2140,9 +2155,11 @@ enum SpeechPipelineMode: String, CaseIterable, Identifiable {
         case .compatible:
             return true
         case .nativeIOS27:
+            #if HAS_IOS27_SDK
             if #available(iOS 27.0, *) {
                 return true
             }
+            #endif
             return false
         }
     }
@@ -2159,6 +2176,7 @@ struct SpeechProcessingPipelineDiagnostics: Equatable {
         configuredMode: SpeechPipelineMode,
         runtimeAnalyzerFormatText: String
     ) -> SpeechProcessingPipelineDiagnostics {
+        #if HAS_IOS27_SDK
         if #available(iOS 27.0, *), configuredMode == .nativeIOS27 {
             return SpeechProcessingPipelineDiagnostics(
                 configuredPipelineName: configuredMode.title,
@@ -2178,6 +2196,7 @@ struct SpeechProcessingPipelineDiagnostics: Equatable {
                 runtimeAnalyzerFormatText: runtimeAnalyzerFormatText
             )
         }
+        #endif
 
         return SpeechProcessingPipelineDiagnostics(
             configuredPipelineName: configuredMode.title,
