@@ -2,22 +2,25 @@
 
 LiveTranscriber is an iOS 26+ local recording and live transcription app. It records audio, transcribes speech on device with Apple's Speech APIs, saves audio and transcript files, and keeps recording status visible through Lock Screen Live Activities and Dynamic Island.
 
-The project is designed as a native iOS utility rather than a cloud transcription client. Audio and transcripts stay local by default, with iCloud Drive used for cross-device file sync.
+The project is designed as a native iOS utility rather than a cloud transcription client. Audio and transcripts stay local by default, with an app-private iCloud container used for cross-device file sync when iCloud is available.
 
 ## Current Features
 
 - Tab-based SwiftUI app with recording, file library, and settings areas.
 - Live recording with real-time transcript updates, pause/resume, elapsed timer, and haptic feedback.
+- Save sheet after stopping a recording, with editable name, manual tags, duration, and optional location attachment.
 - WAV and M4A recording output.
 - Stereo Capture recording with `AVCaptureSession` and `AVCaptureDeviceInput.multichannelAudioMode = .stereo`.
 - Offline transcription for imported audio files, with language selection and progress/failure state.
 - Import from Files or the iOS share/Open In menu for audio recordings such as Voice Memos exports.
 - Re-transcription of saved recordings with any supported Speech locale.
-- iCloud Drive storage under `Live Transcriber/Documents/Recordings/`.
+- App-private iCloud container storage for audio and transcript files, with SwiftData metadata indexed through a CloudKit private database.
+- Recording map view for recordings that were saved with location metadata.
 - Search across file names, languages, transcript previews, full transcript text, summaries, and topic tags.
 - Timestamped transcript lines for playback seeking.
 - Saved recording detail view with audio playback, transcript seek, copy, and share actions.
 - Lock Screen and Dynamic Island Live Activity with elapsed time, latest final transcript, language, line count, and stop action.
+- Home Screen widget with quick links to recording, saved files, and settings.
 - Local Apple Intelligence summary and topic tag generation for saved transcripts.
 - Optional file-level loudness normalization after recording, controlled from Developer Options, with a small playback-side boost in the current player.
 - Selectable speech processing pipelines: a stable iOS 26/27 compatible pipeline and an iOS 27 native `AnalyzerInputConverter` pipeline.
@@ -48,7 +51,7 @@ Both live pipelines use a monotonic audio timeline for `AnalyzerInput.bufferStar
 - iOS 26 or later device or simulator for development.
 - iOS 27 is required for the Native Pipeline mode.
 - Apple Speech and FoundationModels availability on the target device.
-- iCloud capability configured for `iCloud.com.iamwilliamli.LiveTranscriber`.
+- iCloud capability configured for `iCloud.com.iamwilliamli.LiveTranscriber`, with CloudDocuments for private file sync and CloudKit for private SwiftData index sync.
 
 ## Build
 
@@ -99,5 +102,6 @@ LiveTranscriber is built around local processing. Recording, transcription, summ
 
 - The app does not use developer-operated servers, third-party analytics, ads, tracking, or custom network requests.
 - Audio and transcript text are not uploaded to developer servers.
-- Files are stored in the local app container by default. When iCloud Drive is available, app-managed recording files sync through the user's Apple iCloud Drive.
+- Files are stored in the local app container by default. When iCloud is available, app-managed recording files sync through an app-private iCloud container instead of a visible iCloud Drive folder.
+- Recording metadata is stored with SwiftData and syncs through the user's CloudKit private database.
 - The camera is not used for photos or video. `NSCameraUsageDescription` is present because Apple static review requires it when the app uses `AVCaptureSession` / `AVCaptureDeviceInput` for microphone recording.

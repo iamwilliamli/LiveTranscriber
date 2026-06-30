@@ -1,4 +1,6 @@
 import AVFoundation
+import CoreLocation
+import MapKit
 import SwiftUI
 import UIKit
 import UniformTypeIdentifiers
@@ -18,6 +20,7 @@ struct RecordingsView: View {
     @State private var deleteErrorMessage: String?
     @State private var pendingImport: PendingImport?
     @State private var searchText = ""
+    @State private var isShowingRecordingsMap = false
 
     private var filteredRecordings: [RecordingItem] {
         let query = normalizedSearchText(searchText)
@@ -47,12 +50,9 @@ struct RecordingsView: View {
                             RecordingRow(
                                 item: item,
                                 isAnalyzing: analyzingRecordingID == item.id,
-                                showsIntelligence: store.intelligenceAvailability.isAvailable,
-                                languages: transcriber.supportedLanguages
+                                showsIntelligence: store.intelligenceAvailability.isAvailable
                             ) {
                                 selectedRecording = item
-                            } onRetranscribe: { language in
-                                retranscribe(item, language: language)
                             }
                             .listRowSeparator(.hidden)
                             .listRowBackground(Color.clear)
@@ -139,6 +139,14 @@ struct RecordingsView: View {
                     }
 
                     Button {
+                        HapticFeedback.play(.navigation)
+                        isShowingRecordingsMap = true
+                    } label: {
+                        Image(systemName: "map")
+                    }
+                    .accessibilityLabel("地图")
+
+                    Button {
                         HapticFeedback.play(.primaryAction)
                         showsImporter = true
                     } label: {
@@ -176,6 +184,9 @@ struct RecordingsView: View {
             allowsMultipleSelection: false
         ) { result in
             handleImportResult(result)
+        }
+        .sheet(isPresented: $isShowingRecordingsMap) {
+            RecordingMapView(store: store, transcriber: transcriber, player: player)
         }
         .confirmationDialog(
             "选择转录语言",
@@ -387,24 +398,11 @@ struct RecordingsView: View {
     }
 
     private func recording(_ item: RecordingItem, matches query: String) -> Bool {
-        let searchableFields = [
-            item.audioFileName,
-            item.languageName,
-            item.transcriptPreview,
-            item.intelligence?.summary ?? "",
-            item.intelligence?.tags.joined(separator: " ") ?? "",
-            store.transcriptText(for: item)
-        ]
-
-        return searchableFields.contains { field in
-            normalizedSearchText(field).contains(query)
-        }
+        store.normalizedSearchText(for: item).contains(query)
     }
 
     private func normalizedSearchText(_ text: String) -> String {
-        text
-            .trimmingCharacters(in: .whitespacesAndNewlines)
-            .folding(options: [.caseInsensitive, .diacriticInsensitive, .widthInsensitive], locale: .current)
+        text.normalizedForRecordingSearch
     }
 }
 
@@ -421,101 +419,325 @@ private struct RecordingDeleteRequest: Identifiable {
     }
 }
 
+private struct RecordingMapView: View {
+    @ObservedObject var store: RecordingStore
+    @ObservedObject var transcriber: LiveTranscriptionManager
+    @ObservedObject var player: RecordingPlaybackController
+    @Environment(\.dismiss) private var dismiss
+    @State private var selectedPoint: RecordingMapPoint?
+    @State private var selectedRecording: RecordingItem?
+
+    private var points: [RecordingMapPoint] {
+        store.recordings.compactMap { item in
+            guard let location = item.location else {
+                return nil
+            }
+            return RecordingMapPoint(item: item, location: location)
+        }
+    }
+
+    var body: some View {
+        NavigationStack {
+            Group {
+                if points.isEmpty {
+                    EmptyStateView(icon: "map", title: "暂无带位置的录音")
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                        .background(AppTheme.groupedBackground)
+                } else {
+                    Map(initialPosition: .region(mapRegion)) {
+                        ForEach(points) { point in
+                            Annotation(point.title, coordinate: point.coordinate) {
+                                Button {
+                                    HapticFeedback.play(.navigation)
+                                    selectedPoint = point
+                                } label: {
+                                    Image(systemName: selectedPoint?.id == point.id ? "waveform.circle.fill" : "waveform.circle")
+                                        .font(.system(size: 28, weight: .semibold))
+                                        .foregroundStyle(.white, AppTheme.brand)
+                                        .shadow(color: Color.black.opacity(0.18), radius: 6, y: 2)
+                                }
+                                .buttonStyle(.plain)
+                            }
+                        }
+                    }
+                    .ignoresSafeArea(edges: .bottom)
+                }
+            }
+            .safeAreaInset(edge: .bottom) {
+                if let selectedPoint {
+                    RecordingMapSelectionCard(point: selectedPoint) {
+                        selectedRecording = selectedPoint.item
+                    }
+                    .padding(.horizontal, 16)
+                    .padding(.bottom, 12)
+                    .transition(.move(edge: .bottom).combined(with: .opacity))
+                }
+            }
+            .navigationTitle("录音地图")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button("完成") {
+                        dismiss()
+                    }
+                }
+            }
+            .navigationDestination(item: $selectedRecording) { item in
+                RecordingDetailView(item: item, store: store, transcriber: transcriber, player: player)
+            }
+        }
+    }
+
+    private var mapRegion: MKCoordinateRegion {
+        guard let firstPoint = points.first else {
+            return MKCoordinateRegion(
+                center: CLLocationCoordinate2D(latitude: 0, longitude: 0),
+                span: MKCoordinateSpan(latitudeDelta: 1, longitudeDelta: 1)
+            )
+        }
+
+        let latitudes = points.map(\.coordinate.latitude)
+        let longitudes = points.map(\.coordinate.longitude)
+        let minLatitude = latitudes.min() ?? firstPoint.coordinate.latitude
+        let maxLatitude = latitudes.max() ?? firstPoint.coordinate.latitude
+        let minLongitude = longitudes.min() ?? firstPoint.coordinate.longitude
+        let maxLongitude = longitudes.max() ?? firstPoint.coordinate.longitude
+
+        return MKCoordinateRegion(
+            center: CLLocationCoordinate2D(
+                latitude: (minLatitude + maxLatitude) / 2,
+                longitude: (minLongitude + maxLongitude) / 2
+            ),
+            span: MKCoordinateSpan(
+                latitudeDelta: max(0.01, (maxLatitude - minLatitude) * 1.8),
+                longitudeDelta: max(0.01, (maxLongitude - minLongitude) * 1.8)
+            )
+        )
+    }
+}
+
+private struct RecordingMapPoint: Identifiable {
+    let id: RecordingItem.ID
+    let item: RecordingItem
+    let title: String
+    let durationText: String
+    let createdAt: Date
+    let location: RecordingLocation
+    let coordinate: CLLocationCoordinate2D
+
+    init(item: RecordingItem, location: RecordingLocation) {
+        id = item.id
+        self.item = item
+        title = (item.audioFileName as NSString).deletingPathExtension
+        durationText = TranscriptionLine.formatTimestamp(Double(item.durationSeconds))
+        createdAt = item.createdAt
+        self.location = location
+        coordinate = CLLocationCoordinate2D(latitude: location.latitude, longitude: location.longitude)
+    }
+}
+
+private struct RecordingMapSelectionCard: View {
+    let point: RecordingMapPoint
+    let onOpen: () -> Void
+
+    var body: some View {
+        Button {
+            HapticFeedback.play(.navigation)
+            onOpen()
+        } label: {
+            HStack(spacing: 12) {
+                ZStack {
+                    RoundedRectangle(cornerRadius: AppTheme.compactCornerRadius, style: .continuous)
+                        .fill(AppTheme.brand.opacity(0.14))
+                    Image(systemName: "waveform")
+                        .font(.system(size: 18, weight: .semibold))
+                        .foregroundStyle(AppTheme.brand)
+                }
+                .frame(width: 42, height: 42)
+
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(point.title)
+                        .font(.redditSans(.subheadline, weight: .semibold))
+                        .foregroundStyle(.primary)
+                        .lineLimit(1)
+                        .truncationMode(.middle)
+
+                    HStack(spacing: 8) {
+                        Label {
+                            RecordingLocationNameText(location: point.location)
+                        } icon: {
+                            Image(systemName: "mappin.and.ellipse")
+                        }
+                        Label(point.durationText, systemImage: "clock")
+                    }
+                    .font(.redditSans(.caption).monospacedDigit())
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+                }
+
+                Spacer(minLength: 8)
+
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundStyle(.tertiary)
+            }
+            .padding(12)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: AppTheme.cornerRadius, style: .continuous))
+            .overlay {
+                RoundedRectangle(cornerRadius: AppTheme.cornerRadius, style: .continuous)
+                    .stroke(AppTheme.cardBorder, lineWidth: 1)
+            }
+            .shadow(color: Color.black.opacity(0.14), radius: 14, y: 6)
+        }
+        .buttonStyle(.plain)
+    }
+}
+
+private extension RecordingLocation {
+    var locationName: String? {
+        placeName
+    }
+
+    var coordinateText: String {
+        "\(latitude.formatted(.number.precision(.fractionLength(5)))), \(longitude.formatted(.number.precision(.fractionLength(5))))"
+    }
+
+    var cacheKey: String {
+        "\(latitude.rounded(toPlaces: 4)),\(longitude.rounded(toPlaces: 4))"
+    }
+}
+
+private struct RecordingLocationNameText: View {
+    let location: RecordingLocation
+    @State private var resolvedName: String?
+
+    var body: some View {
+        Text(resolvedName ?? location.locationName ?? location.coordinateText)
+            .task(id: location.cacheKey) {
+                guard location.locationName == nil else {
+                    resolvedName = location.locationName
+                    return
+                }
+                resolvedName = await RecordingLocationNameCache.shared.name(for: location)
+            }
+    }
+}
+
+@MainActor
+private final class RecordingLocationNameCache {
+    static let shared = RecordingLocationNameCache()
+
+    private var namesByLocationKey: [String: String] = [:]
+
+    func name(for location: RecordingLocation) async -> String {
+        if let storedName = location.locationName {
+            return storedName
+        }
+
+        let key = location.cacheKey
+        if let cachedName = namesByLocationKey[key] {
+            return cachedName
+        }
+
+        let fallback = location.coordinateText
+        do {
+            guard let request = MKReverseGeocodingRequest(location:
+                CLLocation(latitude: location.latitude, longitude: location.longitude)
+            ) else {
+                namesByLocationKey[key] = fallback
+                return fallback
+            }
+            let mapItems = try await request.mapItems
+            let mapItem = mapItems.first
+            let address = mapItem?.addressRepresentations
+            let city = address?.cityName
+                ?? address?.cityWithContext(.short)
+                ?? mapItem?.name
+            let country = address?.regionName
+            let name = [city, country]
+                .compactMap { $0?.trimmingCharacters(in: .whitespacesAndNewlines) }
+                .filter { !$0.isEmpty }
+                .joined(separator: ", ")
+            let resolvedName = name.isEmpty ? fallback : name
+            namesByLocationKey[key] = resolvedName
+            return resolvedName
+        } catch {
+            namesByLocationKey[key] = fallback
+            return fallback
+        }
+    }
+}
+
+private extension Double {
+    func rounded(toPlaces places: Int) -> Double {
+        let divisor = pow(10.0, Double(places))
+        return (self * divisor).rounded() / divisor
+    }
+}
+
 private struct RecordingRow: View {
     let item: RecordingItem
     let isAnalyzing: Bool
     let showsIntelligence: Bool
-    let languages: [TranscriptionLanguage]
     let onOpen: () -> Void
-    let onRetranscribe: (TranscriptionLanguage) -> Void
 
     private var isTranscriptionRunning: Bool {
         item.importStatus?.isFailed == false
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            HStack(alignment: .top, spacing: 12) {
-                HStack(alignment: .top, spacing: 12) {
-                    ZStack {
-                        RoundedRectangle(cornerRadius: AppTheme.cornerRadius, style: .continuous)
-                            .fill(AppTheme.brand.opacity(0.12))
-                        Image(systemName: "waveform")
-                            .font(.system(size: 20, weight: .semibold))
-                            .foregroundStyle(AppTheme.brand)
-                    }
-                    .frame(width: 44, height: 44)
+        VStack(alignment: .leading, spacing: 11) {
+            HStack(alignment: .top, spacing: 10) {
+                ZStack {
+                    RoundedRectangle(cornerRadius: AppTheme.compactCornerRadius, style: .continuous)
+                        .fill(AppTheme.brand.opacity(0.12))
+                    Image(systemName: "waveform")
+                        .font(.system(size: 17, weight: .semibold))
+                        .foregroundStyle(AppTheme.brand)
+                }
+                .frame(width: 36, height: 36)
+                .padding(.top, 1)
 
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text(item.audioFileName)
-                            .font(.redditSans(.headline, weight: .semibold))
-                            .foregroundStyle(.primary)
-                            .lineLimit(1)
-                            .truncationMode(.middle)
-                        Text(item.createdAt, format: .dateTime.year().month().day().hour().minute())
-                            .font(.redditSans(.caption))
-                            .foregroundStyle(.secondary)
-                            .lineLimit(1)
-                    }
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(item.audioFileName)
+                        .font(.redditSans(.headline, weight: .semibold))
+                        .foregroundStyle(.primary)
+                        .lineLimit(1)
+                        .truncationMode(.middle)
+
+                    Text(item.createdAt, format: .dateTime.year().month().day().hour().minute())
+                        .font(.redditSans(.caption))
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
                 }
-                .contentShape(Rectangle())
-                .onTapGesture {
-                    HapticFeedback.play(.navigation)
-                    onOpen()
-                }
+                .frame(maxWidth: .infinity, alignment: .leading)
 
                 Spacer(minLength: 8)
 
-                Menu {
-                    ForEach(languages) { language in
-                        Button {
-                            onRetranscribe(language)
-                        } label: {
-                            Label(
-                                language.displayName,
-                                systemImage: language.id == item.languageID ? "checkmark" : "globe"
-                            )
-                        }
-                    }
-                } label: {
-                    Image(systemName: "arrow.triangle.2.circlepath")
-                        .font(.system(size: 15, weight: .semibold))
-                        .frame(width: 30, height: 30)
-                }
-                .foregroundStyle(isTranscriptionRunning ? .secondary : AppTheme.brand)
-                .disabled(isTranscriptionRunning)
-                .accessibilityLabel("重新转录")
-
-                if item.importStatus?.isFailed == true {
-                    Image(systemName: "exclamationmark.triangle.fill")
-                        .font(.system(size: 15, weight: .semibold))
-                        .foregroundStyle(AppTheme.warning)
-                        .frame(width: 26, height: 26)
-                } else if isAnalyzing {
-                    ProgressView()
-                        .controlSize(.small)
-                        .frame(width: 26, height: 26)
-                } else if !isTranscriptionRunning {
-                    Text(TranscriptionLine.formatTimestamp(Double(item.durationSeconds)))
-                        .font(.redditSans(.caption, weight: .semibold).monospacedDigit())
-                        .foregroundStyle(.secondary)
-                        .padding(.horizontal, 8)
-                        .frame(height: 26)
-                        .background(Color.secondary.opacity(0.12), in: Capsule())
-                }
+                trailingStatus
+            }
+            .contentShape(Rectangle())
+            .onTapGesture {
+                HapticFeedback.play(.navigation)
+                onOpen()
             }
 
-            HStack(spacing: 8) {
-                Label(item.languageName, systemImage: "globe")
-                Label("\(item.lineCount)", systemImage: "text.alignleft")
-            }
-                .font(.redditSans(.caption))
-                .foregroundStyle(.secondary)
+            RecordingMetadataStrip(item: item)
                 .contentShape(Rectangle())
                 .onTapGesture {
                     HapticFeedback.play(.navigation)
                     onOpen()
                 }
+
+            if !item.combinedTags.isEmpty {
+                FlowTags(tags: Array(item.combinedTags.prefix(4)))
+                    .contentShape(Rectangle())
+                    .onTapGesture {
+                        HapticFeedback.play(.navigation)
+                        onOpen()
+                    }
+            }
 
             if let importStatus = item.importStatus {
                 VStack(alignment: .leading, spacing: 6) {
@@ -579,6 +801,76 @@ private struct RecordingRow: View {
         .clipShape(RoundedRectangle(cornerRadius: AppTheme.cornerRadius, style: .continuous))
         .shadow(color: AppTheme.cardShadow, radius: 7, y: 2)
     }
+
+    @ViewBuilder
+    private var trailingStatus: some View {
+        if item.importStatus?.isFailed == true {
+            Image(systemName: "exclamationmark.triangle.fill")
+                .font(.system(size: 15, weight: .semibold))
+                .foregroundStyle(AppTheme.warning)
+                .frame(width: 26, height: 26)
+        } else if isAnalyzing {
+            ProgressView()
+                .controlSize(.small)
+                .frame(width: 26, height: 26)
+        } else if !isTranscriptionRunning {
+            Text(TranscriptionLine.formatTimestamp(Double(item.durationSeconds)))
+                .font(.redditSans(.caption, weight: .semibold).monospacedDigit())
+                .foregroundStyle(.secondary)
+                .padding(.horizontal, 9)
+                .frame(height: 28)
+                .background(Color.secondary.opacity(0.12), in: Capsule())
+        }
+    }
+}
+
+private struct RecordingMetadataStrip: View {
+    let item: RecordingItem
+
+    var body: some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: 6) {
+                RecordingMetadataChip(systemImage: "globe", text: item.languageName)
+                RecordingMetadataChip(systemImage: "text.alignleft", text: "\(item.lineCount)")
+                if let location = item.location {
+                    RecordingMetadataChip(systemImage: "mappin.and.ellipse") {
+                        RecordingLocationNameText(location: location)
+                    }
+                }
+            }
+        }
+        .scrollClipDisabled()
+    }
+}
+
+private struct RecordingMetadataChip<Content: View>: View {
+    let systemImage: String
+    @ViewBuilder var content: Content
+
+    init(systemImage: String, text: String) where Content == Text {
+        self.systemImage = systemImage
+        content = Text(text)
+    }
+
+    init(systemImage: String, @ViewBuilder content: () -> Content) {
+        self.systemImage = systemImage
+        self.content = content()
+    }
+
+    var body: some View {
+        HStack(spacing: 5) {
+            Image(systemName: systemImage)
+                .font(.system(size: 12, weight: .semibold))
+                .foregroundStyle(.secondary)
+            content
+                .font(.redditSans(.caption, weight: .semibold))
+                .foregroundStyle(.secondary)
+                .lineLimit(1)
+        }
+        .padding(.horizontal, 8)
+        .frame(height: 24)
+        .background(Color.secondary.opacity(0.09), in: Capsule())
+    }
 }
 
 private struct RecordingIntelligencePreview: View {
@@ -592,10 +884,6 @@ private struct RecordingIntelligencePreview: View {
                     .foregroundStyle(.primary)
                     .lineLimit(2)
                     .fixedSize(horizontal: false, vertical: true)
-            }
-
-            if !intelligence.tags.isEmpty {
-                FlowTags(tags: Array(intelligence.tags.prefix(4)))
             }
         }
     }
@@ -636,8 +924,12 @@ private struct RecordingDetailView: View {
     @State private var audioFileInfo: RecordingAudioFileInfo?
     @State private var audioFileInfoError: String?
     @State private var isShowingAudioFileInfo = false
-    @State private var isShowingRenameAlert = false
-    @State private var renameText = ""
+    @StateObject private var editLocationProvider = RecordingEditLocationProvider()
+    @State private var isShowingRecordingEditSheet = false
+    @State private var editRecordingName = ""
+    @State private var editRecordingTags: [String] = []
+    @State private var editRecordingIncludesLocation = false
+    @State private var isSavingRecordingEdit = false
     @State private var renameErrorMessage: String?
     @State private var cachedTranscriptLines: [StoredTranscriptLine] = []
     @State private var scrubbedPlaybackTime: TimeInterval?
@@ -695,6 +987,30 @@ private struct RecordingDetailView: View {
                             isShowingAudioFileInfo = false
                         }
                     }
+                }
+            }
+        }
+        .sheet(isPresented: $isShowingRecordingEditSheet) {
+            RecordingEditSheet(
+                item: currentItem,
+                recordingName: $editRecordingName,
+                tags: $editRecordingTags,
+                includesLocation: $editRecordingIncludesLocation,
+                locationProvider: editLocationProvider,
+                isSaving: isSavingRecordingEdit,
+                onSave: saveRecordingEdit,
+                onCancel: {
+                    isShowingRecordingEditSheet = false
+                }
+            )
+            .interactiveDismissDisabled(isSavingRecordingEdit)
+            .presentationDetents([.medium, .large])
+            .presentationDragIndicator(.visible)
+            .onChange(of: editRecordingIncludesLocation) { _, includesLocation in
+                if includesLocation, currentItem.location == nil {
+                    editLocationProvider.requestLocation()
+                } else if !includesLocation {
+                    editLocationProvider.reset()
                 }
             }
         }
@@ -766,19 +1082,6 @@ private struct RecordingDetailView: View {
         } message: {
             Text(deleteErrorMessage ?? "")
         }
-        .alert("重命名录音", isPresented: $isShowingRenameAlert) {
-            TextField("录音名称", text: $renameText)
-                .textInputAutocapitalization(.never)
-                .autocorrectionDisabled()
-
-            Button("保存") {
-                renameCurrentItem()
-            }
-
-            Button("取消", role: .cancel) {}
-        } message: {
-            Text("会同步修改音频文件和转录文本文件名")
-        }
         .alert(
             "重命名失败",
             isPresented: Binding(
@@ -797,10 +1100,11 @@ private struct RecordingDetailView: View {
     }
 
     private var detailActionsMenu: some View {
-        Menu {
+        let transcriptText = store.transcriptText(for: currentItem)
+
+        return Menu {
             Button {
-                renameText = (currentItem.audioFileName as NSString).deletingPathExtension
-                isShowingRenameAlert = true
+                prepareRecordingEditSheet()
             } label: {
                 Label("重命名", systemImage: "pencil")
             }
@@ -819,10 +1123,10 @@ private struct RecordingDetailView: View {
                     Label("分享音频", systemImage: "waveform")
                 }
 
-                ShareLink(item: store.transcriptText(for: currentItem)) {
+                ShareLink(item: transcriptText) {
                     Label("分享转录文字", systemImage: "text.alignleft")
                 }
-                .disabled(store.transcriptText(for: currentItem).trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                .disabled(transcriptText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
             } label: {
                 Label("分享", systemImage: "square.and.arrow.up")
             }
@@ -845,7 +1149,7 @@ private struct RecordingDetailView: View {
 
             Button {
                 HapticFeedback.play(.copy)
-                UIPasteboard.general.string = store.transcriptText(for: currentItem)
+                UIPasteboard.general.string = transcriptText
                 copied = true
                 DispatchQueue.main.asyncAfter(deadline: .now() + 1.4) {
                     copied = false
@@ -891,6 +1195,21 @@ private struct RecordingDetailView: View {
                 RecordingInfoPill(icon: "calendar", text: item.createdAt.formatted(date: .abbreviated, time: .shortened))
                 RecordingInfoPill(icon: "clock", text: TranscriptionLine.formatTimestamp(Double(item.durationSeconds)))
                 RecordingInfoPill(icon: "globe", text: item.languageName)
+            }
+
+            if !item.combinedTags.isEmpty {
+                FlowTags(tags: item.combinedTags)
+            }
+
+            if let location = item.location {
+                Label {
+                    RecordingLocationNameText(location: location)
+                } icon: {
+                    Image(systemName: "mappin.and.ellipse")
+                }
+                    .font(.redditSans(.caption, weight: .semibold))
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
             }
         }
         .padding(14)
@@ -939,10 +1258,6 @@ private struct RecordingDetailView: View {
                         .foregroundStyle(.primary)
                         .lineSpacing(4)
                         .fixedSize(horizontal: false, vertical: true)
-                }
-
-                if !intelligence.tags.isEmpty {
-                    FlowTags(tags: intelligence.tags)
                 }
 
                 Text(intelligence.generatedAt, format: .dateTime.year().month().day().hour().minute())
@@ -1006,47 +1321,62 @@ private struct RecordingDetailView: View {
         let displayedTime = scrubbedPlaybackTime ?? player.currentTime
 
         return VStack(alignment: .leading, spacing: 12) {
-            Label("播放录音", systemImage: "play.circle")
-                .font(.redditSans(.headline))
+            HStack(spacing: 10) {
+                Label("播放录音", systemImage: "play.circle")
+                    .font(.redditSans(.headline))
 
-            HStack(spacing: 12) {
-                Button {
-                    HapticFeedback.play(.playbackToggle)
-                    player.togglePlayback()
-                } label: {
-                    Image(systemName: player.isPlaying ? "pause.fill" : "play.fill")
-                        .font(.system(size: 17, weight: .semibold))
-                        .frame(width: 44, height: 44)
-                        .foregroundStyle(.white)
-                        .background(player.isLoaded ? AppTheme.brand : Color.secondary, in: Circle())
-                }
-                .disabled(!player.isLoaded)
+                Spacer()
 
-                VStack(spacing: 6) {
-                    Slider(
-                        value: Binding(
-                            get: { scrubbedPlaybackTime ?? player.currentTime },
-                            set: { scrubbedPlaybackTime = $0 }
-                        ),
-                        in: 0...max(player.duration, 1),
-                        onEditingChanged: { isEditing in
-                            if !isEditing, let scrubbedPlaybackTime {
-                                player.seek(to: scrubbedPlaybackTime)
-                                self.scrubbedPlaybackTime = nil
-                            }
-                        }
-                    )
+                playbackSpeedMenu
+            }
+
+            VStack(spacing: 10) {
+                HStack(spacing: 14) {
+                    PlaybackRoundButton(systemImage: "gobackward.5", title: "-5s") {
+                        HapticFeedback.play(.timelineSeek)
+                        scrubbedPlaybackTime = nil
+                        player.skip(by: -5)
+                    }
                     .disabled(!player.isLoaded)
 
-                    HStack {
-                        Text(TranscriptionLine.formatTimestamp(displayedTime))
-                        Spacer()
-                        Text(TranscriptionLine.formatTimestamp(player.duration))
+                    PlaybackRoundButton(systemImage: player.isPlaying ? "pause.fill" : "play.fill", title: player.isPlaying ? "暂停" : "播放", isPrimary: true) {
+                        HapticFeedback.play(.playbackToggle)
+                        player.togglePlayback()
                     }
-                    .font(.redditSans(.caption2).monospacedDigit())
-                    .foregroundStyle(.secondary)
+                    .disabled(!player.isLoaded)
+
+                    PlaybackRoundButton(systemImage: "goforward.5", title: "+5s") {
+                        HapticFeedback.play(.timelineSeek)
+                        scrubbedPlaybackTime = nil
+                        player.skip(by: 5)
+                    }
+                    .disabled(!player.isLoaded)
                 }
+
+                Slider(
+                    value: Binding(
+                        get: { scrubbedPlaybackTime ?? player.currentTime },
+                        set: { scrubbedPlaybackTime = $0 }
+                    ),
+                    in: 0...max(player.duration, 1),
+                    onEditingChanged: { isEditing in
+                        if !isEditing, let scrubbedPlaybackTime {
+                            player.seek(to: scrubbedPlaybackTime)
+                            self.scrubbedPlaybackTime = nil
+                        }
+                    }
+                )
+                .disabled(!player.isLoaded)
+
+                HStack {
+                    Text(TranscriptionLine.formatTimestamp(displayedTime))
+                    Spacer()
+                    Text(TranscriptionLine.formatTimestamp(player.duration))
+                }
+                .font(.redditSans(.caption2).monospacedDigit())
+                .foregroundStyle(.secondary)
             }
+            .frame(maxWidth: .infinity)
 
             if let errorText = player.errorText {
                 Label(errorText, systemImage: "exclamationmark.triangle")
@@ -1063,6 +1393,35 @@ private struct RecordingDetailView: View {
                 .stroke(AppTheme.cardBorder, lineWidth: 1)
         }
         .clipShape(RoundedRectangle(cornerRadius: AppTheme.cornerRadius, style: .continuous))
+    }
+
+    private var playbackSpeedMenu: some View {
+        Menu {
+            ForEach(RecordingPlaybackController.availablePlaybackRates, id: \.self) { rate in
+                Button {
+                    HapticFeedback.play(.menuSelection)
+                    player.setPlaybackRate(rate)
+                } label: {
+                    Label(
+                        RecordingPlaybackController.playbackRateLabel(rate),
+                        systemImage: player.playbackRate == rate ? "checkmark" : "speedometer"
+                    )
+                }
+            }
+        } label: {
+            HStack(spacing: 5) {
+                Image(systemName: "speedometer")
+                    .font(.system(size: 12, weight: .semibold))
+                Text(RecordingPlaybackController.playbackRateLabel(player.playbackRate))
+                    .font(.redditSans(.caption, weight: .bold).monospacedDigit())
+            }
+            .foregroundStyle(AppTheme.brand)
+            .padding(.horizontal, 10)
+            .frame(height: 30)
+            .background(AppTheme.brand.opacity(0.11), in: Capsule())
+        }
+        .buttonStyle(.plain)
+        .disabled(!player.isLoaded)
     }
 
     private var transcript: some View {
@@ -1191,16 +1550,39 @@ private struct RecordingDetailView: View {
         cachedTranscriptLines = lines
     }
 
-    private func renameCurrentItem() {
+    private func prepareRecordingEditSheet() {
+        let item = currentItem
+        editRecordingName = (item.audioFileName as NSString).deletingPathExtension
+        editRecordingTags = item.combinedTags
+        editRecordingIncludesLocation = item.location != nil
+        editLocationProvider.reset()
+        isShowingRecordingEditSheet = true
+        HapticFeedback.play(.menuSelection)
+    }
+
+    private func saveRecordingEdit() {
         guard !isTranscriptionRunning else {
             HapticFeedback.play(.blocked)
             return
         }
+        guard !isSavingRecordingEdit else {
+            return
+        }
 
+        isSavingRecordingEdit = true
         do {
-            let renamedItem = try store.rename(currentItem, to: renameText)
+            let location = editRecordingIncludesLocation
+                ? (editLocationProvider.recordingLocation ?? currentItem.location)
+                : nil
+            let updatedItem = try store.updateDetails(
+                for: currentItem,
+                proposedName: editRecordingName,
+                manualTags: editRecordingTags,
+                location: location
+            )
             HapticFeedback.play(.primaryAction)
-            player.load(item: renamedItem, url: store.audioURL(for: renamedItem))
+            isShowingRecordingEditSheet = false
+            player.load(item: updatedItem, url: store.audioURL(for: updatedItem))
             Task {
                 await refreshAudioFileInfo()
                 await refreshTranscriptCache()
@@ -1209,6 +1591,7 @@ private struct RecordingDetailView: View {
             renameErrorMessage = error.localizedDescription
             HapticFeedback.play(.failure)
         }
+        isSavingRecordingEdit = false
     }
 
     private func deleteCurrentItem(_ item: RecordingItem) {
@@ -1221,6 +1604,397 @@ private struct RecordingDetailView: View {
             deleteErrorMessage = error.localizedDescription
             HapticFeedback.play(.failure)
         }
+    }
+}
+
+private struct RecordingEditSheet: View {
+    let item: RecordingItem
+    @Binding var recordingName: String
+    @Binding var tags: [String]
+    @Binding var includesLocation: Bool
+    @ObservedObject var locationProvider: RecordingEditLocationProvider
+    let isSaving: Bool
+    let onSave: () -> Void
+    let onCancel: () -> Void
+
+    var body: some View {
+        NavigationStack {
+            ScrollView {
+                VStack(alignment: .leading, spacing: 14) {
+                    nameSection
+                    tagsEntry
+                    durationRow
+                    locationSection
+                }
+                .padding(16)
+            }
+            .background(AppTheme.groupedBackground.ignoresSafeArea())
+            .navigationTitle("编辑录音")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .topBarLeading) {
+                    Button("取消") {
+                        onCancel()
+                    }
+                    .disabled(isSaving)
+                }
+
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button {
+                        onSave()
+                    } label: {
+                        if isSaving {
+                            ProgressView()
+                                .controlSize(.small)
+                        } else {
+                            Text("保存")
+                                .font(.redditSans(.subheadline, weight: .semibold))
+                        }
+                    }
+                    .disabled(isSaving || recordingName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                }
+            }
+        }
+    }
+
+    private var nameSection: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Label("录音名称", systemImage: "pencil")
+                .font(.redditSans(.caption, weight: .semibold))
+                .foregroundStyle(.secondary)
+
+            TextField("录音名称", text: $recordingName)
+                .font(.redditSans(.headline, weight: .semibold))
+                .textInputAutocapitalization(.never)
+                .autocorrectionDisabled()
+                .padding(.horizontal, 12)
+                .frame(height: 48)
+                .background(AppTheme.elevatedBackground, in: RoundedRectangle(cornerRadius: AppTheme.compactCornerRadius, style: .continuous))
+        }
+        .recordingEditSectionSurface()
+    }
+
+    private var tagsEntry: some View {
+        NavigationLink {
+            RecordingMetadataTagsEditor(tags: $tags)
+        } label: {
+            HStack(spacing: 12) {
+                Label("标签", systemImage: "tag")
+                    .font(.redditSans(.subheadline, weight: .semibold))
+                    .foregroundStyle(.primary)
+
+                Spacer()
+
+                Text(tags.isEmpty ? String(localized: "未添加") : "\(tags.count)")
+                    .font(.redditSans(.caption, weight: .semibold))
+                    .foregroundStyle(.secondary)
+
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundStyle(.tertiary)
+            }
+        }
+        .buttonStyle(.plain)
+        .recordingEditSectionSurface()
+    }
+
+    private var durationRow: some View {
+        HStack(spacing: 12) {
+            Label("音频时长", systemImage: "clock")
+                .font(.redditSans(.subheadline, weight: .semibold))
+            Spacer()
+            Text(TranscriptionLine.formatTimestamp(Double(item.durationSeconds)))
+                .font(.redditSans(.subheadline, weight: .semibold).monospacedDigit())
+                .foregroundStyle(.secondary)
+        }
+        .recordingEditSectionSurface()
+    }
+
+    private var locationSection: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Toggle(isOn: $includesLocation) {
+                Label("添加地理位置", systemImage: "location")
+                    .font(.redditSans(.subheadline, weight: .semibold))
+            }
+            .tint(AppTheme.brand)
+
+            if includesLocation {
+                RecordingEditLocationPreview(
+                    existingLocation: item.location,
+                    locationProvider: locationProvider
+                )
+            }
+        }
+        .recordingEditSectionSurface()
+    }
+}
+
+private struct RecordingMetadataTagsEditor: View {
+    @Binding var tags: [String]
+    @State private var newTag = ""
+
+    var body: some View {
+        List {
+            Section {
+                HStack(spacing: 8) {
+                    TextField("添加标签", text: $newTag)
+                        .textInputAutocapitalization(.never)
+                        .autocorrectionDisabled()
+
+                    Button {
+                        addTag()
+                    } label: {
+                        Image(systemName: "plus.circle.fill")
+                    }
+                    .disabled(normalizedTag.isEmpty)
+                }
+            }
+
+            Section {
+                if tags.isEmpty {
+                    Text("暂无标签")
+                        .foregroundStyle(.secondary)
+                } else {
+                    ForEach(tags, id: \.self) { tag in
+                        Text(tag)
+                    }
+                    .onDelete { offsets in
+                        tags.remove(atOffsets: offsets)
+                    }
+                }
+            }
+        }
+        .navigationTitle("标签")
+        .navigationBarTitleDisplayMode(.inline)
+    }
+
+    private var normalizedTag: String {
+        newTag.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    private func addTag() {
+        let tag = normalizedTag
+        guard !tag.isEmpty else {
+            return
+        }
+
+        if !tags.contains(where: { $0.compare(tag, options: [.caseInsensitive, .diacriticInsensitive]) == .orderedSame }) {
+            tags.append(tag)
+        }
+        newTag = ""
+        HapticFeedback.play(.primaryAction)
+    }
+}
+
+private struct RecordingEditLocationPreview: View {
+    let existingLocation: RecordingLocation?
+    @ObservedObject var locationProvider: RecordingEditLocationProvider
+
+    private var displayedLocation: RecordingLocation? {
+        locationProvider.recordingLocation ?? existingLocation
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            if let displayedLocation {
+                let coordinate = CLLocationCoordinate2D(
+                    latitude: displayedLocation.latitude,
+                    longitude: displayedLocation.longitude
+                )
+
+                Map(
+                    initialPosition: .region(
+                        MKCoordinateRegion(
+                            center: coordinate,
+                            span: MKCoordinateSpan(latitudeDelta: 0.01, longitudeDelta: 0.01)
+                        )
+                    )
+                ) {
+                    Marker(displayedLocation.placeName ?? String(localized: "当前位置"), coordinate: coordinate)
+                }
+                .frame(height: 150)
+                .clipShape(RoundedRectangle(cornerRadius: AppTheme.compactCornerRadius, style: .continuous))
+
+                Label {
+                    RecordingLocationNameText(location: displayedLocation)
+                } icon: {
+                    Image(systemName: "building.2")
+                }
+                .font(.redditSans(.caption, weight: .semibold))
+                .foregroundStyle(.primary)
+
+                HStack(spacing: 8) {
+                    Image(systemName: "mappin.and.ellipse")
+                    Text(displayedLocation.coordinateText)
+                        .monospacedDigit()
+                    Spacer()
+                    Button("更新当前位置") {
+                        locationProvider.requestLocation()
+                    }
+                    .font(.redditSans(.caption, weight: .semibold))
+                }
+                .font(.redditSans(.caption))
+                .foregroundStyle(.secondary)
+            } else if locationProvider.isDenied {
+                Label("位置权限被拒绝", systemImage: "location.slash")
+                    .font(.redditSans(.caption, weight: .semibold))
+                    .foregroundStyle(AppTheme.warning)
+            } else if let errorText = locationProvider.errorText {
+                Label(errorText, systemImage: "exclamationmark.triangle")
+                    .font(.redditSans(.caption))
+                    .foregroundStyle(AppTheme.warning)
+            } else {
+                HStack(spacing: 10) {
+                    ProgressView()
+                        .controlSize(.small)
+                    Text("正在获取位置")
+                        .font(.redditSans(.caption, weight: .semibold))
+                        .foregroundStyle(.secondary)
+                }
+                .task {
+                    locationProvider.requestLocation()
+                }
+            }
+        }
+    }
+}
+
+@MainActor
+private final class RecordingEditLocationProvider: NSObject, ObservableObject, CLLocationManagerDelegate {
+    @Published private(set) var authorizationStatus: CLAuthorizationStatus
+    @Published private(set) var latestLocation: CLLocation?
+    @Published private(set) var placeName: String?
+    @Published private(set) var errorText: String?
+
+    private let manager = CLLocationManager()
+    private var reverseGeocodingRequest: MKReverseGeocodingRequest?
+    private var city: String?
+    private var country: String?
+
+    override init() {
+        authorizationStatus = manager.authorizationStatus
+        super.init()
+        manager.delegate = self
+        manager.desiredAccuracy = kCLLocationAccuracyHundredMeters
+    }
+
+    var isDenied: Bool {
+        authorizationStatus == .denied || authorizationStatus == .restricted
+    }
+
+    var recordingLocation: RecordingLocation? {
+        guard let latestLocation else {
+            return nil
+        }
+
+        return RecordingLocation(
+            latitude: latestLocation.coordinate.latitude,
+            longitude: latestLocation.coordinate.longitude,
+            horizontalAccuracy: latestLocation.horizontalAccuracy >= 0 ? latestLocation.horizontalAccuracy : nil,
+            capturedAt: Date(),
+            city: city,
+            country: country
+        )
+    }
+
+    func reset() {
+        latestLocation = nil
+        placeName = nil
+        city = nil
+        country = nil
+        errorText = nil
+        reverseGeocodingRequest?.cancel()
+        reverseGeocodingRequest = nil
+    }
+
+    func requestLocation() {
+        errorText = nil
+        authorizationStatus = manager.authorizationStatus
+
+        switch authorizationStatus {
+        case .notDetermined:
+            manager.requestWhenInUseAuthorization()
+        case .authorizedAlways, .authorizedWhenInUse:
+            manager.requestLocation()
+        case .denied, .restricted:
+            errorText = String(localized: "位置权限被拒绝")
+        @unknown default:
+            errorText = String(localized: "无法获取位置")
+        }
+    }
+
+    nonisolated func locationManagerDidChangeAuthorization(_ manager: CLLocationManager) {
+        Task { @MainActor in
+            authorizationStatus = manager.authorizationStatus
+            if authorizationStatus == .authorizedWhenInUse || authorizationStatus == .authorizedAlways {
+                manager.requestLocation()
+            }
+        }
+    }
+
+    nonisolated func locationManager(_ manager: CLLocationManager, didUpdateLocations locations: [CLLocation]) {
+        Task { @MainActor in
+            guard let location = locations.last else {
+                return
+            }
+            latestLocation = location
+            errorText = nil
+            await resolvePlaceName(for: location)
+        }
+    }
+
+    nonisolated func locationManager(_ manager: CLLocationManager, didFailWithError error: Error) {
+        Task { @MainActor in
+            errorText = error.localizedDescription
+        }
+    }
+
+    private func resolvePlaceName(for location: CLLocation) async {
+        placeName = nil
+        city = nil
+        country = nil
+        reverseGeocodingRequest?.cancel()
+
+        do {
+            guard let request = MKReverseGeocodingRequest(location: location) else {
+                return
+            }
+            reverseGeocodingRequest = request
+            let mapItems = try await request.mapItems
+            let mapItem = mapItems.first
+            guard reverseGeocodingRequest === request else {
+                return
+            }
+
+            let address = mapItem?.addressRepresentations
+            let resolvedCity = address?.cityName
+                ?? address?.cityWithContext(.short)
+                ?? mapItem?.name
+            let resolvedCountry = address?.regionName
+            city = resolvedCity
+            country = resolvedCountry
+            placeName = [resolvedCity, resolvedCountry]
+                .compactMap { $0?.trimmingCharacters(in: .whitespacesAndNewlines) }
+                .filter { !$0.isEmpty }
+                .joined(separator: ", ")
+        } catch {
+            if reverseGeocodingRequest?.isCancelled != true {
+                placeName = nil
+            }
+        }
+    }
+}
+
+private extension View {
+    func recordingEditSectionSurface() -> some View {
+        self
+            .padding(14)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(AppTheme.cardBackground, in: RoundedRectangle(cornerRadius: AppTheme.cornerRadius, style: .continuous))
+            .overlay {
+                RoundedRectangle(cornerRadius: AppTheme.cornerRadius, style: .continuous)
+                    .stroke(AppTheme.cardBorder, lineWidth: 1)
+            }
     }
 }
 
@@ -1475,6 +2249,28 @@ private struct RecordingAudioFileInfo: Equatable, Sendable {
     }
 }
 
+private struct PlaybackRoundButton: View {
+    let systemImage: String
+    let title: LocalizedStringKey
+    var isPrimary = false
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            Image(systemName: systemImage)
+                .font(.system(size: isPrimary ? 22 : 18, weight: .semibold))
+                .frame(width: isPrimary ? 58 : 46, height: isPrimary ? 58 : 46)
+                .foregroundStyle(isPrimary ? .white : AppTheme.brand)
+                .background(
+                    isPrimary ? AppTheme.brand : AppTheme.brand.opacity(0.11),
+                    in: Circle()
+                )
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(title)
+    }
+}
+
 private struct RecordingAudioParameterRow: View {
     let icon: String
     let title: LocalizedStringKey
@@ -1631,13 +2427,16 @@ private final class RecordingPlaybackController: ObservableObject {
     @Published var currentTime: TimeInterval = 0
     @Published private(set) var duration: TimeInterval = 0
     @Published private(set) var errorText: String?
+    @Published private(set) var playbackRate: Float = 1
 
     private static let playbackGainDecibels: Float = 3
     private static let playbackUITickMilliseconds = 250
+    static let availablePlaybackRates: [Float] = [0.75, 1, 1.25, 1.5, 2]
 
     private let audioSessionQueue = DispatchQueue(label: "com.reddownloader.live-transcriber.playback-session", qos: .userInitiated)
     private var audioEngine: AVAudioEngine?
     private var playerNode: AVAudioPlayerNode?
+    private var timePitchUnit: AVAudioUnitTimePitch?
     private var gainUnit: AVAudioUnitEQ?
     private var audioFile: AVAudioFile?
     private var playbackTimerTask: Task<Void, Never>?
@@ -1678,6 +2477,13 @@ private final class RecordingPlaybackController: ObservableObject {
 
     func togglePlayback() {
         isPlaying ? pause() : play()
+    }
+
+    static func playbackRateLabel(_ rate: Float) -> String {
+        if rate == floor(rate) {
+            return "\(Int(rate))x"
+        }
+        return String(format: "%.2gx", rate)
     }
 
     func play() {
@@ -1723,11 +2529,32 @@ private final class RecordingPlaybackController: ObservableObject {
         }
     }
 
+    func skip(by seconds: TimeInterval) {
+        seek(to: currentPlaybackTime() + seconds)
+    }
+
+    func setPlaybackRate(_ rate: Float) {
+        let clampedRate = min(max(rate, 0.5), 3)
+        guard playbackRate != clampedRate else {
+            return
+        }
+
+        currentTime = currentPlaybackTime()
+        playbackRate = clampedRate
+        timePitchUnit?.rate = clampedRate
+
+        if isPlaying {
+            schedulePlayback(from: currentTime)
+            playerNode?.play()
+        }
+    }
+
     func unload() {
         playbackScheduleID += 1
         playerNode?.stop()
         audioEngine?.stop()
         playerNode = nil
+        timePitchUnit = nil
         gainUnit = nil
         audioEngine = nil
         audioFile = nil
@@ -1777,6 +2604,8 @@ private final class RecordingPlaybackController: ObservableObject {
     private func configurePlaybackEngine(format: AVAudioFormat) throws {
         let engine = AVAudioEngine()
         let node = AVAudioPlayerNode()
+        let timePitch = AVAudioUnitTimePitch()
+        timePitch.rate = playbackRate
         let equalizer = AVAudioUnitEQ(numberOfBands: 1)
         if let band = equalizer.bands.first {
             band.filterType = .parametric
@@ -1788,13 +2617,16 @@ private final class RecordingPlaybackController: ObservableObject {
         equalizer.globalGain = Self.playbackGainDecibels
 
         engine.attach(node)
+        engine.attach(timePitch)
         engine.attach(equalizer)
-        engine.connect(node, to: equalizer, format: format)
+        engine.connect(node, to: timePitch, format: format)
+        engine.connect(timePitch, to: equalizer, format: format)
         engine.connect(equalizer, to: engine.mainMixerNode, format: format)
         engine.prepare()
 
         audioEngine = engine
         playerNode = node
+        timePitchUnit = timePitch
         gainUnit = equalizer
     }
 

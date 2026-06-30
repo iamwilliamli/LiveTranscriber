@@ -43,30 +43,30 @@ This avoids excessive ActivityKit updates while still keeping the newest stable 
 
 The manager sends the suffix of the latest transcript lines, capped at 700 characters. The widget then trims again for each presentation:
 
-- Lock Screen: latest trailing lines, up to 3 lines and about 220 characters.
+- Lock Screen: latest trailing lines, up to 2 lines and about 220 characters.
 - Expanded Dynamic Island: latest trailing lines, up to 2 lines and about 130 characters.
 - Compact text helper: about 28 trailing characters.
 
 ## Lock Screen Layout
 
-The Lock Screen view prioritizes:
+The Lock Screen view uses compact metric blocks:
 
-- Recording state on the top-left with a red/green status dot.
-- Elapsed recording time on the top-right.
-- Latest transcript in the middle.
-- Language and line count in the footer.
-- Centered stop action in the footer while recording.
+- Top-left: status block with red/green status dot and current recording state.
+- Top-right: fixed-width time block with the live timer.
+- Middle: latest final transcript, capped to two lines.
+- Footer-left: language metric block.
+- Footer-right: segment count metric block and stop action while recording.
 
-The Lock Screen content uses compact padding, secondary-system background tint, Reddit Sans, monospaced timer digits, and a red foreground for the system action while recording.
+The Lock Screen content uses compact padding, secondary-system background tint, Reddit Sans, monospaced timer digits, and a red stop action while recording.
 
 ## Dynamic Island Layout
 
 Expanded Dynamic Island:
 
-- Leading: status dot and `Transcribe` label.
-- Trailing: elapsed time.
-- Bottom: status, latest transcript, language, and line count.
+- Leading: status metric block.
+- Trailing: fixed-width time metric block.
+- Bottom: latest final transcript, language metric, segment count metric, and stop action while recording.
 
-Compact and minimal presentations use a small status dot and compact elapsed time. The status dot ring is disabled in compact/minimal modes to avoid clipping.
+Compact and minimal presentations use a small status glyph and compact elapsed time. The status dot ring is disabled in compact/minimal modes to avoid clipping.
 
 Compact trailing is width-constrained for elapsed time. Expanded regions use leading/trailing horizontal padding from `LiveActivityLayout`.

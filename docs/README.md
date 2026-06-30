@@ -15,7 +15,7 @@ The app has three main runtime areas:
 
 1. `ContentView` owns the top-level tab shell and wires shared `LiveTranscriptionManager` and `RecordingStore` instances into the recording, library, and settings views.
 2. `LiveTranscriptionManager` owns the live recording session, AVCaptureSession Stereo Capture path, SpeechAnalyzer pipeline, transcript lines, elapsed timer, selected language/format, and Live Activity updates.
-3. `RecordingStore` owns saved recording metadata, iCloud Drive storage, local fallback storage, import transcription, re-transcription, normalization, deletion, search inputs, and Apple Intelligence analysis.
+3. `RecordingStore` owns saved recording metadata, app-private iCloud storage, local fallback storage, SwiftData/CloudKit private index sync, import transcription, re-transcription, normalization, deletion, search inputs, and Apple Intelligence analysis.
 4. `RecordingsView` owns the file-library UI: search, import picker, row actions, swipe actions, detail navigation, playback, transcript seek, sharing, copy, delete, re-transcribe, and summary/tag generation.
 5. `AppTheme`, `AppTypography`, `EmptyStateView`, and `HapticFeedback` define the shared visual and tactile design language.
 6. `LiveTranscriberWidget` renders ActivityKit content for Lock Screen and Dynamic Island.

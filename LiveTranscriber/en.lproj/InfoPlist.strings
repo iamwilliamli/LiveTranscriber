@@ -2,4 +2,5 @@
 "CFBundleName" = "Live Transcriber";
 "NSCameraUsageDescription" = "Live Transcriber does not use the camera. Apple's capture framework is used only for microphone recording.";
 "NSMicrophoneUsageDescription" = "Used to record audio for live transcription.";
+"NSLocationWhenInUseUsageDescription" = "Used only when you choose to attach a location to a saved recording.";
 "NSSpeechRecognitionUsageDescription" = "Used to turn recorded speech into live transcription text.";

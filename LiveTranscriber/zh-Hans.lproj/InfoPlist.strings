@@ -2,4 +2,5 @@
 "CFBundleName" = "实时转录";
 "NSCameraUsageDescription" = "Live Transcriber 不使用相机；录音功能仅使用 Apple 采集框架获取麦克风音频。";
 "NSMicrophoneUsageDescription" = "用于录音并实时转录文本。";
+"NSLocationWhenInUseUsageDescription" = "仅在你选择给录音添加地理位置时使用。";
 "NSSpeechRecognitionUsageDescription" = "用于把录到的语音实时转成文字。";

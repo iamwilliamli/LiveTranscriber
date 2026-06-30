@@ -59,6 +59,8 @@
 	<string>Live Transcriber does not use the camera. Apple's capture framework is used only for microphone recording. 不使用相机；录音功能仅使用 Apple 采集框架获取麦克风音频。</string>
 	<key>NSMicrophoneUsageDescription</key>
 	<string>Used to record audio for live transcription. 用于录音并实时转录文本。</string>
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>Used only when you choose to attach a location to a saved recording. 仅在你选择给录音添加地理位置时使用。</string>
 	<key>NSSpeechRecognitionUsageDescription</key>
 	<string>Used to turn recorded speech into live transcription text. 用于把录到的语音实时转成文字。</string>
 	<key>NSUbiquitousContainers</key>
@@ -66,7 +68,7 @@
 		<key>iCloud.com.iamwilliamli.LiveTranscriber</key>
 		<dict>
 			<key>NSUbiquitousContainerIsDocumentScopePublic</key>
-			<true/>
+			<false/>
 			<key>NSUbiquitousContainerName</key>
 			<string>Live Transcriber</string>
 			<key>NSUbiquitousContainerSupportedFolderLevels</key>

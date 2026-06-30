@@ -252,7 +252,13 @@ struct SettingsView: View {
 
                 SettingsStatusRow(
                     icon: "icloud",
-                    text: "文件默认保存在本机 app 容器；启用 iCloud Drive 时通过 Apple iCloud 同步。",
+                    text: "录音文件保存在 app 私有容器；启用 iCloud 时通过 app 私有 iCloud container 同步，不暴露到 iCloud Drive 文件夹。",
+                    tint: AppTheme.info
+                )
+
+                SettingsStatusRow(
+                    icon: "list.bullet.rectangle",
+                    text: "录音索引用 SwiftData 存储，并通过 CloudKit private database 同步到用户自己的 iCloud。",
                     tint: AppTheme.info
                 )
 
@@ -273,6 +279,12 @@ struct SettingsView: View {
                 SettingsStatusRow(
                     icon: "captions.bubble",
                     text: "语音识别权限只用于把用户选择的录音转成文本。",
+                    tint: AppTheme.brand
+                )
+
+                SettingsStatusRow(
+                    icon: "location",
+                    text: "位置权限只在保存录音时选择添加地理位置时使用。",
                     tint: AppTheme.brand
                 )
 

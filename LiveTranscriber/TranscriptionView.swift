@@ -1,16 +1,23 @@
+import CoreLocation
+import MapKit
 import SwiftUI
 
 struct TranscriptionView: View {
     @ObservedObject var transcriber: LiveTranscriptionManager
     @ObservedObject var recordingStore: RecordingStore
+    @Binding var externalPendingRecordingDraft: RecordingDraft?
     @State private var savedRecordingName: String?
-    @State private var completionDrop: RecordingCompletionDrop?
-    @State private var completionDropIsVisible = false
-    @State private var completionDropIsFlying = false
-    @State private var completionDropTask: Task<Void, Never>?
+    @State private var savedRecordingBannerIsVisible = false
+    @State private var savedRecordingBannerTask: Task<Void, Never>?
+    @StateObject private var locationProvider = RecordingLocationProvider()
+    @State private var pendingRecordingSave: PendingRecordingSave?
+    @State private var pendingRecordingName = ""
+    @State private var pendingRecordingTags: [String] = []
+    @State private var pendingRecordingIncludesLocation = false
+    @State private var isSavingPendingRecording = false
 
     private var isCompletingRecording: Bool {
-        completionDrop != nil
+        pendingRecordingSave != nil || isSavingPendingRecording
     }
 
     var body: some View {
@@ -21,11 +28,8 @@ struct TranscriptionView: View {
 
                 VStack(alignment: .leading, spacing: 14) {
                     recorderCard
-                        .scaleEffect(completionDropIsVisible ? 0.96 : 1, anchor: .top)
-                        .opacity(completionDropIsFlying ? 0.58 : 1)
 
                     transcriptCard
-                        .opacity(completionDropIsFlying ? 0.45 : 1)
                 }
                 .padding(.horizontal, 16)
                 .padding(.top, 12)
@@ -36,44 +40,76 @@ struct TranscriptionView: View {
                     .padding(.horizontal, 18)
                     .padding(.bottom, 12)
 
-                completionDropOverlay
+                savedRecordingBanner
+                    .padding(.top, 10)
+                    .padding(.horizontal, 20)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+                    .allowsHitTesting(false)
+                    .zIndex(20)
             }
             .toolbar(.hidden, for: .navigationBar)
             .animation(.snappy(duration: 0.22, extraBounce: 0.02), value: transcriber.isRecording)
             .animation(.snappy(duration: 0.2, extraBounce: 0.02), value: transcriber.isPaused)
-            .animation(.snappy(duration: 0.22, extraBounce: 0.02), value: completionDropIsVisible)
-            .animation(.smooth(duration: 0.58), value: completionDropIsFlying)
         }
         .task {
             await transcriber.refreshSupportedLanguages()
         }
+        .onAppear {
+            consumeExternalPendingRecordingDraftIfNeeded()
+        }
+        .onChange(of: externalPendingRecordingDraft?.audioURL) { _, _ in
+            consumeExternalPendingRecordingDraftIfNeeded()
+        }
+        .sheet(item: $pendingRecordingSave) { pendingSave in
+            RecordingSaveSheet(
+                draft: pendingSave.draft,
+                recordingName: $pendingRecordingName,
+                tags: $pendingRecordingTags,
+                includesLocation: $pendingRecordingIncludesLocation,
+                locationProvider: locationProvider,
+                isSaving: isSavingPendingRecording,
+                onSave: savePendingRecording,
+                onDiscard: discardPendingRecording
+            )
+            .interactiveDismissDisabled(true)
+            .presentationDetents([.medium, .large])
+            .presentationDragIndicator(.visible)
+            .onChange(of: pendingRecordingIncludesLocation) { _, includesLocation in
+                if includesLocation {
+                    locationProvider.requestLocation()
+                } else {
+                    locationProvider.reset()
+                }
+            }
+        }
     }
 
     @ViewBuilder
-    private var completionDropOverlay: some View {
-        GeometryReader { proxy in
-            if let completionDrop {
-                let targetY = max(proxy.size.height - 176, 180)
-                let expandedWidth = max(220, min(proxy.size.width - 48, 330))
+    private var savedRecordingBanner: some View {
+        if let savedRecordingName {
+            HStack(spacing: 10) {
+                Image(systemName: "checkmark.circle.fill")
+                    .font(.system(size: 17, weight: .semibold))
+                    .foregroundStyle(AppTheme.success)
 
-                VStack {
-                    RecordingCompletionDropCard(
-                        drop: completionDrop,
-                        isFlying: completionDropIsFlying
-                    )
-                    .frame(
-                        maxWidth: completionDropIsFlying ? 76 : expandedWidth
-                    )
-                    .scaleEffect(completionDropIsFlying ? 0.62 : 1)
-                    .opacity(completionDropIsVisible ? 1 : 0)
-                    .offset(y: completionDropIsFlying ? targetY : 104)
-                    .shadow(color: Color.black.opacity(completionDropIsFlying ? 0.12 : 0.18), radius: completionDropIsFlying ? 10 : 20, y: completionDropIsFlying ? 4 : 10)
-                }
-                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+                Text(String(format: String(localized: "已保存: %@"), savedRecordingName))
+                    .font(.redditSans(.caption, weight: .semibold))
+                    .foregroundStyle(.primary)
+                    .lineLimit(1)
+                    .truncationMode(.middle)
             }
+            .padding(.horizontal, 14)
+            .frame(height: 42)
+            .frame(maxWidth: 340)
+            .background(.ultraThinMaterial, in: Capsule())
+            .overlay {
+                Capsule()
+                    .stroke(AppTheme.success.opacity(0.22), lineWidth: 1)
+            }
+            .shadow(color: Color.black.opacity(0.12), radius: 14, y: 6)
+            .offset(y: savedRecordingBannerIsVisible ? 0 : -74)
+            .opacity(savedRecordingBannerIsVisible ? 1 : 0)
         }
-        .allowsHitTesting(false)
-        .zIndex(10)
     }
 
     private var recorderCard: some View {
@@ -127,14 +163,6 @@ struct TranscriptionView: View {
                 )
 
                 Spacer(minLength: 0)
-            }
-
-            if let savedRecordingName {
-                Label(String(format: String(localized: "已保存: %@"), savedRecordingName), systemImage: "checkmark.circle.fill")
-                    .font(.redditSans(.caption))
-                    .foregroundStyle(AppTheme.success)
-                    .lineLimit(2)
-                    .fixedSize(horizontal: false, vertical: true)
             }
 
             if let errorText = transcriber.errorText {
@@ -237,7 +265,7 @@ struct TranscriptionView: View {
             return
         }
         HapticFeedback.play(.recordingStart)
-        savedRecordingName = nil
+        hideSavedRecordingBanner()
         Task {
             await transcriber.startRecording()
         }
@@ -257,62 +285,108 @@ struct TranscriptionView: View {
     private func stopRecording() {
         HapticFeedback.play(.recordingStop)
         Task {
-            if let draft = await transcriber.stopRecording(),
-               let saved = await recordingStore.save(draft) {
-                savedRecordingName = saved.audioFileName
-                HapticFeedback.play(.recordingSaved)
-                beginCompletionDrop(for: saved)
+            if let draft = await transcriber.stopRecording() {
+                presentSaveSheet(for: draft)
             } else {
                 HapticFeedback.play(.warning)
             }
         }
     }
 
-    private func beginCompletionDrop(for item: RecordingItem) {
-        completionDropTask?.cancel()
-        completionDrop = RecordingCompletionDrop(
-            fileName: item.audioFileName,
-            durationText: formatDuration(item.durationSeconds),
-            lineCount: item.lineCount
-        )
-        completionDropIsVisible = false
-        completionDropIsFlying = false
+    private func presentSaveSheet(for draft: RecordingDraft) {
+        pendingRecordingName = RecordingStore.defaultBaseName(for: draft.startedAt)
+        pendingRecordingTags = []
+        pendingRecordingIncludesLocation = false
+        locationProvider.reset()
+        pendingRecordingSave = PendingRecordingSave(draft: draft)
+    }
 
-        withAnimation(.snappy(duration: 0.2, extraBounce: 0.04)) {
-            completionDropIsVisible = true
+    private func consumeExternalPendingRecordingDraftIfNeeded() {
+        guard let draft = externalPendingRecordingDraft else {
+            return
         }
 
-        completionDropTask = Task { @MainActor in
-            try? await Task.sleep(for: .milliseconds(260))
+        presentSaveSheet(for: draft)
+        externalPendingRecordingDraft = nil
+    }
+
+    private func savePendingRecording() {
+        guard let pendingRecordingSave,
+              !isSavingPendingRecording else {
+            return
+        }
+
+        isSavingPendingRecording = true
+        Task {
+            let location = pendingRecordingIncludesLocation ? locationProvider.recordingLocation : nil
+            if let saved = await recordingStore.save(
+                pendingRecordingSave.draft,
+                preferredName: pendingRecordingName,
+                manualTags: pendingRecordingTags,
+                location: location
+            ) {
+                showSavedRecordingBanner(fileName: saved.audioFileName)
+                transcriber.clearTranscript()
+                self.pendingRecordingSave = nil
+                HapticFeedback.play(.recordingSaved)
+            } else {
+                HapticFeedback.play(.failure)
+            }
+            isSavingPendingRecording = false
+        }
+    }
+
+    private func discardPendingRecording() {
+        guard !isSavingPendingRecording else {
+            return
+        }
+        if let audioURL = pendingRecordingSave?.draft.audioURL {
+            try? FileManager.default.removeItem(at: audioURL)
+        }
+        pendingRecordingSave = nil
+        pendingRecordingName = ""
+        pendingRecordingTags = []
+        pendingRecordingIncludesLocation = false
+        locationProvider.reset()
+        transcriber.clearTranscript()
+        HapticFeedback.play(.deleteConfirmed)
+    }
+
+    private func showSavedRecordingBanner(fileName: String) {
+        savedRecordingBannerTask?.cancel()
+        savedRecordingName = fileName
+
+        withAnimation(.snappy(duration: 0.28, extraBounce: 0.06)) {
+            savedRecordingBannerIsVisible = true
+        }
+
+        savedRecordingBannerTask = Task { @MainActor in
+            try? await Task.sleep(for: .seconds(3))
             guard !Task.isCancelled else {
                 return
             }
 
-            withAnimation(.smooth(duration: 0.72)) {
-                completionDropIsFlying = true
+            withAnimation(.snappy(duration: 0.28, extraBounce: 0)) {
+                savedRecordingBannerIsVisible = false
             }
 
-            try? await Task.sleep(for: .milliseconds(720))
+            try? await Task.sleep(for: .milliseconds(320))
             guard !Task.isCancelled else {
                 return
             }
 
-            transcriber.clearTranscript()
             savedRecordingName = nil
-
-            withAnimation(.snappy(duration: 0.2, extraBounce: 0)) {
-                completionDropIsVisible = false
-            }
-
-            try? await Task.sleep(for: .milliseconds(220))
-            guard !Task.isCancelled else {
-                return
-            }
-
-            completionDrop = nil
-            completionDropIsFlying = false
-            completionDropTask = nil
+            savedRecordingBannerTask = nil
         }
+    }
+
+    private func hideSavedRecordingBanner() {
+        savedRecordingBannerTask?.cancel()
+        savedRecordingBannerTask = nil
+        withAnimation(.snappy(duration: 0.18, extraBounce: 0)) {
+            savedRecordingBannerIsVisible = false
+        }
+        savedRecordingName = nil
     }
 
     private var transcriptCard: some View {
@@ -365,66 +439,381 @@ struct TranscriptionView: View {
     }
 }
 
-private struct RecordingCompletionDrop: Identifiable {
+private struct PendingRecordingSave: Identifiable {
     let id = UUID()
-    let fileName: String
-    let durationText: String
-    let lineCount: Int
+    let draft: RecordingDraft
 }
 
-private struct RecordingCompletionDropCard: View {
-    let drop: RecordingCompletionDrop
-    let isFlying: Bool
+private struct RecordingSaveSheet: View {
+    let draft: RecordingDraft
+    @Binding var recordingName: String
+    @Binding var tags: [String]
+    @Binding var includesLocation: Bool
+    @ObservedObject var locationProvider: RecordingLocationProvider
+    let isSaving: Bool
+    let onSave: () -> Void
+    let onDiscard: () -> Void
 
     var body: some View {
-        HStack(spacing: isFlying ? 0 : 12) {
-            ZStack {
-                RoundedRectangle(cornerRadius: isFlying ? 18 : AppTheme.compactCornerRadius, style: .continuous)
-                    .fill(AppTheme.success.opacity(0.14))
-
-                Image(systemName: "waveform.badge.checkmark")
-                    .font(.system(size: isFlying ? 20 : 22, weight: .semibold))
-                    .foregroundStyle(AppTheme.success)
-            }
-            .frame(width: isFlying ? 42 : 48, height: isFlying ? 42 : 48)
-
-            if !isFlying {
-                VStack(alignment: .leading, spacing: 5) {
-                    Text("已保存到录音文件")
-                        .font(.redditSans(.caption2, weight: .bold))
-                        .foregroundStyle(AppTheme.success)
-                        .lineLimit(1)
-
-                    Text(drop.fileName)
-                        .font(.redditSans(.subheadline, weight: .semibold))
-                        .foregroundStyle(.primary)
-                        .lineLimit(1)
-                        .truncationMode(.middle)
-
-                    HStack(spacing: 8) {
-                        Label(drop.durationText, systemImage: "clock")
-                        Label("\(drop.lineCount)", systemImage: "text.alignleft")
-                    }
-                    .font(.redditSans(.caption2, weight: .semibold).monospacedDigit())
-                    .foregroundStyle(.secondary)
-                    .lineLimit(1)
+        NavigationStack {
+            ScrollView {
+                VStack(alignment: .leading, spacing: 14) {
+                    nameSection
+                    tagsEntry
+                    durationRow
+                    locationSection
                 }
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .transition(.opacity.combined(with: .scale(scale: 0.96, anchor: .leading)))
+                .padding(16)
+            }
+            .background(AppTheme.groupedBackground.ignoresSafeArea())
+            .navigationTitle("保存录音")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .topBarLeading) {
+                    Button("丢弃", role: .destructive) {
+                        onDiscard()
+                    }
+                    .disabled(isSaving)
+                }
 
-                Image(systemName: "folder.fill")
-                    .font(.system(size: 18, weight: .semibold))
-                    .foregroundStyle(AppTheme.info)
-                    .transition(.opacity)
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button {
+                        onSave()
+                    } label: {
+                        if isSaving {
+                            ProgressView()
+                                .controlSize(.small)
+                        } else {
+                            Text("保存")
+                                .font(.redditSans(.subheadline, weight: .semibold))
+                        }
+                    }
+                    .disabled(isSaving || recordingName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                }
             }
         }
-        .padding(.horizontal, isFlying ? 6 : 12)
-        .frame(height: isFlying ? 54 : 76)
-        .frame(maxWidth: .infinity)
-        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: isFlying ? 28 : AppTheme.cornerRadius, style: .continuous))
+    }
+
+    private var nameSection: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Label("录音名称", systemImage: "pencil")
+                .font(.redditSans(.caption, weight: .semibold))
+                .foregroundStyle(.secondary)
+
+            TextField("录音名称", text: $recordingName)
+                .font(.redditSans(.headline, weight: .semibold))
+                .textInputAutocapitalization(.never)
+                .autocorrectionDisabled()
+                .padding(.horizontal, 12)
+                .frame(height: 48)
+                .background(AppTheme.elevatedBackground, in: RoundedRectangle(cornerRadius: AppTheme.compactCornerRadius, style: .continuous))
+        }
+        .recordingSaveSectionSurface()
+    }
+
+    private var tagsEntry: some View {
+        NavigationLink {
+            RecordingTagsEditor(tags: $tags)
+        } label: {
+            HStack(spacing: 12) {
+                Label("标签", systemImage: "tag")
+                    .font(.redditSans(.subheadline, weight: .semibold))
+                    .foregroundStyle(.primary)
+
+                Spacer()
+
+                Text(tags.isEmpty ? String(localized: "未添加") : "\(tags.count)")
+                    .font(.redditSans(.caption, weight: .semibold))
+                    .foregroundStyle(.secondary)
+
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundStyle(.tertiary)
+            }
+        }
+        .buttonStyle(.plain)
+        .recordingSaveSectionSurface()
+    }
+
+    private var durationRow: some View {
+        HStack(spacing: 12) {
+            Label("音频时长", systemImage: "clock")
+                .font(.redditSans(.subheadline, weight: .semibold))
+            Spacer()
+            Text(TranscriptionLine.formatTimestamp(Double(draft.durationSeconds)))
+                .font(.redditSans(.subheadline, weight: .semibold).monospacedDigit())
+                .foregroundStyle(.secondary)
+        }
+        .recordingSaveSectionSurface()
+    }
+
+    private var locationSection: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Toggle(isOn: $includesLocation) {
+                Label("添加地理位置", systemImage: "location")
+                    .font(.redditSans(.subheadline, weight: .semibold))
+            }
+            .tint(AppTheme.brand)
+
+            if includesLocation {
+                RecordingLocationPreview(locationProvider: locationProvider)
+            }
+        }
+        .recordingSaveSectionSurface()
+    }
+}
+
+private struct RecordingTagsEditor: View {
+    @Binding var tags: [String]
+    @State private var newTag = ""
+
+    var body: some View {
+        List {
+            Section {
+                HStack(spacing: 8) {
+                    TextField("添加标签", text: $newTag)
+                        .textInputAutocapitalization(.never)
+                        .autocorrectionDisabled()
+
+                    Button {
+                        addTag()
+                    } label: {
+                        Image(systemName: "plus.circle.fill")
+                    }
+                    .disabled(normalizedTag.isEmpty)
+                }
+            }
+
+            Section {
+                if tags.isEmpty {
+                    Text("暂无标签")
+                        .foregroundStyle(.secondary)
+                } else {
+                    ForEach(tags, id: \.self) { tag in
+                        Text(tag)
+                    }
+                    .onDelete { offsets in
+                        tags.remove(atOffsets: offsets)
+                    }
+                }
+            }
+        }
+        .navigationTitle("标签")
+        .navigationBarTitleDisplayMode(.inline)
+    }
+
+    private var normalizedTag: String {
+        newTag.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    private func addTag() {
+        let tag = normalizedTag
+        guard !tag.isEmpty else {
+            return
+        }
+
+        if !tags.contains(where: { $0.compare(tag, options: [.caseInsensitive, .diacriticInsensitive]) == .orderedSame }) {
+            tags.append(tag)
+        }
+        newTag = ""
+        HapticFeedback.play(.primaryAction)
+    }
+}
+
+private struct RecordingLocationPreview: View {
+    @ObservedObject var locationProvider: RecordingLocationProvider
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            if let location = locationProvider.latestLocation {
+                let coordinate = location.coordinate
+                Map(
+                    initialPosition: .region(
+                        MKCoordinateRegion(
+                            center: coordinate,
+                            span: MKCoordinateSpan(latitudeDelta: 0.01, longitudeDelta: 0.01)
+                        )
+                    )
+                ) {
+                    Marker("当前位置", coordinate: coordinate)
+                }
+                .frame(height: 150)
+                .clipShape(RoundedRectangle(cornerRadius: AppTheme.compactCornerRadius, style: .continuous))
+
+                if let placeName = locationProvider.placeName, !placeName.isEmpty {
+                    Label(placeName, systemImage: "building.2")
+                        .font(.redditSans(.caption, weight: .semibold))
+                        .foregroundStyle(.primary)
+                }
+
+                HStack(spacing: 8) {
+                    Image(systemName: "mappin.and.ellipse")
+                    Text("\(coordinate.latitude.formatted(.number.precision(.fractionLength(5)))), \(coordinate.longitude.formatted(.number.precision(.fractionLength(5))))")
+                        .monospacedDigit()
+                    Spacer()
+                    if location.horizontalAccuracy >= 0 {
+                        Text("±\(Int(location.horizontalAccuracy.rounded()))m")
+                            .monospacedDigit()
+                    }
+                }
+                .font(.redditSans(.caption))
+                .foregroundStyle(.secondary)
+            } else if locationProvider.isDenied {
+                Label("位置权限被拒绝", systemImage: "location.slash")
+                    .font(.redditSans(.caption, weight: .semibold))
+                    .foregroundStyle(AppTheme.warning)
+            } else if let errorText = locationProvider.errorText {
+                Label(errorText, systemImage: "exclamationmark.triangle")
+                    .font(.redditSans(.caption))
+                    .foregroundStyle(AppTheme.warning)
+            } else {
+                HStack(spacing: 10) {
+                    ProgressView()
+                        .controlSize(.small)
+                    Text("正在获取位置")
+                        .font(.redditSans(.caption, weight: .semibold))
+                        .foregroundStyle(.secondary)
+                }
+            }
+        }
+    }
+}
+
+@MainActor
+private final class RecordingLocationProvider: NSObject, ObservableObject, CLLocationManagerDelegate {
+    @Published private(set) var authorizationStatus: CLAuthorizationStatus
+    @Published private(set) var latestLocation: CLLocation?
+    @Published private(set) var placeName: String?
+    @Published private(set) var errorText: String?
+
+    private let manager = CLLocationManager()
+    private var reverseGeocodingRequest: MKReverseGeocodingRequest?
+    private var city: String?
+    private var country: String?
+
+    override init() {
+        authorizationStatus = manager.authorizationStatus
+        super.init()
+        manager.delegate = self
+        manager.desiredAccuracy = kCLLocationAccuracyHundredMeters
+    }
+
+    var isDenied: Bool {
+        authorizationStatus == .denied || authorizationStatus == .restricted
+    }
+
+    var recordingLocation: RecordingLocation? {
+        guard let latestLocation else {
+            return nil
+        }
+
+        return RecordingLocation(
+            latitude: latestLocation.coordinate.latitude,
+            longitude: latestLocation.coordinate.longitude,
+            horizontalAccuracy: latestLocation.horizontalAccuracy >= 0 ? latestLocation.horizontalAccuracy : nil,
+            capturedAt: Date(),
+            city: city,
+            country: country
+        )
+    }
+
+    func reset() {
+        latestLocation = nil
+        placeName = nil
+        city = nil
+        country = nil
+        errorText = nil
+        reverseGeocodingRequest?.cancel()
+        reverseGeocodingRequest = nil
+    }
+
+    func requestLocation() {
+        errorText = nil
+        authorizationStatus = manager.authorizationStatus
+
+        switch authorizationStatus {
+        case .notDetermined:
+            manager.requestWhenInUseAuthorization()
+        case .authorizedAlways, .authorizedWhenInUse:
+            manager.requestLocation()
+        case .denied, .restricted:
+            errorText = String(localized: "位置权限被拒绝")
+        @unknown default:
+            errorText = String(localized: "无法获取位置")
+        }
+    }
+
+    nonisolated func locationManagerDidChangeAuthorization(_ manager: CLLocationManager) {
+        Task { @MainActor in
+            authorizationStatus = manager.authorizationStatus
+            if authorizationStatus == .authorizedWhenInUse || authorizationStatus == .authorizedAlways {
+                manager.requestLocation()
+            }
+        }
+    }
+
+    nonisolated func locationManager(_ manager: CLLocationManager, didUpdateLocations locations: [CLLocation]) {
+        Task { @MainActor in
+            guard let location = locations.last else {
+                return
+            }
+            latestLocation = location
+            errorText = nil
+            await resolvePlaceName(for: location)
+        }
+    }
+
+    nonisolated func locationManager(_ manager: CLLocationManager, didFailWithError error: Error) {
+        Task { @MainActor in
+            errorText = error.localizedDescription
+        }
+    }
+
+    private func resolvePlaceName(for location: CLLocation) async {
+        placeName = nil
+        city = nil
+        country = nil
+        reverseGeocodingRequest?.cancel()
+
+        do {
+            guard let request = MKReverseGeocodingRequest(location: location) else {
+                return
+            }
+            reverseGeocodingRequest = request
+            let mapItems = try await request.mapItems
+            let mapItem = mapItems.first
+            guard reverseGeocodingRequest === request else {
+                return
+            }
+
+            let address = mapItem?.addressRepresentations
+            let resolvedCity = address?.cityName
+                ?? address?.cityWithContext(.short)
+                ?? mapItem?.name
+            let resolvedCountry = address?.regionName
+            city = resolvedCity
+            country = resolvedCountry
+            placeName = [resolvedCity, resolvedCountry]
+                .compactMap { $0?.trimmingCharacters(in: .whitespacesAndNewlines) }
+                .filter { !$0.isEmpty }
+                .joined(separator: ", ")
+        } catch {
+            if reverseGeocodingRequest?.isCancelled != true {
+                placeName = nil
+            }
+        }
+    }
+}
+
+private extension View {
+    func recordingSaveSectionSurface() -> some View {
+        self
+            .padding(14)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(AppTheme.cardBackground, in: RoundedRectangle(cornerRadius: AppTheme.cornerRadius, style: .continuous))
         .overlay {
-            RoundedRectangle(cornerRadius: isFlying ? 28 : AppTheme.cornerRadius, style: .continuous)
-                .stroke(.white.opacity(0.28), lineWidth: 1)
+            RoundedRectangle(cornerRadius: AppTheme.cornerRadius, style: .continuous)
+                .stroke(AppTheme.cardBorder, lineWidth: 1)
         }
     }
 }
@@ -558,7 +947,8 @@ private extension View {
 #Preview("Transcription") {
     TranscriptionView(
         transcriber: LiveTranscriptionManager(),
-        recordingStore: RecordingStore()
+        recordingStore: RecordingStore(),
+        externalPendingRecordingDraft: .constant(nil)
     )
     .font(.redditSans(.body))
     .tint(AppTheme.brand)

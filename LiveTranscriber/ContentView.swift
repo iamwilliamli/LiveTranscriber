@@ -6,10 +6,15 @@ struct ContentView: View {
     @StateObject private var recordingStore = RecordingStore()
     @State private var selectedTab: AppTab = .transcribe
     @State private var incomingRecordingImportURL: URL?
+    @State private var pendingRecordingDraftFromLiveActivity: RecordingDraft?
 
     var body: some View {
-        TabView(selection: $selectedTab) {
-            TranscriptionView(transcriber: transcriber, recordingStore: recordingStore)
+        TabView(selection: tabSelection) {
+            TranscriptionView(
+                transcriber: transcriber,
+                recordingStore: recordingStore,
+                externalPendingRecordingDraft: $pendingRecordingDraftFromLiveActivity
+            )
                 .tabItem {
                     Label("转录", systemImage: "waveform.and.mic")
                 }
@@ -47,7 +52,24 @@ struct ContentView: View {
         }
     }
 
+    private var tabSelection: Binding<AppTab> {
+        Binding {
+            selectedTab
+        } set: { newTab in
+            guard newTab != selectedTab else {
+                return
+            }
+
+            selectedTab = newTab
+            HapticFeedback.play(.tabSelection)
+        }
+    }
+
     private func handleOpenedURL(_ url: URL) {
+        if handleAppRouteURL(url) {
+            return
+        }
+
         if handleLiveActivityURL(url) {
             return
         }
@@ -62,6 +84,54 @@ struct ContentView: View {
     }
 
     @discardableResult
+    private func handleAppRouteURL(_ url: URL) -> Bool {
+        guard url.scheme == "livetranscriber",
+              let host = url.host else {
+            return false
+        }
+
+        switch host {
+        case "record", "transcribe":
+            selectedTab = .transcribe
+            if shouldStartRecording(from: url) {
+                startRecordingFromDeepLink()
+                return true
+            }
+        case "recordings", "files":
+            selectedTab = .recordings
+        case "settings":
+            selectedTab = .settings
+        default:
+            return false
+        }
+
+        HapticFeedback.play(.menuSelection)
+        return true
+    }
+
+    private func shouldStartRecording(from url: URL) -> Bool {
+        guard let components = URLComponents(url: url, resolvingAgainstBaseURL: false) else {
+            return false
+        }
+
+        return components.queryItems?.contains { item in
+            item.name == "start" && item.value != "0"
+        } ?? false
+    }
+
+    private func startRecordingFromDeepLink() {
+        guard !transcriber.isRecording, !transcriber.isPreparing else {
+            HapticFeedback.play(.menuSelection)
+            return
+        }
+
+        HapticFeedback.play(.recordingStart)
+        Task {
+            await transcriber.startRecording()
+        }
+    }
+
+    @discardableResult
     private func handleLiveActivityURL(_ url: URL) -> Bool {
         guard url.scheme == "livetranscriber",
               url.host == "stop-recording" else {
@@ -70,11 +140,11 @@ struct ContentView: View {
 
         Task {
             HapticFeedback.play(.recordingStop)
-            if let draft = await transcriber.stopRecording(),
-               await recordingStore.save(draft) != nil {
-                HapticFeedback.play(.recordingSaved)
-                await recordingStore.reload()
-                transcriber.clearTranscript()
+            if let draft = await transcriber.stopRecording() {
+                selectedTab = .transcribe
+                pendingRecordingDraftFromLiveActivity = draft
+            } else {
+                HapticFeedback.play(.warning)
             }
         }
         return true

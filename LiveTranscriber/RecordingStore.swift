@@ -4,6 +4,7 @@ import Foundation
 import FoundationModels
 import Speech
 import OSLog
+import SwiftData
 
 struct RecordingDraft {
     var audioURL: URL
@@ -30,6 +31,53 @@ struct RecordingItem: Identifiable, Codable, Hashable {
     var audioNormalizedAt: Date?
     var audioNormalizationVersion: Int?
     var importStatus: RecordingImportStatus?
+    var manualTags: [String]?
+    var location: RecordingLocation?
+
+    var combinedTags: [String] {
+        Self.mergedTags(manualTags ?? [], intelligence?.tags ?? [])
+    }
+
+    static func mergedTags(_ primaryTags: [String], _ secondaryTags: [String]) -> [String] {
+        var normalizedTags = Set<String>()
+        var mergedTags: [String] = []
+
+        for tag in primaryTags + secondaryTags {
+            let trimmedTag = tag.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !trimmedTag.isEmpty else {
+                continue
+            }
+
+            let normalizedTag = trimmedTag.folding(
+                options: [.caseInsensitive, .diacriticInsensitive, .widthInsensitive],
+                locale: .current
+            )
+            guard !normalizedTags.contains(normalizedTag) else {
+                continue
+            }
+
+            normalizedTags.insert(normalizedTag)
+            mergedTags.append(trimmedTag)
+        }
+
+        return mergedTags
+    }
+}
+
+struct RecordingLocation: Codable, Hashable {
+    var latitude: Double
+    var longitude: Double
+    var horizontalAccuracy: Double?
+    var capturedAt: Date
+    var city: String?
+    var country: String?
+
+    var placeName: String? {
+        let parts = [city, country]
+            .compactMap { $0?.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .filter { !$0.isEmpty }
+        return parts.isEmpty ? nil : parts.joined(separator: ", ")
+    }
 }
 
 struct RecordingIntelligence: Codable, Hashable {
@@ -109,6 +157,160 @@ struct RecordingImportStatus: Codable, Hashable {
     var isFailed: Bool
 }
 
+@Model
+final class RecordingIndexRecord {
+    var idString: String = UUID().uuidString
+    var createdAt: Date = Date()
+    var durationSeconds: Int = 0
+    var languageID: String = ""
+    var languageName: String = ""
+    var audioFileName: String = ""
+    var transcriptFileName: String = ""
+    var transcriptPreview: String = ""
+    var lineCount: Int = 0
+    var intelligenceSummary: String?
+    var intelligenceTagsJSON: String?
+    var intelligenceGeneratedAt: Date?
+    var audioNormalizedAt: Date?
+    var audioNormalizationVersion: Int?
+    var importStatusProgress: Double?
+    var importStatusMessage: String?
+    var importStatusIsFailed: Bool = false
+    var manualTagsJSON: String?
+    var locationLatitude: Double?
+    var locationLongitude: Double?
+    var locationHorizontalAccuracy: Double?
+    var locationCapturedAt: Date?
+    var locationCity: String?
+    var locationCountry: String?
+
+    init(item: RecordingItem) {
+        apply(item)
+    }
+
+    func apply(_ item: RecordingItem) {
+        idString = item.id.uuidString
+        createdAt = item.createdAt
+        durationSeconds = item.durationSeconds
+        languageID = item.languageID
+        languageName = item.languageName
+        audioFileName = item.audioFileName
+        transcriptFileName = item.transcriptFileName
+        transcriptPreview = item.transcriptPreview
+        lineCount = item.lineCount
+
+        if let intelligence = item.intelligence {
+            intelligenceSummary = intelligence.summary
+            intelligenceTagsJSON = Self.encodeTags(intelligence.tags)
+            intelligenceGeneratedAt = intelligence.generatedAt
+        } else {
+            intelligenceSummary = nil
+            intelligenceTagsJSON = nil
+            intelligenceGeneratedAt = nil
+        }
+
+        audioNormalizedAt = item.audioNormalizedAt
+        audioNormalizationVersion = item.audioNormalizationVersion
+
+        if let importStatus = item.importStatus {
+            importStatusProgress = importStatus.progress
+            importStatusMessage = importStatus.message
+            importStatusIsFailed = importStatus.isFailed
+        } else {
+            importStatusProgress = nil
+            importStatusMessage = nil
+            importStatusIsFailed = false
+        }
+
+        manualTagsJSON = Self.encodeTags(item.manualTags ?? [])
+        locationLatitude = item.location?.latitude
+        locationLongitude = item.location?.longitude
+        locationHorizontalAccuracy = item.location?.horizontalAccuracy
+        locationCapturedAt = item.location?.capturedAt
+        locationCity = item.location?.city
+        locationCountry = item.location?.country
+    }
+
+    var item: RecordingItem {
+        RecordingItem(
+            id: UUID(uuidString: idString) ?? UUID(),
+            createdAt: createdAt,
+            durationSeconds: durationSeconds,
+            languageID: languageID,
+            languageName: languageName,
+            audioFileName: audioFileName,
+            transcriptFileName: transcriptFileName,
+            transcriptPreview: transcriptPreview,
+            lineCount: lineCount,
+            intelligence: intelligence,
+            audioNormalizedAt: audioNormalizedAt,
+            audioNormalizationVersion: audioNormalizationVersion,
+            importStatus: importStatus,
+            manualTags: Self.decodeTags(manualTagsJSON),
+            location: location
+        )
+    }
+
+    private var location: RecordingLocation? {
+        guard let locationLatitude,
+              let locationLongitude,
+              let locationCapturedAt else {
+            return nil
+        }
+
+        return RecordingLocation(
+            latitude: locationLatitude,
+            longitude: locationLongitude,
+            horizontalAccuracy: locationHorizontalAccuracy,
+            capturedAt: locationCapturedAt,
+            city: locationCity,
+            country: locationCountry
+        )
+    }
+
+    private var intelligence: RecordingIntelligence? {
+        guard let intelligenceSummary,
+              let intelligenceGeneratedAt else {
+            return nil
+        }
+
+        return RecordingIntelligence(
+            summary: intelligenceSummary,
+            tags: Self.decodeTags(intelligenceTagsJSON),
+            generatedAt: intelligenceGeneratedAt
+        )
+    }
+
+    private var importStatus: RecordingImportStatus? {
+        guard let importStatusProgress,
+              let importStatusMessage else {
+            return nil
+        }
+
+        return RecordingImportStatus(
+            progress: importStatusProgress,
+            message: importStatusMessage,
+            isFailed: importStatusIsFailed
+        )
+    }
+
+    private static func encodeTags(_ tags: [String]) -> String? {
+        guard let data = try? JSONEncoder().encode(tags) else {
+            return nil
+        }
+        return String(data: data, encoding: .utf8)
+    }
+
+    private static func decodeTags(_ json: String?) -> [String] {
+        guard let json,
+              let data = json.data(using: .utf8),
+              let tags = try? JSONDecoder().decode([String].self, from: data) else {
+            return []
+        }
+        return tags
+    }
+}
+
 @MainActor
 final class RecordingStore: ObservableObject {
     @Published private(set) var recordings: [RecordingItem] = []
@@ -117,9 +319,11 @@ final class RecordingStore: ObservableObject {
     private static let logger = Logger(subsystem: "com.reddownloader.LiveTranscriber", category: "RecordingStore")
 
     private static let iCloudContainerIdentifier = "iCloud.com.iamwilliamli.LiveTranscriber"
+    private static let swiftDataStoreName = "RecordingIndex"
     private static let audioFileExtensions: Set<String> = ["wav", "m4a", "mp3", "aac", "aif", "aiff", "caf"]
 
     private let fileManager = FileManager.default
+    private let modelContainer: ModelContainer?
     private let encoder: JSONEncoder = {
         let encoder = JSONEncoder()
         encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
@@ -131,6 +335,8 @@ final class RecordingStore: ObservableObject {
         decoder.dateDecodingStrategy = .iso8601
         return decoder
     }()
+    private var searchIndexCache: [RecordingItem.ID: RecordingSearchIndexCacheEntry] = [:]
+    private var searchIndexWarmupTask: Task<Void, Never>?
 
     private var localRecordingsDirectory: URL {
         let documents = fileManager.urls(for: .documentDirectory, in: .userDomainMask)[0]
@@ -142,6 +348,12 @@ final class RecordingStore: ObservableObject {
     private var iCloudRecordingsDirectory: URL? {
         fileManager
             .url(forUbiquityContainerIdentifier: Self.iCloudContainerIdentifier)?
+            .appendingPathComponent("Recordings", isDirectory: true)
+    }
+
+    private var legacyICloudRecordingsDirectory: URL? {
+        fileManager
+            .url(forUbiquityContainerIdentifier: Self.iCloudContainerIdentifier)?
             .appendingPathComponent("Documents/Recordings", isDirectory: true)
     }
 
@@ -150,11 +362,45 @@ final class RecordingStore: ObservableObject {
     }
 
     var storageDisplayName: String {
-        iCloudRecordingsDirectory == nil ? String(localized: "本机存储") : "iCloud Drive"
+        iCloudRecordingsDirectory == nil ? String(localized: "本机存储") : String(localized: "iCloud 私有容器")
     }
 
-    private var indexURL: URL {
-        recordingsDirectory.appendingPathComponent("recordings.json")
+    private var legacyIndexURLs: [URL] {
+        [
+            localRecordingsDirectory.appendingPathComponent("recordings.json"),
+            legacyICloudRecordingsDirectory?.appendingPathComponent("recordings.json"),
+            recordingsDirectory.appendingPathComponent("recordings.json")
+        ].compactMap { $0 }
+    }
+
+    init() {
+        modelContainer = Self.makeModelContainer()
+    }
+
+    private static func makeModelContainer() -> ModelContainer? {
+        let schema = Schema([RecordingIndexRecord.self])
+        do {
+            let configuration = ModelConfiguration(
+                swiftDataStoreName,
+                schema: schema,
+                cloudKitDatabase: .private(iCloudContainerIdentifier)
+            )
+            return try ModelContainer(for: schema, configurations: [configuration])
+        } catch {
+            logger.error("CloudKit SwiftData index unavailable: \(error.localizedDescription, privacy: .public)")
+        }
+
+        do {
+            let configuration = ModelConfiguration(
+                swiftDataStoreName,
+                schema: schema,
+                cloudKitDatabase: .none
+            )
+            return try ModelContainer(for: schema, configurations: [configuration])
+        } catch {
+            logger.error("Local SwiftData index unavailable: \(error.localizedDescription, privacy: .public)")
+            return nil
+        }
     }
 
     func reload() async {
@@ -164,9 +410,14 @@ final class RecordingStore: ObservableObject {
             let indexedRecordings = try loadIndexedRecordings()
             recordings = try mergedRecordings(with: indexedRecordings)
                 .sorted { $0.createdAt > $1.createdAt }
+            pruneSearchIndexCache()
+            warmSearchIndexInBackground()
             try? persist()
         } catch {
             recordings = []
+            searchIndexCache = [:]
+            searchIndexWarmupTask?.cancel()
+            searchIndexWarmupTask = nil
         }
     }
 
@@ -175,11 +426,16 @@ final class RecordingStore: ObservableObject {
     }
 
     @discardableResult
-    func save(_ draft: RecordingDraft) async -> RecordingItem? {
+    func save(
+        _ draft: RecordingDraft,
+        preferredName: String? = nil,
+        manualTags: [String] = [],
+        location: RecordingLocation? = nil
+    ) async -> RecordingItem? {
         do {
             try ensureRecordingsDirectory()
 
-            let baseName = uniqueBaseName(for: draft.startedAt)
+            let baseName = try uniqueBaseName(forProposedName: preferredName, fallbackDate: draft.startedAt)
             let audioExtension = draft.audioURL.pathExtension.isEmpty ? "wav" : draft.audioURL.pathExtension
             let audioFileName = "\(baseName).\(audioExtension)"
             let transcriptFileName = "\(baseName).txt"
@@ -206,7 +462,9 @@ final class RecordingStore: ObservableObject {
                 intelligence: nil,
                 audioNormalizedAt: draft.audioNormalizedAt,
                 audioNormalizationVersion: draft.audioNormalizationVersion,
-                importStatus: nil
+                importStatus: nil,
+                manualTags: manualTags,
+                location: location
             )
 
             recordings.insert(item, at: 0)
@@ -251,7 +509,9 @@ final class RecordingStore: ObservableObject {
                 progress: 0.02,
                 message: String(localized: "正在导入录音"),
                 isFailed: false
-            )
+            ),
+            manualTags: nil,
+            location: nil
         )
         recordings.insert(item, at: 0)
         recordings.sort { $0.createdAt > $1.createdAt }
@@ -395,6 +655,7 @@ final class RecordingStore: ObservableObject {
             try fileManager.removeItem(at: transcriptURL)
         }
         recordings.removeAll { $0.id == item.id }
+        searchIndexCache[item.id] = nil
         try persist()
     }
 
@@ -473,6 +734,24 @@ final class RecordingStore: ObservableObject {
         }
     }
 
+    @discardableResult
+    func updateDetails(
+        for item: RecordingItem,
+        proposedName: String,
+        manualTags: [String],
+        location: RecordingLocation?
+    ) throws -> RecordingItem {
+        let renamedItem = try rename(item, to: proposedName)
+        guard let index = recordings.firstIndex(where: { $0.id == renamedItem.id }) else {
+            throw RecordingRenameError.itemMissing
+        }
+
+        recordings[index].manualTags = manualTags
+        recordings[index].location = location
+        try persist()
+        return recordings[index]
+    }
+
     func audioURL(for item: RecordingItem) -> URL {
         recordingsDirectory.appendingPathComponent(item.audioFileName)
     }
@@ -483,6 +762,31 @@ final class RecordingStore: ObservableObject {
 
     func transcriptText(for item: RecordingItem) -> String {
         (try? String(contentsOf: transcriptURL(for: item), encoding: .utf8)) ?? ""
+    }
+
+    func normalizedSearchText(for item: RecordingItem) -> String {
+        let signature = searchIndexSignature(for: item)
+        if let cachedEntry = searchIndexCache[item.id],
+           cachedEntry.signature == signature {
+            return cachedEntry.normalizedText
+        }
+
+        let searchableFields = [
+            item.audioFileName,
+            item.languageName,
+            item.transcriptPreview,
+            item.combinedTags.joined(separator: " "),
+            item.intelligence?.summary ?? "",
+            transcriptText(for: item)
+        ]
+        let normalizedText = searchableFields
+            .joined(separator: "\n")
+            .normalizedForRecordingSearch
+        searchIndexCache[item.id] = RecordingSearchIndexCacheEntry(
+            signature: signature,
+            normalizedText: normalizedText
+        )
+        return normalizedText
     }
 
     func normalizeAudioIfNeeded(for item: RecordingItem, loudnessProcessingEnabled: Bool) async {
@@ -530,6 +834,7 @@ final class RecordingStore: ObservableObject {
         }
 
         recordings[index].intelligence = intelligence
+        recordings[index].manualTags = RecordingItem.mergedTags(recordings[index].manualTags ?? [], intelligence.tags)
         try persist()
         return intelligence
     }
@@ -540,11 +845,35 @@ final class RecordingStore: ObservableObject {
     }
 
     private func loadIndexedRecordings() throws -> [RecordingItem] {
-        guard fileManager.fileExists(atPath: indexURL.path) else {
+        let swiftDataItems = try loadSwiftDataRecordings()
+        if !swiftDataItems.isEmpty {
+            return swiftDataItems
+        }
+
+        let legacyItems = try loadLegacyJSONRecordings()
+        if !legacyItems.isEmpty {
+            try persist(legacyItems)
+        }
+        return legacyItems
+    }
+
+    private func loadSwiftDataRecordings() throws -> [RecordingItem] {
+        guard let context = modelContainer?.mainContext else {
             return []
         }
-        let data = try Data(contentsOf: indexURL)
-        return try decoder.decode([RecordingItem].self, from: data)
+
+        let descriptor = FetchDescriptor<RecordingIndexRecord>(
+            sortBy: [SortDescriptor(\RecordingIndexRecord.createdAt, order: .reverse)]
+        )
+        return try context.fetch(descriptor).map(\.item)
+    }
+
+    private func loadLegacyJSONRecordings() throws -> [RecordingItem] {
+        for indexURL in legacyIndexURLs where fileManager.fileExists(atPath: indexURL.path) {
+            let data = try Data(contentsOf: indexURL)
+            return try decoder.decode([RecordingItem].self, from: data)
+        }
+        return []
     }
 
     private func mergedRecordings(with indexedRecordings: [RecordingItem]) throws -> [RecordingItem] {
@@ -608,44 +937,196 @@ final class RecordingStore: ObservableObject {
             intelligence: nil,
             audioNormalizedAt: nil,
             audioNormalizationVersion: nil,
-            importStatus: nil
+            importStatus: nil,
+            manualTags: nil,
+            location: nil
         )
     }
 
     private func migrateLocalRecordingsToICloudIfAvailable() throws {
         guard let iCloudDirectory = iCloudRecordingsDirectory,
-              iCloudDirectory.path != localRecordingsDirectory.path,
-              fileManager.fileExists(atPath: localRecordingsDirectory.path) else {
+              iCloudDirectory.path != localRecordingsDirectory.path else {
             return
         }
 
         try fileManager.createDirectory(at: iCloudDirectory, withIntermediateDirectories: true)
-        let localFiles = try fileManager.contentsOfDirectory(
-            at: localRecordingsDirectory,
+
+        if let legacyICloudRecordingsDirectory,
+           legacyICloudRecordingsDirectory.path != iCloudDirectory.path {
+            try migrateRecordingFiles(from: legacyICloudRecordingsDirectory, to: iCloudDirectory)
+        }
+
+        try migrateRecordingFiles(from: localRecordingsDirectory, to: iCloudDirectory)
+    }
+
+    private func migrateRecordingFiles(from sourceDirectory: URL, to destinationDirectory: URL) throws {
+        guard fileManager.fileExists(atPath: sourceDirectory.path) else {
+            return
+        }
+
+        let fileURLs = try fileManager.contentsOfDirectory(
+            at: sourceDirectory,
             includingPropertiesForKeys: [.isRegularFileKey],
             options: [.skipsHiddenFiles]
         )
-        for localURL in localFiles {
-            let destinationURL = iCloudDirectory.appendingPathComponent(localURL.lastPathComponent)
+
+        for sourceURL in fileURLs {
+            let fileExtension = sourceURL.pathExtension.lowercased()
+            guard Self.audioFileExtensions.contains(fileExtension) || fileExtension == "txt" else {
+                continue
+            }
+
+            let destinationURL = destinationDirectory.appendingPathComponent(sourceURL.lastPathComponent)
             guard !fileManager.fileExists(atPath: destinationURL.path) else {
                 continue
             }
-            try? fileManager.copyItem(at: localURL, to: destinationURL)
+
+            try? fileManager.copyItem(at: sourceURL, to: destinationURL)
         }
     }
 
     private func persist() throws {
-        let data = try encoder.encode(recordings)
-        try data.write(to: indexURL, options: .atomic)
+        try persist(recordings)
     }
 
-    private func uniqueBaseName(for date: Date) -> String {
+    private func pruneSearchIndexCache() {
+        let currentIDs = Set(recordings.map(\.id))
+        searchIndexCache = searchIndexCache.filter { currentIDs.contains($0.key) }
+    }
+
+    private func warmSearchIndexInBackground() {
+        let workItems = recordings.compactMap { item -> RecordingSearchIndexWorkItem? in
+            let signature = searchIndexSignature(for: item)
+            if let cachedEntry = searchIndexCache[item.id],
+               cachedEntry.signature == signature {
+                return nil
+            }
+
+            return RecordingSearchIndexWorkItem(
+                id: item.id,
+                signature: signature,
+                metadataText: [
+                    item.audioFileName,
+                    item.languageName,
+                    item.transcriptPreview,
+                    item.combinedTags.joined(separator: " "),
+                    item.intelligence?.summary ?? ""
+                ].joined(separator: "\n"),
+                transcriptURL: transcriptURL(for: item)
+            )
+        }
+
+        guard !workItems.isEmpty else {
+            return
+        }
+
+        searchIndexWarmupTask?.cancel()
+        searchIndexWarmupTask = Task(priority: .utility) { [weak self] in
+            let entries = await Task.detached(priority: .utility) {
+                workItems.map { item in
+                    let transcript = (try? String(contentsOf: item.transcriptURL, encoding: .utf8)) ?? ""
+                    return RecordingSearchIndexWarmupEntry(
+                        id: item.id,
+                        signature: item.signature,
+                        normalizedText: [item.metadataText, transcript]
+                            .joined(separator: "\n")
+                            .normalizedForRecordingSearch
+                    )
+                }
+            }.value
+
+            guard !Task.isCancelled else {
+                return
+            }
+
+            await MainActor.run {
+                guard let self else {
+                    return
+                }
+
+                for entry in entries {
+                    guard let currentItem = self.recordings.first(where: { $0.id == entry.id }),
+                          self.searchIndexSignature(for: currentItem) == entry.signature else {
+                        continue
+                    }
+                    self.searchIndexCache[entry.id] = RecordingSearchIndexCacheEntry(
+                        signature: entry.signature,
+                        normalizedText: entry.normalizedText
+                    )
+                }
+                self.searchIndexWarmupTask = nil
+            }
+        }
+    }
+
+    private func searchIndexSignature(for item: RecordingItem) -> String {
+        [
+            item.audioFileName,
+            item.transcriptFileName,
+            "\(item.lineCount)",
+            "\(item.transcriptPreview.hashValue)",
+            "\(item.combinedTags.hashValue)",
+            "\(item.intelligence?.summary.hashValue ?? 0)",
+            "\(transcriptModificationTime(for: item))",
+            "\(item.importStatus == nil)"
+        ].joined(separator: "|")
+    }
+
+    private func transcriptModificationTime(for item: RecordingItem) -> TimeInterval {
+        let url = transcriptURL(for: item)
+        return ((try? url.resourceValues(forKeys: [.contentModificationDateKey]).contentModificationDate) ?? .distantPast).timeIntervalSinceReferenceDate
+    }
+
+    private func persist(_ items: [RecordingItem]) throws {
+        guard let context = modelContainer?.mainContext else {
+            return
+        }
+
+        let descriptor = FetchDescriptor<RecordingIndexRecord>()
+        let existingRecords = try context.fetch(descriptor)
+        var recordsByID = Dictionary(uniqueKeysWithValues: existingRecords.map { ($0.idString, $0) })
+        let expectedIDs = Set(items.map(\.id.uuidString))
+
+        for item in items {
+            let idString = item.id.uuidString
+            if let record = recordsByID[idString] {
+                record.apply(item)
+            } else {
+                let record = RecordingIndexRecord(item: item)
+                context.insert(record)
+                recordsByID[idString] = record
+            }
+        }
+
+        for record in existingRecords where !expectedIDs.contains(record.idString) {
+            context.delete(record)
+        }
+
+        try context.save()
+    }
+
+    static func defaultBaseName(for date: Date) -> String {
         let formatter = DateFormatter()
         formatter.calendar = Calendar(identifier: .gregorian)
         formatter.locale = Locale(identifier: "en_US_POSIX")
         formatter.dateFormat = "yyyyMMdd_HHmmss"
+        return "Recording_\(formatter.string(from: date))"
+    }
 
-        let root = "Recording_\(formatter.string(from: date))"
+    private func uniqueBaseName(for date: Date) -> String {
+        uniqueBaseName(root: Self.defaultBaseName(for: date))
+    }
+
+    private func uniqueBaseName(forProposedName proposedName: String?, fallbackDate: Date) throws -> String {
+        guard let proposedName,
+              !proposedName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+            return uniqueBaseName(for: fallbackDate)
+        }
+
+        return uniqueBaseName(root: try Self.sanitizedBaseName(from: proposedName))
+    }
+
+    private func uniqueBaseName(root: String) -> String {
         var candidate = root
         var index = 1
         while ["wav", "caf", "m4a", "mp3"].contains(where: { fileManager.fileExists(atPath: recordingsDirectory.appendingPathComponent("\(candidate).\($0)").path) })
@@ -706,6 +1187,31 @@ private enum RecordingRenameError: LocalizedError {
         case .itemMissing:
             return String(localized: "找不到录音文件")
         }
+    }
+}
+
+private struct RecordingSearchIndexCacheEntry {
+    var signature: String
+    var normalizedText: String
+}
+
+private struct RecordingSearchIndexWorkItem {
+    var id: RecordingItem.ID
+    var signature: String
+    var metadataText: String
+    var transcriptURL: URL
+}
+
+private struct RecordingSearchIndexWarmupEntry {
+    var id: RecordingItem.ID
+    var signature: String
+    var normalizedText: String
+}
+
+extension String {
+    var normalizedForRecordingSearch: String {
+        trimmingCharacters(in: .whitespacesAndNewlines)
+            .folding(options: [.caseInsensitive, .diacriticInsensitive, .widthInsensitive], locale: .current)
     }
 }
 

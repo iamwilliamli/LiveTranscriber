@@ -4,6 +4,7 @@ import UIKit
 enum HapticFeedback {
     enum Event: Hashable {
         case navigation
+        case tabSelection
         case menuSelection
         case primaryAction
         case recordingStart
@@ -66,6 +67,9 @@ enum HapticFeedback {
         switch event {
         case .navigation:
             softImpact(intensity: 0.35)
+        case .tabSelection:
+            selection()
+            delayedImpact(.light, intensity: 0.42, afterMilliseconds: 24)
         case .menuSelection:
             selection()
         case .primaryAction:
@@ -189,7 +193,7 @@ enum HapticFeedback {
         switch event {
         case .timelineSeek, .menuSelection:
             return 0.04
-        case .navigation, .playbackToggle, .copy:
+        case .navigation, .tabSelection, .playbackToggle, .copy:
             return 0.08
         case .blocked, .warning, .failure:
             return 0.35
