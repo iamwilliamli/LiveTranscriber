@@ -7,6 +7,7 @@ struct RecorderMetalVisualizer: UIViewRepresentable {
     var isActive: Bool
     var level: Float
     var levelHistory: [Float]
+    var colorScheme: ColorScheme
 
     private static let historySampleCount = 72
 
@@ -27,7 +28,12 @@ struct RecorderMetalVisualizer: UIViewRepresentable {
 
     func updateUIView(_ view: MTKView, context: Context) {
         view.preferredFramesPerSecond = isActive ? 30 : 12
-        context.coordinator.update(isActive: isActive, level: level, levelHistory: levelHistory)
+        context.coordinator.update(
+            isActive: isActive,
+            level: level,
+            levelHistory: levelHistory,
+            colorScheme: colorScheme
+        )
     }
 
     func makeCoordinator() -> Coordinator {
@@ -43,6 +49,7 @@ struct RecorderMetalVisualizer: UIViewRepresentable {
         private var displayedLevel: Float = 0
         private var targetHistory: [Float] = Array(repeating: 0, count: RecorderMetalVisualizer.historySampleCount)
         private var displayedHistory: [Float] = Array(repeating: 0, count: RecorderMetalVisualizer.historySampleCount)
+        private var colorScheme: ColorScheme = .dark
 
         func configure(with device: MTLDevice?, colorPixelFormat: MTLPixelFormat) {
             guard let device,
@@ -67,10 +74,11 @@ struct RecorderMetalVisualizer: UIViewRepresentable {
             commandQueue = device.makeCommandQueue()
         }
 
-        func update(isActive: Bool, level: Float, levelHistory: [Float]) {
+        func update(isActive: Bool, level: Float, levelHistory: [Float], colorScheme: ColorScheme) {
             self.isActive = isActive
             targetLevel = min(max(level, 0), 1)
             targetHistory = Self.normalizedHistory(levelHistory)
+            self.colorScheme = colorScheme
         }
 
         func draw(in view: MTKView) {
@@ -97,6 +105,7 @@ struct RecorderMetalVisualizer: UIViewRepresentable {
                 level: displayedLevel,
                 active: isActive ? 1 : 0,
                 historyCount: UInt32(displayedHistory.count),
+                style: SIMD2<Float>(colorScheme == .dark ? 0 : 1, 0),
                 size: SIMD2<Float>(
                     Float(max(view.drawableSize.width, 1)),
                     Float(max(view.drawableSize.height, 1))
@@ -140,6 +149,7 @@ private struct RecorderVisualizerUniforms {
     var level: Float
     var active: Float
     var historyCount: UInt32
+    var style: SIMD2<Float>
     var size: SIMD2<Float>
     var tint: SIMD4<Float>
 }

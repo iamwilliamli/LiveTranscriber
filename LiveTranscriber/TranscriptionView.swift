@@ -3,6 +3,7 @@ import MapKit
 import SwiftUI
 
 struct TranscriptionView: View {
+    @Environment(\.colorScheme) private var colorScheme
     @ObservedObject var transcriber: LiveTranscriptionManager
     @ObservedObject var recordingStore: RecordingStore
     @Binding var externalPendingRecordingDraft: RecordingDraft?
@@ -145,22 +146,31 @@ struct TranscriptionView: View {
             RecorderMetalVisualizer(
                 isActive: transcriber.isRecording && !transcriber.isPaused,
                 level: transcriber.inputLevel,
-                levelHistory: transcriber.inputLevelHistory
+                levelHistory: transcriber.inputLevelHistory,
+                colorScheme: colorScheme
             )
 
             RoundedRectangle(cornerRadius: AppTheme.cornerRadius, style: .continuous)
-                .stroke(.white.opacity(0.14), lineWidth: 1)
+                .stroke(recorderDeckBorderColor, lineWidth: 1)
+
+            RollingRecorderTimeText(
+                text: formatDuration(transcriber.elapsedSeconds),
+                color: recorderDeckPrimaryColor
+            )
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
+            .padding(.top, 6)
+            .allowsHitTesting(false)
 
             HStack(alignment: .top, spacing: 12) {
                 VStack(alignment: .leading, spacing: 5) {
                     Label("实时转录", systemImage: "waveform.and.mic")
                         .font(.redditSans(.headline, weight: .semibold))
-                        .foregroundStyle(.white)
+                        .foregroundStyle(recorderDeckPrimaryColor)
                         .lineLimit(1)
 
                     Text(transcriber.statusText)
                         .font(.redditSans(.caption, weight: .semibold))
-                        .foregroundStyle(transcriber.isRecording && !transcriber.isPaused ? AppTheme.brandSoft : .white.opacity(0.72))
+                        .foregroundStyle(transcriber.isRecording && !transcriber.isPaused ? AppTheme.brandSoft : recorderDeckSecondaryColor)
                         .lineLimit(1)
                 }
 
@@ -169,24 +179,32 @@ struct TranscriptionView: View {
                 VStack(alignment: .trailing, spacing: 8) {
                     Text(transcriber.selectedAudioFormat.badgeText)
                         .font(.redditSans(.caption2, weight: .bold))
-                        .foregroundStyle(.white)
+                        .foregroundStyle(recorderDeckPrimaryColor)
                         .padding(.horizontal, 8)
                         .frame(height: 25)
-                        .background(.white.opacity(0.14), in: Capsule())
-
-                    Spacer(minLength: 0)
-
-                    Text(formatDuration(transcriber.elapsedSeconds))
-                        .font(.redditSans(size: 38, weight: .semibold).monospacedDigit())
-                        .foregroundStyle(.white)
-                        .minimumScaleFactor(0.72)
-                        .lineLimit(1)
+                        .background(recorderDeckPillColor, in: Capsule())
                 }
             }
             .padding(14)
         }
         .frame(height: 138)
         .clipShape(RoundedRectangle(cornerRadius: AppTheme.cornerRadius, style: .continuous))
+    }
+
+    private var recorderDeckPrimaryColor: Color {
+        colorScheme == .dark ? .white : .primary
+    }
+
+    private var recorderDeckSecondaryColor: Color {
+        colorScheme == .dark ? .white.opacity(0.72) : .secondary
+    }
+
+    private var recorderDeckBorderColor: Color {
+        colorScheme == .dark ? .white.opacity(0.14) : .black.opacity(0.10)
+    }
+
+    private var recorderDeckPillColor: Color {
+        colorScheme == .dark ? .white.opacity(0.14) : .black.opacity(0.06)
     }
 
     private var languageMenu: some View {
@@ -813,6 +831,89 @@ private final class RecordingLocationProvider: NSObject, ObservableObject, CLLoc
             if reverseGeocodingRequest?.isCancelled != true {
                 placeName = nil
             }
+        }
+    }
+}
+
+private struct RollingRecorderTimeText: View {
+    let text: String
+    let color: Color
+
+    private let digitHeight: CGFloat = 46
+    private let digitWidth: CGFloat = 27
+
+    var body: some View {
+        HStack(alignment: .center, spacing: 1) {
+            ForEach(Array(text.enumerated()), id: \.offset) { _, character in
+                if let value = character.wholeNumberValue {
+                    RollingRecorderDigit(
+                        value: value,
+                        width: digitWidth,
+                        height: digitHeight,
+                        color: color
+                    )
+                } else {
+                    Text(String(character))
+                        .font(.system(size: 36, weight: .semibold, design: .monospaced))
+                        .foregroundStyle(color)
+                        .frame(width: 12, height: digitHeight)
+                }
+            }
+        }
+        .accessibilityLabel(text)
+    }
+}
+
+private struct RollingRecorderDigit: View {
+    let value: Int
+    let width: CGFloat
+    let height: CGFloat
+    let color: Color
+
+    @State private var rollingValue = 0
+
+    var body: some View {
+        VStack(spacing: 0) {
+            ForEach(0..<30, id: \.self) { index in
+                Text("\(index % 10)")
+                    .font(.system(size: 40, weight: .semibold, design: .monospaced))
+                    .foregroundStyle(color)
+                    .frame(width: width, height: height)
+            }
+        }
+        .offset(y: -CGFloat(rollingValue) * height)
+        .frame(width: width, height: height, alignment: .top)
+        .clipped()
+        .onAppear {
+            reset(to: value)
+        }
+        .onChange(of: value) { _, newValue in
+            roll(to: newValue)
+        }
+        .animation(.spring(response: 0.36, dampingFraction: 0.82), value: rollingValue)
+    }
+
+    private func roll(to newValue: Int) {
+        let currentValue = rollingValue % 10
+        let step = (newValue - currentValue + 10) % 10
+        guard step != 0 else {
+            return
+        }
+
+        rollingValue += step
+        if rollingValue >= 20 {
+            let resetValue = 10 + newValue
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.42) {
+                reset(to: resetValue)
+            }
+        }
+    }
+
+    private func reset(to newValue: Int) {
+        var transaction = Transaction()
+        transaction.disablesAnimations = true
+        withTransaction(transaction) {
+            rollingValue = 10 + (newValue % 10)
         }
     }
 }
