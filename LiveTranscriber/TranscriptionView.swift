@@ -113,45 +113,8 @@ struct TranscriptionView: View {
     }
 
     private var recorderCard: some View {
-        VStack(alignment: .leading, spacing: 16) {
-            HStack(alignment: .center, spacing: 12) {
-                VStack(alignment: .leading, spacing: 4) {
-                    Label("实时转录", systemImage: "waveform.and.mic")
-                        .font(.redditSans(.headline, weight: .semibold))
-                        .foregroundStyle(.primary)
-
-                    Text(transcriber.statusText)
-                        .font(.redditSans(.caption, weight: .semibold))
-                        .foregroundStyle(transcriber.isRecording && !transcriber.isPaused ? AppTheme.danger : .secondary)
-                        .lineLimit(1)
-                }
-
-                Spacer()
-
-                RecordingStateBadge(
-                    isRecording: transcriber.isRecording,
-                    isPaused: transcriber.isPaused,
-                    isPreparing: transcriber.isPreparing
-                )
-            }
-
-            HStack(alignment: .lastTextBaseline, spacing: 14) {
-                Text(formatDuration(transcriber.elapsedSeconds))
-                    .font(.redditSans(size: 56, weight: .semibold).monospacedDigit())
-                    .foregroundStyle(.primary)
-                    .minimumScaleFactor(0.65)
-                    .lineLimit(1)
-
-                Spacer(minLength: 8)
-
-                Text(transcriber.selectedAudioFormat.badgeText)
-                    .font(.redditSans(.caption2, weight: .bold))
-                    .foregroundStyle(AppTheme.brand)
-                    .padding(.horizontal, 8)
-                    .frame(height: 26)
-                    .background(AppTheme.brand.opacity(0.12), in: Capsule())
-            }
-            .frame(maxWidth: .infinity)
+        VStack(alignment: .leading, spacing: 12) {
+            recorderDeck
 
             HStack(spacing: 10) {
                 languageMenu
@@ -175,6 +138,63 @@ struct TranscriptionView: View {
         .padding(16)
         .frame(maxWidth: .infinity)
         .cardSurface()
+    }
+
+    private var recorderDeck: some View {
+        ZStack {
+            RecorderMetalVisualizer(
+                isActive: transcriber.isRecording && !transcriber.isPaused,
+                level: transcriber.inputLevel
+            )
+
+            RoundedRectangle(cornerRadius: AppTheme.cornerRadius, style: .continuous)
+                .stroke(.white.opacity(0.14), lineWidth: 1)
+
+            HStack(alignment: .top, spacing: 12) {
+                VStack(alignment: .leading, spacing: 5) {
+                    Label("实时转录", systemImage: "waveform.and.mic")
+                        .font(.redditSans(.headline, weight: .semibold))
+                        .foregroundStyle(.white)
+                        .lineLimit(1)
+
+                    Text(transcriber.statusText)
+                        .font(.redditSans(.caption, weight: .semibold))
+                        .foregroundStyle(transcriber.isRecording && !transcriber.isPaused ? AppTheme.brandSoft : .white.opacity(0.72))
+                        .lineLimit(1)
+
+                    Spacer(minLength: 0)
+
+                    RecordingStateBadge(
+                        isRecording: transcriber.isRecording,
+                        isPaused: transcriber.isPaused,
+                        isPreparing: transcriber.isPreparing
+                    )
+                    .colorScheme(.dark)
+                }
+
+                Spacer(minLength: 8)
+
+                VStack(alignment: .trailing, spacing: 8) {
+                    Text(transcriber.selectedAudioFormat.badgeText)
+                        .font(.redditSans(.caption2, weight: .bold))
+                        .foregroundStyle(.white)
+                        .padding(.horizontal, 8)
+                        .frame(height: 25)
+                        .background(.white.opacity(0.14), in: Capsule())
+
+                    Spacer(minLength: 0)
+
+                    Text(formatDuration(transcriber.elapsedSeconds))
+                        .font(.redditSans(size: 38, weight: .semibold).monospacedDigit())
+                        .foregroundStyle(.white)
+                        .minimumScaleFactor(0.72)
+                        .lineLimit(1)
+                }
+            }
+            .padding(14)
+        }
+        .frame(height: 138)
+        .clipShape(RoundedRectangle(cornerRadius: AppTheme.cornerRadius, style: .continuous))
     }
 
     private var languageMenu: some View {

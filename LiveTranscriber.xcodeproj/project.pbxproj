@@ -39,6 +39,8 @@
 		7B000000000000000000001E /* RedditSans-Italic.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 7B0000000000000000001014 /* RedditSans-Italic.ttf */; };
 		7B000000000000000000001F /* Localizable.strings in Resources */ = {isa = PBXBuildFile; fileRef = 7B0000000000000000003005 /* Localizable.strings */; };
 		7B0000000000000000000020 /* HapticFeedback.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7B0000000000000000001020 /* HapticFeedback.swift */; };
+		7B0000000000000000000021 /* RecorderMetalVisualizer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7B0000000000000000001021 /* RecorderMetalVisualizer.swift */; };
+		7B0000000000000000000022 /* RecorderVisualizerShaders.metal in Sources */ = {isa = PBXBuildFile; fileRef = 7B0000000000000000001022 /* RecorderVisualizerShaders.metal */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -97,6 +99,8 @@
 		7B000000000000000000101D /* LiveTranscriberWidget.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = LiveTranscriberWidget.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 		7B000000000000000000101E /* LiveTranscriber.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = LiveTranscriber.entitlements; sourceTree = "<group>"; };
 		7B0000000000000000001020 /* HapticFeedback.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HapticFeedback.swift; sourceTree = "<group>"; };
+		7B0000000000000000001021 /* RecorderMetalVisualizer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecorderMetalVisualizer.swift; sourceTree = "<group>"; };
+		7B0000000000000000001022 /* RecorderVisualizerShaders.metal */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.metal; path = RecorderVisualizerShaders.metal; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -137,6 +141,8 @@
 				7B0000000000000000001006 /* LiveTranscriptionManager.swift */,
 				7B0000000000000000001015 /* TranscriptionLanguage.swift */,
 				7B0000000000000000001020 /* HapticFeedback.swift */,
+				7B0000000000000000001021 /* RecorderMetalVisualizer.swift */,
+				7B0000000000000000001022 /* RecorderVisualizerShaders.metal */,
 				7B0000000000000000001016 /* RecordingStore.swift */,
 				7B0000000000000000001017 /* RecordingsView.swift */,
 				7B0000000000000000001018 /* SettingsView.swift */,
@@ -307,6 +313,8 @@
 				7B0000000000000000000011 /* TranscriptionLanguage.swift in Sources */,
 				7B0000000000000000000012 /* RecordingStore.swift in Sources */,
 				7B0000000000000000000020 /* HapticFeedback.swift in Sources */,
+				7B0000000000000000000021 /* RecorderMetalVisualizer.swift in Sources */,
+				7B0000000000000000000022 /* RecorderVisualizerShaders.metal in Sources */,
 				7B0000000000000000000013 /* RecordingsView.swift in Sources */,
 				7B0000000000000000000014 /* SettingsView.swift in Sources */,
 				7B0000000000000000000015 /* TranscriptionActivityAttributes.swift in Sources */,

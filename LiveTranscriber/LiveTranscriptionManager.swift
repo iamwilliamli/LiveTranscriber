@@ -51,6 +51,7 @@ final class LiveTranscriptionManager: ObservableObject {
     @Published private(set) var statusText = String(localized: "准备就绪")
     @Published private(set) var errorText: String?
     @Published private(set) var elapsedSeconds: Int = 0
+    @Published private(set) var inputLevel: Float = 0
     @Published private(set) var supportedLanguages: [TranscriptionLanguage] = TranscriptionLanguage.fallbackOptions
     @Published private(set) var speechPipelineRuntimeFormatText = String(localized: "Runtime Analyzer 输入: 等待录音")
     @Published var selectedAudioFormat: RecordingAudioFormat {
@@ -98,6 +99,7 @@ final class LiveTranscriptionManager: ObservableObject {
     private var currentAudioURL: URL?
     private var currentRecordingFormat: AVAudioFormat?
     private var currentAudioOutputFormat: RecordingAudioFormat?
+    private var smoothedInputLevel: Float = 0
     private var finalizedLines: [TranscriptionLine] = []
     private var interimLine: TranscriptionLine?
     private var lastLiveActivitySnapshot: LiveActivitySnapshot?
@@ -186,6 +188,7 @@ final class LiveTranscriptionManager: ObservableObject {
 
         isPreparing = true
         errorText = nil
+        resetInputLevel()
         lastSpeechPipelineRuntimeFormat = nil
         speechPipelineRuntimeFormatText = String(localized: "Runtime Analyzer 输入: 等待首个 buffer")
         resetTranscriptStorage()
@@ -231,11 +234,17 @@ final class LiveTranscriptionManager: ObservableObject {
         let prepared = try await prepareSpeechPipeline(language: language, audioInputFormat: analyzerSourceFormat)
         let recordingURL = try Self.makeTemporaryRecordingURL(format: audioFormat)
         let writer = try AudioFileWriter(url: recordingURL, inputFormat: recordingFormat, outputFormat: audioFormat)
+        let inputLevelObserver: @Sendable (Float) -> Void = { [weak self] level in
+            Task { @MainActor [weak self] in
+                self?.handleInputLevel(level)
+            }
+        }
         let capturePipeline = CaptureSessionRecordingPipeline(
             recordingFormat: recordingFormat,
             analyzerSourceFormat: analyzerSourceFormat,
             writer: writer,
-            analyzerPipeline: prepared.pipeline
+            analyzerPipeline: prepared.pipeline,
+            inputLevelObserver: inputLevelObserver
         )
 
         analyzer = prepared.analyzer
@@ -258,6 +267,7 @@ final class LiveTranscriptionManager: ObservableObject {
         }
 
         await captureRecordingPipeline?.stop()
+        resetInputLevel()
         pauseElapsedTimer()
         isPaused = true
         statusText = String(localized: "已暂停")
@@ -295,6 +305,7 @@ final class LiveTranscriptionManager: ObservableObject {
         isPreparing = false
         isRecording = false
         isPaused = false
+        resetInputLevel()
 
         let pendingCapturePipeline = captureRecordingPipeline
         captureRecordingPipeline = nil
@@ -378,6 +389,7 @@ final class LiveTranscriptionManager: ObservableObject {
         if !isRecording {
             statusText = String(localized: "准备就绪")
             elapsedSeconds = 0
+            resetInputLevel()
             accumulatedRecordingSeconds = 0
             recordingStartedAt = nil
             activeSegmentStartedAt = nil
@@ -446,6 +458,23 @@ final class LiveTranscriptionManager: ObservableObject {
             stream: stream,
             pipeline: pipeline
         )
+    }
+
+    private func handleInputLevel(_ level: Float) {
+        guard isRecording, !isPaused else {
+            resetInputLevel()
+            return
+        }
+
+        let clampedLevel = min(max(level, 0), 1)
+        let response: Float = clampedLevel > smoothedInputLevel ? 0.42 : 0.16
+        smoothedInputLevel += (clampedLevel - smoothedInputLevel) * response
+        inputLevel = smoothedInputLevel
+    }
+
+    private func resetInputLevel() {
+        smoothedInputLevel = 0
+        inputLevel = 0
     }
 
     private static func makeAnalyzerInputFormat() throws -> AVAudioFormat {
@@ -1220,6 +1249,7 @@ private final class CaptureSessionRecordingPipeline: NSObject, AVCaptureAudioDat
     private let analyzerSourceFormat: AVAudioFormat
     private let writer: AudioFileWriter
     private let analyzerPipeline: AnalyzerInputPipeline
+    private let inputLevelObserver: @Sendable (Float) -> Void
     private let recordingConverter: CaptureSampleBufferAudioConverter
     private let analyzerConverter: CaptureSampleBufferAudioConverter
 
@@ -1228,17 +1258,20 @@ private final class CaptureSessionRecordingPipeline: NSObject, AVCaptureAudioDat
     private var isConfigured = false
     private var didReportFirstFormat = false
     private var didReportConversionFailure = false
+    private var lastInputLevelReportTime: UInt64 = 0
 
     init(
         recordingFormat: AVAudioFormat,
         analyzerSourceFormat: AVAudioFormat,
         writer: AudioFileWriter,
-        analyzerPipeline: AnalyzerInputPipeline
+        analyzerPipeline: AnalyzerInputPipeline,
+        inputLevelObserver: @escaping @Sendable (Float) -> Void
     ) {
         self.recordingFormat = recordingFormat
         self.analyzerSourceFormat = analyzerSourceFormat
         self.writer = writer
         self.analyzerPipeline = analyzerPipeline
+        self.inputLevelObserver = inputLevelObserver
         recordingConverter = CaptureSampleBufferAudioConverter(targetFormat: recordingFormat)
         analyzerConverter = CaptureSampleBufferAudioConverter(targetFormat: analyzerSourceFormat)
         super.init()
@@ -1330,6 +1363,7 @@ private final class CaptureSessionRecordingPipeline: NSObject, AVCaptureAudioDat
             let sourceBuffer = try CaptureSampleBufferAudioConverter.makePCMBuffer(from: sampleBuffer)
             let recordingBuffer = try recordingConverter.convert(sourceBuffer)
             let analyzerBuffer = try analyzerConverter.convert(sourceBuffer)
+            reportInputLevelIfNeeded(recordingBuffer)
             reportFirstFormatIfNeeded(
                 sourceFormat: sourceBuffer.format,
                 recordingFormat: recordingBuffer.format,
@@ -1340,6 +1374,95 @@ private final class CaptureSessionRecordingPipeline: NSObject, AVCaptureAudioDat
         } catch {
             reportConversionFailureIfNeeded(error)
         }
+    }
+
+    private func reportInputLevelIfNeeded(_ buffer: AVAudioPCMBuffer) {
+        let now = DispatchTime.now().uptimeNanoseconds
+        guard now - lastInputLevelReportTime >= 33_000_000 else {
+            return
+        }
+
+        lastInputLevelReportTime = now
+        inputLevelObserver(Self.normalizedInputLevel(for: buffer))
+    }
+
+    private static func normalizedInputLevel(for buffer: AVAudioPCMBuffer) -> Float {
+        let frameCount = Int(buffer.frameLength)
+        let channelCount = Int(buffer.format.channelCount)
+        guard frameCount > 0, channelCount > 0 else {
+            return 0
+        }
+
+        switch buffer.format.commonFormat {
+        case .pcmFormatFloat32:
+            guard let channelData = buffer.floatChannelData else {
+                return 0
+            }
+            return normalizedFloatLevel(channelData: channelData, channelCount: channelCount, frameCount: frameCount)
+        case .pcmFormatInt16:
+            guard let channelData = buffer.int16ChannelData else {
+                return 0
+            }
+            return normalizedInt16Level(channelData: channelData, channelCount: channelCount, frameCount: frameCount)
+        default:
+            return 0
+        }
+    }
+
+    private static func normalizedFloatLevel(
+        channelData: UnsafePointer<UnsafeMutablePointer<Float>>,
+        channelCount: Int,
+        frameCount: Int
+    ) -> Float {
+        let stride = max(frameCount / 512, 1)
+        var sum: Float = 0
+        var count = 0
+
+        for channel in 0..<channelCount {
+            let samples = channelData[channel]
+            var frame = 0
+            while frame < frameCount {
+                let sample = samples[frame]
+                sum += sample * sample
+                count += 1
+                frame += stride
+            }
+        }
+
+        return normalizedRMS(sum: sum, count: count)
+    }
+
+    private static func normalizedInt16Level(
+        channelData: UnsafePointer<UnsafeMutablePointer<Int16>>,
+        channelCount: Int,
+        frameCount: Int
+    ) -> Float {
+        let stride = max(frameCount / 512, 1)
+        var sum: Float = 0
+        var count = 0
+
+        for channel in 0..<channelCount {
+            let samples = channelData[channel]
+            var frame = 0
+            while frame < frameCount {
+                let sample = Float(samples[frame]) / Float(Int16.max)
+                sum += sample * sample
+                count += 1
+                frame += stride
+            }
+        }
+
+        return normalizedRMS(sum: sum, count: count)
+    }
+
+    private static func normalizedRMS(sum: Float, count: Int) -> Float {
+        guard count > 0 else {
+            return 0
+        }
+
+        let rms = sqrt(sum / Float(count))
+        let decibels = 20 * log10(max(rms, 0.000_001))
+        return min(max((decibels + 54) / 54, 0), 1)
     }
 
     private func reportFirstFormatIfNeeded(
