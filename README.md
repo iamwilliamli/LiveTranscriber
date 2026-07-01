@@ -2,7 +2,20 @@
 
 LiveTranscriber is an iOS 26+ local recording and live transcription app. It records audio, transcribes speech on device with Apple's Speech APIs, saves audio and transcript files, and keeps recording status visible through Lock Screen Live Activities and Dynamic Island.
 
-The project is designed as a native iOS utility rather than a cloud transcription client. Audio and transcripts stay local by default, with an app-private iCloud container used for cross-device file sync when iCloud is available.
+The project is designed as a native iOS utility rather than a cloud transcription client. Audio, transcripts, and the recording index stay in the local app-private container by default. Users can enable iCloud in Settings to move storage into an app-private iCloud container for cross-device sync.
+
+## Source Availability and Commercial Attribution
+
+LiveTranscriber is source-available under the [LiveTranscriber Source Available License 1.0](LICENSE). The code is public so people can learn from it, fork it, and continue development.
+
+This is not an OSI-approved open-source license because commercial forks have an attribution requirement. Commercial apps, services, forks, or derivative products based on this project must include visible in-app attribution:
+
+```text
+Based on LiveTranscriber by William Li
+Original project: https://github.com/iamwilliamli/LiveTranscriber
+```
+
+Attribution-free, private-label, or white-label commercial use requires separate written permission from William Li. See [LICENSE](LICENSE), [NOTICE](NOTICE), and [CONTRIBUTING.md](CONTRIBUTING.md) for the full terms.
 
 ## Current Features
 
@@ -14,7 +27,7 @@ The project is designed as a native iOS utility rather than a cloud transcriptio
 - Offline transcription for imported audio files, with language selection and progress/failure state.
 - Import from Files or the iOS share/Open In menu for audio recordings such as Voice Memos exports.
 - Re-transcription of saved recordings with any supported Speech locale.
-- App-private iCloud container storage for audio and transcript files, with SwiftData metadata indexed through a CloudKit private database.
+- Local app-private storage by default, with an optional Settings-controlled app-private iCloud container for audio, transcript, and recording-index sync.
 - Recording map view for recordings that were saved with location metadata.
 - Search across file names, languages, transcript previews, full transcript text, summaries, and topic tags.
 - Timestamped transcript lines for playback seeking.
@@ -83,6 +96,11 @@ For device testing, open `LiveTranscriber.xcodeproj` in Xcode and use a signing 
 - [Recording Processing Pipeline](docs/RECORDING_PIPELINE.md)
 - [Live Activity Design](docs/LIVE_ACTIVITY.md)
 - [Development Notes](DEVELOPMENT_NOTES.md)
+- [Reddit Launch Draft](docs/REDDIT_POST.md)
+
+## Third-Party Licenses
+
+Reddit Sans is included under the SIL Open Font License, Version 1.1. The font may be bundled with commercial software under the OFL terms. See [LiveTranscriber/Fonts/OFL.txt](LiveTranscriber/Fonts/OFL.txt) and [NOTICE](NOTICE).
 
 ## Apple Developer References
 
@@ -102,6 +120,6 @@ LiveTranscriber is built around local processing. Recording, transcription, summ
 
 - The app does not use developer-operated servers, third-party analytics, ads, tracking, or custom network requests.
 - Audio and transcript text are not uploaded to developer servers.
-- Files are stored in the local app container by default. When iCloud is available, app-managed recording files sync through an app-private iCloud container instead of a visible iCloud Drive folder.
-- Recording metadata is stored with SwiftData and syncs through the user's CloudKit private database.
+- Files are stored in the local app-private container by default. When iCloud storage is enabled in Settings, app-managed recording files sync through an app-private iCloud container instead of a visible iCloud Drive folder.
+- Recording metadata is stored with SwiftData locally by default. When iCloud storage is enabled, it syncs through the user's CloudKit private database.
 - The camera is not used for photos or video. `NSCameraUsageDescription` is present because Apple static review requires it when the app uses `AVCaptureSession` / `AVCaptureDeviceInput` for microphone recording.

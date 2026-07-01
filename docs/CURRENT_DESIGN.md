@@ -39,7 +39,7 @@ Iconography uses SF Symbols throughout. Primary controls use familiar symbols su
 
 - `LiveTranscriptionManager` is shared by recording, file library, and settings so language/format state stays consistent.
 - `RecordingStore` is shared by recording and library so saved files appear immediately after recording stops.
-- `RecordingStore` keeps audio/transcript files in the app-private recordings directory and uses SwiftData for the recording index. When iCloud is available, files sync through the app-private ubiquity container and the index syncs through a CloudKit private database.
+- `RecordingStore` keeps audio/transcript files in the local app-private recordings directory by default and uses SwiftData for the recording index. When the user enables iCloud storage in Settings and the ubiquity container is available, files sync through the app-private ubiquity container and the index syncs through a CloudKit private database.
 - The app reloads recordings on launch and when returning to foreground.
 - The app handles `livetranscriber://stop-recording` from Live Activity and saves the resulting draft.
 - The app handles `livetranscriber://record`, `livetranscriber://recordings`, and `livetranscriber://settings` for Widget quick links.
@@ -124,13 +124,13 @@ Settings are grouped into card surfaces:
 
 - Transcription: language menu, disabled while recording/preparing.
 - Recording: WAV/M4A format picker.
-- Files: recording count and storage location.
+- Files: recording count, storage location, iCloud storage toggle/status, and iCloud upload progress counts for saved recordings.
 
 The current default format is WAV. M4A is available for smaller AAC files.
 
 Microphone mode is not user-selectable. Stereo Capture uses `AVCaptureSession`, sets `AVCaptureDeviceInput.multichannelAudioMode = .stereo`, saves stereo audio, and downmixes the same captured buffers to mono for SpeechAnalyzer.
 
-Privacy shows the app's local-processing boundary, no developer server/analytics/tracking policy, app-private iCloud storage behavior, SwiftData/CloudKit private index behavior, and the purpose of microphone, speech recognition, camera purpose-string, and background audio permissions.
+Privacy shows the app's local-processing boundary, no developer server/analytics/tracking policy, local-by-default storage behavior, optional app-private iCloud storage behavior, SwiftData/CloudKit private index behavior, and the purpose of microphone, speech recognition, camera purpose-string, and background audio permissions.
 
 Developer Options show device/system information, active speech pipeline, supported pipeline types, runtime analyzer input format, and a Loudness Processing toggle for comparing normalized files against raw Stereo Capture recordings.
 

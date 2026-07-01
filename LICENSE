@@ -1,0 +1,121 @@
+LiveTranscriber Source Available License 1.0
+
+Copyright (c) 2026 William Li
+
+This license applies to the LiveTranscriber source code and project materials,
+except for third-party components that include their own license notices.
+
+This is a source-available license. It is not an OSI-approved open-source
+license because it includes commercial attribution requirements.
+
+1. Definitions
+
+"Project" means LiveTranscriber, including its source code, documentation,
+assets, build files, and related materials distributed with this license.
+
+"Licensor" means William Li.
+
+"You" means any individual or legal entity exercising rights under this
+license.
+
+"Commercial Distribution" means distributing, selling, sublicensing, offering,
+publishing, deploying, or making available any application, service, product,
+or fork based on the Project for commercial advantage or monetary compensation,
+including paid apps, subscriptions, advertising-supported apps, enterprise
+offerings, client work, bundled products, or white-label products.
+
+"Derivative Product" means any application, service, product, or fork that is
+based on, derived from, incorporates, or substantially reuses the Project.
+
+2. Source-Available Grant
+
+Subject to this license, the Licensor grants You a worldwide, royalty-free,
+non-exclusive, revocable-on-breach license to:
+
+- view, study, and run the Project;
+- copy and modify the Project;
+- create forks and derivative works;
+- distribute source-code copies of the Project or derivative works; and
+- distribute compiled applications or services based on the Project, including
+  through Commercial Distribution, only if You comply with Section 4.
+
+3. Preservation of Notices
+
+Any distribution of the Project or a derivative work must preserve:
+
+- this LICENSE file;
+- the NOTICE file;
+- copyright notices;
+- third-party license notices; and
+- any attribution notices already present in the Project.
+
+You may add your own copyright notices for your modifications, but You may not
+remove or obscure the Licensor's notices.
+
+4. Commercial Attribution Requirement
+
+If You engage in Commercial Distribution of a Derivative Product, You must
+include visible in-app attribution to the original Project and Licensor.
+
+The attribution must be available from a reasonably discoverable location in
+the app or service, such as Settings, About, Credits, Legal, or an equivalent
+screen. It must be visible to end users without requiring a paid upgrade.
+
+The attribution must include substantially the following text:
+
+Based on LiveTranscriber by William Li
+Original project: https://github.com/iamwilliamli/LiveTranscriber
+
+The attribution must be at least as prominent as other third-party notices in
+the app or service. You may adapt formatting to fit your interface, but You may
+not remove the Licensor's name or the original project link.
+
+This attribution does not imply endorsement by the Licensor.
+
+5. White-Label and Attribution-Free Use
+
+Commercial Distribution without the attribution required by Section 4 is not
+permitted under this license. White-label use, private-label use, removal of
+the Project attribution, or use that implies the Project is entirely your
+original work requires a separate written commercial license from the Licensor.
+
+6. Trademarks and Branding
+
+This license does not grant permission to use the Licensor's name, trademarks,
+logos, app icons, trade dress, or branding except as necessary to provide the
+attribution required by Section 4 and preserve existing notices.
+
+Derivative Products must not imply endorsement, sponsorship, or official status
+unless separately authorized in writing by the Licensor.
+
+7. Contributions
+
+If You intentionally submit a contribution to the Project, You agree that your
+contribution is licensed under this license. You also grant the Licensor a
+perpetual, worldwide, non-exclusive, royalty-free, irrevocable license to use,
+copy, modify, publish, distribute, sublicense, and relicense your contribution,
+including for commercial purposes.
+
+8. No Warranty
+
+THE PROJECT IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE, TITLE, AND NON-INFRINGEMENT. USE THE PROJECT
+AT YOUR OWN RISK.
+
+9. Limitation of Liability
+
+IN NO EVENT SHALL THE LICENSOR BE LIABLE FOR ANY CLAIM, DAMAGES, OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT, OR OTHERWISE, ARISING FROM,
+OUT OF, OR IN CONNECTION WITH THE PROJECT OR THE USE OR OTHER DEALINGS IN THE
+PROJECT.
+
+10. Termination
+
+Your rights under this license terminate automatically if You violate any term
+of this license and do not cure the violation within 30 days after receiving
+notice. Sections 3, 4, 5, 6, 7, 8, and 9 survive termination.
+
+11. Reserved Rights
+
+All rights not expressly granted by this license are reserved by the Licensor.

@@ -1328,6 +1328,7 @@ struct RecordingDetailView: View {
 
     private var header: some View {
         let item = currentItem
+        let iCloudSyncStatus = store.iCloudSyncStatus(for: item)
 
         return VStack(alignment: .leading, spacing: 10) {
             Label(item.audioFileName, systemImage: "waveform")
@@ -1335,10 +1336,25 @@ struct RecordingDetailView: View {
                 .lineLimit(2)
                 .truncationMode(.middle)
 
-            HStack(spacing: 10) {
-                RecordingInfoPill(icon: "calendar", text: item.createdAt.formatted(date: .abbreviated, time: .shortened))
-                RecordingInfoPill(icon: "clock", text: TranscriptionLine.formatTimestamp(Double(item.durationSeconds)))
-                RecordingInfoPill(icon: "globe", text: item.languageName)
+            ViewThatFits(in: .horizontal) {
+                HStack(spacing: 10) {
+                    RecordingInfoPill(icon: "calendar", text: item.createdAt.formatted(date: .abbreviated, time: .shortened))
+                    RecordingInfoPill(icon: "clock", text: TranscriptionLine.formatTimestamp(Double(item.durationSeconds)))
+                    RecordingInfoPill(icon: "globe", text: item.languageName)
+                    RecordingInfoPill(icon: iCloudSyncStatus.systemImage, text: iCloudSyncStatus.displayName)
+                }
+
+                VStack(alignment: .leading, spacing: 8) {
+                    HStack(spacing: 10) {
+                        RecordingInfoPill(icon: "calendar", text: item.createdAt.formatted(date: .abbreviated, time: .shortened))
+                        RecordingInfoPill(icon: "clock", text: TranscriptionLine.formatTimestamp(Double(item.durationSeconds)))
+                    }
+
+                    HStack(spacing: 10) {
+                        RecordingInfoPill(icon: "globe", text: item.languageName)
+                        RecordingInfoPill(icon: iCloudSyncStatus.systemImage, text: iCloudSyncStatus.displayName)
+                    }
+                }
             }
 
             if !item.combinedTags.isEmpty {
@@ -1424,7 +1440,9 @@ struct RecordingDetailView: View {
     }
 
     private var audioParametersCard: some View {
-        VStack(alignment: .leading, spacing: 12) {
+        let iCloudSyncStatus = store.iCloudSyncStatus(for: currentItem)
+
+        return VStack(alignment: .leading, spacing: 12) {
             Label("音频参数", systemImage: "info.circle")
                 .font(.redditSans(.headline))
 
@@ -1438,6 +1456,7 @@ struct RecordingDetailView: View {
                     RecordingAudioParameterRow(icon: "timer", title: "音频时长", value: audioFileInfo.durationText)
                     RecordingAudioParameterRow(icon: "square.stack.3d.up", title: "音频帧数", value: audioFileInfo.frameCountText)
                     RecordingAudioParameterRow(icon: "doc", title: "文件大小", value: audioFileInfo.fileSizeText)
+                    RecordingAudioParameterRow(icon: iCloudSyncStatus.systemImage, title: "iCloud 同步", value: iCloudSyncStatus.displayName)
                     RecordingAudioParameterRow(icon: "checkmark.seal", title: "音量处理", value: audioFileInfo.normalizationText, showsDivider: false)
                 }
             } else if let audioFileInfoError {

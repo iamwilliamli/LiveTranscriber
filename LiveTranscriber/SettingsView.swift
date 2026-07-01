@@ -4,6 +4,7 @@ import UIKit
 struct SettingsView: View {
     @ObservedObject var transcriber: LiveTranscriptionManager
     @ObservedObject var recordingStore: RecordingStore
+    @State private var iCloudSyncRefreshTick = 0
 
     var body: some View {
         NavigationStack {
@@ -90,6 +91,9 @@ struct SettingsView: View {
             await transcriber.refreshSupportedLanguages()
             await recordingStore.reload()
             recordingStore.refreshIntelligenceAvailability()
+        }
+        .task {
+            await refreshICloudSyncStatusPeriodically()
         }
     }
 
@@ -193,6 +197,17 @@ struct SettingsView: View {
         }
     }
 
+    private var iCloudStorageBinding: Binding<Bool> {
+        Binding {
+            recordingStore.isICloudStorageEnabled
+        } set: { isEnabled in
+            HapticFeedback.play(.menuSelection)
+            Task {
+                await recordingStore.setICloudStorageEnabled(isEnabled)
+            }
+        }
+    }
+
     private var developerSettingsPage: some View {
         SettingsDetailPage(title: "开发者选项") {
             developerSection
@@ -231,13 +246,13 @@ struct SettingsView: View {
 
                 SettingsStatusRow(
                     icon: "icloud",
-                    text: "录音文件保存在 app 私有存储；启用 iCloud 时同步到 app 私有 iCloud container 的 Data 目录，不暴露到 iCloud Drive 文件夹。",
+                    text: "默认保存在本机 app 私有容器；只有在设置里开启 iCloud 后，录音文件和索引才会保存到 app 私有 iCloud container。",
                     tint: AppTheme.info
                 )
 
                 SettingsStatusRow(
                     icon: "list.bullet.rectangle",
-                    text: "录音索引用 SwiftData 存储，并通过 CloudKit private database 同步到用户自己的 iCloud。",
+                    text: "录音索引默认存在本机；开启 iCloud 后通过 CloudKit private database 同步到用户自己的 iCloud。",
                     tint: AppTheme.info
                 )
 
@@ -310,7 +325,11 @@ struct SettingsView: View {
     }
 
     private var fileSection: some View {
-        SettingsSection(title: "文件", systemImage: "folder", tint: AppTheme.success) {
+        let refreshTick = iCloudSyncRefreshTick
+        let iCloudSyncSummary = recordingStore.iCloudSyncSummary
+        let iCloudSyncTint = iCloudSyncSummary.failedRecordingCount > 0 ? AppTheme.warning : AppTheme.info
+
+        return SettingsSection(title: "文件", systemImage: "folder", tint: AppTheme.success) {
             SettingsMetricRow(
                 icon: "number",
                 title: "录音数量",
@@ -324,6 +343,67 @@ struct SettingsView: View {
                 value: recordingStore.storageDisplayName,
                 tint: AppTheme.info
             )
+
+            Toggle(isOn: iCloudStorageBinding) {
+                HStack(alignment: .top, spacing: 10) {
+                    SettingsIcon(systemImage: "icloud", tint: AppTheme.info)
+
+                    VStack(alignment: .leading, spacing: 3) {
+                        Text("iCloud 同步")
+                            .font(.redditSans(.subheadline, weight: .semibold))
+                            .foregroundStyle(.primary)
+
+                        Text("开启后，新的录音和索引会保存到 app 私有 iCloud container；关闭时默认保存在本机 app 私有容器。")
+                            .font(.redditSans(.caption))
+                            .foregroundStyle(.secondary)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                }
+            }
+            .toggleStyle(.switch)
+            .disabled(recordingStore.isStorageLocationChanging)
+
+            SettingsMetricRow(
+                icon: "icloud.and.arrow.up",
+                title: "iCloud 状态",
+                value: recordingStore.iCloudStorageStatusDisplayName,
+                tint: recordingStore.isICloudStorageEnabled ? AppTheme.info : AppTheme.warning
+            )
+
+            SettingsVerbatimStatusRow(
+                icon: recordingStore.isICloudStorageEnabled ? "icloud" : "internaldrive",
+                text: recordingStore.iCloudStorageDetailText,
+                tint: recordingStore.isICloudStorageEnabled ? AppTheme.info : AppTheme.success
+            )
+
+            SettingsMetricRow(
+                icon: iCloudSyncSummary.systemImage,
+                title: "iCloud 同步进度",
+                value: iCloudSyncSummary.statusText,
+                tint: iCloudSyncTint
+            )
+            .id(refreshTick)
+
+            SettingsVerbatimStatusRow(
+                icon: iCloudSyncSummary.systemImage,
+                text: iCloudSyncSummary.detailText,
+                tint: iCloudSyncTint
+            )
+            .id("detail-\(refreshTick)")
+        }
+    }
+
+    private func refreshICloudSyncStatusPeriodically() async {
+        while !Task.isCancelled {
+            do {
+                try await Task.sleep(nanoseconds: 5_000_000_000)
+            } catch {
+                return
+            }
+
+            await MainActor.run {
+                iCloudSyncRefreshTick &+= 1
+            }
         }
     }
 
@@ -331,6 +411,7 @@ struct SettingsView: View {
         let availability = recordingStore.intelligenceAvailability
         let tint = availability.isAvailable ? AppTheme.success : AppTheme.warning
         let device = DeveloperDeviceInfo.current
+        let build = DeveloperBuildInfo.current
         let pipeline = transcriber.speechPipelineDiagnostics
 
         return SettingsSection(title: "开发者选项", systemImage: "wrench.and.screwdriver", tint: AppTheme.purple) {
@@ -345,6 +426,20 @@ struct SettingsView: View {
                 icon: "gearshape",
                 title: "系统版本",
                 value: device.systemVersion,
+                tint: AppTheme.info
+            )
+
+            SettingsMetricRow(
+                icon: "number",
+                title: "版本",
+                value: build.version,
+                tint: AppTheme.info
+            )
+
+            SettingsMetricRow(
+                icon: "calendar.badge.clock",
+                title: "Build 时间",
+                value: build.buildTime,
                 tint: AppTheme.info
             )
 
@@ -420,6 +515,56 @@ struct SettingsView: View {
             )
         }
     }
+}
+
+private struct DeveloperBuildInfo {
+    var version: String
+    var buildTime: String
+
+    static var current: DeveloperBuildInfo {
+        DeveloperBuildInfo(
+            version: versionText(),
+            buildTime: buildTimeText()
+        )
+    }
+
+    private static func versionText(bundle: Bundle = .main) -> String {
+        let unknown = String(localized: "未知")
+        let version = (bundle.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String)
+            .flatMap { $0.isEmpty ? nil : $0 } ?? unknown
+        let build = (bundle.object(forInfoDictionaryKey: "CFBundleVersion") as? String)
+            .flatMap { $0.isEmpty ? nil : $0 }
+
+        guard let build else {
+            return version
+        }
+
+        return "\(version) (\(build))"
+    }
+
+    private static func buildTimeText(bundle: Bundle = .main) -> String {
+        if let stampedTimestamp = bundle.object(forInfoDictionaryKey: "LTBuildTimestamp") as? String,
+           let stampedDate = iso8601Formatter.date(from: stampedTimestamp) {
+            return displayFormatter.string(from: stampedDate)
+        }
+
+        if let executableURL = bundle.executableURL,
+           let values = try? executableURL.resourceValues(forKeys: [.contentModificationDateKey]),
+           let date = values.contentModificationDate {
+            return displayFormatter.string(from: date)
+        }
+
+        return String(localized: "未知")
+    }
+
+    private static let iso8601Formatter = ISO8601DateFormatter()
+
+    private static let displayFormatter: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.dateFormat = "yyyy-MM-dd HH:mm:ss zzz"
+        return formatter
+    }()
 }
 
 private struct DeveloperDeviceInfo {
@@ -590,6 +735,26 @@ private struct SettingsMetricRow: View {
 private struct SettingsStatusRow: View {
     let icon: String
     let text: LocalizedStringKey
+    let tint: Color
+
+    var body: some View {
+        HStack(alignment: .top, spacing: 8) {
+            Image(systemName: icon)
+                .font(.system(size: 12, weight: .semibold))
+                .foregroundStyle(tint)
+                .frame(width: 18, height: 18)
+
+            Text(text)
+                .font(.redditSans(.caption))
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+    }
+}
+
+private struct SettingsVerbatimStatusRow: View {
+    let icon: String
+    let text: String
     let tint: Color
 
     var body: some View {
