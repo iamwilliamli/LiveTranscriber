@@ -51,8 +51,8 @@ final class LiveTranscriptionManager: ObservableObject {
     @Published private(set) var statusText = String(localized: L10n.RecordingStatus.ready)
     @Published private(set) var errorText: String?
     @Published private(set) var elapsedSeconds: Int = 0
-    @Published private(set) var inputLevel: Float = 0
-    @Published private(set) var inputLevelHistory: [Float] = Array(repeating: 0, count: 72)
+    private(set) var inputLevel: Float = 0
+    private(set) var inputLevelHistory: [Float] = Array(repeating: 0, count: 72)
     @Published private(set) var supportedLanguages: [TranscriptionLanguage] = TranscriptionLanguage.fallbackOptions
     @Published private(set) var speechPipelineRuntimeFormatText = String(localized: L10n.SpeechText.runtimeInputWaitingRecording)
     @Published var selectedAudioFormat: RecordingAudioFormat {
@@ -227,17 +227,11 @@ final class LiveTranscriptionManager: ObservableObject {
         let prepared = try await prepareSpeechPipeline(language: language, audioInputFormat: analyzerSourceFormat)
         let recordingURL = try Self.makeTemporaryRecordingURL(format: audioFormat)
         let writer = try AudioFileWriter(url: recordingURL, inputFormat: recordingFormat, outputFormat: audioFormat)
-        let inputLevelObserver: @Sendable (Float) -> Void = { [weak self] level in
-            Task { @MainActor [weak self] in
-                self?.handleInputLevel(level)
-            }
-        }
         let capturePipeline = CaptureSessionRecordingPipeline(
             recordingFormat: recordingFormat,
             analyzerSourceFormat: analyzerSourceFormat,
             writer: writer,
-            analyzerPipeline: prepared.pipeline,
-            inputLevelObserver: inputLevelObserver
+            analyzerPipeline: prepared.pipeline
         )
 
         analyzer = prepared.analyzer
@@ -1257,7 +1251,7 @@ private final class CaptureSessionRecordingPipeline: NSObject, AVCaptureAudioDat
     private let analyzerSourceFormat: AVAudioFormat
     private let writer: AudioFileWriter
     private let analyzerPipeline: AnalyzerInputPipeline
-    private let inputLevelObserver: @Sendable (Float) -> Void
+    private let inputLevelObserver: (@Sendable (Float) -> Void)?
     private let recordingConverter: CaptureSampleBufferAudioConverter
     private let analyzerConverter: CaptureSampleBufferAudioConverter
 
@@ -1273,7 +1267,7 @@ private final class CaptureSessionRecordingPipeline: NSObject, AVCaptureAudioDat
         analyzerSourceFormat: AVAudioFormat,
         writer: AudioFileWriter,
         analyzerPipeline: AnalyzerInputPipeline,
-        inputLevelObserver: @escaping @Sendable (Float) -> Void
+        inputLevelObserver: (@Sendable (Float) -> Void)? = nil
     ) {
         self.recordingFormat = recordingFormat
         self.analyzerSourceFormat = analyzerSourceFormat
@@ -1385,6 +1379,10 @@ private final class CaptureSessionRecordingPipeline: NSObject, AVCaptureAudioDat
     }
 
     private func reportInputLevelIfNeeded(_ buffer: AVAudioPCMBuffer) {
+        guard let inputLevelObserver else {
+            return
+        }
+
         let now = DispatchTime.now().uptimeNanoseconds
         guard now - lastInputLevelReportTime >= 33_000_000 else {
             return

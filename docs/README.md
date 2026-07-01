@@ -8,7 +8,6 @@ This folder contains focused engineering notes for LiveTranscriber. Keep user-fa
 - [Recording Processing Pipeline](RECORDING_PIPELINE.md): AVCaptureSession audio capture, transcription fan-out, and stereo recording decisions.
 - [Live Activity Design](LIVE_ACTIVITY.md): Lock Screen and Dynamic Island state, layout, and update policy.
 - [Localization](LOCALIZATION.md): Semantic string catalog rules, Swift usage patterns, and steps for adding a new language.
-- [Reddit Launch Draft](REDDIT_POST.md): Source-available launch announcement draft and project positioning.
 - [Development Notes](../DEVELOPMENT_NOTES.md): Full project log, feature notes, tradeoffs, and TestFlight checklist.
 
 ## Current Architecture

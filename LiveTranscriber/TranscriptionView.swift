@@ -1362,12 +1362,12 @@ private struct RollingRecorderDigit: View {
         self.width = width
         self.height = height
         self.color = color
-        _rollingValue = State(initialValue: 10 + (value % 10))
+        _rollingValue = State(initialValue: value % 10)
     }
 
     var body: some View {
         VStack(spacing: 0) {
-            ForEach(0..<30, id: \.self) { index in
+            ForEach(0..<20, id: \.self) { index in
                 Text("\(index % 10)")
                     .font(.system(size: 40, weight: .semibold, design: .monospaced))
                     .foregroundStyle(color)
@@ -1383,7 +1383,7 @@ private struct RollingRecorderDigit: View {
         .onChange(of: value) { _, newValue in
             roll(to: newValue)
         }
-        .animation(.spring(response: 0.36, dampingFraction: 0.82), value: rollingValue)
+        .animation(.easeOut(duration: 0.24), value: rollingValue)
     }
 
     private func roll(to newValue: Int) {
@@ -1394,9 +1394,9 @@ private struct RollingRecorderDigit: View {
         }
 
         rollingValue += step
-        if rollingValue >= 20 {
-            let resetValue = 10 + newValue
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.42) {
+        if rollingValue >= 10 {
+            let resetValue = newValue % 10
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.28) {
                 reset(to: resetValue)
             }
         }
@@ -1406,7 +1406,7 @@ private struct RollingRecorderDigit: View {
         var transaction = Transaction()
         transaction.disablesAnimations = true
         withTransaction(transaction) {
-            rollingValue = 10 + (newValue % 10)
+            rollingValue = newValue % 10
         }
     }
 }

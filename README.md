@@ -1,5 +1,7 @@
 # LiveTranscriber
 
+![LiveTranscriber README poster](docs/assets/readme-poster.png)
+
 LiveTranscriber is an iOS 26+ local recording and live transcription app. It records audio, transcribes speech on device with Apple's Speech APIs, saves audio and transcript files, and keeps recording status visible through Lock Screen Live Activities and Dynamic Island.
 
 The project is designed as a native iOS utility rather than a cloud transcription client. Audio, transcripts, and the recording index stay in the local app-private container by default. Users can enable iCloud in Settings to move storage into an app-private iCloud container for cross-device sync.
@@ -149,7 +151,6 @@ For device testing, open `LiveTranscriber.xcodeproj` in Xcode and use a signing 
 - [Live Activity Design](docs/LIVE_ACTIVITY.md)
 - [Localization](docs/LOCALIZATION.md)
 - [Development Notes](DEVELOPMENT_NOTES.md)
-- [Reddit Launch Draft](docs/REDDIT_POST.md)
 
 ## Third-Party Licenses
 
