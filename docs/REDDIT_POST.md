@@ -10,6 +10,8 @@ I built LiveTranscriber, a local-first iOS 26+ recording and live transcription 
 
 I am releasing the source so people can learn from it, fork it, and keep developing it. The project is source-available rather than OSI-open-source because I want to preserve commercial attribution rights: commercial forks are allowed, but they must visibly credit the original app and project in-app.
 
+One honest note: the app was built quickly and is mostly vibe-coded/prototyped, so the codebase still needs real engineering pass-throughs. I expect there are plenty of places to simplify, optimize, harden, and make the architecture more maintainable.
+
 Required commercial attribution:
 
 Based on LiveTranscriber by William Li
@@ -28,4 +30,3 @@ Notes:
 - Audio and transcripts stay in the app-private container by default.
 - iCloud sync uses the user's private iCloud container when enabled.
 - Built with SwiftUI, Speech, AVFoundation, ActivityKit, WidgetKit, SwiftData, CloudKit, and FoundationModels.
-

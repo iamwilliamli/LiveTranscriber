@@ -733,10 +733,10 @@ private extension Font {
     TranscriptionLiveActivityWidget()
 } contentStates: {
     TranscriptionActivityAttributes.ContentState(
-        status: "正在录音",
-        languageName: "简体中文",
-        latestText: "这是一句实时转录文本，会同步显示到灵动岛。",
-        placeholderText: String(localized: "等待语音"),
+        status: "Recording",
+        languageName: "English",
+        latestText: "This is a live transcript preview shown in Dynamic Island.",
+        placeholderText: "Waiting for speech",
         elapsedSeconds: 92,
         timerReferenceDate: Date(timeIntervalSinceNow: -92),
         lineCount: 8,

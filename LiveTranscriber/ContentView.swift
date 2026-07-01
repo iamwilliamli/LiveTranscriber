@@ -11,7 +11,7 @@ struct ContentView: View {
 
     var body: some View {
         TabView(selection: tabSelection) {
-            Tab("转录", systemImage: "waveform.and.mic", value: AppTab.transcribe) {
+            Tab(String(localized: L10n.App.transcribeTab), systemImage: "waveform.and.mic", value: AppTab.transcribe) {
                 TranscriptionView(
                     transcriber: transcriber,
                     recordingStore: recordingStore,
@@ -19,7 +19,7 @@ struct ContentView: View {
                 )
             }
 
-            Tab("录音文件", systemImage: "folder", value: AppTab.recordings) {
+            Tab(String(localized: L10n.App.recordingsTab), systemImage: "folder", value: AppTab.recordings) {
                 RecordingsView(
                     store: recordingStore,
                     transcriber: transcriber,
@@ -28,7 +28,7 @@ struct ContentView: View {
                 )
             }
 
-            Tab("设置", systemImage: "gearshape", value: AppTab.settings) {
+            Tab(String(localized: L10n.App.settingsTab), systemImage: "gearshape", value: AppTab.settings) {
                 SettingsView(transcriber: transcriber, recordingStore: recordingStore)
             }
         }

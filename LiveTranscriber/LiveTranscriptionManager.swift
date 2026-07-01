@@ -48,28 +48,23 @@ final class LiveTranscriptionManager: ObservableObject {
     @Published private(set) var isRecording = false
     @Published private(set) var isPaused = false
     @Published private(set) var isPreparing = false
-    @Published private(set) var statusText = String(localized: "准备就绪")
+    @Published private(set) var statusText = String(localized: L10n.RecordingStatus.ready)
     @Published private(set) var errorText: String?
     @Published private(set) var elapsedSeconds: Int = 0
     @Published private(set) var inputLevel: Float = 0
     @Published private(set) var inputLevelHistory: [Float] = Array(repeating: 0, count: 72)
     @Published private(set) var supportedLanguages: [TranscriptionLanguage] = TranscriptionLanguage.fallbackOptions
-    @Published private(set) var speechPipelineRuntimeFormatText = String(localized: "Runtime Analyzer 输入: 等待录音")
+    @Published private(set) var speechPipelineRuntimeFormatText = String(localized: L10n.SpeechText.runtimeInputWaitingRecording)
     @Published var selectedAudioFormat: RecordingAudioFormat {
         didSet {
             UserDefaults.standard.set(selectedAudioFormat.rawValue, forKey: Self.audioFormatDefaultsKey)
-        }
-    }
-    @Published var isLoudnessProcessingEnabled: Bool {
-        didSet {
-            UserDefaults.standard.set(isLoudnessProcessingEnabled, forKey: Self.loudnessProcessingDefaultsKey)
         }
     }
     @Published var selectedLanguageID: String {
         didSet {
             UserDefaults.standard.set(selectedLanguageID, forKey: Self.languageDefaultsKey)
             if !isRecording && !isPreparing {
-                statusText = String(localized: "准备就绪")
+                statusText = String(localized: L10n.RecordingStatus.ready)
             }
         }
     }
@@ -81,7 +76,6 @@ final class LiveTranscriptionManager: ObservableObject {
 
     private static let languageDefaultsKey = "transcription.language"
     private static let audioFormatDefaultsKey = "recording.audioFormat"
-    private static let loudnessProcessingDefaultsKey = "developer.loudnessProcessingEnabled"
     private static let speechPipelineModeDefaultsKey = "speech.pipelineMode"
     private static let analyzerSampleRate: Double = 16_000
     private static let inputLevelHistoryCount = 72
@@ -101,7 +95,6 @@ final class LiveTranscriptionManager: ObservableObject {
     private var accumulatedRecordingSeconds: TimeInterval = 0
     private var currentAudioURL: URL?
     private var currentRecordingFormat: AVAudioFormat?
-    private var currentAudioOutputFormat: RecordingAudioFormat?
     private var smoothedInputLevel: Float = 0
     private var lastInputLevelHistorySampleAt: TimeInterval = 0
     private var finalizedLines: [TranscriptionLine] = []
@@ -151,11 +144,6 @@ final class LiveTranscriptionManager: ObservableObject {
             selectedAudioFormat = .defaultFormat
         }
 
-        if UserDefaults.standard.object(forKey: Self.loudnessProcessingDefaultsKey) == nil {
-            isLoudnessProcessingEnabled = false
-        } else {
-            isLoudnessProcessingEnabled = UserDefaults.standard.bool(forKey: Self.loudnessProcessingDefaultsKey)
-        }
     }
 
     func refreshSupportedLanguages() async {
@@ -195,9 +183,9 @@ final class LiveTranscriptionManager: ObservableObject {
         errorText = nil
         resetInputLevel(clearHistory: true)
         lastSpeechPipelineRuntimeFormat = nil
-        speechPipelineRuntimeFormatText = String(localized: "Runtime Analyzer 输入: 等待首个 buffer")
+        speechPipelineRuntimeFormatText = String(localized: L10n.SpeechText.runtimeInputWaitingFirstBuffer)
         resetTranscriptStorage()
-        statusText = String(localized: "正在请求权限")
+        statusText = String(localized: L10n.RecordingStatus.requestingPermission)
 
         guard await requestPermissions() else {
             isPreparing = false
@@ -212,7 +200,7 @@ final class LiveTranscriptionManager: ObservableObject {
             isPreparing = false
             isRecording = true
             isPaused = false
-            statusText = String(localized: "正在录音")
+            statusText = String(localized: L10n.RecordingStatus.recording)
             await TranscriptionLiveActivityCoordinator.start(
                 startedAt: recordingStartedAt ?? Date(),
                 status: statusText,
@@ -226,7 +214,7 @@ final class LiveTranscriptionManager: ObservableObject {
             if let draft = await stopRecording(endingLiveActivity: false) {
                 try? FileManager.default.removeItem(at: draft.audioURL)
             }
-            fail(with: String(format: String(localized: "录音启动失败: %@"), error.localizedDescription))
+            fail(with: String(format: String(localized: L10n.SpeechText.recordingStartFailedFormat), error.localizedDescription))
         }
     }
 
@@ -259,7 +247,6 @@ final class LiveTranscriptionManager: ObservableObject {
         audioWriter = writer
         currentAudioURL = recordingURL
         currentRecordingFormat = recordingFormat
-        currentAudioOutputFormat = audioFormat
 
         startResultReader(for: prepared.transcriber)
         startAnalyzer(prepared.analyzer, stream: prepared.stream)
@@ -275,7 +262,7 @@ final class LiveTranscriptionManager: ObservableObject {
         resetInputLevel()
         pauseElapsedTimer()
         isPaused = true
-        statusText = String(localized: "已暂停")
+        statusText = String(localized: L10n.RecordingStatus.paused)
         await deactivateAudioSession()
         await updateLiveActivityFromCurrentState(isRecording: false)
     }
@@ -285,7 +272,7 @@ final class LiveTranscriptionManager: ObservableObject {
             return
         }
         guard let captureRecordingPipeline else {
-            fail(with: String(localized: "录音恢复失败"))
+            fail(with: String(localized: L10n.SpeechText.recordingResumeFailed))
             return
         }
 
@@ -294,10 +281,10 @@ final class LiveTranscriptionManager: ObservableObject {
             try await captureRecordingPipeline.start()
             resumeElapsedTimer()
             isPaused = false
-            statusText = String(localized: "正在录音")
+            statusText = String(localized: L10n.RecordingStatus.recording)
             await updateLiveActivityFromCurrentState(isRecording: true)
         } catch {
-            fail(with: String(format: String(localized: "录音恢复失败: %@"), error.localizedDescription))
+            fail(with: String(format: String(localized: L10n.SpeechText.recordingResumeFailedFormat), error.localizedDescription))
         }
     }
 
@@ -339,13 +326,13 @@ final class LiveTranscriptionManager: ObservableObject {
         finishElapsedTimer()
         let finishedLines = transcriptLines
         let recordingURL = currentAudioURL
-        let audioOutputFormat = currentAudioOutputFormat ?? selectedAudioFormat
         currentAudioURL = nil
-        currentAudioOutputFormat = nil
         let startedAt = recordingStartedAt ?? Date()
         recordingStartedAt = nil
 
-        statusText = hasTranscript ? String(localized: "转录完成") : String(localized: "已停止")
+        statusText = hasTranscript
+            ? String(localized: L10n.RecordingStatus.complete)
+            : String(localized: L10n.RecordingStatus.stopped)
         await deactivateAudioSession()
 
         if endingLiveActivity {
@@ -362,29 +349,13 @@ final class LiveTranscriptionManager: ObservableObject {
             return nil
         }
 
-        let audioNormalizedAt: Date?
-        if isLoudnessProcessingEnabled {
-            statusText = String(localized: "正在增强录音音量")
-            do {
-                try await RecordingFileNormalizer.normalize(url: recordingURL, outputFormat: audioOutputFormat)
-                audioNormalizedAt = Date()
-            } catch {
-                audioNormalizedAt = nil
-            }
-        } else {
-            audioNormalizedAt = nil
-        }
-        statusText = hasTranscript ? String(localized: "转录完成") : String(localized: "已停止")
-
         return RecordingDraft(
             audioURL: recordingURL,
             startedAt: startedAt,
             durationSeconds: elapsedSeconds,
             languageID: selectedLanguageID,
             languageName: selectedLanguage.displayName,
-            lines: finishedLines,
-            audioNormalizedAt: audioNormalizedAt,
-            audioNormalizationVersion: audioNormalizedAt == nil ? nil : RecordingFileNormalizer.version
+            lines: finishedLines
         )
     }
 
@@ -392,7 +363,7 @@ final class LiveTranscriptionManager: ObservableObject {
         resetTranscriptStorage()
         errorText = nil
         if !isRecording {
-            statusText = String(localized: "准备就绪")
+            statusText = String(localized: L10n.RecordingStatus.ready)
             elapsedSeconds = 0
             resetInputLevel(clearHistory: true)
             accumulatedRecordingSeconds = 0
@@ -405,7 +376,7 @@ final class LiveTranscriptionManager: ObservableObject {
         language: TranscriptionLanguage,
         audioInputFormat: AVAudioFormat
     ) async throws -> PreparedSpeechPipeline {
-        statusText = String(localized: "正在准备语言模型")
+        statusText = String(localized: L10n.RecordingStatus.preparingLanguageModel)
         guard SpeechTranscriber.isAvailable else {
             throw LiveTranscriptionError.analyzerUnavailable
         }
@@ -569,7 +540,7 @@ final class LiveTranscriptionManager: ObservableObject {
         case .unsupported:
             throw LiveTranscriptionError.unsupportedLanguage
         case .downloading:
-            statusText = String(localized: "正在下载语言模型")
+            statusText = String(localized: L10n.RecordingStatus.downloadingLanguageModel)
         case .supported, .installed:
             break
         @unknown default:
@@ -577,7 +548,7 @@ final class LiveTranscriptionManager: ObservableObject {
         }
 
         if let request = try await AssetInventory.assetInstallationRequest(supporting: modules) {
-            statusText = String(localized: "正在下载语言模型")
+            statusText = String(localized: L10n.RecordingStatus.downloadingLanguageModel)
             try await request.downloadAndInstall()
         }
     }
@@ -621,14 +592,14 @@ final class LiveTranscriptionManager: ObservableObject {
         let speechStatus = await requestSpeechAuthorization()
         guard speechStatus == .authorized else {
             let message = speechStatus == .restricted
-                ? String(localized: "语音识别受系统限制")
-                : String(localized: "语音识别权限被拒绝")
+                ? String(localized: L10n.SpeechText.speechRestricted)
+                : String(localized: L10n.SpeechText.speechDenied)
             fail(with: message)
             return false
         }
 
         guard await requestMicrophoneAuthorization() else {
-            fail(with: String(localized: "麦克风权限被拒绝"))
+            fail(with: String(localized: L10n.SpeechText.microphoneDenied))
             return false
         }
 
@@ -728,7 +699,7 @@ final class LiveTranscriptionManager: ObservableObject {
 
         publishLines()
         if !isPaused {
-            statusText = String(localized: "正在录音")
+            statusText = String(localized: L10n.RecordingStatus.recording)
         }
 
         if result.isFinal {
@@ -943,7 +914,7 @@ private struct SpeechPipelineRuntimeFormat: Equatable, Sendable {
 
     var displayText: String {
         String(
-            format: String(localized: "Runtime Analyzer 输入: Mic %@ -> Analyzer %@"),
+            format: String(localized: L10n.SpeechText.runtimeInputMicToAnalyzerFormat),
             Self.formatDescription(
                 sampleRate: sourceSampleRate,
                 channelCount: sourceChannelCount,
@@ -1512,7 +1483,7 @@ private final class CaptureSessionRecordingPipeline: NSObject, AVCaptureAudioDat
         }
 
         didReportFirstFormat = true
-        let name = deviceName.isEmpty ? String(localized: "未知") : deviceName
+        let name = deviceName.isEmpty ? String(localized: L10n.Common.unknown) : deviceName
         liveTranscriptionLogger.debug(
             "AVCapture Stereo first buffer device=\(name, privacy: .public) source=\(liveAudioFormatSummary(sourceFormat), privacy: .public) file=\(liveAudioFormatSummary(recordingFormat), privacy: .public) analyzer=\(liveAudioFormatSummary(analyzerSourceFormat), privacy: .public)"
         )
@@ -1752,349 +1723,6 @@ private final class AudioFileWriter: @unchecked Sendable {
     }
 }
 
-enum RecordingFileNormalizer {
-    static let version = 2
-
-    private static let targetActiveRMS: Float = 0.20
-    private static let maximumGain: Float = 16
-    private static let limiterCeiling: Float = 0.94
-    private static let activeSampleThreshold: Float = 0.012
-    private static let minimumActiveRMS: Float = 0.006
-    private static let frameCapacity: AVAudioFrameCount = 8_192
-
-    static func normalize(url: URL, outputFormat: RecordingAudioFormat) async throws {
-        try await Task.detached(priority: .utility) {
-            try normalizeSynchronously(url: url, outputFormat: outputFormat)
-        }.value
-    }
-
-    private static func normalizeSynchronously(url: URL, outputFormat: RecordingAudioFormat) throws {
-        let processingFormat: AVAudioFormat
-        let stats: AVAudioPCMBuffer.LevelStats
-        do {
-            let input = try AVAudioFile(forReading: url)
-            processingFormat = input.processingFormat
-            stats = try wholeFileLevelStats(file: input, format: processingFormat)
-        }
-
-        guard stats.activeSampleCount > 0, stats.activeRMS >= minimumActiveRMS else {
-            return
-        }
-
-        let gain = min(max(targetActiveRMS / max(stats.activeRMS, 0.0001), 1), maximumGain)
-        guard gain > 1.05 else {
-            return
-        }
-
-        let temporaryURL = url
-            .deletingLastPathComponent()
-            .appendingPathComponent(".normalized-\(UUID().uuidString).\(outputFormat.fileExtension)")
-
-        do {
-            let input = try AVAudioFile(forReading: url)
-            let output = try AVAudioFile(
-                forWriting: temporaryURL,
-                settings: AudioFileWriter.settings(for: outputFormat, inputFormat: processingFormat),
-                commonFormat: processingFormat.commonFormat,
-                interleaved: processingFormat.isInterleaved
-            )
-            try writeNormalizedAudio(input: input, output: output, format: processingFormat, gain: gain)
-        }
-
-        try replaceAudioFile(at: url, with: temporaryURL)
-    }
-
-    private static func wholeFileLevelStats(file: AVAudioFile, format: AVAudioFormat) throws -> AVAudioPCMBuffer.LevelStats {
-        var sumSquares: Double = 0
-        var peak: Float = 0
-        var sampleCount = 0
-        var activeSumSquares: Double = 0
-        var activeSampleCount = 0
-
-        while file.framePosition < file.length {
-            guard let buffer = AVAudioPCMBuffer(pcmFormat: format, frameCapacity: frameCapacity) else {
-                break
-            }
-            let remainingFrames = AVAudioFrameCount(min(AVAudioFramePosition(frameCapacity), file.length - file.framePosition))
-            try file.read(into: buffer, frameCount: remainingFrames)
-            guard let stats = buffer.levelStats(activeThreshold: activeSampleThreshold) else {
-                continue
-            }
-
-            let count = buffer.sampleCount
-            sumSquares += Double(stats.rms * stats.rms) * Double(count)
-            peak = max(peak, stats.peak)
-            sampleCount += count
-            activeSumSquares += Double(stats.activeRMS * stats.activeRMS) * Double(stats.activeSampleCount)
-            activeSampleCount += stats.activeSampleCount
-        }
-
-        guard sampleCount > 0 else {
-            return .init(rms: 0, peak: 0)
-        }
-
-        let activeRMS = activeSampleCount > 0 ? Float(sqrt(activeSumSquares / Double(activeSampleCount))) : 0
-        return .init(
-            rms: Float(sqrt(sumSquares / Double(sampleCount))),
-            peak: peak,
-            activeRMS: activeRMS,
-            activeSampleCount: activeSampleCount
-        )
-    }
-
-    private static func writeNormalizedAudio(
-        input: AVAudioFile,
-        output: AVAudioFile,
-        format: AVAudioFormat,
-        gain: Float
-    ) throws {
-        while input.framePosition < input.length {
-            guard let buffer = AVAudioPCMBuffer(pcmFormat: format, frameCapacity: frameCapacity) else {
-                break
-            }
-            let remainingFrames = AVAudioFrameCount(min(AVAudioFramePosition(frameCapacity), input.length - input.framePosition))
-            try input.read(into: buffer, frameCount: remainingFrames)
-            buffer.applyGain(gain, limiterCeiling: limiterCeiling)
-            try output.write(from: buffer)
-        }
-    }
-
-    private static func replaceAudioFile(at originalURL: URL, with normalizedURL: URL) throws {
-        let backupURL = originalURL
-            .deletingLastPathComponent()
-            .appendingPathComponent(".backup-\(UUID().uuidString).\(originalURL.pathExtension)")
-        try FileManager.default.moveItem(at: originalURL, to: backupURL)
-        do {
-            try FileManager.default.moveItem(at: normalizedURL, to: originalURL)
-            try? FileManager.default.removeItem(at: backupURL)
-        } catch {
-            try? FileManager.default.moveItem(at: backupURL, to: originalURL)
-            try? FileManager.default.removeItem(at: normalizedURL)
-            throw error
-        }
-    }
-}
-
-private extension AVAudioPCMBuffer {
-    struct LevelStats {
-        var rms: Float
-        var peak: Float
-        var activeRMS: Float
-        var activeSampleCount: Int
-
-        init(rms: Float, peak: Float, activeRMS: Float? = nil, activeSampleCount: Int = 0) {
-            self.rms = rms
-            self.peak = peak
-            self.activeRMS = activeRMS ?? rms
-            self.activeSampleCount = activeSampleCount
-        }
-    }
-
-    var sampleCount: Int {
-        Int(frameLength) * Int(format.channelCount)
-    }
-
-    func levelStats(activeThreshold: Float = 0.012) -> LevelStats? {
-        let frameCount = Int(frameLength)
-        let channelCount = Int(format.channelCount)
-        guard frameCount > 0, channelCount > 0 else {
-            return nil
-        }
-
-        if let channelData = floatChannelData {
-            return floatLevelStats(channelData: channelData, frameCount: frameCount, channelCount: channelCount, activeThreshold: activeThreshold)
-        } else if let channelData = int16ChannelData {
-            return int16LevelStats(channelData: channelData, frameCount: frameCount, channelCount: channelCount, activeThreshold: activeThreshold)
-        }
-
-        return nil
-    }
-
-    func applyGain(_ gain: Float, limiterCeiling: Float) {
-        if let channelData = floatChannelData {
-            applyFloatGain(channelData: channelData, gain: gain, limiterCeiling: limiterCeiling)
-        } else if let channelData = int16ChannelData {
-            applyInt16Gain(channelData: channelData, gain: gain, limiterCeiling: limiterCeiling)
-        }
-    }
-
-    private func floatLevelStats(
-        channelData: UnsafePointer<UnsafeMutablePointer<Float>>,
-        frameCount: Int,
-        channelCount: Int,
-        activeThreshold: Float
-    ) -> LevelStats {
-        var sumSquares: Float = 0
-        var peak: Float = 0
-        var activeSumSquares: Float = 0
-        var activeSampleCount = 0
-        let sampleCount = interleavedSampleCount(frameCount: frameCount, channelCount: channelCount)
-
-        withSamples(channelData: channelData, frameCount: frameCount, channelCount: channelCount) { sample in
-            let value = abs(sample)
-            peak = max(peak, value)
-            sumSquares += sample * sample
-            if value >= activeThreshold {
-                activeSumSquares += sample * sample
-                activeSampleCount += 1
-            }
-        }
-
-        let activeRMS = activeSampleCount > 0 ? sqrt(activeSumSquares / Float(activeSampleCount)) : 0
-        return LevelStats(
-            rms: sqrt(sumSquares / Float(sampleCount)),
-            peak: peak,
-            activeRMS: activeRMS,
-            activeSampleCount: activeSampleCount
-        )
-    }
-
-    private func int16LevelStats(
-        channelData: UnsafePointer<UnsafeMutablePointer<Int16>>,
-        frameCount: Int,
-        channelCount: Int,
-        activeThreshold: Float
-    ) -> LevelStats {
-        var sumSquares: Float = 0
-        var peak: Float = 0
-        var activeSumSquares: Float = 0
-        var activeSampleCount = 0
-        let sampleCount = interleavedSampleCount(frameCount: frameCount, channelCount: channelCount)
-
-        withSamples(channelData: channelData, frameCount: frameCount, channelCount: channelCount) { sample in
-            let normalized = Float(sample) / Float(Int16.max)
-            let value = abs(normalized)
-            peak = max(peak, value)
-            sumSquares += normalized * normalized
-            if value >= activeThreshold {
-                activeSumSquares += normalized * normalized
-                activeSampleCount += 1
-            }
-        }
-
-        let activeRMS = activeSampleCount > 0 ? sqrt(activeSumSquares / Float(activeSampleCount)) : 0
-        return LevelStats(
-            rms: sqrt(sumSquares / Float(sampleCount)),
-            peak: peak,
-            activeRMS: activeRMS,
-            activeSampleCount: activeSampleCount
-        )
-    }
-
-    private func applyFloatGain(
-        channelData: UnsafePointer<UnsafeMutablePointer<Float>>,
-        gain: Float,
-        limiterCeiling: Float
-    ) {
-        let frameCount = Int(frameLength)
-        let channelCount = Int(format.channelCount)
-        let sampleCount = interleavedSampleCount(frameCount: frameCount, channelCount: channelCount)
-
-        if format.isInterleaved {
-            let samples = channelData[0]
-            for sample in 0..<sampleCount {
-                samples[sample] = limited(samples[sample] * gain, ceiling: limiterCeiling)
-            }
-        } else {
-            for channel in 0..<channelCount {
-                let samples = channelData[channel]
-                for frame in 0..<frameCount {
-                    samples[frame] = limited(samples[frame] * gain, ceiling: limiterCeiling)
-                }
-            }
-        }
-    }
-
-    private func applyInt16Gain(
-        channelData: UnsafePointer<UnsafeMutablePointer<Int16>>,
-        gain: Float,
-        limiterCeiling: Float
-    ) {
-        let frameCount = Int(frameLength)
-        let channelCount = Int(format.channelCount)
-        let sampleCount = interleavedSampleCount(frameCount: frameCount, channelCount: channelCount)
-
-        if format.isInterleaved {
-            let samples = channelData[0]
-            for sample in 0..<sampleCount {
-                samples[sample] = scaledInt16Sample(samples[sample], gain: gain, limiterCeiling: limiterCeiling)
-            }
-        } else {
-            for channel in 0..<channelCount {
-                let samples = channelData[channel]
-                for frame in 0..<frameCount {
-                    samples[frame] = scaledInt16Sample(samples[frame], gain: gain, limiterCeiling: limiterCeiling)
-                }
-            }
-        }
-    }
-
-    private func withSamples(
-        channelData: UnsafePointer<UnsafeMutablePointer<Float>>,
-        frameCount: Int,
-        channelCount: Int,
-        body: (Float) -> Void
-    ) {
-        if format.isInterleaved {
-            let samples = channelData[0]
-            for sample in 0..<interleavedSampleCount(frameCount: frameCount, channelCount: channelCount) {
-                body(samples[sample])
-            }
-        } else {
-            for channel in 0..<channelCount {
-                let samples = channelData[channel]
-                for frame in 0..<frameCount {
-                    body(samples[frame])
-                }
-            }
-        }
-    }
-
-    private func withSamples(
-        channelData: UnsafePointer<UnsafeMutablePointer<Int16>>,
-        frameCount: Int,
-        channelCount: Int,
-        body: (Int16) -> Void
-    ) {
-        if format.isInterleaved {
-            let samples = channelData[0]
-            for sample in 0..<interleavedSampleCount(frameCount: frameCount, channelCount: channelCount) {
-                body(samples[sample])
-            }
-        } else {
-            for channel in 0..<channelCount {
-                let samples = channelData[channel]
-                for frame in 0..<frameCount {
-                    body(samples[frame])
-                }
-            }
-        }
-    }
-
-    private func interleavedSampleCount(frameCount: Int, channelCount: Int) -> Int {
-        format.isInterleaved ? frameCount * channelCount : frameCount * channelCount
-    }
-
-    private func limited(_ value: Float, ceiling: Float) -> Float {
-        let knee = ceiling * 0.75
-        let magnitude = abs(value)
-        guard magnitude > knee else {
-            return value
-        }
-
-        let range = max(ceiling - knee, 0.0001)
-        let over = (magnitude - knee) / range
-        let compressed = knee + range * (1 - exp(-over))
-        return copysign(min(compressed, ceiling), value)
-    }
-
-    private func scaledInt16Sample(_ sample: Int16, gain: Float, limiterCeiling: Float) -> Int16 {
-        let normalized = Float(sample) / Float(Int16.max)
-        let limitedSample = limited(normalized * gain, ceiling: limiterCeiling)
-        return Int16(max(Float(Int16.min), min(Float(Int16.max), limitedSample * Float(Int16.max))))
-    }
-}
-
 private enum RecordingAudioSessionMode {
     case captureStereo
 
@@ -2133,20 +1761,28 @@ enum SpeechPipelineMode: String, CaseIterable, Identifiable {
     }
 
     var title: String {
+        String(localized: titleResource)
+    }
+
+    var titleResource: LocalizedStringResource {
         switch self {
         case .compatible:
-            return String(localized: "Compatible Pipeline")
+            return L10n.SpeechText.compatiblePipelineTitle
         case .nativeIOS27:
-            return String(localized: "iOS 27 Native Pipeline")
+            return L10n.SpeechText.nativePipelineTitle
         }
     }
 
     var detail: String {
+        String(localized: detailResource)
+    }
+
+    var detailResource: LocalizedStringResource {
         switch self {
         case .compatible:
-            return String(localized: "使用 16 kHz mono Int16 输入，优先保证 iOS 26/27 时间戳一致")
+            return L10n.SpeechText.compatiblePipelineDetail
         case .nativeIOS27:
-            return String(localized: "使用 iOS 27 compatibleWith 转换器，让系统选择语音输入 Pipeline")
+            return L10n.SpeechText.nativePipelineDetail
         }
     }
 
@@ -2180,9 +1816,9 @@ struct SpeechProcessingPipelineDiagnostics: Equatable {
         if #available(iOS 27.0, *), configuredMode == .nativeIOS27 {
             return SpeechProcessingPipelineDiagnostics(
                 configuredPipelineName: configuredMode.title,
-                activePipelineName: String(localized: "iOS 27 Native compatibleWith"),
-                supportedPipelinesText: String(localized: "支持 Pipeline: iOS 27 Native AnalyzerInputConverter；Compatible AVAudioConverter"),
-                analyzerFormatText: String(localized: "Analyzer 输入: iOS 27 系统自适应，实际 Hz 录音时由 Runtime Analyzer 输入显示"),
+                activePipelineName: String(localized: L10n.SpeechText.activeNativeCompatibleWith),
+                supportedPipelinesText: String(localized: L10n.SpeechText.supportedPipelinesIOS27),
+                analyzerFormatText: String(localized: L10n.SpeechText.analyzerAdaptiveIOS27),
                 runtimeAnalyzerFormatText: runtimeAnalyzerFormatText
             )
         }
@@ -2190,9 +1826,9 @@ struct SpeechProcessingPipelineDiagnostics: Equatable {
         if #available(iOS 27.0, *) {
             return SpeechProcessingPipelineDiagnostics(
                 configuredPipelineName: configuredMode.title,
-                activePipelineName: String(localized: "iOS 27 Compatible AVAudioConverter"),
-                supportedPipelinesText: String(localized: "支持 Pipeline: iOS 27 Native AnalyzerInputConverter；Compatible AVAudioConverter"),
-                analyzerFormatText: String(localized: "Analyzer 输入: 16 kHz / mono / Int16 PCM"),
+                activePipelineName: String(localized: L10n.SpeechText.activeCompatibleAVAudioConverter),
+                supportedPipelinesText: String(localized: L10n.SpeechText.supportedPipelinesIOS27),
+                analyzerFormatText: String(localized: L10n.SpeechText.analyzerFixed16K),
                 runtimeAnalyzerFormatText: runtimeAnalyzerFormatText
             )
         }
@@ -2200,9 +1836,9 @@ struct SpeechProcessingPipelineDiagnostics: Equatable {
 
         return SpeechProcessingPipelineDiagnostics(
             configuredPipelineName: configuredMode.title,
-            activePipelineName: String(localized: "iOS 26 AVAudioConverter"),
-            supportedPipelinesText: String(localized: "支持 Pipeline: iOS 26 AVAudioConverter fallback"),
-            analyzerFormatText: String(localized: "Analyzer 输入: 16 kHz / mono / Int16 PCM"),
+            activePipelineName: String(localized: L10n.SpeechText.activeIOS26AVAudioConverter),
+            supportedPipelinesText: String(localized: L10n.SpeechText.supportedPipelinesIOS26),
+            analyzerFormatText: String(localized: L10n.SpeechText.analyzerFixed16K),
             runtimeAnalyzerFormatText: runtimeAnalyzerFormatText
         )
     }
@@ -2217,13 +1853,13 @@ private enum LiveTranscriptionError: LocalizedError {
     var errorDescription: String? {
         switch self {
         case .invalidAudioInput:
-            return String(localized: "无法读取麦克风输入")
+            return String(localized: L10n.SpeechText.cannotReadMicrophone)
         case .analyzerUnavailable:
-            return String(localized: "语音分析器不可用")
+            return String(localized: L10n.SpeechText.analyzerUnavailable)
         case .unsupportedLanguage:
-            return String(localized: "当前语言暂不支持")
+            return String(localized: L10n.SpeechText.unsupportedLanguage)
         case .stereoCaptureUnavailable:
-            return String(localized: "当前麦克风不支持 AVCapture stereo 采集")
+            return String(localized: L10n.SpeechText.stereoUnsupported)
         }
     }
 }

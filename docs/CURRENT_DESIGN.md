@@ -114,7 +114,7 @@ Tapping a transcript row seeks playback to that line's start timestamp. The curr
 
 Toolbar actions:
 
-- Top-right more menu opens audio parameters in a sheet: sample rate, channel count, encoding, processing format, bit depth, duration, frame count, file size, and normalization status.
+- Top-right more menu opens audio parameters in a sheet: sample rate, channel count, encoding, processing format, bit depth, duration, frame count, and file size.
 - The same menu also supports sharing audio or transcript, re-transcribing with a selected language, copying transcript text, generating or refreshing Apple Intelligence summary/tags, and deleting the recording.
 - Audio files can be imported through the in-app file picker or through iOS document handoff/share flows such as Voice Memos exports.
 
@@ -132,7 +132,7 @@ Microphone mode is not user-selectable. Stereo Capture uses `AVCaptureSession`, 
 
 Privacy shows the app's local-processing boundary, no developer server/analytics/tracking policy, local-by-default storage behavior, optional app-private iCloud storage behavior, SwiftData/CloudKit private index behavior, and the purpose of microphone, speech recognition, camera purpose-string, and background audio permissions.
 
-Developer Options show device/system information, active speech pipeline, supported pipeline types, runtime analyzer input format, and a Loudness Processing toggle for comparing normalized files against raw Stereo Capture recordings.
+Developer Options show device/system information, active speech pipeline, supported pipeline types, and runtime analyzer input format.
 
 ## Widgets
 

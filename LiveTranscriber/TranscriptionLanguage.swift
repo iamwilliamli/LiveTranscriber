@@ -54,11 +54,15 @@ enum RecordingAudioFormat: String, CaseIterable, Identifiable, Codable {
     }
 
     var detail: String {
+        String(localized: detailResource)
+    }
+
+    var detailResource: LocalizedStringResource {
         switch self {
         case .wav:
-            return String(localized: "无损 PCM，文件更大")
+            return L10n.Transcription.wavDetail
         case .m4a:
-            return String(localized: "AAC 压缩，文件更小")
+            return L10n.Transcription.m4aDetail
         }
     }
 

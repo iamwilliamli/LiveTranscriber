@@ -5,6 +5,7 @@ struct SettingsView: View {
     @ObservedObject var transcriber: LiveTranscriptionManager
     @ObservedObject var recordingStore: RecordingStore
     @State private var iCloudSyncRefreshTick = 0
+    private static let repositoryURL = URL(string: "https://github.com/iamwilliamli/LiveTranscriber")!
 
     var body: some View {
         NavigationStack {
@@ -15,9 +16,9 @@ struct SettingsView: View {
                     } label: {
                         SettingsNavigationRow(
                             icon: "captions.bubble",
-                            title: "转录",
+                            titleResource: L10n.Settings.transcription,
                             value: transcriber.selectedLanguage.displayName,
-                            subtitle: "语言和转录模型",
+                            subtitleResource: L10n.Settings.languageAndModel,
                             tint: AppTheme.info
                         )
                     }
@@ -29,9 +30,9 @@ struct SettingsView: View {
                     } label: {
                         SettingsNavigationRow(
                             icon: "waveform.badge.mic",
-                            title: "录音",
+                            titleResource: L10n.Settings.recording,
                             value: transcriber.selectedAudioFormat.title,
-                            subtitle: "音频格式和录音行为",
+                            subtitleResource: L10n.Settings.audioFormatAndBehavior,
                             tint: AppTheme.brand
                         )
                     }
@@ -43,9 +44,9 @@ struct SettingsView: View {
                     } label: {
                         SettingsNavigationRow(
                             icon: "folder",
-                            title: "文件",
+                            titleResource: L10n.Settings.files,
                             value: recordingStore.storageDisplayName,
-                            subtitle: "保存位置和录音数量",
+                            subtitleResource: L10n.Settings.storageLocationAndCount,
                             tint: AppTheme.success
                         )
                     }
@@ -57,10 +58,24 @@ struct SettingsView: View {
                     } label: {
                         SettingsNavigationRow(
                             icon: "lock.shield",
-                            title: "隐私",
-                            value: String(localized: "本地处理"),
-                            subtitle: "数据边界和权限用途",
+                            titleResource: L10n.Settings.privacy,
+                            value: String(localized: L10n.Settings.localProcessing),
+                            subtitleResource: L10n.Settings.dataBoundariesAndPermissions,
                             tint: AppTheme.success
+                        )
+                    }
+                    .buttonStyle(.plain)
+                    .settingsSurface()
+
+                    NavigationLink {
+                        sourceSettingsPage
+                    } label: {
+                        SettingsNavigationRow(
+                            icon: "chevron.left.forwardslash.chevron.right",
+                            titleResource: L10n.Source.title,
+                            value: String(localized: L10n.Source.sourceAvailable),
+                            subtitleResource: L10n.Source.subtitle,
+                            tint: AppTheme.info
                         )
                     }
                     .buttonStyle(.plain)
@@ -71,9 +86,9 @@ struct SettingsView: View {
                     } label: {
                         SettingsNavigationRow(
                             icon: "wrench.and.screwdriver",
-                            title: "开发者选项",
+                            titleResource: L10n.Settings.developerOptions,
                             value: transcriber.speechPipelineDiagnostics.activePipelineName,
-                            subtitle: "设备和 Pipeline 诊断",
+                            subtitleResource: L10n.Settings.deviceAndPipelineDiagnostics,
                             tint: AppTheme.purple
                         )
                     }
@@ -84,7 +99,7 @@ struct SettingsView: View {
             }
             .background(AppTheme.groupedBackground.ignoresSafeArea())
             .toolbar(.visible, for: .navigationBar)
-            .navigationTitle("设置")
+            .navigationTitle(String(localized: L10n.Settings.title))
             .navigationBarTitleDisplayMode(.inline)
         }
         .task {
@@ -98,32 +113,32 @@ struct SettingsView: View {
     }
 
     private var transcriptionSettingsPage: some View {
-        SettingsDetailPage(title: "转录") {
-            SettingsSection(title: "转录", systemImage: "captions.bubble", tint: AppTheme.info) {
+        SettingsDetailPage(titleResource: L10n.Settings.transcription) {
+            SettingsSection(titleResource: L10n.Settings.transcription, systemImage: "captions.bubble", tint: AppTheme.info) {
                 NavigationLink {
                     transcriptionLanguagePage
                 } label: {
-                    SettingsNavigationRow(
-                        icon: "globe",
-                        title: "转录语言",
-                        value: transcriber.selectedLanguage.displayName,
-                        subtitle: "下次开始录音时使用所选语言",
-                        tint: AppTheme.info
-                    )
+                        SettingsNavigationRow(
+                            icon: "globe",
+                            titleResource: L10n.Settings.transcriptionLanguage,
+                            value: transcriber.selectedLanguage.displayName,
+                            subtitleResource: L10n.Settings.nextStartUsesLanguage,
+                            tint: AppTheme.info
+                        )
                 }
                 .buttonStyle(.plain)
                 .disabled(transcriber.isRecording || transcriber.isPreparing)
 
                 if transcriber.isRecording || transcriber.isPreparing {
-                    SettingsStatusRow(icon: "lock.fill", text: "录音中不能切换语言", tint: AppTheme.warning)
+                    SettingsStatusRow(icon: "lock.fill", textResource: L10n.Settings.cannotChangeLanguageWhileRecording, tint: AppTheme.warning)
                 }
             }
         }
     }
 
     private var transcriptionLanguagePage: some View {
-        SettingsDetailPage(title: "转录语言") {
-            SettingsSection(title: "转录语言", systemImage: "globe", tint: AppTheme.info) {
+        SettingsDetailPage(titleResource: L10n.Settings.transcriptionLanguage) {
+            SettingsSection(titleResource: L10n.Settings.transcriptionLanguage, systemImage: "globe", tint: AppTheme.info) {
                 ForEach(transcriber.supportedLanguages) { language in
                     Button {
                         HapticFeedback.play(.menuSelection)
@@ -145,16 +160,16 @@ struct SettingsView: View {
     }
 
     private var recordingSettingsPage: some View {
-        SettingsDetailPage(title: "录音") {
-            SettingsSection(title: "录音", systemImage: "waveform.badge.mic", tint: AppTheme.brand) {
+        SettingsDetailPage(titleResource: L10n.Settings.recording) {
+            SettingsSection(titleResource: L10n.Settings.recording, systemImage: "waveform.badge.mic", tint: AppTheme.brand) {
                 NavigationLink {
                     recordingFormatPage
                 } label: {
                     SettingsNavigationRow(
                         icon: "waveform.badge.mic",
-                        title: "录音格式",
+                        titleResource: L10n.Settings.recordingFormat,
                         value: transcriber.selectedAudioFormat.title,
-                        subtitle: LocalizedStringKey(transcriber.selectedAudioFormat.detail),
+                        subtitleResource: transcriber.selectedAudioFormat.detailResource,
                         tint: AppTheme.brand
                     )
                 }
@@ -162,15 +177,15 @@ struct SettingsView: View {
                 .disabled(transcriber.isRecording || transcriber.isPreparing)
 
                 if transcriber.isRecording || transcriber.isPreparing {
-                    SettingsStatusRow(icon: "lock.fill", text: "录音中不能切换格式", tint: AppTheme.warning)
+                    SettingsStatusRow(icon: "lock.fill", textResource: L10n.Settings.cannotChangeFormatWhileRecording, tint: AppTheme.warning)
                 }
             }
         }
     }
 
     private var recordingFormatPage: some View {
-        SettingsDetailPage(title: "录音格式") {
-            SettingsSection(title: "录音格式", systemImage: "waveform.badge.mic", tint: AppTheme.brand) {
+        SettingsDetailPage(titleResource: L10n.Settings.recordingFormat) {
+            SettingsSection(titleResource: L10n.Settings.recordingFormat, systemImage: "waveform.badge.mic", tint: AppTheme.brand) {
                 ForEach(RecordingAudioFormat.allCases) { format in
                     Button {
                         HapticFeedback.play(.menuSelection)
@@ -179,7 +194,7 @@ struct SettingsView: View {
                         SettingsSelectionRow(
                             icon: format == .wav ? "waveform" : "waveform.badge.plus",
                             title: format.title,
-                            subtitle: format.detail,
+                            subtitleResource: format.detailResource,
                             isSelected: format == transcriber.selectedAudioFormat,
                             tint: AppTheme.brand
                         )
@@ -192,7 +207,7 @@ struct SettingsView: View {
     }
 
     private var fileSettingsPage: some View {
-        SettingsDetailPage(title: "文件") {
+        SettingsDetailPage(titleResource: L10n.Settings.files) {
             fileSection
         }
     }
@@ -209,97 +224,131 @@ struct SettingsView: View {
     }
 
     private var developerSettingsPage: some View {
-        SettingsDetailPage(title: "开发者选项") {
+        SettingsDetailPage(titleResource: L10n.Settings.developerOptions) {
             developerSection
         }
     }
 
     private var privacySettingsPage: some View {
-        SettingsDetailPage(title: "隐私") {
-            SettingsSection(title: "本地处理", systemImage: "lock.shield", tint: AppTheme.success) {
+        SettingsDetailPage(titleResource: L10n.Settings.privacy) {
+            SettingsSection(titleResource: L10n.Settings.localProcessing, systemImage: "lock.shield", tint: AppTheme.success) {
                 SettingsStatusRow(
                     icon: "server.rack",
-                    text: "不使用开发者服务器、第三方分析、广告、追踪或自定义网络请求。",
+                    textResource: L10n.Settings.noDeveloperServers,
                     tint: AppTheme.success
                 )
 
                 SettingsStatusRow(
                     icon: "waveform.badge.mic",
-                    text: "录音、转录文本、摘要和标签使用 Apple 系统框架在设备上处理。",
+                    textResource: L10n.Settings.onDeviceProcessing,
                     tint: AppTheme.info
                 )
 
                 SettingsStatusRow(
                     icon: "person.crop.circle.badge.xmark",
-                    text: "音频和转录不会上传到开发者服务器，开发者无法访问用户内容。",
+                    textResource: L10n.Settings.developerCannotAccessContent,
                     tint: AppTheme.success
                 )
             }
 
-            SettingsSection(title: "存储", systemImage: "internaldrive", tint: AppTheme.info) {
+            SettingsSection(titleResource: L10n.Settings.storage, systemImage: "internaldrive", tint: AppTheme.info) {
                 SettingsMetricRow(
                     icon: "folder",
-                    title: "当前位置",
+                    titleResource: L10n.Settings.currentLocation,
                     value: recordingStore.storageDisplayName,
                     tint: AppTheme.info
                 )
 
                 SettingsStatusRow(
                     icon: "icloud",
-                    text: "默认保存在本机 app 私有容器；只有在设置里开启 iCloud 后，录音文件和索引才会保存到 app 私有 iCloud container。",
+                    textResource: L10n.Settings.localThenICloudStorage,
                     tint: AppTheme.info
                 )
 
                 SettingsStatusRow(
                     icon: "list.bullet.rectangle",
-                    text: "录音索引默认存在本机；开启 iCloud 后通过 CloudKit private database 同步到用户自己的 iCloud。",
+                    textResource: L10n.Settings.indexSyncPrivateDatabase,
                     tint: AppTheme.info
                 )
 
                 SettingsStatusRow(
                     icon: "trash",
-                    text: "删除录音会删除 app 管理的音频文件和转录文本。",
+                    textResource: L10n.Settings.deleteRemovesManagedFiles,
                     tint: AppTheme.danger
                 )
             }
 
-            SettingsSection(title: "权限用途", systemImage: "checkmark.shield", tint: AppTheme.brand) {
+            SettingsSection(titleResource: L10n.Settings.permissionUsage, systemImage: "checkmark.shield", tint: AppTheme.brand) {
                 SettingsStatusRow(
                     icon: "mic",
-                    text: "麦克风权限只用于录音和实时转录。",
+                    textResource: L10n.Settings.microphonePermissionUse,
                     tint: AppTheme.brand
                 )
 
                 SettingsStatusRow(
                     icon: "captions.bubble",
-                    text: "语音识别权限只用于把用户选择的录音转成文本。",
+                    textResource: L10n.Settings.speechPermissionUse,
                     tint: AppTheme.brand
                 )
 
                 SettingsStatusRow(
                     icon: "location",
-                    text: "位置权限只在保存录音时选择添加地理位置时使用。",
+                    textResource: L10n.Settings.locationPermissionUse,
                     tint: AppTheme.brand
                 )
 
                 SettingsStatusRow(
                     icon: "camera",
-                    text: "相机不用于拍照或录像；相机权限说明仅用于满足 Apple capture framework 的审核要求。",
+                    textResource: L10n.Settings.cameraPermissionUse,
                     tint: AppTheme.info
                 )
 
                 SettingsStatusRow(
                     icon: "waveform.circle",
-                    text: "后台音频只用于录音或播放继续进行，不用于其他后台任务。",
+                    textResource: L10n.Settings.backgroundAudioUse,
                     tint: AppTheme.warning
                 )
             }
         }
     }
 
+    private var sourceSettingsPage: some View {
+        SettingsDetailPage(titleResource: L10n.Source.title) {
+            SettingsSection(titleResource: L10n.Source.title, systemImage: "chevron.left.forwardslash.chevron.right", tint: AppTheme.info) {
+                SettingsStatusRow(
+                    icon: "doc.text",
+                    textResource: L10n.Source.description,
+                    tint: AppTheme.info
+                )
+
+                SettingsStatusRow(
+                    icon: "exclamationmark.shield",
+                    textResource: L10n.Source.licenseNote,
+                    tint: AppTheme.warning
+                )
+
+                SettingsStatusRow(
+                    icon: "person.text.rectangle",
+                    textResource: L10n.Source.requiredAttribution,
+                    tint: AppTheme.info
+                )
+
+                Link(destination: Self.repositoryURL) {
+                    SettingsExternalLinkRow(
+                        icon: "link",
+                        titleResource: L10n.Source.repositoryTitle,
+                        value: Self.repositoryURL.absoluteString,
+                        tint: AppTheme.brand
+                    )
+                }
+                .buttonStyle(.plain)
+            }
+        }
+    }
+
     private var speechPipelineModePage: some View {
-        SettingsDetailPage(title: "语音 Pipeline 模式") {
-            SettingsSection(title: "语音 Pipeline 模式", systemImage: "waveform.path.ecg", tint: AppTheme.brand) {
+        SettingsDetailPage(titleResource: L10n.Settings.speechPipelineMode) {
+            SettingsSection(titleResource: L10n.Settings.speechPipelineMode, systemImage: "waveform.path.ecg", tint: AppTheme.brand) {
                 ForEach(SpeechPipelineMode.allCases) { mode in
                     Button {
                         HapticFeedback.play(.menuSelection)
@@ -308,7 +357,7 @@ struct SettingsView: View {
                         SettingsSelectionRow(
                             icon: mode == .nativeIOS27 ? "sparkles" : "checkmark.shield",
                             title: mode.title,
-                            subtitle: mode.detail,
+                            subtitleResource: mode.detailResource,
                             isSelected: mode == transcriber.selectedSpeechPipelineMode,
                             tint: mode.isSupportedOnCurrentOS ? AppTheme.brand : AppTheme.warning
                         )
@@ -318,7 +367,7 @@ struct SettingsView: View {
                 }
 
                 if transcriber.isRecording || transcriber.isPreparing {
-                    SettingsStatusRow(icon: "lock.fill", text: "录音中不能切换 Pipeline", tint: AppTheme.warning)
+                    SettingsStatusRow(icon: "lock.fill", textResource: L10n.Settings.cannotChangePipelineWhileRecording, tint: AppTheme.warning)
                 }
             }
         }
@@ -329,17 +378,17 @@ struct SettingsView: View {
         let iCloudSyncSummary = recordingStore.iCloudSyncSummary
         let iCloudSyncTint = iCloudSyncSummary.failedRecordingCount > 0 ? AppTheme.warning : AppTheme.info
 
-        return SettingsSection(title: "文件", systemImage: "folder", tint: AppTheme.success) {
+        return SettingsSection(titleResource: L10n.Settings.files, systemImage: "folder", tint: AppTheme.success) {
             SettingsMetricRow(
                 icon: "number",
-                title: "录音数量",
+                titleResource: L10n.Settings.recordingCount,
                 value: "\(recordingStore.recordings.count)",
                 tint: AppTheme.success
             )
 
             SettingsMetricRow(
                 icon: "icloud",
-                title: "存储位置",
+                titleResource: L10n.Settings.storageLocation,
                 value: recordingStore.storageDisplayName,
                 tint: AppTheme.info
             )
@@ -349,11 +398,11 @@ struct SettingsView: View {
                     SettingsIcon(systemImage: "icloud", tint: AppTheme.info)
 
                     VStack(alignment: .leading, spacing: 3) {
-                        Text("iCloud 同步")
+                        Text(L10n.Settings.iCloudSync)
                             .font(.redditSans(.subheadline, weight: .semibold))
                             .foregroundStyle(.primary)
 
-                        Text("开启后，新的录音和索引会保存到 app 私有 iCloud container；关闭时默认保存在本机 app 私有容器。")
+                        Text(L10n.Settings.iCloudSyncDescription)
                             .font(.redditSans(.caption))
                             .foregroundStyle(.secondary)
                             .fixedSize(horizontal: false, vertical: true)
@@ -365,7 +414,7 @@ struct SettingsView: View {
 
             SettingsMetricRow(
                 icon: "icloud.and.arrow.up",
-                title: "iCloud 状态",
+                titleResource: L10n.Settings.iCloudStatus,
                 value: recordingStore.iCloudStorageStatusDisplayName,
                 tint: recordingStore.isICloudStorageEnabled ? AppTheme.info : AppTheme.warning
             )
@@ -378,7 +427,7 @@ struct SettingsView: View {
 
             SettingsMetricRow(
                 icon: iCloudSyncSummary.systemImage,
-                title: "iCloud 同步进度",
+                titleResource: L10n.Settings.iCloudProgress,
                 value: iCloudSyncSummary.statusText,
                 tint: iCloudSyncTint
             )
@@ -414,38 +463,38 @@ struct SettingsView: View {
         let build = DeveloperBuildInfo.current
         let pipeline = transcriber.speechPipelineDiagnostics
 
-        return SettingsSection(title: "开发者选项", systemImage: "wrench.and.screwdriver", tint: AppTheme.purple) {
+        return SettingsSection(titleResource: L10n.Settings.developerOptions, systemImage: "wrench.and.screwdriver", tint: AppTheme.purple) {
             SettingsMetricRow(
                 icon: "iphone",
-                title: "设备",
+                titleResource: L10n.Settings.device,
                 value: device.modelIdentifier,
                 tint: AppTheme.info
             )
 
             SettingsMetricRow(
                 icon: "gearshape",
-                title: "系统版本",
+                titleResource: L10n.Settings.systemVersion,
                 value: device.systemVersion,
                 tint: AppTheme.info
             )
 
             SettingsMetricRow(
                 icon: "number",
-                title: "版本",
+                titleResource: L10n.Settings.version,
                 value: build.version,
                 tint: AppTheme.info
             )
 
             SettingsMetricRow(
                 icon: "calendar.badge.clock",
-                title: "Build 时间",
+                titleResource: L10n.Settings.buildTime,
                 value: build.buildTime,
                 tint: AppTheme.info
             )
 
             SettingsMetricRow(
                 icon: "waveform.path.ecg",
-                title: "当前语音 Pipeline",
+                titleResource: L10n.Settings.currentSpeechPipeline,
                 value: pipeline.activePipelineName,
                 tint: AppTheme.brand
             )
@@ -455,62 +504,43 @@ struct SettingsView: View {
             } label: {
                 SettingsNavigationRow(
                     icon: "slider.horizontal.3",
-                    title: "语音 Pipeline 模式",
+                    titleResource: L10n.Settings.speechPipelineMode,
                     value: pipeline.configuredPipelineName,
-                    subtitle: "切换兼容模式或 iOS 27 Native 模式",
+                    subtitleResource: L10n.Settings.switchPipelineSubtitle,
                     tint: AppTheme.brand
                 )
             }
             .buttonStyle(.plain)
             .disabled(transcriber.isRecording || transcriber.isPreparing)
 
-            SettingsStatusRow(
+            SettingsVerbatimStatusRow(
                 icon: "slider.horizontal.3",
-                text: LocalizedStringKey(pipeline.supportedPipelinesText),
+                text: pipeline.supportedPipelinesText,
                 tint: AppTheme.brand
             )
 
-            SettingsStatusRow(
+            SettingsVerbatimStatusRow(
                 icon: "waveform",
-                text: LocalizedStringKey(pipeline.analyzerFormatText),
+                text: pipeline.analyzerFormatText,
                 tint: AppTheme.info
             )
 
-            SettingsStatusRow(
+            SettingsVerbatimStatusRow(
                 icon: "waveform.path",
-                text: LocalizedStringKey(pipeline.runtimeAnalyzerFormatText),
+                text: pipeline.runtimeAnalyzerFormatText,
                 tint: AppTheme.info
             )
-
-            Toggle(isOn: $transcriber.isLoudnessProcessingEnabled) {
-                HStack(alignment: .top, spacing: 10) {
-                    SettingsIcon(systemImage: "waveform.badge.plus", tint: AppTheme.warning)
-
-                    VStack(alignment: .leading, spacing: 3) {
-                        Text("响度处理")
-                            .font(.redditSans(.subheadline, weight: .semibold))
-                            .foregroundStyle(.primary)
-
-                        Text("开启后会在录音结束、导入和详情页补处理时做文件级响度归一化；关闭时保留 Stereo Capture 原始音量")
-                            .font(.redditSans(.caption))
-                            .foregroundStyle(.secondary)
-                            .fixedSize(horizontal: false, vertical: true)
-                    }
-                }
-            }
-            .toggleStyle(.switch)
-            .disabled(transcriber.isRecording || transcriber.isPreparing)
 
             SettingsMetricRow(
                 icon: "sparkles",
-                title: "高端模型",
+                titleResource: L10n.Settings.advancedModel,
                 value: availability.statusText,
                 tint: tint
             )
 
-            SettingsStatusRow(
+            SettingsVerbatimStatusRow(
                 icon: availability.isAvailable ? "checkmark.seal.fill" : "exclamationmark.triangle.fill",
-                text: LocalizedStringKey(availability.detailText),
+                text: availability.detailText,
                 tint: tint
             )
         }
@@ -529,7 +559,7 @@ private struct DeveloperBuildInfo {
     }
 
     private static func versionText(bundle: Bundle = .main) -> String {
-        let unknown = String(localized: "未知")
+        let unknown = String(localized: L10n.Common.unknown)
         let version = (bundle.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String)
             .flatMap { $0.isEmpty ? nil : $0 } ?? unknown
         let build = (bundle.object(forInfoDictionaryKey: "CFBundleVersion") as? String)
@@ -554,7 +584,7 @@ private struct DeveloperBuildInfo {
             return displayFormatter.string(from: date)
         }
 
-        return String(localized: "未知")
+        return String(localized: L10n.Common.unknown)
     }
 
     private static let iso8601Formatter = ISO8601DateFormatter()
@@ -590,8 +620,13 @@ private struct DeveloperDeviceInfo {
 }
 
 private struct SettingsDetailPage<Content: View>: View {
-    let title: LocalizedStringKey
+    let title: Text
     @ViewBuilder let content: Content
+
+    init(titleResource: LocalizedStringResource, @ViewBuilder content: () -> Content) {
+        self.title = Text(titleResource)
+        self.content = content()
+    }
 
     var body: some View {
         ScrollView {
@@ -608,21 +643,35 @@ private struct SettingsDetailPage<Content: View>: View {
 
 private struct SettingsNavigationRow: View {
     let icon: String
-    let title: LocalizedStringKey
+    let title: Text
     let value: String
-    let subtitle: LocalizedStringKey
+    let subtitle: Text
     let tint: Color
+
+    init(
+        icon: String,
+        titleResource: LocalizedStringResource,
+        value: String,
+        subtitleResource: LocalizedStringResource,
+        tint: Color
+    ) {
+        self.icon = icon
+        self.title = Text(titleResource)
+        self.value = value
+        self.subtitle = Text(subtitleResource)
+        self.tint = tint
+    }
 
     var body: some View {
         HStack(spacing: 12) {
             SettingsIcon(systemImage: icon, tint: tint)
 
             VStack(alignment: .leading, spacing: 3) {
-                Text(title)
+                title
                     .font(.redditSans(.subheadline, weight: .semibold))
                     .foregroundStyle(.primary)
 
-                Text(subtitle)
+                subtitle
                     .font(.redditSans(.caption))
                     .foregroundStyle(.secondary)
                     .lineLimit(2)
@@ -648,21 +697,37 @@ private struct SettingsNavigationRow: View {
 
 private struct SettingsSelectionRow: View {
     let icon: String
-    let title: String
-    let subtitle: String
+    let title: Text
+    let subtitle: Text
     let isSelected: Bool
     let tint: Color
+
+    init(icon: String, title: String, subtitle: String, isSelected: Bool, tint: Color) {
+        self.icon = icon
+        self.title = Text(verbatim: title)
+        self.subtitle = Text(verbatim: subtitle)
+        self.isSelected = isSelected
+        self.tint = tint
+    }
+
+    init(icon: String, title: String, subtitleResource: LocalizedStringResource, isSelected: Bool, tint: Color) {
+        self.icon = icon
+        self.title = Text(verbatim: title)
+        self.subtitle = Text(subtitleResource)
+        self.isSelected = isSelected
+        self.tint = tint
+    }
 
     var body: some View {
         HStack(spacing: 10) {
             SettingsIcon(systemImage: icon, tint: tint)
 
             VStack(alignment: .leading, spacing: 2) {
-                Text(title)
+                title
                     .font(.redditSans(.subheadline, weight: .semibold))
                     .foregroundStyle(.primary)
 
-                Text(subtitle)
+                subtitle
                     .font(.redditSans(.caption))
                     .foregroundStyle(.secondary)
                     .lineLimit(2)
@@ -683,17 +748,24 @@ private struct SettingsSelectionRow: View {
 }
 
 private struct SettingsSection<Content: View>: View {
-    let title: LocalizedStringKey
+    let title: Text
     let systemImage: String
     let tint: Color
     @ViewBuilder let content: Content
+
+    init(titleResource: LocalizedStringResource, systemImage: String, tint: Color, @ViewBuilder content: () -> Content) {
+        self.title = Text(titleResource)
+        self.systemImage = systemImage
+        self.tint = tint
+        self.content = content()
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             HStack(spacing: 10) {
                 SettingsIcon(systemImage: systemImage, tint: tint)
 
-                Text(title)
+                title
                     .font(.redditSans(.headline, weight: .semibold))
                     .foregroundStyle(.primary)
 
@@ -708,15 +780,22 @@ private struct SettingsSection<Content: View>: View {
 
 private struct SettingsMetricRow: View {
     let icon: String
-    let title: LocalizedStringKey
+    let title: Text
     let value: String
     let tint: Color
+
+    init(icon: String, titleResource: LocalizedStringResource, value: String, tint: Color) {
+        self.icon = icon
+        self.title = Text(titleResource)
+        self.value = value
+        self.tint = tint
+    }
 
     var body: some View {
         HStack(spacing: 10) {
             SettingsIcon(systemImage: icon, tint: tint)
 
-            Text(title)
+            title
                 .font(.redditSans(.subheadline, weight: .semibold))
                 .foregroundStyle(.primary)
 
@@ -732,10 +811,56 @@ private struct SettingsMetricRow: View {
     }
 }
 
+private struct SettingsExternalLinkRow: View {
+    let icon: String
+    let title: Text
+    let value: String
+    let tint: Color
+
+    init(icon: String, titleResource: LocalizedStringResource, value: String, tint: Color) {
+        self.icon = icon
+        self.title = Text(titleResource)
+        self.value = value
+        self.tint = tint
+    }
+
+    var body: some View {
+        HStack(spacing: 10) {
+            SettingsIcon(systemImage: icon, tint: tint)
+
+            VStack(alignment: .leading, spacing: 2) {
+                title
+                    .font(.redditSans(.subheadline, weight: .semibold))
+                    .foregroundStyle(.primary)
+
+                Text(value)
+                    .font(.redditSans(.caption))
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.72)
+            }
+
+            Spacer(minLength: 12)
+
+            Image(systemName: "arrow.up.forward")
+                .font(.system(size: 12, weight: .bold))
+                .foregroundStyle(tint)
+        }
+        .frame(minHeight: 44)
+        .contentShape(Rectangle())
+    }
+}
+
 private struct SettingsStatusRow: View {
     let icon: String
-    let text: LocalizedStringKey
+    let text: Text
     let tint: Color
+
+    init(icon: String, textResource: LocalizedStringResource, tint: Color) {
+        self.icon = icon
+        self.text = Text(textResource)
+        self.tint = tint
+    }
 
     var body: some View {
         HStack(alignment: .top, spacing: 8) {
@@ -744,7 +869,7 @@ private struct SettingsStatusRow: View {
                 .foregroundStyle(tint)
                 .frame(width: 18, height: 18)
 
-            Text(text)
+            text
                 .font(.redditSans(.caption))
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)

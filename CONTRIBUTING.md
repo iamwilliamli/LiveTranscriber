@@ -27,5 +27,9 @@ separate written license from William Li.
 
 - Keep the app local-first and privacy-preserving.
 - Prefer native Apple frameworks over server-side services.
-- Preserve Chinese and English localization when adding user-facing text.
+- Preserve localization when adding user-facing text.
+- Use the typed `L10n.*` localization pattern for SwiftUI text, such as
+  `L10n.Settings.recordingFormat`, instead of inline localized string literals.
 - Keep UI changes consistent with the existing compact SwiftUI design.
+- Do not attach private recordings or transcripts to public issues or pull
+  requests unless you are comfortable making them public.

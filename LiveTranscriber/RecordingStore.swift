@@ -13,8 +13,6 @@ struct RecordingDraft {
     var languageID: String
     var languageName: String
     var lines: [TranscriptionLine]
-    var audioNormalizedAt: Date?
-    var audioNormalizationVersion: Int?
 }
 
 struct RecordingItem: Identifiable, Codable, Hashable {
@@ -28,8 +26,6 @@ struct RecordingItem: Identifiable, Codable, Hashable {
     var transcriptPreview: String
     var lineCount: Int
     var intelligence: RecordingIntelligence?
-    var audioNormalizedAt: Date?
-    var audioNormalizationVersion: Int?
     var importStatus: RecordingImportStatus?
     var manualTags: [String]?
     var location: RecordingLocation?
@@ -109,30 +105,30 @@ enum RecordingIntelligenceAvailability: Equatable {
     var statusText: String {
         switch self {
         case .available:
-            return String(localized: "可用")
+            return String(localized: L10n.Intelligence.available)
         case .unavailable(.deviceNotEligible):
-            return String(localized: "设备不支持")
+            return String(localized: L10n.Intelligence.unsupportedDevice)
         case .unavailable(.appleIntelligenceNotEnabled):
-            return String(localized: "未开启")
+            return String(localized: L10n.Intelligence.disabled)
         case .unavailable(.modelNotReady):
-            return String(localized: "模型未准备好")
+            return String(localized: L10n.Intelligence.modelNotReady)
         case .unavailable(.unknown):
-            return String(localized: "不可用")
+            return String(localized: L10n.Intelligence.unavailable)
         }
     }
 
     var detailText: String {
         switch self {
         case .available:
-            return String(localized: "Apple Intelligence 本地高端模型可用于智能摘要")
+            return String(localized: L10n.Intelligence.detailAvailable)
         case .unavailable(.deviceNotEligible):
-            return String(localized: "当前设备不支持 Apple Intelligence 本地高端模型")
+            return String(localized: L10n.Intelligence.detailUnsupportedDevice)
         case .unavailable(.appleIntelligenceNotEnabled):
-            return String(localized: "Apple Intelligence 未开启")
+            return String(localized: L10n.Intelligence.detailDisabled)
         case .unavailable(.modelNotReady):
-            return String(localized: "Apple Intelligence 本地模型尚未准备好")
+            return String(localized: L10n.Intelligence.detailModelNotReady)
         case .unavailable(.unknown):
-            return String(localized: "Apple Intelligence 本地模型不可用")
+            return String(localized: L10n.Intelligence.detailUnavailable)
         }
     }
 
@@ -176,8 +172,6 @@ final class RecordingIndexRecord {
     var intelligenceSummary: String?
     var intelligenceTagsJSON: String?
     var intelligenceGeneratedAt: Date?
-    var audioNormalizedAt: Date?
-    var audioNormalizationVersion: Int?
     var importStatusProgress: Double?
     var importStatusMessage: String?
     var importStatusIsFailed: Bool = false
@@ -214,9 +208,6 @@ final class RecordingIndexRecord {
             intelligenceGeneratedAt = nil
         }
 
-        audioNormalizedAt = item.audioNormalizedAt
-        audioNormalizationVersion = item.audioNormalizationVersion
-
         if let importStatus = item.importStatus {
             importStatusProgress = importStatus.progress
             importStatusMessage = importStatus.message
@@ -248,8 +239,6 @@ final class RecordingIndexRecord {
             transcriptPreview: transcriptPreview,
             lineCount: lineCount,
             intelligence: intelligence,
-            audioNormalizedAt: audioNormalizedAt,
-            audioNormalizationVersion: audioNormalizationVersion,
             importStatus: importStatus,
             manualTags: Self.decodeTags(manualTagsJSON),
             location: location
@@ -334,34 +323,38 @@ struct RecordingICloudSyncStatus: Equatable {
     var displayName: String {
         switch state {
         case .localOnly:
-            return String(localized: "本机未同步")
+            return String(localized: L10n.ICloud.localOnly)
         case .iCloudUnavailable:
-            return String(localized: "等待 iCloud")
+            return String(localized: L10n.ICloud.waitingForICloud)
         case .waiting:
-            return String(localized: "等待上传")
+            return String(localized: L10n.ICloud.waitingToUpload)
         case .uploading:
-            return String(localized: "上传中")
+            return String(localized: L10n.ICloud.uploading)
         case .uploaded:
-            return String(localized: "已上传 iCloud")
+            return String(localized: L10n.ICloud.uploadedToICloud)
         case .failed:
-            return String(localized: "上传失败")
+            return String(localized: L10n.ICloud.uploadFailed)
         }
     }
 
     var detailText: String {
         switch state {
         case .localOnly:
-            return String(localized: "这条录音仍在本机 app 私有容器。")
+            return String(localized: L10n.ICloud.recordingLocalOnly)
         case .iCloudUnavailable:
-            return String(localized: "iCloud container 当前不可用，录音会先保留在本机。")
+            return String(localized: L10n.ICloud.recordingStaysLocal)
         case .waiting:
-            return String(localized: "录音已在 iCloud 私有容器中，正在等待系统上传。")
+            return String(localized: L10n.ICloud.recordingWaitingUpload)
         case .uploading:
-            return String(format: String(localized: "%d/%d 个文件已上传"), uploadedFileCount, totalFileCount)
+            return String(
+                format: String(localized: L10n.ICloud.filesUploadedFormat),
+                uploadedFileCount,
+                totalFileCount
+            )
         case .uploaded:
-            return String(localized: "这条录音的音频和转录文件已上传到 iCloud。")
+            return String(localized: L10n.ICloud.recordingUploaded)
         case .failed:
-            return errorDescription ?? String(localized: "iCloud 上传失败")
+            return errorDescription ?? String(localized: L10n.ICloud.uploadFailedDetail)
         }
     }
 
@@ -395,43 +388,47 @@ struct RecordingICloudSyncSummary: Equatable {
 
     var statusText: String {
         guard totalRecordingCount > 0 else {
-            return String(localized: "无录音")
+            return String(localized: L10n.ICloud.noRecordings)
         }
 
         guard isICloudStorageEnabled else {
-            return String(format: String(localized: "%d 个本机录音"), totalRecordingCount)
+            return String(format: String(localized: L10n.ICloud.localRecordingsCountFormat), totalRecordingCount)
         }
 
         guard isICloudStorageAvailable else {
-            return String(localized: "等待 iCloud")
+            return String(localized: L10n.ICloud.waitingForICloud)
         }
 
         if failedRecordingCount > 0 {
-            return String(format: String(localized: "%d 个上传失败"), failedRecordingCount)
+            return String(format: String(localized: L10n.ICloud.uploadFailedCountFormat), failedRecordingCount)
         }
 
         if uploadedRecordingCount == totalRecordingCount {
-            return String(localized: "全部已上传")
+            return String(localized: L10n.ICloud.allUploaded)
         }
 
-        return String(format: String(localized: "%d/%d 已上传"), uploadedRecordingCount, totalRecordingCount)
+        return String(
+            format: String(localized: L10n.ICloud.uploadedCountFormat),
+            uploadedRecordingCount,
+            totalRecordingCount
+        )
     }
 
     var detailText: String {
         guard totalRecordingCount > 0 else {
-            return String(localized: "没有需要同步的录音。")
+            return String(localized: L10n.ICloud.noRecordingsToSync)
         }
 
         guard isICloudStorageEnabled else {
-            return String(localized: "iCloud 未开启，所有录音只保存在本机 app 私有容器。")
+            return String(localized: L10n.ICloud.disabledAllLocal)
         }
 
         guard isICloudStorageAvailable else {
-            return String(localized: "iCloud 已开启，但当前无法访问 iCloud container；录音会先暂存在本机。")
+            return String(localized: L10n.ICloud.enabledButUnavailableLocalFirst)
         }
 
         return String(
-            format: String(localized: "已上传 %d，上传中 %d，等待 %d，失败 %d，本机 %d"),
+            format: String(localized: L10n.ICloud.syncSummaryCountsFormat),
             uploadedRecordingCount,
             uploadingRecordingCount,
             waitingRecordingCount,
@@ -545,35 +542,39 @@ final class RecordingStore: ObservableObject {
     }
 
     var storageDisplayName: String {
-        iCloudRecordingsDirectory == nil ? String(localized: "本机私有容器") : String(localized: "iCloud 私有容器")
+        iCloudRecordingsDirectory == nil
+            ? String(localized: L10n.ICloud.localPrivateContainer)
+            : String(localized: L10n.ICloud.privateContainer)
     }
 
     var iCloudStorageStatusDisplayName: String {
         if isStorageLocationChanging {
-            return String(localized: "正在切换")
+            return String(localized: L10n.ICloud.switching)
         }
 
         if !isICloudStorageEnabled {
-            return String(localized: "未开启")
+            return String(localized: L10n.ICloud.disabled)
         }
 
-        return isICloudStorageAvailable ? String(localized: "已开启") : String(localized: "等待 iCloud")
+        return isICloudStorageAvailable
+            ? String(localized: L10n.ICloud.enabled)
+            : String(localized: L10n.ICloud.waitingForICloud)
     }
 
     var iCloudStorageDetailText: String {
         if isStorageLocationChanging {
-            return String(localized: "正在切换存储位置，会保留现有录音文件。")
+            return String(localized: L10n.ICloud.detailSwitchingStorage)
         }
 
         if !isICloudStorageEnabled {
-            return String(localized: "iCloud 未开启，录音文件和索引保存在本机 app 私有容器。")
+            return String(localized: L10n.ICloud.detailDisabled)
         }
 
         if isICloudStorageAvailable {
-            return String(localized: "iCloud 已开启，录音文件保存到 app 私有 iCloud container 的 Data 目录，索引通过 CloudKit private database 同步。")
+            return String(localized: L10n.ICloud.detailEnabled)
         }
 
-        return String(localized: "iCloud 已开启，但当前无法访问 iCloud container；在可用前会暂存到本机 app 私有容器。")
+        return String(localized: L10n.ICloud.detailContainerUnavailable)
     }
 
     var iCloudSyncSummary: RecordingICloudSyncSummary {
@@ -751,8 +752,6 @@ final class RecordingStore: ObservableObject {
                 transcriptPreview: draft.lines.plainTranscriptText,
                 lineCount: draft.lines.count,
                 intelligence: nil,
-                audioNormalizedAt: draft.audioNormalizedAt,
-                audioNormalizationVersion: draft.audioNormalizationVersion,
                 importStatus: nil,
                 manualTags: manualTags,
                 location: location
@@ -770,8 +769,7 @@ final class RecordingStore: ObservableObject {
     @discardableResult
     func importRecording(
         from sourceURL: URL,
-        language: TranscriptionLanguage,
-        loudnessProcessingEnabled: Bool
+        language: TranscriptionLanguage
     ) async throws -> RecordingItem {
         try ensureRecordingsDirectory()
 
@@ -794,11 +792,9 @@ final class RecordingStore: ObservableObject {
             transcriptPreview: "",
             lineCount: 0,
             intelligence: nil,
-            audioNormalizedAt: nil,
-            audioNormalizationVersion: nil,
             importStatus: RecordingImportStatus(
                 progress: 0.02,
-                message: String(localized: "正在导入录音"),
+                message: String(localized: L10n.Import.importingRecording),
                 isFailed: false
             ),
             manualTags: nil,
@@ -818,7 +814,7 @@ final class RecordingStore: ObservableObject {
                 recordings[index].durationSeconds = durationSeconds
                 try persist()
             }
-            updateImportStatus(for: item.id, progress: 0.08, message: String(localized: "正在准备转录"), shouldPersist: true)
+            updateImportStatus(for: item.id, progress: 0.08, message: String(localized: L10n.Import.preparingTranscription), shouldPersist: true)
             let lines = try await importWorker.transcribe(
                 audioURL: targetAudioURL,
                 language: language
@@ -827,20 +823,10 @@ final class RecordingStore: ObservableObject {
                     self?.updateImportStatus(
                         for: item.id,
                         progress: 0.1 + progress * 0.78,
-                        message: String(localized: "正在转录")
+                        message: String(localized: L10n.Import.transcribing)
                     )
                 }
             }
-            let outputFormat = RecordingAudioFormat(rawValue: targetAudioURL.pathExtension.lowercased())
-            let audioNormalizedAt: Date?
-            if loudnessProcessingEnabled, let outputFormat {
-                updateImportStatus(for: item.id, progress: 0.9, message: String(localized: "正在增强录音音量"), shouldPersist: true)
-                try await RecordingFileNormalizer.normalize(url: targetAudioURL, outputFormat: outputFormat)
-                audioNormalizedAt = Date()
-            } else {
-                audioNormalizedAt = nil
-            }
-
             try lines.timedTranscriptText.write(to: targetTranscriptURL, atomically: true, encoding: .utf8)
             guard let index = recordings.firstIndex(where: { $0.id == item.id }) else {
                 throw RecordingImportError.saveFailed
@@ -848,8 +834,6 @@ final class RecordingStore: ObservableObject {
             recordings[index].durationSeconds = (try? Self.durationSeconds(for: targetAudioURL)) ?? recordings[index].durationSeconds
             recordings[index].transcriptPreview = lines.plainTranscriptText
             recordings[index].lineCount = lines.count
-            recordings[index].audioNormalizedAt = audioNormalizedAt
-            recordings[index].audioNormalizationVersion = audioNormalizedAt == nil ? nil : RecordingFileNormalizer.version
             recordings[index].importStatus = nil
             try persist()
         } catch {
@@ -866,7 +850,7 @@ final class RecordingStore: ObservableObject {
     func retranscribe(_ item: RecordingItem, language: TranscriptionLanguage) async throws {
         let audioURL = audioURL(for: item)
         let transcriptURL = transcriptURL(for: item)
-        updateImportStatus(for: item.id, progress: 0.04, message: String(localized: "正在准备转录"), shouldPersist: true)
+        updateImportStatus(for: item.id, progress: 0.04, message: String(localized: L10n.Import.preparingTranscription), shouldPersist: true)
 
         do {
             let lines = try await importWorker.transcribe(
@@ -877,7 +861,7 @@ final class RecordingStore: ObservableObject {
                     self?.updateImportStatus(
                         for: item.id,
                         progress: 0.08 + progress * 0.9,
-                        message: String(localized: "正在转录")
+                        message: String(localized: L10n.Import.transcribing)
                     )
                 }
             }
@@ -1124,30 +1108,6 @@ final class RecordingStore: ObservableObject {
         return normalizedText
     }
 
-    func normalizeAudioIfNeeded(for item: RecordingItem, loudnessProcessingEnabled: Bool) async {
-        guard loudnessProcessingEnabled else {
-            return
-        }
-        guard item.audioNormalizationVersion != RecordingFileNormalizer.version else {
-            return
-        }
-        let url = audioURL(for: item)
-        guard let format = RecordingAudioFormat(rawValue: url.pathExtension.lowercased()) else {
-            return
-        }
-        do {
-            try await RecordingFileNormalizer.normalize(url: url, outputFormat: format)
-            guard let index = recordings.firstIndex(where: { $0.id == item.id }) else {
-                return
-            }
-            recordings[index].audioNormalizedAt = Date()
-            recordings[index].audioNormalizationVersion = RecordingFileNormalizer.version
-            try? persist()
-        } catch {
-            return
-        }
-    }
-
     func shareURLs(for item: RecordingItem) -> [URL] {
         [audioURL(for: item), transcriptURL(for: item)]
     }
@@ -1295,8 +1255,6 @@ final class RecordingStore: ObservableObject {
             transcriptPreview: transcript.plainTranscriptTextForIntelligence,
             lineCount: transcript.transcriptLineCount,
             intelligence: nil,
-            audioNormalizedAt: nil,
-            audioNormalizationVersion: nil,
             importStatus: nil,
             manualTags: nil,
             location: nil
@@ -1598,11 +1556,11 @@ private enum RecordingRenameError: LocalizedError {
     var errorDescription: String? {
         switch self {
         case .emptyName:
-            return String(localized: "录音名称不能为空")
+            return String(localized: L10n.Import.emptyRecordingName)
         case .nameAlreadyExists:
-            return String(localized: "已存在同名录音文件")
+            return String(localized: L10n.Import.duplicateRecordingName)
         case .itemMissing:
-            return String(localized: "找不到录音文件")
+            return String(localized: L10n.Import.recordingFileNotFound)
         }
     }
 }
@@ -1699,15 +1657,15 @@ private enum RecordingImportError: LocalizedError {
     var errorDescription: String? {
         switch self {
         case .speechRecognitionDenied:
-            return String(localized: "语音识别权限被拒绝")
+            return String(localized: L10n.SpeechText.speechDenied)
         case .analyzerUnavailable:
-            return String(localized: "语音分析器不可用")
+            return String(localized: L10n.SpeechText.analyzerUnavailable)
         case .unsupportedLanguage:
-            return String(localized: "当前语言暂不支持")
+            return String(localized: L10n.SpeechText.unsupportedLanguage)
         case .noTranscript:
-            return String(localized: "导入录音没有识别到文本")
+            return String(localized: L10n.Import.noRecognizedText)
         case .saveFailed:
-            return String(localized: "导入录音保存失败")
+            return String(localized: L10n.Import.saveFailed)
         }
     }
 }
@@ -2183,9 +2141,9 @@ private enum RecordingIntelligenceService {
         let cleanedText = cleanedModelText(text)
         let summary = labeledValue(
             in: cleanedText,
-            labels: ["summary", "summarization", "摘要", "总结"]
+            labels: summaryRecoveryLabels
         )
-        let tags = labeledTags(in: cleanedText, labels: ["tags", "topic tags", "标签", "主题标签"])
+        let tags = labeledTags(in: cleanedText, labels: tagsRecoveryLabels)
         if let summary, !summary.isEmpty {
             debugLog("Recovered analysis from labeled text. summaryCharacters=\(summary.count), tagCount=\(tags.count)")
             return GeneratedRecordingIntelligencePayload(summary: summary, tags: tags)
@@ -2221,8 +2179,8 @@ private enum RecordingIntelligenceService {
         }
 
         let cleanedText = cleanedModelText(text)
-        let title = labeledValue(in: cleanedText, labels: ["title", "recording title", "标题"])
-        let tags = labeledTags(in: cleanedText, labels: ["tags", "topic tags", "标签", "主题标签"])
+        let title = labeledValue(in: cleanedText, labels: titleRecoveryLabels)
+        let tags = labeledTags(in: cleanedText, labels: tagsRecoveryLabels)
         if let title, !title.isEmpty {
             debugLog("Recovered title from labeled text. titleCharacters=\(title.count), tagCount=\(tags.count)")
             return GeneratedRecordingTitlePayload(title: title, tags: tags)
@@ -2298,6 +2256,38 @@ private enum RecordingIntelligenceService {
             .replacingOccurrences(of: "```json", with: "", options: [.caseInsensitive])
             .replacingOccurrences(of: "```", with: "")
             .trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    private static var summaryRecoveryLabels: [String] {
+        normalizedRecoveryLabels([
+            "summary",
+            "summarization",
+            String(localized: L10n.Intelligence.parseSummaryLabel),
+            String(localized: L10n.Intelligence.parseSummarySynonymLabel)
+        ])
+    }
+
+    private static var titleRecoveryLabels: [String] {
+        normalizedRecoveryLabels([
+            "title",
+            "recording title",
+            String(localized: L10n.Intelligence.parseTitleLabel)
+        ])
+    }
+
+    private static var tagsRecoveryLabels: [String] {
+        normalizedRecoveryLabels([
+            "tags",
+            "topic tags",
+            String(localized: L10n.Intelligence.parseTagsLabel),
+            String(localized: L10n.Intelligence.parseTopicTagsLabel)
+        ])
+    }
+
+    private static func normalizedRecoveryLabels(_ labels: [String]) -> [String] {
+        labels
+            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines).localizedLowercase }
+            .filter { !$0.isEmpty }
     }
 
     private static func labeledValue(in text: String, labels: [String]) -> String? {
@@ -2519,19 +2509,19 @@ private enum RecordingIntelligenceError: LocalizedError {
     var errorDescription: String? {
         switch self {
         case .emptyTranscript:
-            return String(localized: "没有可分析的转录文本")
+            return String(localized: L10n.Intelligence.emptyTranscript)
         case .emptyResponse:
-            return String(localized: "没有生成有效的摘要")
+            return String(localized: L10n.Intelligence.emptySummary)
         case .emptyTitle:
-            return String(localized: "没有生成有效的标题")
+            return String(localized: L10n.Intelligence.emptyTitle)
         case .unavailable(.deviceNotEligible):
-            return String(localized: "当前设备不支持 Apple Intelligence 本地模型")
+            return String(localized: L10n.Intelligence.detailUnsupportedDevice)
         case .unavailable(.appleIntelligenceNotEnabled):
-            return String(localized: "Apple Intelligence 未开启")
+            return String(localized: L10n.Intelligence.detailDisabled)
         case .unavailable(.modelNotReady):
-            return String(localized: "Apple Intelligence 本地模型尚未准备好")
+            return String(localized: L10n.Intelligence.detailModelNotReady)
         @unknown default:
-            return String(localized: "Apple Intelligence 本地模型不可用")
+            return String(localized: L10n.Intelligence.detailUnavailable)
         }
     }
 }

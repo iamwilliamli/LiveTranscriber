@@ -97,7 +97,7 @@ enum TranscriptionLiveActivityCoordinator {
             status: status,
             languageName: languageName,
             latestText: latestText,
-            placeholderText: String(localized: "等待语音"),
+            placeholderText: String(localized: L10n.RecordingStatus.waitingForSpeech),
             elapsedSeconds: elapsedSeconds,
             timerReferenceDate: Date(timeIntervalSinceNow: -TimeInterval(max(elapsedSeconds, 0))),
             lineCount: lineCount,

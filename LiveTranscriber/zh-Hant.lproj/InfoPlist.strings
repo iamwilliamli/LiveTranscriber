@@ -1,0 +1,6 @@
+"CFBundleDisplayName" = "即時轉錄";
+"CFBundleName" = "即時轉錄";
+"NSCameraUsageDescription" = "Live Transcriber 不使用相機；錄音功能僅使用 Apple 擷取框架取得麥克風音訊。";
+"NSMicrophoneUsageDescription" = "用於錄音並即時轉錄文字。";
+"NSLocationWhenInUseUsageDescription" = "僅在你選擇替錄音加入地理位置時使用。";
+"NSSpeechRecognitionUsageDescription" = "用於把錄到的語音即時轉成文字。";

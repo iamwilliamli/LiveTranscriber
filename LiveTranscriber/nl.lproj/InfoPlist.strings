@@ -1,0 +1,6 @@
+"CFBundleDisplayName" = "Live Transcriptie";
+"CFBundleName" = "Live Transcriptie";
+"NSCameraUsageDescription" = "Live Transcriber gebruikt de camera niet. Apple's capture framework wordt alleen gebruikt voor microfoonopnamen.";
+"NSMicrophoneUsageDescription" = "Gebruikt om audio op te nemen voor live transcriptie.";
+"NSLocationWhenInUseUsageDescription" = "Alleen gebruikt wanneer je een locatie toevoegt aan een bewaarde opname.";
+"NSSpeechRecognitionUsageDescription" = "Gebruikt om opgenomen spraak om te zetten in live transcriptietekst.";

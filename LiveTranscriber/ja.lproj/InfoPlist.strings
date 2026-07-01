@@ -1,0 +1,6 @@
+"CFBundleDisplayName" = "ライブ文字起こし";
+"CFBundleName" = "ライブ文字起こし";
+"NSCameraUsageDescription" = "Live Transcriberはカメラを使用しません。Appleのキャプチャフレームワークはマイク録音にのみ使用されます。";
+"NSMicrophoneUsageDescription" = "ライブ文字起こし用の音声を録音するために使用されます。";
+"NSLocationWhenInUseUsageDescription" = "保存した録音に位置情報を追加する場合にのみ使用されます。";
+"NSSpeechRecognitionUsageDescription" = "録音した音声をライブ文字起こしテキストに変換するために使用されます。";

@@ -17,5 +17,3 @@ Package.resolved
 # Local runtime output
 *.log
 *.tmp
-*.normalized-*
-

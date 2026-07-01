@@ -1,6 +1,6 @@
 # Recording Processing Pipeline
 
-This is the current audio pipeline that works well on device. File-level normalization is off by default and available behind the Developer Options loudness-processing toggle; avoid returning to input-tap gain or repeated normalization passes.
+This is the current audio pipeline that works well on device. The recorder does not apply real-time gain or post-save audio rewriting; it preserves the captured audio and keeps playback adjustment limited to the player.
 
 ## Recording Stage
 
@@ -52,7 +52,7 @@ Important constraints:
 - The stereo mode only takes effect for the built-in microphone. External microphones may be ignored by the system for this property.
 - If `.stereo` is unsupported, the app fails fast with `stereoCaptureUnavailable` instead of silently saving mono.
 - Do not use `AVCaptureAudioDataOutput.audioSettings` on iOS; it is unavailable there. Convert the received sample buffers in app code.
-- Keep this path free of real-time gain. Optional file-level normalization is the only durable loudness adjustment.
+- Keep this path free of real-time gain and file rewrites.
 
 Diagnostics:
 
@@ -121,47 +121,8 @@ When recording stops:
 
 1. Stop the `AVCaptureSession`.
 2. Finish the analyzer pipeline and wait for SpeechAnalyzer to flush final transcript results.
-3. If Developer Options > Loudness Processing is enabled, run `RecordingFileNormalizer.normalize(...)` on the saved audio file.
-4. Save `audioNormalizedAt` and `audioNormalizationVersion` only when normalization succeeds.
-
-The app briefly shows `正在增强录音音量` while normalization runs. If normalization is disabled or fails, the recording draft is still returned and can still be saved.
-
-## Normalization
-
-Current normalizer version:
-
-```swift
-RecordingFileNormalizer.version = 2
-```
-
-Core parameters:
-
-```text
-targetActiveRMS = 0.20
-maximumGain = 16
-limiterCeiling = 0.94
-activeSampleThreshold = 0.012
-minimumActiveRMS = 0.006
-frameCapacity = 8192
-```
-
-The normalizer computes gain from active speech samples instead of whole-file RMS or single peak level. This keeps short loud peaks from making the entire voice recording too quiet.
-
-## Replacement Strategy
-
-Normalization writes to a temporary sibling file first:
-
-```text
-.normalized-UUID.ext
-```
-
-After writing succeeds, the original file is replaced through a backup-based swap. If replacement fails, the code attempts to restore the original file.
-
-## Existing Recordings
-
-`RecordingStore.normalizeAudioIfNeeded(for:loudnessProcessingEnabled:)` runs when a recording detail view opens only if Developer Options > Loudness Processing is enabled. It only normalizes when the stored version is older than the current normalizer version.
-
-Do not repeatedly normalize an already-normalized file at the same version. Repeated gain passes can reintroduce distortion.
+3. Return a recording draft with the captured audio URL, transcript lines, language metadata, and elapsed duration.
+4. Let `TranscriptionView` present the save sheet before the draft is committed to the library.
 
 ## Imported and Re-Transcribed Recordings
 
@@ -174,7 +135,6 @@ Imported recordings enter the same library model as live recordings:
 5. `ImportedRecordingTranscriptionService` reads the file in frames and feeds `SpeechAnalyzer` / `SpeechTranscriber`.
 6. Progress is reported as the audio file is consumed.
 7. The finished timed transcript replaces the empty `.txt` file.
-8. If Loudness Processing is enabled, supported output formats are normalized and tagged with `RecordingFileNormalizer.version`.
 
 Re-transcription reuses the stored audio file, replaces the transcript text, updates language metadata, clears existing summary/tags, and clears `importStatus` when complete.
 
@@ -192,11 +152,8 @@ Current behavior:
 - Updates current playback time roughly every 120 ms.
 - Tapping a saved transcript row seeks to that row's timestamp.
 
-When enabled, normalization is the durable file-level loudness fix. The playback gain is a small current-code boost, not a replacement for normalization.
-
 ## Explicit Non-Goals
 
 - No input-tap gain before writing files.
-- No peak-only gain calculation.
-- No repeated normalization for the same version.
-- No hidden repeated gain passes that rewrite already-normalized files.
+- No post-save audio rewriting pass.
+- No hidden gain passes that rewrite saved audio files.

@@ -17,6 +17,14 @@ Original project: https://github.com/iamwilliamli/LiveTranscriber
 
 Attribution-free, private-label, or white-label commercial use requires separate written permission from William Li. See [LICENSE](LICENSE), [NOTICE](NOTICE), and [CONTRIBUTING.md](CONTRIBUTING.md) for the full terms.
 
+## Community and Reporting
+
+- [Contributing Guide](CONTRIBUTING.md)
+- [Code of Conduct](CODE_OF_CONDUCT.md)
+- [Security Policy](SECURITY.md)
+- [Bug Reports](https://github.com/iamwilliamli/LiveTranscriber/issues/new?template=bug_report.md)
+- [Feature Requests](https://github.com/iamwilliamli/LiveTranscriber/issues/new?template=feature_request.md)
+
 ## Current Features
 
 - Tab-based SwiftUI app with recording, file library, and settings areas.
@@ -35,11 +43,55 @@ Attribution-free, private-label, or white-label commercial use requires separate
 - Lock Screen and Dynamic Island Live Activity with elapsed time, latest final transcript, language, line count, and stop action.
 - Home Screen widget with quick links to recording, saved files, and settings.
 - Local Apple Intelligence summary and topic tag generation for saved transcripts.
-- Optional file-level loudness normalization after recording, controlled from Developer Options, with a small playback-side boost in the current player.
 - Selectable speech processing pipelines: a stable iOS 26/27 compatible pipeline and an iOS 27 native `AnalyzerInputConverter` pipeline.
-- Recording detail audio parameters, including sample rate, channel count, encoding, duration, frame count, file size, and normalization status.
+- Recording detail audio parameters, including sample rate, channel count, encoding, duration, frame count, and file size.
 - Shared visual system based on Reddit Sans, grouped backgrounds, compact card surfaces, red recording actions, and system SF Symbols.
-- Chinese and English localization.
+- English, Simplified Chinese, Traditional Chinese, German, Dutch, and Japanese localization.
+
+## How It Works
+
+LiveTranscriber is a local-first iOS app. The main recording path captures stereo audio once, writes that audio to a file, and downmixes the same live sample buffers into the Speech pipeline for real-time transcripts. Saved recordings, transcript text, search metadata, summaries, and tags stay in the app-private container by default. If the user enables iCloud, app-managed files move to the app-private iCloud container and the SwiftData index syncs through the user's private CloudKit database.
+
+```mermaid
+flowchart TB
+    user["User"]
+    ui["SwiftUI App\nRecordings, Transcription, Settings"]
+    manager["LiveTranscriptionManager\nrecording session state"]
+    capture["AVCaptureSession\nStereo microphone capture"]
+    fileWriter["Audio File Writer\nWAV / M4A"]
+    speechInput["Analyzer Input Pipeline\nmonotonic timestamps"]
+    speech["Apple Speech\nSpeechAnalyzer + SpeechTranscriber"]
+    liveText["Live Transcript Lines"]
+    activity["ActivityKit + WidgetKit\nLock Screen, Dynamic Island, Home Widget"]
+    store["RecordingStore\nmetadata, files, search, import"]
+    localFiles["Local App-Private Container\naudio + transcript files"]
+    swiftData["SwiftData Index\nrecording metadata"]
+    icloudFiles["App-Private iCloud Container\noptional file sync"]
+    cloudKit["Private CloudKit Database\noptional index sync"]
+    detail["Recording Detail\nplayback, seek, share, re-transcribe"]
+    intelligence["FoundationModels\non-device summary + tags"]
+    importAudio["Files / Share Sheet\nimported audio"]
+
+    user --> ui
+    ui --> manager
+    manager --> capture
+    capture --> fileWriter
+    capture --> speechInput
+    speechInput --> speech
+    speech --> liveText
+    liveText --> ui
+    liveText --> activity
+    fileWriter --> store
+    liveText --> store
+    importAudio --> store
+    store --> localFiles
+    store --> swiftData
+    store -. "when iCloud is enabled" .-> icloudFiles
+    swiftData -. "when iCloud is enabled" .-> cloudKit
+    store --> detail
+    detail --> intelligence
+    intelligence --> store
+```
 
 ## Recording Capture Mode
 
@@ -95,6 +147,7 @@ For device testing, open `LiveTranscriber.xcodeproj` in Xcode and use a signing 
 - [Current Product and UI Design](docs/CURRENT_DESIGN.md)
 - [Recording Processing Pipeline](docs/RECORDING_PIPELINE.md)
 - [Live Activity Design](docs/LIVE_ACTIVITY.md)
+- [Localization](docs/LOCALIZATION.md)
 - [Development Notes](DEVELOPMENT_NOTES.md)
 - [Reddit Launch Draft](docs/REDDIT_POST.md)
 

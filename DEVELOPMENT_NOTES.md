@@ -126,7 +126,7 @@ iCloud 同步设计：
 - `RecordingStore` 先创建带 `RecordingImportStatus` 的占位 `RecordingItem`，列表和详情页可以展示进度。
 - 导入 worker 复制源文件到录音目录，并创建空 `.txt`。
 - `ImportedRecordingTranscriptionService` 用 `SpeechAnalyzer` / `SpeechTranscriber` 离线转录，按音频读取进度更新 UI。
-- 转录完成后写入 timed transcript，更新 preview、行数、时长、语言和归一化版本。
+- 转录完成后写入 timed transcript，更新 preview、行数、时长和语言。
 - 导入失败时不直接丢掉条目，而是把 `importStatus.isFailed` 设为 true，方便用户看到失败原因。
 
 重转录设计：
@@ -139,7 +139,7 @@ iCloud 同步设计：
 
 ### 录音处理 Pipeline
 
-当前这套链路在真机体验上可以稳定工作：录音文件音量足够，播放不再破音。后续不要回到录制阶段实时放大的方案；播放端如果保留增益，也应只是小幅辅助，不能替代文件级归一化。
+当前这套链路在真机体验上可以稳定工作：保存原始采集音频，录制阶段不做实时增益，停止后不再做保存文件后处理。
 
 当前只保留 `AVCaptureSession` 立体声采集路径：
 
@@ -169,42 +169,15 @@ iCloud 同步设计：
 
 1. 停止 `AVCaptureSession`。
 2. finish analyzer pipeline，等待 SpeechAnalyzer flush。
-3. 如果开发者选项里的“响度处理”开启，用 `RecordingFileNormalizer.normalize(...)` 对刚生成的音频文件做一次离线归一化。
-4. 只有归一化成功后才写入 `audioNormalizedAt` 和 `audioNormalizationVersion`。
-5. `TranscriptionView` 弹出保存 sheet，让用户修改录音名、添加手动标签、查看时长，并可选择附加地理位置。
-6. 用户点保存后，`RecordingStore.save(...)` 才把临时音频、转录文本和 metadata 一起写入私有录音目录与 SwiftData 索引；用户点丢弃时删除临时音频并清空当前 transcript。
+3. `TranscriptionView` 弹出保存 sheet，让用户修改录音名、添加手动标签、查看时长，并可选择附加地理位置。
+4. 用户点保存后，`RecordingStore.save(...)` 才把临时音频、转录文本和 metadata 一起写入私有录音目录与 SwiftData 索引；用户点丢弃时删除临时音频并清空当前 transcript。
 
-“响度处理”默认关闭。开启后，新录音、导入录音和打开详情页时的补处理会执行文件级归一化；关闭时保留 Stereo Capture 原始音量。已经归一化过的旧文件不会自动恢复成原始文件。
-
-当前归一化版本是 `RecordingFileNormalizer.version = 2`。核心参数：
-
-- `targetActiveRMS = 0.20`
-- `maximumGain = 16`
-- `limiterCeiling = 0.94`
-- `activeSampleThreshold = 0.012`
-- `minimumActiveRMS = 0.006`
-- `frameCapacity = 8192`
-
-归一化按“有效语音样本”的 RMS 计算增益，而不是按整段 RMS 或单个最高峰值计算。这样短促爆点不会把整段人声音量压低。写出时使用软限幅，避免硬裁剪造成破音。
-
-归一化写入策略：
-
-- 先读原文件统计 active RMS。
-- 写到同目录临时文件 `.normalized-UUID.ext`。
-- 写完后用 backup 文件做替换，失败时尽量恢复原文件。
-
-已有录音：
-
-- 打开录音详情页时调用 `RecordingStore.normalizeAudioIfNeeded(for:loudnessProcessingEnabled:)`。
-- 如果“响度处理”开启且 `audioNormalizationVersion` 不是当前版本，会重新归一化。
-- 如果版本已匹配，则不重复处理，避免反复增益导致破音。
+新录音、导入录音和详情页打开都不会改写音频文件。
 
 明确不要做：
 
 - 不要在 input tap 写文件前实时放大。
-- 不要继续提高播放端增益来替代文件级归一化。
-- 不要用单个 peak 决定整段 gain。
-- 不要每次打开详情页都重复归一化同一个版本的文件。
+- 不要在保存后做隐藏的增益处理并改写用户音频。
 
 ### 文件管理
 
@@ -237,7 +210,7 @@ iCloud 同步设计：
 
 播放逻辑在 `RecordingPlaybackController`。
 
-当前使用 `AVAudioEngine + AVAudioPlayerNode`，中间接 `AVAudioUnitEQ`，`globalGain = 3`。播放器负责播放、暂停、seek 和轻量播放端增益；长期、可持久的音量增强放在可选的文件级归一化阶段完成。
+当前使用 `AVAudioEngine + AVAudioPlayerNode`，中间接 `AVAudioUnitEQ`，`globalGain = 3`。播放器负责播放、暂停、seek 和轻量播放端增益，不改写保存的音频文件。
 
 详情页会把转录文本解析成带时间的行。点击某一行会 `seek(to:)` 到该行的 `startSeconds`。
 

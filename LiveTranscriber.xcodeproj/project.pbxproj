@@ -16,7 +16,6 @@
 		7B0000000000000000000007 /* EmptyStateView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7B0000000000000000001007 /* EmptyStateView.swift */; };
 		7B0000000000000000000008 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 7B0000000000000000001008 /* Assets.xcassets */; };
 		7B0000000000000000000009 /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = 7B0000000000000000001009 /* PrivacyInfo.xcprivacy */; };
-		7B000000000000000000000A /* Localizable.strings in Resources */ = {isa = PBXBuildFile; fileRef = 7B0000000000000000003005 /* Localizable.strings */; };
 		7B000000000000000000000B /* InfoPlist.strings in Resources */ = {isa = PBXBuildFile; fileRef = 7B0000000000000000003006 /* InfoPlist.strings */; };
 		7B000000000000000000000C /* RedditSans-Regular.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 7B0000000000000000001010 /* RedditSans-Regular.ttf */; };
 		7B000000000000000000000D /* RedditSans-Medium.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 7B0000000000000000001011 /* RedditSans-Medium.ttf */; };
@@ -37,8 +36,9 @@
 		7B000000000000000000001C /* RedditSans-SemiBold.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 7B0000000000000000001012 /* RedditSans-SemiBold.ttf */; };
 		7B000000000000000000001D /* RedditSans-Bold.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 7B0000000000000000001013 /* RedditSans-Bold.ttf */; };
 		7B000000000000000000001E /* RedditSans-Italic.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 7B0000000000000000001014 /* RedditSans-Italic.ttf */; };
-		7B000000000000000000001F /* Localizable.strings in Resources */ = {isa = PBXBuildFile; fileRef = 7B0000000000000000003005 /* Localizable.strings */; };
 		7B0000000000000000000020 /* HapticFeedback.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7B0000000000000000001020 /* HapticFeedback.swift */; };
+		7B0000000000000000000021 /* L10n.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7B0000000000000000001021 /* L10n.swift */; };
+		7B0000000000000000000022 /* Semantic.xcstrings in Resources */ = {isa = PBXBuildFile; fileRef = 7B0000000000000000001022 /* Semantic.xcstrings */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -77,10 +77,12 @@
 		7B0000000000000000001008 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		7B0000000000000000001009 /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; lastKnownFileType = text.xml; path = PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
 		7B000000000000000000100A /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
-		7B000000000000000000100B /* en */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = en; path = en.lproj/Localizable.strings; sourceTree = "<group>"; };
-		7B000000000000000000100C /* zh-Hans */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = "zh-Hans"; path = "zh-Hans.lproj/Localizable.strings"; sourceTree = "<group>"; };
 		7B000000000000000000100D /* en */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = en; path = en.lproj/InfoPlist.strings; sourceTree = "<group>"; };
 		7B000000000000000000100E /* zh-Hans */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = "zh-Hans"; path = "zh-Hans.lproj/InfoPlist.strings"; sourceTree = "<group>"; };
+		7B0000000000000000001023 /* de */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = de; path = de.lproj/InfoPlist.strings; sourceTree = "<group>"; };
+		7B0000000000000000001024 /* nl */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = nl; path = nl.lproj/InfoPlist.strings; sourceTree = "<group>"; };
+		7B0000000000000000001025 /* ja */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = ja; path = ja.lproj/InfoPlist.strings; sourceTree = "<group>"; };
+		7B0000000000000000001026 /* zh-Hant */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = "zh-Hant"; path = "zh-Hant.lproj/InfoPlist.strings"; sourceTree = "<group>"; };
 		7B0000000000000000001010 /* RedditSans-Regular.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = "RedditSans-Regular.ttf"; sourceTree = "<group>"; };
 		7B0000000000000000001011 /* RedditSans-Medium.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = "RedditSans-Medium.ttf"; sourceTree = "<group>"; };
 		7B0000000000000000001012 /* RedditSans-SemiBold.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = "RedditSans-SemiBold.ttf"; sourceTree = "<group>"; };
@@ -97,6 +99,8 @@
 		7B000000000000000000101D /* LiveTranscriberWidget.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = LiveTranscriberWidget.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 		7B000000000000000000101E /* LiveTranscriber.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = LiveTranscriber.entitlements; sourceTree = "<group>"; };
 		7B0000000000000000001020 /* HapticFeedback.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HapticFeedback.swift; sourceTree = "<group>"; };
+		7B0000000000000000001021 /* L10n.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = L10n.swift; sourceTree = "<group>"; };
+		7B0000000000000000001022 /* Semantic.xcstrings */ = {isa = PBXFileReference; lastKnownFileType = text.json.xcstrings; path = Semantic.xcstrings; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -137,6 +141,7 @@
 				7B0000000000000000001006 /* LiveTranscriptionManager.swift */,
 				7B0000000000000000001015 /* TranscriptionLanguage.swift */,
 				7B0000000000000000001020 /* HapticFeedback.swift */,
+				7B0000000000000000001021 /* L10n.swift */,
 				7B0000000000000000001016 /* RecordingStore.swift */,
 				7B0000000000000000001017 /* RecordingsView.swift */,
 				7B0000000000000000001018 /* SettingsView.swift */,
@@ -145,7 +150,7 @@
 				7B0000000000000000001007 /* EmptyStateView.swift */,
 				7B0000000000000000001008 /* Assets.xcassets */,
 				7B0000000000000000003010 /* Fonts */,
-				7B0000000000000000003005 /* Localizable.strings */,
+				7B0000000000000000001022 /* Semantic.xcstrings */,
 				7B0000000000000000003006 /* InfoPlist.strings */,
 				7B000000000000000000100A /* Info.plist */,
 				7B000000000000000000101E /* LiveTranscriber.entitlements */,
@@ -245,11 +250,15 @@
 			compatibilityVersion = "Xcode 14.0";
 			developmentRegion = en;
 			hasScannedForEncodings = 0;
-			knownRegions = (
-				en,
-				"zh-Hans",
-				Base,
-			);
+				knownRegions = (
+					en,
+					"zh-Hans",
+					"zh-Hant",
+					de,
+					nl,
+					ja,
+					Base,
+				);
 			mainGroup = 7B0000000000000000003001;
 			productRefGroup = 7B0000000000000000003003 /* Products */;
 			projectDirPath = "";
@@ -268,7 +277,7 @@
 			files = (
 				7B0000000000000000000008 /* Assets.xcassets in Resources */,
 				7B0000000000000000000009 /* PrivacyInfo.xcprivacy in Resources */,
-				7B000000000000000000000A /* Localizable.strings in Resources */,
+				7B0000000000000000000022 /* Semantic.xcstrings in Resources */,
 				7B000000000000000000000B /* InfoPlist.strings in Resources */,
 				7B000000000000000000000C /* RedditSans-Regular.ttf in Resources */,
 				7B000000000000000000000D /* RedditSans-Medium.ttf in Resources */,
@@ -282,7 +291,6 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				7B000000000000000000001F /* Localizable.strings in Resources */,
 				7B000000000000000000001A /* RedditSans-Regular.ttf in Resources */,
 				7B000000000000000000001B /* RedditSans-Medium.ttf in Resources */,
 				7B000000000000000000001C /* RedditSans-SemiBold.ttf in Resources */,
@@ -307,6 +315,7 @@
 				7B0000000000000000000011 /* TranscriptionLanguage.swift in Sources */,
 				7B0000000000000000000012 /* RecordingStore.swift in Sources */,
 				7B0000000000000000000020 /* HapticFeedback.swift in Sources */,
+				7B0000000000000000000021 /* L10n.swift in Sources */,
 				7B0000000000000000000013 /* RecordingsView.swift in Sources */,
 				7B0000000000000000000014 /* SettingsView.swift in Sources */,
 				7B0000000000000000000015 /* TranscriptionActivityAttributes.swift in Sources */,
@@ -335,20 +344,15 @@
 /* End PBXTargetDependency section */
 
 /* Begin PBXVariantGroup section */
-		7B0000000000000000003005 /* Localizable.strings */ = {
-			isa = PBXVariantGroup;
-			children = (
-				7B000000000000000000100B /* en */,
-				7B000000000000000000100C /* zh-Hans */,
-			);
-			name = Localizable.strings;
-			sourceTree = "<group>";
-		};
 		7B0000000000000000003006 /* InfoPlist.strings */ = {
 			isa = PBXVariantGroup;
 			children = (
 				7B000000000000000000100D /* en */,
 				7B000000000000000000100E /* zh-Hans */,
+				7B0000000000000000001026 /* zh-Hant */,
+				7B0000000000000000001023 /* de */,
+				7B0000000000000000001024 /* nl */,
+				7B0000000000000000001025 /* ja */,
 			);
 			name = InfoPlist.strings;
 			sourceTree = "<group>";

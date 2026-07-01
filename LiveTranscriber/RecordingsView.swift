@@ -8,6 +8,14 @@ import Translation
 import UIKit
 import UniformTypeIdentifiers
 
+private func localized(_ resource: LocalizedStringResource) -> String {
+    String(localized: resource)
+}
+
+private func localizedFormat(_ resource: LocalizedStringResource, _ arguments: CVarArg...) -> String {
+    String(format: String(localized: resource), arguments: arguments)
+}
+
 struct RecordingsView: View {
     @ObservedObject var store: RecordingStore
     @ObservedObject var transcriber: LiveTranscriptionManager
@@ -42,7 +50,7 @@ struct RecordingsView: View {
     var body: some View {
         NavigationStack {
             recordingsList
-                .navigationTitle("录音文件")
+                .navigationTitle(localized(L10n.Recordings.title))
                 .navigationBarTitleDisplayMode(.large)
                 .toolbar {
                     recordingsToolbar
@@ -55,7 +63,7 @@ struct RecordingsView: View {
         .searchable(
             text: $searchText,
             placement: .navigationBarDrawer(displayMode: .always),
-            prompt: Text("搜索录音或转录")
+            prompt: Text(L10n.Recordings.searchPrompt)
         )
         .task {
             await transcriber.refreshSupportedLanguages()
@@ -90,7 +98,7 @@ struct RecordingsView: View {
             RecordingMapView(store: store, transcriber: transcriber, player: player)
         }
         .confirmationDialog(
-            "选择转录语言",
+            localized(L10n.Recordings.chooseTranscriptionLanguage),
             isPresented: Binding(
                 get: { pendingImport != nil },
                 set: { isPresented in
@@ -114,12 +122,12 @@ struct RecordingsView: View {
                 }
             }
 
-            Button("取消", role: .cancel) {}
+            Button(localized(L10n.Common.cancel), role: .cancel) {}
         } message: {
-            Text("导入录音")
+            Text(L10n.Recordings.importRecording)
         }
         .alert(
-            "分析失败",
+            localized(L10n.Recordings.analysisFailed),
             isPresented: Binding(
                 get: { analysisErrorMessage != nil },
                 set: { isPresented in
@@ -129,12 +137,12 @@ struct RecordingsView: View {
                 }
             )
         ) {
-            Button("好", role: .cancel) {}
+            Button(localized(L10n.Common.ok), role: .cancel) {}
         } message: {
             Text(analysisErrorMessage ?? "")
         }
         .alert(
-            "导入失败",
+            localized(L10n.Recordings.importFailed),
             isPresented: Binding(
                 get: { importErrorMessage != nil },
                 set: { isPresented in
@@ -144,12 +152,12 @@ struct RecordingsView: View {
                 }
             )
         ) {
-            Button("好", role: .cancel) {}
+            Button(localized(L10n.Common.ok), role: .cancel) {}
         } message: {
             Text(importErrorMessage ?? "")
         }
         .alert(
-            "转录失败",
+            localized(L10n.Recordings.transcriptionFailed),
             isPresented: Binding(
                 get: { transcriptionErrorMessage != nil },
                 set: { isPresented in
@@ -159,12 +167,12 @@ struct RecordingsView: View {
                 }
             )
         ) {
-            Button("好", role: .cancel) {}
+            Button(localized(L10n.Common.ok), role: .cancel) {}
         } message: {
             Text(transcriptionErrorMessage ?? "")
         }
         .alert(
-            "删除录音",
+            localized(L10n.Recordings.deleteRecording),
             isPresented: Binding(
                 get: { deleteRequest != nil },
                 set: { isPresented in
@@ -174,18 +182,18 @@ struct RecordingsView: View {
                 }
             )
         ) {
-            Button("删除", role: .destructive) {
+            Button(localized(L10n.Common.delete), role: .destructive) {
                 if let request = deleteRequest {
                     delete(request.item)
                     deleteRequest = nil
                 }
             }
-            Button("取消", role: .cancel) {}
+            Button(localized(L10n.Common.cancel), role: .cancel) {}
         } message: {
-            Text(String(format: String(localized: "确定要删除 %@ 吗？"), deleteRequest?.item.audioFileName ?? ""))
+            Text(localizedFormat(L10n.Recordings.deleteConfirmationFormat, deleteRequest?.item.audioFileName ?? ""))
         }
         .alert(
-            "删除失败",
+            localized(L10n.Recordings.deleteFailed),
             isPresented: Binding(
                 get: { deleteErrorMessage != nil },
                 set: { isPresented in
@@ -195,7 +203,7 @@ struct RecordingsView: View {
                 }
             )
         ) {
-            Button("好", role: .cancel) {}
+            Button(localized(L10n.Common.ok), role: .cancel) {}
         } message: {
             Text(deleteErrorMessage ?? "")
         }
@@ -205,12 +213,12 @@ struct RecordingsView: View {
     private var recordingsList: some View {
         List {
             if store.recordings.isEmpty {
-                EmptyStateView(icon: "waveform.path.badge.plus", title: "暂无录音文件")
+                EmptyStateView(icon: "waveform.path.badge.plus", titleResource: L10n.Recordings.noRecordings)
                     .frame(maxWidth: .infinity, minHeight: 360)
                     .listRowSeparator(.hidden)
                     .listRowBackground(Color.clear)
             } else if filteredRecordings.isEmpty {
-                EmptyStateView(icon: "magnifyingglass", title: "没有找到录音")
+                EmptyStateView(icon: "magnifyingglass", titleResource: L10n.Recordings.noSearchResults)
                     .frame(maxWidth: .infinity, minHeight: 360)
                     .listRowSeparator(.hidden)
                     .listRowBackground(Color.clear)
@@ -246,7 +254,7 @@ struct RecordingsView: View {
                         Image(systemName: "map")
                             .frame(width: 32, height: 28)
                     }
-                    .accessibilityLabel("地图")
+                    .accessibilityLabel(Text(L10n.Recordings.map))
 
                     Divider()
                         .frame(height: 18)
@@ -260,7 +268,7 @@ struct RecordingsView: View {
                             .frame(width: 32, height: 28)
                     }
                     .disabled(isImporting || pendingImport != nil || transcriber.isRecording || transcriber.isPreparing)
-                    .accessibilityLabel("导入录音")
+                    .accessibilityLabel(Text(L10n.Recordings.importRecording))
                 }
                 .fixedSize()
             }
@@ -283,14 +291,19 @@ struct RecordingsView: View {
                 HapticFeedback.play(.copy)
                 UIPasteboard.general.string = store.transcriptText(for: item)
             } label: {
-                Label("复制转录文本", systemImage: "doc.on.doc")
+                Label(localized(L10n.Recordings.copyTranscript), systemImage: "doc.on.doc")
             }
 
             if store.intelligenceAvailability.isAvailable {
                 Button {
                     analyze(item)
                 } label: {
-                    Label(item.intelligence == nil ? "生成标签和总结" : "重新分析", systemImage: "sparkles")
+                    Label(
+                        item.intelligence == nil
+                            ? localized(L10n.Recordings.generateTagsAndSummary)
+                            : localized(L10n.Recordings.analyzeAgain),
+                        systemImage: "sparkles"
+                    )
                 }
                 .disabled(analyzingRecordingID != nil)
             }
@@ -307,14 +320,14 @@ struct RecordingsView: View {
                     }
                 }
             } label: {
-                Label("重新转录", systemImage: "arrow.triangle.2.circlepath")
+                Label(localized(L10n.Recordings.retranscribe), systemImage: "arrow.triangle.2.circlepath")
             }
             .disabled(item.importStatus?.isFailed == false || transcriber.isRecording || transcriber.isPreparing)
 
             Button(role: .destructive) {
                 requestDelete(item)
             } label: {
-                Label("删除", systemImage: "trash")
+                Label(localized(L10n.Common.delete), systemImage: "trash")
             }
             .disabled(item.importStatus?.isFailed == false)
         }
@@ -323,7 +336,7 @@ struct RecordingsView: View {
                 Button {
                     analyze(item)
                 } label: {
-                    Label("分析", systemImage: "sparkles")
+                    Label(localized(L10n.Recordings.analyze), systemImage: "sparkles")
                 }
                 .tint(AppTheme.info)
                 .disabled(analyzingRecordingID != nil)
@@ -333,7 +346,7 @@ struct RecordingsView: View {
             Button {
                 requestDelete(item)
             } label: {
-                Label("删除", systemImage: "trash")
+                Label(localized(L10n.Common.delete), systemImage: "trash")
             }
             .tint(AppTheme.danger)
             .disabled(item.importStatus?.isFailed == false)
@@ -391,8 +404,7 @@ struct RecordingsView: View {
             do {
                 _ = try await store.importRecording(
                     from: url,
-                    language: language,
-                    loudnessProcessingEnabled: transcriber.isLoudnessProcessingEnabled
+                    language: language
                 )
                 HapticFeedback.play(.importComplete)
             } catch {
@@ -545,7 +557,7 @@ struct RecordingMapView: View {
         NavigationStack {
             Group {
                 if points.isEmpty {
-                    EmptyStateView(icon: "map", title: "暂无带位置的录音")
+                    EmptyStateView(icon: "map", titleResource: L10n.Recordings.noLocatedRecordings)
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
                         .background(AppTheme.groupedBackground)
                 } else {
@@ -578,11 +590,11 @@ struct RecordingMapView: View {
                     .transition(.move(edge: .bottom).combined(with: .opacity))
                 }
             }
-            .navigationTitle("录音地图")
+            .navigationTitle(localized(L10n.Recordings.mapTitle))
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
-                    Button("完成") {
+                    Button(localized(L10n.Common.done)) {
                         dismiss()
                     }
                 }
@@ -866,7 +878,7 @@ private struct RecordingRow: View {
                     onOpen()
                 }
             } else if showsIntelligence && isAnalyzing {
-                Label("正在分析", systemImage: "sparkles")
+                Label(localized(L10n.Recordings.analyzing), systemImage: "sparkles")
                     .font(.redditSans(.caption, weight: .semibold))
                     .foregroundStyle(AppTheme.info)
                     .contentShape(Rectangle())
@@ -1096,7 +1108,7 @@ struct RecordingDetailView: View {
                     } label: {
                         Image(systemName: "chevron.left")
                     }
-                    .accessibilityLabel("返回")
+                    .accessibilityLabel(Text(L10n.Common.back))
                 }
             }
 
@@ -1111,11 +1123,11 @@ struct RecordingDetailView: View {
                         .padding()
                 }
                 .background(AppTheme.groupedBackground.ignoresSafeArea())
-                .navigationTitle("音频参数")
+                .navigationTitle(localized(L10n.Recordings.audioParameters))
                 .navigationBarTitleDisplayMode(.inline)
                 .toolbar {
                     ToolbarItem(placement: .topBarTrailing) {
-                        Button("完成") {
+                        Button(localized(L10n.Common.done)) {
                             isShowingAudioFileInfo = false
                         }
                     }
@@ -1149,10 +1161,6 @@ struct RecordingDetailView: View {
         .onAppear {
             Task {
                 store.refreshIntelligenceAvailability()
-                await store.normalizeAudioIfNeeded(
-                    for: currentItem,
-                    loudnessProcessingEnabled: transcriber.isLoudnessProcessingEnabled
-                )
                 await refreshAudioFileInfo()
                 player.load(item: currentItem, url: store.audioURL(for: currentItem))
             }
@@ -1176,7 +1184,7 @@ struct RecordingDetailView: View {
             }
         }
         .alert(
-            "分析失败",
+            localized(L10n.Recordings.analysisFailed),
             isPresented: Binding(
                 get: { analysisErrorMessage != nil },
                 set: { isPresented in
@@ -1186,12 +1194,12 @@ struct RecordingDetailView: View {
                 }
             )
         ) {
-            Button("好", role: .cancel) {}
+            Button(localized(L10n.Common.ok), role: .cancel) {}
         } message: {
             Text(analysisErrorMessage ?? "")
         }
         .alert(
-            "删除录音",
+            localized(L10n.Recordings.deleteRecording),
             isPresented: Binding(
                 get: { deleteRequest != nil },
                 set: { isPresented in
@@ -1201,18 +1209,18 @@ struct RecordingDetailView: View {
                 }
             )
         ) {
-            Button("删除", role: .destructive) {
+            Button(localized(L10n.Common.delete), role: .destructive) {
                 if let request = deleteRequest {
                     deleteCurrentItem(request.item)
                     deleteRequest = nil
                 }
             }
-            Button("取消", role: .cancel) {}
+            Button(localized(L10n.Common.cancel), role: .cancel) {}
         } message: {
-            Text(String(format: String(localized: "确定要删除 %@ 吗？"), deleteRequest?.item.audioFileName ?? ""))
+            Text(localizedFormat(L10n.Recordings.deleteConfirmationFormat, deleteRequest?.item.audioFileName ?? ""))
         }
         .alert(
-            "删除失败",
+            localized(L10n.Recordings.deleteFailed),
             isPresented: Binding(
                 get: { deleteErrorMessage != nil },
                 set: { isPresented in
@@ -1222,12 +1230,12 @@ struct RecordingDetailView: View {
                 }
             )
         ) {
-            Button("好", role: .cancel) {}
+            Button(localized(L10n.Common.ok), role: .cancel) {}
         } message: {
             Text(deleteErrorMessage ?? "")
         }
         .alert(
-            "重命名失败",
+            localized(L10n.Recordings.renameFailed),
             isPresented: Binding(
                 get: { renameErrorMessage != nil },
                 set: { isPresented in
@@ -1237,7 +1245,7 @@ struct RecordingDetailView: View {
                 }
             )
         ) {
-            Button("好", role: .cancel) {}
+            Button(localized(L10n.Common.ok), role: .cancel) {}
         } message: {
             Text(renameErrorMessage ?? "")
         }
@@ -1250,29 +1258,29 @@ struct RecordingDetailView: View {
             Button {
                 prepareRecordingEditSheet()
             } label: {
-                Label("重命名", systemImage: "pencil")
+                Label(localized(L10n.Recordings.rename), systemImage: "pencil")
             }
             .disabled(isTranscriptionRunning)
 
             Button {
                 isShowingAudioFileInfo = true
             } label: {
-                Label("音频参数", systemImage: "info.circle")
+                Label(localized(L10n.Recordings.audioParameters), systemImage: "info.circle")
             }
 
             Divider()
 
             Menu {
                 ShareLink(item: store.audioURL(for: currentItem)) {
-                    Label("分享音频", systemImage: "waveform")
+                    Label(localized(L10n.Recordings.shareAudio), systemImage: "waveform")
                 }
 
                 ShareLink(item: transcriptText) {
-                    Label("分享转录文字", systemImage: "text.alignleft")
+                    Label(localized(L10n.Recordings.shareTranscript), systemImage: "text.alignleft")
                 }
                 .disabled(transcriptText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
             } label: {
-                Label("分享", systemImage: "square.and.arrow.up")
+                Label(localized(L10n.Recordings.share), systemImage: "square.and.arrow.up")
             }
 
             Menu {
@@ -1287,7 +1295,7 @@ struct RecordingDetailView: View {
                     }
                 }
             } label: {
-                Label("重新转录", systemImage: isTranscriptionRunning ? "hourglass" : "arrow.triangle.2.circlepath")
+                Label(localized(L10n.Recordings.retranscribe), systemImage: isTranscriptionRunning ? "hourglass" : "arrow.triangle.2.circlepath")
             }
             .disabled(isTranscriptionRunning || transcriber.isRecording || transcriber.isPreparing)
 
@@ -1299,14 +1307,17 @@ struct RecordingDetailView: View {
                     copied = false
                 }
             } label: {
-                Label(copied ? "已复制" : "复制转录文本", systemImage: copied ? "checkmark" : "doc.on.doc")
+                Label(
+                    copied ? localized(L10n.Recordings.copied) : localized(L10n.Recordings.copyTranscript),
+                    systemImage: copied ? "checkmark" : "doc.on.doc"
+                )
             }
 
             if store.intelligenceAvailability.isAvailable {
                 Button {
                     analyzeCurrentItem()
                 } label: {
-                    Label("智能分析", systemImage: isAnalyzing ? "hourglass" : "sparkles")
+                    Label(localized(L10n.Recordings.intelligenceAnalysis), systemImage: isAnalyzing ? "hourglass" : "sparkles")
                 }
                 .disabled(isAnalyzing)
             }
@@ -1317,13 +1328,13 @@ struct RecordingDetailView: View {
                 HapticFeedback.play(.deleteRequested)
                 deleteRequest = RecordingDeleteRequest(item: currentItem)
             } label: {
-                Label("删除录音", systemImage: "trash")
+                Label(localized(L10n.Recordings.deleteRecording), systemImage: "trash")
             }
             .disabled(isTranscriptionRunning)
         } label: {
             Image(systemName: "ellipsis.circle")
         }
-        .accessibilityLabel("更多")
+        .accessibilityLabel(Text(L10n.Common.more))
     }
 
     private var header: some View {
@@ -1387,7 +1398,7 @@ struct RecordingDetailView: View {
 
         return VStack(alignment: .leading, spacing: 12) {
             HStack(alignment: .center, spacing: 12) {
-                Label("智能摘要", systemImage: "sparkles")
+                Label(localized(L10n.Recordings.intelligenceSummary), systemImage: "sparkles")
                     .font(.redditSans(.headline))
 
                 Spacer(minLength: 8)
@@ -1399,7 +1410,7 @@ struct RecordingDetailView: View {
                         ProgressView()
                             .controlSize(.small)
                     } else {
-                        Text(item.intelligence == nil ? "分析" : "重新分析")
+                        Text(item.intelligence == nil ? localized(L10n.Recordings.analyze) : localized(L10n.Recordings.analyzeAgain))
                             .font(.redditSans(.caption, weight: .semibold))
                     }
                 }
@@ -1408,7 +1419,7 @@ struct RecordingDetailView: View {
             }
 
             if isAnalyzing {
-                Label("正在分析", systemImage: "sparkles")
+                Label(localized(L10n.Recordings.analyzing), systemImage: "sparkles")
                     .font(.redditSans(.caption, weight: .semibold))
                     .foregroundStyle(AppTheme.info)
             } else if let intelligence = item.intelligence {
@@ -1424,7 +1435,7 @@ struct RecordingDetailView: View {
                     .font(.redditSans(.caption2))
                     .foregroundStyle(.secondary)
             } else {
-                EmptyStateView(icon: "sparkles", title: "暂无摘要")
+                EmptyStateView(icon: "sparkles", titleResource: L10n.Recordings.noSummary)
                     .frame(maxWidth: .infinity)
                     .frame(height: 96)
             }
@@ -1443,21 +1454,20 @@ struct RecordingDetailView: View {
         let iCloudSyncStatus = store.iCloudSyncStatus(for: currentItem)
 
         return VStack(alignment: .leading, spacing: 12) {
-            Label("音频参数", systemImage: "info.circle")
+            Label(localized(L10n.Recordings.audioParameters), systemImage: "info.circle")
                 .font(.redditSans(.headline))
 
             if let audioFileInfo {
                 VStack(spacing: 0) {
-                    RecordingAudioParameterRow(icon: "waveform", title: "采样率", value: audioFileInfo.fileSampleRateText)
-                    RecordingAudioParameterRow(icon: "speaker.wave.2", title: "声道", value: audioFileInfo.channelLayoutText)
-                    RecordingAudioParameterRow(icon: "cpu", title: "编码", value: audioFileInfo.fileFormatText)
-                    RecordingAudioParameterRow(icon: "slider.horizontal.3", title: "处理格式", value: audioFileInfo.processingFormatText)
-                    RecordingAudioParameterRow(icon: "number", title: "PCM 位深", value: audioFileInfo.bitDepthText)
-                    RecordingAudioParameterRow(icon: "timer", title: "音频时长", value: audioFileInfo.durationText)
-                    RecordingAudioParameterRow(icon: "square.stack.3d.up", title: "音频帧数", value: audioFileInfo.frameCountText)
-                    RecordingAudioParameterRow(icon: "doc", title: "文件大小", value: audioFileInfo.fileSizeText)
-                    RecordingAudioParameterRow(icon: iCloudSyncStatus.systemImage, title: "iCloud 同步", value: iCloudSyncStatus.displayName)
-                    RecordingAudioParameterRow(icon: "checkmark.seal", title: "音量处理", value: audioFileInfo.normalizationText, showsDivider: false)
+                    RecordingAudioParameterRow(icon: "waveform", titleResource: L10n.Recordings.sampleRate, value: audioFileInfo.fileSampleRateText)
+                    RecordingAudioParameterRow(icon: "speaker.wave.2", titleResource: L10n.Recordings.channels, value: audioFileInfo.channelLayoutText)
+                    RecordingAudioParameterRow(icon: "cpu", titleResource: L10n.Recordings.encoding, value: audioFileInfo.fileFormatText)
+                    RecordingAudioParameterRow(icon: "slider.horizontal.3", titleResource: L10n.Recordings.processingFormat, value: audioFileInfo.processingFormatText)
+                    RecordingAudioParameterRow(icon: "number", titleResource: L10n.Recordings.pcmBitDepth, value: audioFileInfo.bitDepthText)
+                    RecordingAudioParameterRow(icon: "timer", titleResource: L10n.Recordings.audioDuration, value: audioFileInfo.durationText)
+                    RecordingAudioParameterRow(icon: "square.stack.3d.up", titleResource: L10n.Recordings.audioFrames, value: audioFileInfo.frameCountText)
+                    RecordingAudioParameterRow(icon: "doc", titleResource: L10n.Recordings.fileSize, value: audioFileInfo.fileSizeText)
+                    RecordingAudioParameterRow(icon: iCloudSyncStatus.systemImage, titleResource: L10n.Recordings.iCloudSync, value: iCloudSyncStatus.displayName, showsDivider: false)
                 }
             } else if let audioFileInfoError {
                 Label(audioFileInfoError, systemImage: "exclamationmark.triangle")
@@ -1465,7 +1475,7 @@ struct RecordingDetailView: View {
                     .foregroundStyle(AppTheme.warning)
                     .fixedSize(horizontal: false, vertical: true)
             } else {
-                Label("正在读取音频参数", systemImage: "waveform")
+                Label(localized(L10n.Recordings.readingAudioParameters), systemImage: "waveform")
                     .font(.redditSans(.caption, weight: .semibold))
                     .foregroundStyle(AppTheme.info)
             }
@@ -1524,7 +1534,11 @@ struct RecordingDetailView: View {
                     }
                     .disabled(!player.isLoaded)
 
-                    PlaybackRoundButton(systemImage: player.isPlaying ? "pause.fill" : "play.fill", title: player.isPlaying ? "暂停" : "播放", isPrimary: true) {
+                    PlaybackRoundButton(
+                        systemImage: player.isPlaying ? "pause.fill" : "play.fill",
+                        titleResource: player.isPlaying ? L10n.Recordings.pause : L10n.Recordings.play,
+                        isPrimary: true
+                    ) {
                         HapticFeedback.play(.playbackToggle)
                         player.togglePlayback()
                     }
@@ -1592,7 +1606,7 @@ struct RecordingDetailView: View {
 
         return VStack(alignment: .leading, spacing: 12) {
             HStack(alignment: .center, spacing: 12) {
-                Label("转录文本", systemImage: "text.alignleft")
+                Label(localized(L10n.Recordings.transcript), systemImage: "text.alignleft")
                     .font(.redditSans(.headline))
 
                 Spacer(minLength: 8)
@@ -1609,7 +1623,7 @@ struct RecordingDetailView: View {
 
             if lines.isEmpty {
                 if item.importStatus == nil {
-                    EmptyStateView(icon: "text.badge.xmark", title: "暂无文本")
+                    EmptyStateView(icon: "text.badge.xmark", titleResource: L10n.Recordings.noText)
                         .frame(maxWidth: .infinity)
                         .frame(height: 180)
                 }
@@ -1646,7 +1660,7 @@ struct RecordingDetailView: View {
             Button {
                 clearTranscriptTranslation()
             } label: {
-                Label("原文", systemImage: selectedTranslationLanguage == nil ? "checkmark" : "text.alignleft")
+                Label(localized(L10n.Recordings.original), systemImage: selectedTranslationLanguage == nil ? "checkmark" : "text.alignleft")
             }
 
             Divider()
@@ -1665,7 +1679,7 @@ struct RecordingDetailView: View {
             HStack(spacing: 5) {
                 Image(systemName: "translate")
                     .font(.system(size: 12, weight: .semibold))
-                Text(selectedTranslationLanguage?.shortName ?? String(localized: "翻译"))
+                Text(selectedTranslationLanguage?.shortName ?? localized(L10n.Recordings.translate))
                     .font(.redditSans(.caption, weight: .bold))
             }
             .foregroundStyle(selectedTranslationLanguage == nil ? AppTheme.info : AppTheme.brand)
@@ -1688,7 +1702,7 @@ struct RecordingDetailView: View {
                         .font(.system(size: 12, weight: .semibold))
                 }
 
-                Text(translationErrorMessage ?? String(format: String(localized: "翻译成 %@"), selectedTranslationLanguage.displayName))
+                Text(translationErrorMessage ?? localizedFormat(L10n.Recordings.translatingToFormat, selectedTranslationLanguage.displayName))
                     .font(.redditSans(.caption, weight: .semibold))
                     .foregroundStyle(translationErrorMessage == nil ? .secondary : AppTheme.warning)
                     .lineLimit(2)
@@ -1716,13 +1730,13 @@ struct RecordingDetailView: View {
 
         let item = currentItem
         if selectedTranslationLanguage != nil, isTranslatingTranscript {
-            analysisErrorMessage = String(localized: "请等待翻译完成后再生成智能摘要")
+            analysisErrorMessage = localized(L10n.Recordings.waitForTranslationBeforeSummary)
             HapticFeedback.play(.blocked)
             return
         }
         let translatedAnalysisInput = translatedTranscriptAnalysisInput()
         if selectedTranslationLanguage != nil, translatedAnalysisInput == nil {
-            analysisErrorMessage = String(localized: "没有可用于智能摘要的翻译文本")
+            analysisErrorMessage = localized(L10n.Recordings.noTranslatedTextForSummary)
             HapticFeedback.play(.blocked)
             return
         }
@@ -1798,21 +1812,15 @@ struct RecordingDetailView: View {
     private func refreshAudioFileInfo() async {
         let item = currentItem
         let url = store.audioURL(for: item)
-        let audioNormalizedAt = item.audioNormalizedAt
-        let audioNormalizationVersion = item.audioNormalizationVersion
         do {
             let info = try await Task.detached(priority: .utility) {
-                try RecordingAudioFileInfo(
-                    url: url,
-                    audioNormalizedAt: audioNormalizedAt,
-                    audioNormalizationVersion: audioNormalizationVersion
-                )
+                try RecordingAudioFileInfo(url: url)
             }.value
             audioFileInfo = info
             audioFileInfoError = nil
         } catch {
             audioFileInfo = nil
-            audioFileInfoError = String(format: String(localized: "无法读取音频参数: %@"), error.localizedDescription)
+            audioFileInfoError = localizedFormat(L10n.Recordings.audioInfoReadFailedFormat, error.localizedDescription)
         }
     }
 
@@ -2074,11 +2082,11 @@ private struct RecordingEditSheet: View {
                 .padding(16)
             }
             .background(AppTheme.groupedBackground.ignoresSafeArea())
-            .navigationTitle("编辑录音")
+            .navigationTitle(localized(L10n.Recordings.editRecordingTitle))
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {
-                    Button("取消") {
+                    Button(localized(L10n.Common.cancel)) {
                         onCancel()
                     }
                     .disabled(isSaving)
@@ -2092,7 +2100,7 @@ private struct RecordingEditSheet: View {
                             ProgressView()
                                 .controlSize(.small)
                         } else {
-                            Text("保存")
+                            Text(L10n.Common.save)
                                 .font(.redditSans(.subheadline, weight: .semibold))
                         }
                     }
@@ -2104,11 +2112,11 @@ private struct RecordingEditSheet: View {
 
     private var nameSection: some View {
         VStack(alignment: .leading, spacing: 8) {
-            Label("录音名称", systemImage: "pencil")
+            Label(localized(L10n.Recordings.recordingName), systemImage: "pencil")
                 .font(.redditSans(.caption, weight: .semibold))
                 .foregroundStyle(.secondary)
 
-            TextField("录音名称", text: $recordingName)
+            TextField(localized(L10n.Recordings.recordingName), text: $recordingName)
                 .font(.redditSans(.headline, weight: .semibold))
                 .textInputAutocapitalization(.never)
                 .autocorrectionDisabled()
@@ -2124,13 +2132,13 @@ private struct RecordingEditSheet: View {
             RecordingMetadataTagsEditor(tags: $tags)
         } label: {
             HStack(spacing: 12) {
-                Label("标签", systemImage: "tag")
+                Label(localized(L10n.Recordings.tags), systemImage: "tag")
                     .font(.redditSans(.subheadline, weight: .semibold))
                     .foregroundStyle(.primary)
 
                 Spacer()
 
-                Text(tags.isEmpty ? String(localized: "未添加") : "\(tags.count)")
+                Text(tags.isEmpty ? localized(L10n.Recordings.notAdded) : "\(tags.count)")
                     .font(.redditSans(.caption, weight: .semibold))
                     .foregroundStyle(.secondary)
 
@@ -2145,7 +2153,7 @@ private struct RecordingEditSheet: View {
 
     private var durationRow: some View {
         HStack(spacing: 12) {
-            Label("音频时长", systemImage: "clock")
+            Label(localized(L10n.Recordings.audioDuration), systemImage: "clock")
                 .font(.redditSans(.subheadline, weight: .semibold))
             Spacer()
             Text(TranscriptionLine.formatTimestamp(Double(item.durationSeconds)))
@@ -2158,7 +2166,7 @@ private struct RecordingEditSheet: View {
     private var locationSection: some View {
         VStack(alignment: .leading, spacing: 12) {
             Toggle(isOn: $includesLocation) {
-                Label("添加地理位置", systemImage: "location")
+                Label(localized(L10n.Recordings.addLocation), systemImage: "location")
                     .font(.redditSans(.subheadline, weight: .semibold))
             }
             .tint(AppTheme.brand)
@@ -2182,7 +2190,7 @@ private struct RecordingMetadataTagsEditor: View {
         List {
             Section {
                 HStack(spacing: 8) {
-                    TextField("添加标签", text: $newTag)
+                    TextField(localized(L10n.Recordings.addTag), text: $newTag)
                         .textInputAutocapitalization(.never)
                         .autocorrectionDisabled()
 
@@ -2197,7 +2205,7 @@ private struct RecordingMetadataTagsEditor: View {
 
             Section {
                 if tags.isEmpty {
-                    Text("暂无标签")
+                    Text(L10n.Recordings.noTags)
                         .foregroundStyle(.secondary)
                 } else {
                     ForEach(tags, id: \.self) { tag in
@@ -2209,7 +2217,7 @@ private struct RecordingMetadataTagsEditor: View {
                 }
             }
         }
-        .navigationTitle("标签")
+        .navigationTitle(localized(L10n.Recordings.tags))
         .navigationBarTitleDisplayMode(.inline)
     }
 
@@ -2255,7 +2263,7 @@ private struct RecordingEditLocationPreview: View {
                         )
                     )
                 ) {
-                    Marker(displayedLocation.placeName ?? String(localized: "当前位置"), coordinate: coordinate)
+                    Marker(displayedLocation.placeName ?? localized(L10n.Recordings.currentLocation), coordinate: coordinate)
                 }
                 .frame(height: 150)
                 .clipShape(RoundedRectangle(cornerRadius: AppTheme.compactCornerRadius, style: .continuous))
@@ -2273,7 +2281,7 @@ private struct RecordingEditLocationPreview: View {
                     Text(displayedLocation.coordinateText)
                         .monospacedDigit()
                     Spacer()
-                    Button("更新当前位置") {
+                    Button(localized(L10n.Recordings.updateCurrentLocation)) {
                         locationProvider.requestLocation()
                     }
                     .font(.redditSans(.caption, weight: .semibold))
@@ -2281,7 +2289,7 @@ private struct RecordingEditLocationPreview: View {
                 .font(.redditSans(.caption))
                 .foregroundStyle(.secondary)
             } else if locationProvider.isDenied {
-                Label("位置权限被拒绝", systemImage: "location.slash")
+                Label(localized(L10n.Recordings.locationDenied), systemImage: "location.slash")
                     .font(.redditSans(.caption, weight: .semibold))
                     .foregroundStyle(AppTheme.warning)
             } else if let errorText = locationProvider.errorText {
@@ -2292,7 +2300,7 @@ private struct RecordingEditLocationPreview: View {
                 HStack(spacing: 10) {
                     ProgressView()
                         .controlSize(.small)
-                    Text("正在获取位置")
+                    Text(L10n.Recordings.locating)
                         .font(.redditSans(.caption, weight: .semibold))
                         .foregroundStyle(.secondary)
                 }
@@ -2362,9 +2370,9 @@ private final class RecordingEditLocationProvider: NSObject, ObservableObject, C
         case .authorizedAlways, .authorizedWhenInUse:
             manager.requestLocation()
         case .denied, .restricted:
-            errorText = String(localized: "位置权限被拒绝")
+            errorText = localized(L10n.Recordings.locationDenied)
         @unknown default:
-            errorText = String(localized: "无法获取位置")
+            errorText = localized(L10n.Recordings.locationUnavailable)
         }
     }
 
@@ -2480,10 +2488,8 @@ private struct RecordingAudioFileInfo: Equatable, Sendable {
     var frameCount: AVAudioFramePosition
     var durationSeconds: TimeInterval
     var fileSize: Int64?
-    var audioNormalizedAt: Date?
-    var audioNormalizationVersion: Int?
 
-    init(url: URL, audioNormalizedAt: Date?, audioNormalizationVersion: Int?) throws {
+    init(url: URL) throws {
         let file = try AVAudioFile(forReading: url)
         let fileFormat = file.fileFormat
         let processingFormat = file.processingFormat
@@ -2501,8 +2507,6 @@ private struct RecordingAudioFileInfo: Equatable, Sendable {
         self.frameCount = file.length
         self.durationSeconds = processingFormat.sampleRate > 0 ? Double(file.length) / processingFormat.sampleRate : 0
         self.fileSize = resourceValues?.fileSize.map { Int64($0) }
-        self.audioNormalizedAt = audioNormalizedAt
-        self.audioNormalizationVersion = audioNormalizationVersion
     }
 
     var fileSampleRateText: String {
@@ -2512,11 +2516,11 @@ private struct RecordingAudioFileInfo: Equatable, Sendable {
     var channelLayoutText: String {
         switch channelCount {
         case 1:
-            return String(localized: "单声道")
+            return localized(L10n.Recordings.mono)
         case 2:
-            return String(localized: "立体声")
+            return localized(L10n.Recordings.stereo)
         default:
-            return String(format: String(localized: "%d 声道"), Int(channelCount))
+            return localizedFormat(L10n.Recordings.channelCountFormat, Int(channelCount))
         }
     }
 
@@ -2531,11 +2535,11 @@ private struct RecordingAudioFileInfo: Equatable, Sendable {
         let channelText: String
         switch processingChannelCount {
         case 1:
-            channelText = String(localized: "单声道")
+            channelText = localized(L10n.Recordings.mono)
         case 2:
-            channelText = String(localized: "立体声")
+            channelText = localized(L10n.Recordings.stereo)
         default:
-            channelText = String(format: String(localized: "%d 声道"), Int(processingChannelCount))
+            channelText = localizedFormat(L10n.Recordings.channelCountFormat, Int(processingChannelCount))
         }
 
         return "\(Self.sampleRateText(processingSampleRate)) / \(channelText) / \(processingCommonFormatName)"
@@ -2543,9 +2547,9 @@ private struct RecordingAudioFileInfo: Equatable, Sendable {
 
     var bitDepthText: String {
         guard let bitDepth else {
-            return String(localized: "不适用")
+            return localized(L10n.Common.notApplicable)
         }
-        return String(format: String(localized: "%d-bit"), bitDepth)
+        return localizedFormat(L10n.Recordings.bitDepthFormat, bitDepth)
     }
 
     var durationText: String {
@@ -2558,25 +2562,9 @@ private struct RecordingAudioFileInfo: Equatable, Sendable {
 
     var fileSizeText: String {
         guard let fileSize else {
-            return String(localized: "未知")
+            return localized(L10n.Common.unknown)
         }
         return ByteCountFormatter.string(fromByteCount: fileSize, countStyle: .file)
-    }
-
-    var normalizationText: String {
-        guard let audioNormalizationVersion else {
-            return String(localized: "未归一化")
-        }
-
-        if let audioNormalizedAt {
-            return String(
-                format: String(localized: "已归一化 v%d · %@"),
-                audioNormalizationVersion,
-                audioNormalizedAt.formatted(date: .abbreviated, time: .shortened)
-            )
-        }
-
-        return String(format: String(localized: "已归一化 v%d"), audioNormalizationVersion)
     }
 
     private static let integerFormatter: NumberFormatter = {
@@ -2587,7 +2575,7 @@ private struct RecordingAudioFileInfo: Equatable, Sendable {
 
     private static func sampleRateText(_ sampleRate: Double) -> String {
         guard sampleRate.isFinite, sampleRate > 0 else {
-            return String(localized: "未知")
+            return localized(L10n.Common.unknown)
         }
 
         let kilohertz = sampleRate / 1_000
@@ -2608,15 +2596,15 @@ private struct RecordingAudioFileInfo: Equatable, Sendable {
         case .pcmFormatInt32:
             return "Int32 PCM"
         case .otherFormat:
-            return String(localized: "压缩或其他格式")
+            return localized(L10n.Recordings.compressedOrOtherFormat)
         @unknown default:
-            return String(localized: "未知")
+            return localized(L10n.Common.unknown)
         }
     }
 
     private static func formatName(from value: Any?) -> String {
         guard let formatID = audioFormatID(from: value) else {
-            return String(localized: "未知")
+            return localized(L10n.Common.unknown)
         }
 
         switch fourCharacterCode(formatID) {
@@ -2696,9 +2684,23 @@ private struct RecordingAudioFileInfo: Equatable, Sendable {
 
 private struct PlaybackRoundButton: View {
     let systemImage: String
-    let title: LocalizedStringKey
+    let title: Text
     var isPrimary = false
     let action: () -> Void
+
+    init(systemImage: String, title: String, isPrimary: Bool = false, action: @escaping () -> Void) {
+        self.systemImage = systemImage
+        self.title = Text(verbatim: title)
+        self.isPrimary = isPrimary
+        self.action = action
+    }
+
+    init(systemImage: String, titleResource: LocalizedStringResource, isPrimary: Bool = false, action: @escaping () -> Void) {
+        self.systemImage = systemImage
+        self.title = Text(titleResource)
+        self.isPrimary = isPrimary
+        self.action = action
+    }
 
     var body: some View {
         Button(action: action) {
@@ -2727,9 +2729,16 @@ private struct PlaybackRoundButtonStyle: ButtonStyle {
 
 private struct RecordingAudioParameterRow: View {
     let icon: String
-    let title: LocalizedStringKey
+    let title: Text
     let value: String
     var showsDivider = true
+
+    init(icon: String, titleResource: LocalizedStringResource, value: String, showsDivider: Bool = true) {
+        self.icon = icon
+        self.title = Text(titleResource)
+        self.value = value
+        self.showsDivider = showsDivider
+    }
 
     var body: some View {
         VStack(spacing: 0) {
@@ -2739,7 +2748,7 @@ private struct RecordingAudioParameterRow: View {
                     .foregroundStyle(AppTheme.info)
                     .frame(width: 18)
 
-                Text(title)
+                title
                     .font(.redditSans(.caption, weight: .semibold))
                     .foregroundStyle(.secondary)
 
@@ -2875,7 +2884,7 @@ private struct StoredTranscriptLineRow: View {
                             .frame(maxWidth: .infinity, alignment: .leading)
                             .accessibilityHidden(true)
                     } else if isShowingTranslation {
-                        Text("正在翻译")
+                        Text(L10n.Recordings.translating)
                             .font(.redditSans(.caption, weight: .semibold))
                             .foregroundStyle(.secondary)
                     }
@@ -2959,7 +2968,7 @@ final class RecordingPlaybackController: ObservableObject {
         errorText = nil
 
         guard FileManager.default.fileExists(atPath: url.path) else {
-            errorText = String(localized: "录音文件不存在")
+            errorText = localized(L10n.Recordings.recordingFileMissing)
             return
         }
 
@@ -2974,7 +2983,7 @@ final class RecordingPlaybackController: ObservableObject {
             updateNowPlayingInfo()
             updateRemoteCommandAvailability(isEnabled: true)
         } catch {
-            errorText = String(format: String(localized: "无法播放录音: %@"), error.localizedDescription)
+            errorText = localizedFormat(L10n.Recordings.playbackFailedFormat, error.localizedDescription)
             updateRemoteCommandAvailability(isEnabled: false)
         }
     }
@@ -3031,7 +3040,7 @@ final class RecordingPlaybackController: ObservableObject {
                 startTimer()
                 updateNowPlayingInfo()
             } catch {
-                errorText = String(format: String(localized: "播放启动失败: %@"), error.localizedDescription)
+                errorText = localizedFormat(L10n.Recordings.playbackStartFailedFormat, error.localizedDescription)
             }
         }
     }
@@ -3377,7 +3386,7 @@ final class RecordingPlaybackController: ObservableObject {
         let elapsedTime = min(max(currentPlaybackTime(), 0), duration)
         var info: [String: Any] = [
             MPMediaItemPropertyTitle: nowPlayingTitle,
-            MPMediaItemPropertyArtist: String(localized: "LiveTranscriber"),
+            MPMediaItemPropertyArtist: "LiveTranscriber",
             MPMediaItemPropertyAlbumTitle: nowPlayingSubtitle,
             MPMediaItemPropertyPlaybackDuration: duration,
             MPNowPlayingInfoPropertyElapsedPlaybackTime: elapsedTime,
@@ -3425,12 +3434,12 @@ final class RecordingPlaybackController: ObservableObject {
     }
 
     private var nowPlayingTitle: String {
-        currentItem?.audioFileName ?? String(localized: "录音")
+        currentItem?.audioFileName ?? localized(L10n.Recordings.recordingFallback)
     }
 
     private var nowPlayingSubtitle: String {
         guard let item = currentItem else {
-            return String(localized: "录音播放")
+            return localized(L10n.Recordings.recordingPlayback)
         }
 
         let formattedDate = item.createdAt.formatted(date: .abbreviated, time: .shortened)

@@ -3,6 +3,14 @@ import MapKit
 import SwiftUI
 import Translation
 
+private func localized(_ resource: LocalizedStringResource) -> String {
+    String(localized: resource)
+}
+
+private func localizedFormat(_ resource: LocalizedStringResource, _ arguments: CVarArg...) -> String {
+    String(format: String(localized: resource), arguments: arguments)
+}
+
 struct TranscriptionView: View {
     @Environment(\.colorScheme) private var colorScheme
     @ObservedObject var transcriber: LiveTranscriptionManager
@@ -140,7 +148,7 @@ struct TranscriptionView: View {
                     .font(.system(size: 17, weight: .semibold))
                     .foregroundStyle(AppTheme.success)
 
-                Text(String(format: String(localized: "已保存: %@"), savedRecordingName))
+                Text(localizedFormat(L10n.Transcription.savedFormat, savedRecordingName))
                     .font(.redditSans(.caption, weight: .semibold))
                     .foregroundStyle(.primary)
                     .lineLimit(1)
@@ -206,7 +214,11 @@ struct TranscriptionView: View {
 
             VStack(alignment: .leading, spacing: 0) {
                 HStack(alignment: .top, spacing: 12) {
-                    Label("实时转录", systemImage: "waveform.and.mic")
+                    Label {
+                        Text(L10n.Transcription.liveTranscription)
+                    } icon: {
+                        Image(systemName: "waveform.and.mic")
+                    }
                         .font(.redditSans(.caption, weight: .bold))
                         .foregroundStyle(recorderDeckSecondaryColor)
                         .labelStyle(.titleAndIcon)
@@ -286,7 +298,7 @@ struct TranscriptionView: View {
         if transcriber.isRecording {
             HStack(spacing: 10) {
                 FloatingControlButton(
-                    title: transcriber.isPaused ? "继续" : "暂停",
+                    titleResource: transcriber.isPaused ? L10n.Transcription.resume : L10n.Transcription.pause,
                     systemImage: transcriber.isPaused ? "play.fill" : "pause.fill",
                     tint: .primary,
                     background: Color.secondary.opacity(0.14)
@@ -295,7 +307,7 @@ struct TranscriptionView: View {
                 }
 
                 FloatingControlButton(
-                    title: "停止",
+                    titleResource: L10n.Transcription.stop,
                     systemImage: "stop.fill",
                     tint: .white,
                     background: AppTheme.danger
@@ -322,7 +334,7 @@ struct TranscriptionView: View {
                             .font(.system(size: 20, weight: .semibold))
                     }
 
-                    Text(isCompletingRecording ? LocalizedStringKey("保存录音") : LocalizedStringKey("开始录音"))
+                    Text(isCompletingRecording ? L10n.Transcription.saveRecording : L10n.Transcription.startRecording)
                         .font(.redditSans(.subheadline, weight: .semibold))
                 }
                 .foregroundStyle(.white)
@@ -472,7 +484,11 @@ struct TranscriptionView: View {
     private var transcriptCard: some View {
         VStack(alignment: .leading, spacing: 12) {
             HStack {
-                Label("转录文本", systemImage: "text.alignleft")
+                Label {
+                    Text(L10n.Recordings.transcript)
+                } icon: {
+                    Image(systemName: "text.alignleft")
+                }
                     .font(.redditSans(.headline))
                 Spacer()
                 liveTranscriptTranslationMenu
@@ -510,7 +526,7 @@ struct TranscriptionView: View {
                         }
                 }
             } else {
-                EmptyStateView(icon: "quote.bubble", title: "暂无文本")
+                EmptyStateView(icon: "quote.bubble", titleResource: L10n.Recordings.noText)
                     .frame(maxWidth: .infinity)
                     .frame(maxHeight: .infinity)
             }
@@ -529,7 +545,7 @@ struct TranscriptionView: View {
             HStack(spacing: 5) {
                 Image(systemName: "translate")
                     .font(.system(size: 12, weight: .semibold))
-                Text(selectedLiveTranslationLanguage?.shortName ?? String(localized: "翻译"))
+                Text(selectedLiveTranslationLanguage?.shortName ?? localized(L10n.Recordings.translate))
                     .font(.redditSans(.caption, weight: .bold))
             }
             .foregroundStyle(selectedLiveTranslationLanguage == nil ? AppTheme.info : AppTheme.brand)
@@ -573,12 +589,12 @@ struct TranscriptionView: View {
             return liveTranslationErrorMessage
         }
         if finalTranscriptLines.isEmpty {
-            return String(localized: "等待已完成段落")
+            return localized(L10n.Transcription.waitingForFinalSegments)
         }
         if isTranslatingLiveTranscript {
-            return String(localized: "正在翻译已完成段落")
+            return localized(L10n.Transcription.translatingFinalSegments)
         }
-        return String(format: String(localized: "翻译成 %@"), language.displayName)
+        return localizedFormat(L10n.Recordings.translatingToFormat, language.displayName)
     }
 
     private func requestLiveTranscriptTranslation(to language: TranscriptionLanguage) {
@@ -761,8 +777,8 @@ private struct LiveTranslationLanguagePicker: View {
                         dismiss()
                     } label: {
                         languageRow(
-                            title: String(localized: "原文"),
-                            subtitle: String(localized: "停止实时翻译"),
+                            title: localized(L10n.Recordings.original),
+                            subtitle: localized(L10n.Transcription.stopLiveTranslation),
                             systemImage: "text.alignleft",
                             isSelected: selectedLanguageID == nil
                         )
@@ -770,9 +786,9 @@ private struct LiveTranslationLanguagePicker: View {
                     .foregroundStyle(.primary)
                 }
 
-                Section("翻译语言") {
+                Section {
                     if languages.isEmpty {
-                        Text("暂无可翻译语言")
+                        Text(L10n.Transcription.noTranslationLanguages)
                             .foregroundStyle(.secondary)
                     } else {
                         ForEach(languages) { language in
@@ -790,15 +806,19 @@ private struct LiveTranslationLanguagePicker: View {
                             .foregroundStyle(.primary)
                         }
                     }
+                } header: {
+                    Text(L10n.Transcription.translationLanguage)
                 }
             }
             .listStyle(.insetGrouped)
-            .navigationTitle("实时翻译")
+            .navigationTitle(localized(L10n.Transcription.realTimeTranslation))
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
-                    Button("完成") {
+                    Button {
                         dismiss()
+                    } label: {
+                        Text(L10n.Common.done)
                     }
                 }
             }
@@ -862,12 +882,14 @@ private struct RecordingSaveSheet: View {
                 .padding(16)
             }
             .background(AppTheme.groupedBackground.ignoresSafeArea())
-            .navigationTitle("保存录音")
+            .navigationTitle(localized(L10n.Transcription.saveRecording))
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {
-                    Button("丢弃", role: .destructive) {
+                    Button(role: .destructive) {
                         onDiscard()
+                    } label: {
+                        Text(L10n.Transcription.discard)
                     }
                     .disabled(isSaving)
                 }
@@ -880,7 +902,7 @@ private struct RecordingSaveSheet: View {
                             ProgressView()
                                 .controlSize(.small)
                         } else {
-                            Text("保存")
+                            Text(L10n.Common.save)
                                 .font(.redditSans(.subheadline, weight: .semibold))
                         }
                     }
@@ -889,7 +911,7 @@ private struct RecordingSaveSheet: View {
             }
         }
         .alert(
-            "生成标题失败",
+            localized(L10n.Transcription.titleGenerationFailed),
             isPresented: Binding(
                 get: { titleGenerationErrorMessage != nil },
                 set: { isPresented in
@@ -899,7 +921,7 @@ private struct RecordingSaveSheet: View {
                 }
             )
         ) {
-            Button("好", role: .cancel) {}
+            Button(localized(L10n.Common.ok), role: .cancel) {}
         } message: {
             Text(titleGenerationErrorMessage ?? "")
         }
@@ -907,12 +929,16 @@ private struct RecordingSaveSheet: View {
 
     private var nameSection: some View {
         VStack(alignment: .leading, spacing: 8) {
-            Label("录音名称", systemImage: "pencil")
+            Label {
+                Text(L10n.Recordings.recordingName)
+            } icon: {
+                Image(systemName: "pencil")
+            }
                 .font(.redditSans(.caption, weight: .semibold))
                 .foregroundStyle(.secondary)
 
             HStack(spacing: 8) {
-                TextField("录音名称", text: $recordingName)
+                TextField(localized(L10n.Recordings.recordingName), text: $recordingName)
                     .font(.redditSans(.headline, weight: .semibold))
                     .textInputAutocapitalization(.never)
                     .autocorrectionDisabled()
@@ -936,7 +962,7 @@ private struct RecordingSaveSheet: View {
                     }
                     .buttonStyle(.plain)
                     .disabled(!canGenerateTitle)
-                    .accessibilityLabel("AI 生成标题和标签")
+                    .accessibilityLabel(localized(L10n.Transcription.generateTitleAndTagsAccessibility))
                 }
             }
                 .padding(.leading, 12)
@@ -967,7 +993,7 @@ private struct RecordingSaveSheet: View {
                 let suggestion = try await onGenerateTitle()
                 let cleanedTitle = suggestion.title.trimmingCharacters(in: .whitespacesAndNewlines)
                 guard !cleanedTitle.isEmpty else {
-                    titleGenerationErrorMessage = String(localized: "没有生成有效的标题")
+                    titleGenerationErrorMessage = localized(L10n.Intelligence.emptyTitle)
                     HapticFeedback.play(.failure)
                     isGeneratingTitle = false
                     return
@@ -988,13 +1014,17 @@ private struct RecordingSaveSheet: View {
             RecordingTagsEditor(tags: $tags)
         } label: {
             HStack(spacing: 12) {
-                Label("标签", systemImage: "tag")
+                Label {
+                    Text(L10n.Recordings.tags)
+                } icon: {
+                    Image(systemName: "tag")
+                }
                     .font(.redditSans(.subheadline, weight: .semibold))
                     .foregroundStyle(.primary)
 
                 Spacer()
 
-                Text(tags.isEmpty ? String(localized: "未添加") : "\(tags.count)")
+                Text(tags.isEmpty ? localized(L10n.Recordings.notAdded) : "\(tags.count)")
                     .font(.redditSans(.caption, weight: .semibold))
                     .foregroundStyle(.secondary)
 
@@ -1009,7 +1039,11 @@ private struct RecordingSaveSheet: View {
 
     private var durationRow: some View {
         HStack(spacing: 12) {
-            Label("音频时长", systemImage: "clock")
+            Label {
+                Text(L10n.Recordings.audioDuration)
+            } icon: {
+                Image(systemName: "clock")
+            }
                 .font(.redditSans(.subheadline, weight: .semibold))
             Spacer()
             Text(TranscriptionLine.formatTimestamp(Double(draft.durationSeconds)))
@@ -1022,7 +1056,11 @@ private struct RecordingSaveSheet: View {
     private var locationSection: some View {
         VStack(alignment: .leading, spacing: 12) {
             Toggle(isOn: $includesLocation) {
-                Label("添加地理位置", systemImage: "location")
+                Label {
+                    Text(L10n.Recordings.addLocation)
+                } icon: {
+                    Image(systemName: "location")
+                }
                     .font(.redditSans(.subheadline, weight: .semibold))
             }
             .tint(AppTheme.brand)
@@ -1043,7 +1081,7 @@ private struct RecordingTagsEditor: View {
         List {
             Section {
                 HStack(spacing: 8) {
-                    TextField("添加标签", text: $newTag)
+                    TextField(localized(L10n.Recordings.addTag), text: $newTag)
                         .textInputAutocapitalization(.never)
                         .autocorrectionDisabled()
 
@@ -1058,7 +1096,7 @@ private struct RecordingTagsEditor: View {
 
             Section {
                 if tags.isEmpty {
-                    Text("暂无标签")
+                    Text(L10n.Recordings.noTags)
                         .foregroundStyle(.secondary)
                 } else {
                     ForEach(tags, id: \.self) { tag in
@@ -1070,7 +1108,7 @@ private struct RecordingTagsEditor: View {
                 }
             }
         }
-        .navigationTitle("标签")
+        .navigationTitle(localized(L10n.Recordings.tags))
         .navigationBarTitleDisplayMode(.inline)
     }
 
@@ -1107,7 +1145,7 @@ private struct RecordingLocationPreview: View {
                         )
                     )
                 ) {
-                    Marker("当前位置", coordinate: coordinate)
+                    Marker(localized(L10n.Recordings.currentLocation), coordinate: coordinate)
                 }
                 .frame(height: 150)
                 .clipShape(RoundedRectangle(cornerRadius: AppTheme.compactCornerRadius, style: .continuous))
@@ -1131,7 +1169,11 @@ private struct RecordingLocationPreview: View {
                 .font(.redditSans(.caption))
                 .foregroundStyle(.secondary)
             } else if locationProvider.isDenied {
-                Label("位置权限被拒绝", systemImage: "location.slash")
+                Label {
+                    Text(L10n.Recordings.locationDenied)
+                } icon: {
+                    Image(systemName: "location.slash")
+                }
                     .font(.redditSans(.caption, weight: .semibold))
                     .foregroundStyle(AppTheme.warning)
             } else if let errorText = locationProvider.errorText {
@@ -1142,7 +1184,7 @@ private struct RecordingLocationPreview: View {
                 HStack(spacing: 10) {
                     ProgressView()
                         .controlSize(.small)
-                    Text("正在获取位置")
+                    Text(L10n.Recordings.locating)
                         .font(.redditSans(.caption, weight: .semibold))
                         .foregroundStyle(.secondary)
                 }
@@ -1209,9 +1251,9 @@ private final class RecordingLocationProvider: NSObject, ObservableObject, CLLoc
         case .authorizedAlways, .authorizedWhenInUse:
             manager.requestLocation()
         case .denied, .restricted:
-            errorText = String(localized: "位置权限被拒绝")
+            errorText = localized(L10n.Recordings.locationDenied)
         @unknown default:
-            errorText = String(localized: "无法获取位置")
+            errorText = localized(L10n.Recordings.locationUnavailable)
         }
     }
 
@@ -1413,7 +1455,7 @@ private struct TranscriptionLineRow: View {
                         .frame(maxWidth: .infinity, alignment: .leading)
                         .accessibilityHidden(true)
                 } else if isShowingTranslation {
-                    Text("正在翻译")
+                    Text(L10n.Recordings.translating)
                         .font(.redditSans(.caption, weight: .semibold))
                         .foregroundStyle(.secondary)
                 }
@@ -1436,14 +1478,14 @@ private struct RecordingStateBadge: View {
     let isPaused: Bool
     let isPreparing: Bool
 
-    private var title: LocalizedStringKey {
+    private var titleResource: LocalizedStringResource {
         if isPreparing {
-            return "正在请求权限"
+            return L10n.RecordingStatus.requestingPermission
         }
         if isRecording {
-            return isPaused ? "已暂停" : "正在录音"
+            return isPaused ? L10n.RecordingStatus.paused : L10n.RecordingStatus.recording
         }
-        return "准备就绪"
+        return L10n.RecordingStatus.ready
     }
 
     private var tint: Color {
@@ -1457,7 +1499,11 @@ private struct RecordingStateBadge: View {
     }
 
     var body: some View {
-        Label(title, systemImage: isRecording && !isPaused ? "record.circle" : "checkmark.circle")
+        Label {
+            Text(titleResource)
+        } icon: {
+            Image(systemName: isRecording && !isPaused ? "record.circle" : "checkmark.circle")
+        }
             .font(.redditSans(.caption, weight: .semibold))
             .foregroundStyle(tint)
             .lineLimit(1)
@@ -1494,18 +1540,32 @@ private struct StatusPill: View {
 }
 
 private struct FloatingControlButton: View {
-    let title: LocalizedStringKey
+    let title: Text
     let systemImage: String
     let tint: Color
     let background: Color
     let action: () -> Void
+
+    init(
+        titleResource: LocalizedStringResource,
+        systemImage: String,
+        tint: Color,
+        background: Color,
+        action: @escaping () -> Void
+    ) {
+        self.title = Text(titleResource)
+        self.systemImage = systemImage
+        self.tint = tint
+        self.background = background
+        self.action = action
+    }
 
     var body: some View {
         Button(action: action) {
             HStack(spacing: 9) {
                 Image(systemName: systemImage)
                     .font(.system(size: 16, weight: .semibold))
-                Text(title)
+                title
                     .font(.redditSans(.subheadline, weight: .semibold))
             }
             .foregroundStyle(tint)
