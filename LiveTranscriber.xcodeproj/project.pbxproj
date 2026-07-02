@@ -39,6 +39,8 @@
 		7B0000000000000000000020 /* HapticFeedback.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7B0000000000000000001020 /* HapticFeedback.swift */; };
 		7B0000000000000000000021 /* L10n.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7B0000000000000000001021 /* L10n.swift */; };
 		7B0000000000000000000022 /* Semantic.xcstrings in Resources */ = {isa = PBXBuildFile; fileRef = 7B0000000000000000001022 /* Semantic.xcstrings */; };
+		7B0000000000000000000023 /* StructuredFoundationModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7B0000000000000000001027 /* StructuredFoundationModels.swift */; };
+		7B0000000000000000000024 /* LiveTranscriberStructuredFoundationModels.framework in Embed Frameworks */ = {isa = PBXBuildFile; fileRef = 7B0000000000000000001028 /* LiveTranscriberStructuredFoundationModels.framework */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -48,6 +50,13 @@
 			proxyType = 1;
 			remoteGlobalIDString = 7B0000000000000000004002;
 			remoteInfo = LiveTranscriberWidget;
+		};
+		7B000000000000000000A003 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 7B0000000000000000006001 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 7B0000000000000000004003;
+			remoteInfo = LiveTranscriberStructuredFoundationModels;
 		};
 /* End PBXContainerItemProxy section */
 
@@ -61,6 +70,17 @@
 				7B0000000000000000000019 /* LiveTranscriberWidget.appex in Embed Foundation Extensions */,
 			);
 			name = "Embed Foundation Extensions";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		7B0000000000000000005007 /* Embed Frameworks */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "";
+			dstSubfolderSpec = 10;
+			files = (
+				7B0000000000000000000024 /* LiveTranscriberStructuredFoundationModels.framework in Embed Frameworks */,
+			);
+			name = "Embed Frameworks";
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXCopyFilesBuildPhase section */
@@ -101,6 +121,8 @@
 		7B0000000000000000001020 /* HapticFeedback.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HapticFeedback.swift; sourceTree = "<group>"; };
 		7B0000000000000000001021 /* L10n.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = L10n.swift; sourceTree = "<group>"; };
 		7B0000000000000000001022 /* Semantic.xcstrings */ = {isa = PBXFileReference; lastKnownFileType = text.json.xcstrings; path = Semantic.xcstrings; sourceTree = "<group>"; };
+		7B0000000000000000001027 /* StructuredFoundationModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StructuredFoundationModels.swift; sourceTree = "<group>"; };
+		7B0000000000000000001028 /* LiveTranscriberStructuredFoundationModels.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; includeInIndex = 0; path = LiveTranscriberStructuredFoundationModels.framework; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -118,6 +140,13 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		7B0000000000000000002003 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
@@ -126,6 +155,7 @@
 			children = (
 				7B0000000000000000003002 /* LiveTranscriber */,
 				7B0000000000000000003004 /* LiveTranscriberWidget */,
+				7B0000000000000000003005 /* LiveTranscriberStructuredFoundationModels */,
 				7B0000000000000000003003 /* Products */,
 			);
 			sourceTree = "<group>";
@@ -164,6 +194,7 @@
 			children = (
 				7B0000000000000000001000 /* LiveTranscriber.app */,
 				7B000000000000000000101D /* LiveTranscriberWidget.appex */,
+				7B0000000000000000001028 /* LiveTranscriberStructuredFoundationModels.framework */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -175,6 +206,14 @@
 				7B000000000000000000101C /* Info.plist */,
 			);
 			path = LiveTranscriberWidget;
+			sourceTree = "<group>";
+		};
+		7B0000000000000000003005 /* LiveTranscriberStructuredFoundationModels */ = {
+			isa = PBXGroup;
+			children = (
+				7B0000000000000000001027 /* StructuredFoundationModels.swift */,
+			);
+			path = LiveTranscriberStructuredFoundationModels;
 			sourceTree = "<group>";
 		};
 		7B0000000000000000003010 /* Fonts */ = {
@@ -199,12 +238,14 @@
 				7B0000000000000000005001 /* Sources */,
 				7B0000000000000000002001 /* Frameworks */,
 				7B0000000000000000005002 /* Resources */,
+				7B0000000000000000005007 /* Embed Frameworks */,
 				7B0000000000000000005005 /* Embed Foundation Extensions */,
 			);
 			buildRules = (
 			);
 			dependencies = (
 				7B000000000000000000A002 /* PBXTargetDependency */,
+				7B000000000000000000A004 /* PBXTargetDependency */,
 			);
 			name = LiveTranscriber;
 			productName = LiveTranscriber;
@@ -228,6 +269,22 @@
 			productReference = 7B000000000000000000101D /* LiveTranscriberWidget.appex */;
 			productType = "com.apple.product-type.app-extension";
 		};
+		7B0000000000000000004003 /* LiveTranscriberStructuredFoundationModels */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 7B0000000000000000007004 /* Build configuration list for PBXNativeTarget "LiveTranscriberStructuredFoundationModels" */;
+			buildPhases = (
+				7B0000000000000000005006 /* Sources */,
+				7B0000000000000000002003 /* Frameworks */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = LiveTranscriberStructuredFoundationModels;
+			productName = LiveTranscriberStructuredFoundationModels;
+			productReference = 7B0000000000000000001028 /* LiveTranscriberStructuredFoundationModels.framework */;
+			productType = "com.apple.product-type.framework";
+		};
 /* End PBXNativeTarget section */
 
 /* Begin PBXProject section */
@@ -242,6 +299,9 @@
 						CreatedOnToolsVersion = 16.0;
 					};
 					7B0000000000000000004002 = {
+						CreatedOnToolsVersion = 16.0;
+					};
+					7B0000000000000000004003 = {
 						CreatedOnToolsVersion = 16.0;
 					};
 				};
@@ -266,6 +326,7 @@
 			targets = (
 				7B0000000000000000004001 /* LiveTranscriber */,
 				7B0000000000000000004002 /* LiveTranscriberWidget */,
+				7B0000000000000000004003 /* LiveTranscriberStructuredFoundationModels */,
 			);
 		};
 /* End PBXProject section */
@@ -333,6 +394,14 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		7B0000000000000000005006 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				7B0000000000000000000023 /* StructuredFoundationModels.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXSourcesBuildPhase section */
 
 /* Begin PBXTargetDependency section */
@@ -340,6 +409,11 @@
 			isa = PBXTargetDependency;
 			target = 7B0000000000000000004002 /* LiveTranscriberWidget */;
 			targetProxy = 7B000000000000000000A001 /* PBXContainerItemProxy */;
+		};
+		7B000000000000000000A004 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 7B0000000000000000004003 /* LiveTranscriberStructuredFoundationModels */;
+			targetProxy = 7B000000000000000000A003 /* PBXContainerItemProxy */;
 		};
 /* End PBXTargetDependency section */
 
@@ -419,6 +493,7 @@
 				ONLY_ACTIVE_ARCH = YES;
 				SDKROOT = iphoneos;
 				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SUPPORTS_MAC_DESIGNED_FOR_IPHONE_IPAD = NO;
 				SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;
 				"SWIFT_ACTIVE_COMPILATION_CONDITIONS[sdk=iphoneos27.*]" = "DEBUG HAS_IOS27_SDK";
 				"SWIFT_ACTIVE_COMPILATION_CONDITIONS[sdk=iphonesimulator27.*]" = "DEBUG HAS_IOS27_SDK";
@@ -478,6 +553,7 @@
 				MTL_FAST_MATH = YES;
 				SDKROOT = iphoneos;
 				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SUPPORTS_MAC_DESIGNED_FOR_IPHONE_IPAD = NO;
 				"SWIFT_ACTIVE_COMPILATION_CONDITIONS[sdk=iphoneos27.*]" = HAS_IOS27_SDK;
 				"SWIFT_ACTIVE_COMPILATION_CONDITIONS[sdk=iphonesimulator27.*]" = HAS_IOS27_SDK;
 				SWIFT_COMPILATION_MODE = wholemodule;
@@ -590,6 +666,64 @@
 			};
 			name = Release;
 		};
+		7B0000000000000000008007 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 2;
+				DEFINES_MODULE = YES;
+				DYLIB_COMPATIBILITY_VERSION = 1;
+				DYLIB_CURRENT_VERSION = 1;
+				DYLIB_INSTALL_NAME_BASE = "@rpath";
+				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 26.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@loader_path/Frameworks",
+				);
+				MACH_O_TYPE = mh_dylib;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.iamwilliamli.LiveTranscriber.StructuredFoundationModels;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SKIP_INSTALL = YES;
+				SUPPORTS_MAC_DESIGNED_FOR_IPHONE_IPAD = NO;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "DEBUG HAS_IOS27_SDK";
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+		7B0000000000000000008008 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 2;
+				DEFINES_MODULE = YES;
+				DYLIB_COMPATIBILITY_VERSION = 1;
+				DYLIB_CURRENT_VERSION = 1;
+				DYLIB_INSTALL_NAME_BASE = "@rpath";
+				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 26.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@loader_path/Frameworks",
+				);
+				MACH_O_TYPE = mh_dylib;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.iamwilliamli.LiveTranscriber.StructuredFoundationModels;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SKIP_INSTALL = YES;
+				SUPPORTS_MAC_DESIGNED_FOR_IPHONE_IPAD = NO;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = HAS_IOS27_SDK;
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Release;
+		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
@@ -616,6 +750,15 @@
 			buildConfigurations = (
 				7B0000000000000000008005 /* Debug */,
 				7B0000000000000000008006 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		7B0000000000000000007004 /* Build configuration list for PBXNativeTarget "LiveTranscriberStructuredFoundationModels" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				7B0000000000000000008007 /* Debug */,
+				7B0000000000000000008008 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;

@@ -2647,6 +2647,48 @@
         }
       }
     },
+    "recording.status.checking_permissions": {
+      "comment": "Recording status while checking existing microphone and speech permissions.",
+      "extractionState": "stale",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Checking permissions"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "正在检查权限"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Berechtigungen werden geprüft"
+          }
+        },
+        "nl": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Toestemmingen controleren"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "権限を確認中"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "正在檢查權限"
+          }
+        }
+      }
+    },
     "recording.status.complete": {
       "comment": "Recording status after transcription completes.",
       "extractionState": "stale",
@@ -2685,6 +2727,48 @@
           "stringUnit": {
             "state": "translated",
             "value": "轉錄完成"
+          }
+        }
+      }
+    },
+    "recording.status.configuring_audio_input": {
+      "comment": "Recording status while configuring the audio session and microphone input.",
+      "extractionState": "stale",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Configuring microphone"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "正在配置麦克风"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mikrofon wird konfiguriert"
+          }
+        },
+        "nl": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Microfoon configureren"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "マイクを設定中"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "正在配置麥克風"
           }
         }
       }
@@ -2937,6 +3021,48 @@
           "stringUnit": {
             "state": "translated",
             "value": "正在請求權限"
+          }
+        }
+      }
+    },
+    "recording.status.starting_recorder": {
+      "comment": "Recording status while starting audio capture.",
+      "extractionState": "stale",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Starting recorder"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "正在启动录音"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Recorder wird gestartet"
+          }
+        },
+        "nl": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Recorder starten"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "録音を開始中"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "正在啟動錄音"
           }
         }
       }
@@ -8149,6 +8275,48 @@
         }
       }
     },
+    "source.design_notes_title": {
+      "comment": "External link title for the LiveTranscriber design notes article.",
+      "extractionState": "stale",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Design Notes"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "设计 Notes"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Designnotizen"
+          }
+        },
+        "nl": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ontwerpnotities"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "デザインノート"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "設計 Notes"
+          }
+        }
+      }
+    },
     "source.license_note": {
       "comment": "Source information page licensing note.",
       "extractionState": "stale",
@@ -9704,43 +9872,43 @@
       }
     },
     "transcription.generate_title_tags_accessibility": {
-      "comment": "Accessibility label for title generation button.",
+      "comment": "Accessibility label for title, summary, and tag generation button.",
       "extractionState": "stale",
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Generate title and tags with AI"
+            "value": "Generate title, summary, and tags with AI"
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "AI 生成标题和标签"
+            "value": "AI 生成标题、摘要和标签"
           }
         },
         "de": {
           "stringUnit": {
             "state": "translated",
-            "value": "Titel und Tags mit KI erstellen"
+            "value": "Titel, Zusammenfassung und Tags mit KI erstellen"
           }
         },
         "nl": {
           "stringUnit": {
             "state": "translated",
-            "value": "Titel en tags genereren met AI"
+            "value": "Titel, samenvatting en tags genereren met AI"
           }
         },
         "ja": {
           "stringUnit": {
             "state": "translated",
-            "value": "AIでタイトルとタグを生成"
+            "value": "AIでタイトル、要約、タグを生成"
           }
         },
         "zh-Hant": {
           "stringUnit": {
             "state": "translated",
-            "value": "AI 生成標題和標籤"
+            "value": "AI 生成標題、摘要和標籤"
           }
         }
       }

@@ -43,14 +43,59 @@ private func liveAudioCommonFormatName(_ commonFormat: AVAudioCommonFormat) -> S
 }
 
 @MainActor
+final class LiveFinalTranscriptStore: ObservableObject {
+    @Published private(set) var lines: [TranscriptionLine] = []
+    @Published private(set) var revision = 0
+
+    func publish(_ lines: [TranscriptionLine], incrementsRevision: Bool) {
+        self.lines = lines
+        if incrementsRevision {
+            revision &+= 1
+        }
+    }
+
+    func reset() {
+        lines = []
+        revision = 0
+    }
+}
+
+@MainActor
+final class LiveInterimTranscriptStore: ObservableObject {
+    @Published private(set) var line: TranscriptionLine?
+
+    func publish(_ line: TranscriptionLine?) {
+        self.line = line
+    }
+
+    func reset() {
+        line = nil
+    }
+}
+
+@MainActor
+final class RecordingElapsedClock: ObservableObject {
+    @Published private(set) var elapsedSeconds = 0
+
+    func updateElapsedSeconds(_ seconds: Int) {
+        guard elapsedSeconds != seconds else {
+            return
+        }
+        elapsedSeconds = seconds
+    }
+}
+
+@MainActor
 final class LiveTranscriptionManager: ObservableObject {
-    @Published private(set) var transcriptLines: [TranscriptionLine] = []
     @Published private(set) var isRecording = false
     @Published private(set) var isPaused = false
     @Published private(set) var isPreparing = false
     @Published private(set) var statusText = String(localized: L10n.RecordingStatus.ready)
     @Published private(set) var errorText: String?
-    @Published private(set) var elapsedSeconds: Int = 0
+    let finalTranscriptStore = LiveFinalTranscriptStore()
+    let interimTranscriptStore = LiveInterimTranscriptStore()
+    let elapsedClock = RecordingElapsedClock()
+    private(set) var elapsedSeconds: Int = 0
     private(set) var inputLevel: Float = 0
     private(set) var inputLevelHistory: [Float] = Array(repeating: 0, count: 72)
     @Published private(set) var supportedLanguages: [TranscriptionLanguage] = TranscriptionLanguage.fallbackOptions
@@ -114,6 +159,10 @@ final class LiveTranscriptionManager: ObservableObject {
 
     var plainTranscript: String {
         transcriptLines.plainTranscriptText
+    }
+
+    var transcriptLines: [TranscriptionLine] {
+        displayedTranscriptLines(finalizedLines: finalizedLines, interimLine: interimLine)
     }
 
     var hasTranscript: Bool {
@@ -185,7 +234,7 @@ final class LiveTranscriptionManager: ObservableObject {
         lastSpeechPipelineRuntimeFormat = nil
         speechPipelineRuntimeFormatText = String(localized: L10n.SpeechText.runtimeInputWaitingFirstBuffer)
         resetTranscriptStorage()
-        statusText = String(localized: L10n.RecordingStatus.requestingPermission)
+        statusText = String(localized: L10n.RecordingStatus.checkingPermissions)
 
         guard await requestPermissions() else {
             isPreparing = false
@@ -219,12 +268,14 @@ final class LiveTranscriptionManager: ObservableObject {
     }
 
     private func startCaptureSessionRecording(language: TranscriptionLanguage) async throws {
+        statusText = String(localized: L10n.RecordingStatus.configuringAudioInput)
         try await configureAudioSession()
 
         let audioFormat = selectedAudioFormat
         let recordingFormat = try Self.makeCaptureSessionRecordingFormat()
         let analyzerSourceFormat = try Self.makeCaptureSessionAnalyzerSourceFormat(sampleRate: recordingFormat.sampleRate)
         let prepared = try await prepareSpeechPipeline(language: language, audioInputFormat: analyzerSourceFormat)
+        statusText = String(localized: L10n.RecordingStatus.startingRecorder)
         let recordingURL = try Self.makeTemporaryRecordingURL(format: audioFormat)
         let writer = try AudioFileWriter(url: recordingURL, inputFormat: recordingFormat, outputFormat: audioFormat)
         let capturePipeline = CaptureSessionRecordingPipeline(
@@ -358,7 +409,7 @@ final class LiveTranscriptionManager: ObservableObject {
         errorText = nil
         if !isRecording {
             statusText = String(localized: L10n.RecordingStatus.ready)
-            elapsedSeconds = 0
+            setElapsedSeconds(0)
             resetInputLevel(clearHistory: true)
             accumulatedRecordingSeconds = 0
             recordingStartedAt = nil
@@ -583,7 +634,7 @@ final class LiveTranscriptionManager: ObservableObject {
     }
 
     private func requestPermissions() async -> Bool {
-        let speechStatus = await requestSpeechAuthorization()
+        let speechStatus = await resolvedSpeechAuthorization()
         guard speechStatus == .authorized else {
             let message = speechStatus == .restricted
                 ? String(localized: L10n.SpeechText.speechRestricted)
@@ -600,6 +651,16 @@ final class LiveTranscriptionManager: ObservableObject {
         return true
     }
 
+    private func resolvedSpeechAuthorization() async -> SFSpeechRecognizerAuthorizationStatus {
+        let currentStatus = SFSpeechRecognizer.authorizationStatus()
+        guard currentStatus == .notDetermined else {
+            return currentStatus
+        }
+
+        statusText = String(localized: L10n.RecordingStatus.requestingPermission)
+        return await requestSpeechAuthorization()
+    }
+
     private func requestSpeechAuthorization() async -> SFSpeechRecognizerAuthorizationStatus {
         await withCheckedContinuation { continuation in
             SFSpeechRecognizer.requestAuthorization { status in
@@ -609,7 +670,18 @@ final class LiveTranscriptionManager: ObservableObject {
     }
 
     private func requestMicrophoneAuthorization() async -> Bool {
-        await withCheckedContinuation { continuation in
+        switch AVAudioApplication.shared.recordPermission {
+        case .granted:
+            return true
+        case .denied:
+            return false
+        case .undetermined:
+            statusText = String(localized: L10n.RecordingStatus.requestingPermission)
+        @unknown default:
+            statusText = String(localized: L10n.RecordingStatus.requestingPermission)
+        }
+
+        return await withCheckedContinuation { continuation in
             AVAudioApplication.requestRecordPermission { allowed in
                 continuation.resume(returning: allowed)
             }
@@ -681,19 +753,24 @@ final class LiveTranscriptionManager: ObservableObject {
                 line.id = finalizedLines[index].id
                 finalizedLines[index] = line
             } else {
-                finalizedLines.append(line)
+                insertFinalizedLine(line)
             }
             interimLine = nil
+            finalTranscriptStore.publish(finalizedLines, incrementsRevision: true)
+            interimTranscriptStore.publish(nil)
         } else {
             if let existing = interimLine, abs(existing.startSeconds - startSeconds) < 0.1 {
                 line.id = existing.id
             }
             interimLine = line
+            interimTranscriptStore.publish(line)
         }
 
-        publishLines()
         if !isPaused {
-            statusText = String(localized: L10n.RecordingStatus.recording)
+            let recordingStatus = String(localized: L10n.RecordingStatus.recording)
+            if statusText != recordingStatus {
+                statusText = recordingStatus
+            }
         }
 
         if result.isFinal {
@@ -703,22 +780,47 @@ final class LiveTranscriptionManager: ObservableObject {
         }
     }
 
-    private func publishLines() {
-        var lines = finalizedLines.sorted { $0.startSeconds < $1.startSeconds }
-        if let interimLine {
-            if let index = lines.firstIndex(where: { abs($0.startSeconds - interimLine.startSeconds) < 0.1 }) {
-                lines[index] = interimLine
-            } else {
-                lines.append(interimLine)
-            }
+    private func insertFinalizedLine(_ line: TranscriptionLine) {
+        if let lastLine = finalizedLines.last,
+           lastLine.startSeconds <= line.startSeconds {
+            finalizedLines.append(line)
+            return
         }
-        transcriptLines = lines.sorted { $0.startSeconds < $1.startSeconds }
+
+        let insertionIndex = finalizedLines.firstIndex { $0.startSeconds > line.startSeconds } ?? finalizedLines.endIndex
+        finalizedLines.insert(line, at: insertionIndex)
+    }
+
+    private func displayedTranscriptLines(
+        finalizedLines: [TranscriptionLine],
+        interimLine: TranscriptionLine?
+    ) -> [TranscriptionLine] {
+        guard let interimLine else {
+            return finalizedLines
+        }
+
+        var lines = finalizedLines
+        if let index = lines.firstIndex(where: { abs($0.startSeconds - interimLine.startSeconds) < 0.1 }) {
+            lines[index] = interimLine
+            return lines
+        }
+
+        if let lastLine = lines.last,
+           lastLine.startSeconds <= interimLine.startSeconds {
+            lines.append(interimLine)
+            return lines
+        }
+
+        let insertionIndex = lines.firstIndex { $0.startSeconds > interimLine.startSeconds } ?? lines.endIndex
+        lines.insert(interimLine, at: insertionIndex)
+        return lines
     }
 
     private func resetTranscriptStorage() {
         finalizedLines = []
         interimLine = nil
-        transcriptLines = []
+        finalTranscriptStore.reset()
+        interimTranscriptStore.reset()
     }
 
     private func handleSpeechPipelineRuntimeFormat(_ observation: SpeechPipelineRuntimeFormat) {
@@ -735,7 +837,7 @@ final class LiveTranscriptionManager: ObservableObject {
         recordingStartedAt = Date()
         activeSegmentStartedAt = Date()
         accumulatedRecordingSeconds = 0
-        elapsedSeconds = 0
+        setElapsedSeconds(0)
         scheduleElapsedTimer()
     }
 
@@ -750,12 +852,20 @@ final class LiveTranscriptionManager: ObservableObject {
             accumulatedRecordingSeconds += Date().timeIntervalSince(activeSegmentStartedAt)
         }
         activeSegmentStartedAt = nil
-        elapsedSeconds = Int(accumulatedRecordingSeconds.rounded(.down))
+        setElapsedSeconds(Int(accumulatedRecordingSeconds.rounded(.down)))
         stopTimer()
     }
 
     private func finishElapsedTimer() {
         pauseElapsedTimer()
+    }
+
+    private func setElapsedSeconds(_ seconds: Int) {
+        guard elapsedSeconds != seconds else {
+            return
+        }
+        elapsedSeconds = seconds
+        elapsedClock.updateElapsedSeconds(seconds)
     }
 
     private func scheduleElapsedTimer() {
@@ -769,7 +879,7 @@ final class LiveTranscriptionManager: ObservableObject {
                 }
                 let newElapsedSeconds = Int((self.accumulatedRecordingSeconds + activeSeconds).rounded(.down))
                 if newElapsedSeconds != self.elapsedSeconds {
-                    self.elapsedSeconds = newElapsedSeconds
+                    self.setElapsedSeconds(newElapsedSeconds)
                 }
 
                 do {

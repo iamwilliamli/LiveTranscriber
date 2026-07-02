@@ -279,7 +279,7 @@ struct RecordingsView: View {
         RecordingRow(
             item: item,
             isAnalyzing: analyzingRecordingID == item.id,
-            showsIntelligence: store.intelligenceAvailability.isAvailable
+            canGenerateIntelligence: store.intelligenceAvailability.isAvailable
         ) {
             openRecording(item)
         }
@@ -796,7 +796,7 @@ private extension Double {
 private struct RecordingRow: View {
     let item: RecordingItem
     let isAnalyzing: Bool
-    let showsIntelligence: Bool
+    let canGenerateIntelligence: Bool
     let onOpen: () -> Void
 
     private var isTranscriptionRunning: Bool {
@@ -877,7 +877,7 @@ private struct RecordingRow: View {
                     HapticFeedback.play(.navigation)
                     onOpen()
                 }
-            } else if showsIntelligence && isAnalyzing {
+            } else if canGenerateIntelligence && isAnalyzing {
                 Label(localized(L10n.Recordings.analyzing), systemImage: "sparkles")
                     .font(.redditSans(.caption, weight: .semibold))
                     .foregroundStyle(AppTheme.info)
@@ -886,7 +886,7 @@ private struct RecordingRow: View {
                         HapticFeedback.play(.navigation)
                         onOpen()
                     }
-            } else if showsIntelligence, let intelligence = item.intelligence {
+            } else if let intelligence = item.intelligence {
                 RecordingIntelligencePreview(intelligence: intelligence)
                     .contentShape(Rectangle())
                     .onTapGesture {
@@ -1081,7 +1081,7 @@ struct RecordingDetailView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 16) {
                 header
-                if store.intelligenceAvailability.isAvailable {
+                if store.intelligenceAvailability.isAvailable || currentItem.intelligence != nil {
                     intelligenceCard
                 }
                 transcript
@@ -1403,19 +1403,21 @@ struct RecordingDetailView: View {
 
                 Spacer(minLength: 8)
 
-                Button {
-                    analyzeCurrentItem()
-                } label: {
-                    if isAnalyzing {
-                        ProgressView()
-                            .controlSize(.small)
-                    } else {
-                        Text(item.intelligence == nil ? localized(L10n.Recordings.analyze) : localized(L10n.Recordings.analyzeAgain))
-                            .font(.redditSans(.caption, weight: .semibold))
+                if store.intelligenceAvailability.isAvailable {
+                    Button {
+                        analyzeCurrentItem()
+                    } label: {
+                        if isAnalyzing {
+                            ProgressView()
+                                .controlSize(.small)
+                        } else {
+                            Text(item.intelligence == nil ? localized(L10n.Recordings.analyze) : localized(L10n.Recordings.analyzeAgain))
+                                .font(.redditSans(.caption, weight: .semibold))
+                        }
                     }
+                    .disabled(isAnalyzing)
+                    .buttonStyle(.bordered)
                 }
-                .disabled(isAnalyzing)
-                .buttonStyle(.bordered)
             }
 
             if isAnalyzing {

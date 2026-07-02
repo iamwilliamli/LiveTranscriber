@@ -137,7 +137,7 @@ enum L10n {
         static let noTranslationLanguages = L10n.resource("transcription.translation.no_languages", defaultValue: "No translatable languages", comment: "Empty text for translation language list.")
         static let discard = L10n.resource("transcription.discard", defaultValue: "Discard", comment: "Discard unsaved recording button title.")
         static let titleGenerationFailed = L10n.resource("transcription.title_generation_failed", defaultValue: "Title Generation Failed", comment: "Alert title for recording title generation failure.")
-        static let generateTitleAndTagsAccessibility = L10n.resource("transcription.generate_title_tags_accessibility", defaultValue: "Generate title and tags with AI", comment: "Accessibility label for title generation button.")
+        static let generateTitleAndTagsAccessibility = L10n.resource("transcription.generate_title_tags_accessibility", defaultValue: "Generate title, summary, and tags with AI", comment: "Accessibility label for title, summary, and tag generation button.")
     }
 
     enum SpeechText {
@@ -291,6 +291,11 @@ enum L10n {
             defaultValue: "GitHub Repository",
             comment: "External link title for the project repository."
         )
+        static let designNotesTitle = L10n.resource(
+            "source.design_notes_title",
+            defaultValue: "Design Notes",
+            comment: "External link title for the LiveTranscriber design notes article."
+        )
     }
 
     enum RecordingStatus {
@@ -303,6 +308,21 @@ enum L10n {
             "recording.status.requesting_permission",
             defaultValue: "Requesting Permission",
             comment: "Recording status while requesting microphone and speech permissions."
+        )
+        static let checkingPermissions = L10n.resource(
+            "recording.status.checking_permissions",
+            defaultValue: "Checking permissions",
+            comment: "Recording status while checking existing microphone and speech permissions."
+        )
+        static let configuringAudioInput = L10n.resource(
+            "recording.status.configuring_audio_input",
+            defaultValue: "Configuring microphone",
+            comment: "Recording status while configuring the audio session and microphone input."
+        )
+        static let startingRecorder = L10n.resource(
+            "recording.status.starting_recorder",
+            defaultValue: "Starting recorder",
+            comment: "Recording status while starting audio capture."
         )
         static let recording = L10n.resource(
             "recording.status.recording",

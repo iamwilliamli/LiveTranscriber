@@ -6,6 +6,7 @@ struct SettingsView: View {
     @ObservedObject var recordingStore: RecordingStore
     @State private var iCloudSyncRefreshTick = 0
     private static let repositoryURL = URL(string: "https://github.com/iamwilliamli/LiveTranscriber")!
+    private static let designNotesURL = URL(string: "https://chengqili.com/post/livetranscriber/")!
 
     var body: some View {
         NavigationStack {
@@ -339,6 +340,16 @@ struct SettingsView: View {
                         titleResource: L10n.Source.repositoryTitle,
                         value: Self.repositoryURL.absoluteString,
                         tint: AppTheme.brand
+                    )
+                }
+                .buttonStyle(.plain)
+
+                Link(destination: Self.designNotesURL) {
+                    SettingsExternalLinkRow(
+                        icon: "doc.text.magnifyingglass",
+                        titleResource: L10n.Source.designNotesTitle,
+                        value: Self.designNotesURL.absoluteString,
+                        tint: AppTheme.info
                     )
                 }
                 .buttonStyle(.plain)

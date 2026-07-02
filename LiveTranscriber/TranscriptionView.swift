@@ -1,3 +1,4 @@
+import Combine
 import CoreLocation
 import MapKit
 import SwiftUI
@@ -23,6 +24,7 @@ struct TranscriptionView: View {
     @State private var pendingRecordingSave: PendingRecordingSave?
     @State private var pendingRecordingName = ""
     @State private var pendingRecordingTags: [String] = []
+    @State private var pendingRecordingIntelligence: RecordingIntelligence?
     @State private var pendingRecordingIncludesLocation = false
     @State private var isSavingPendingRecording = false
     @State private var liveTranslationConfiguration: TranslationSession.Configuration?
@@ -38,15 +40,9 @@ struct TranscriptionView: View {
     }
 
     private var finalTranscriptLines: [TranscriptionLine] {
-        transcriber.transcriptLines.filter { line in
-            line.isFinal && !line.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        transcriber.finalTranscriptStore.lines.filter { line in
+            !line.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
         }
-    }
-
-    private var finalTranscriptSignature: String {
-        finalTranscriptLines
-            .map { "\($0.id.uuidString)|\($0.startSeconds)|\($0.text.hashValue)" }
-            .joined(separator: "\n")
     }
 
     var body: some View {
@@ -87,7 +83,7 @@ struct TranscriptionView: View {
         .onAppear {
             consumeExternalPendingRecordingDraftIfNeeded()
         }
-        .onChange(of: finalTranscriptSignature) { _, _ in
+        .onReceive(transcriber.finalTranscriptStore.$revision.dropFirst()) { _ in
             scheduleFinalTranscriptTranslationIfNeeded()
         }
         .onChange(of: transcriber.selectedLanguageID) { _, _ in
@@ -117,6 +113,7 @@ struct TranscriptionView: View {
                 draft: pendingSave.draft,
                 recordingName: $pendingRecordingName,
                 tags: $pendingRecordingTags,
+                generatedIntelligence: $pendingRecordingIntelligence,
                 includesLocation: $pendingRecordingIncludesLocation,
                 locationProvider: locationProvider,
                 isSaving: isSavingPendingRecording,
@@ -204,8 +201,8 @@ struct TranscriptionView: View {
             RoundedRectangle(cornerRadius: AppTheme.cornerRadius, style: .continuous)
                 .stroke(recorderDeckBorderColor, lineWidth: 1)
 
-            RollingRecorderTimeText(
-                text: formatDuration(transcriber.elapsedSeconds),
+            RecordingElapsedTimeText(
+                clock: transcriber.elapsedClock,
                 color: recorderDeckPrimaryColor
             )
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
@@ -388,6 +385,7 @@ struct TranscriptionView: View {
     private func presentSaveSheet(for draft: RecordingDraft) {
         pendingRecordingName = RecordingStore.defaultBaseName(for: draft.startedAt)
         pendingRecordingTags = []
+        pendingRecordingIntelligence = nil
         pendingRecordingIncludesLocation = false
         locationProvider.reset()
         pendingRecordingSave = PendingRecordingSave(draft: draft)
@@ -411,15 +409,24 @@ struct TranscriptionView: View {
         isSavingPendingRecording = true
         Task {
             let location = pendingRecordingIncludesLocation ? locationProvider.recordingLocation : nil
+            let intelligence = pendingRecordingIntelligence.map { pendingIntelligence in
+                RecordingIntelligence(
+                    summary: pendingIntelligence.summary,
+                    tags: pendingRecordingTags,
+                    generatedAt: pendingIntelligence.generatedAt
+                )
+            }
             if let saved = await recordingStore.save(
                 pendingRecordingSave.draft,
                 preferredName: pendingRecordingName,
                 manualTags: pendingRecordingTags,
+                intelligence: intelligence,
                 location: location
             ) {
                 showSavedRecordingBanner(fileName: saved.audioFileName)
                 transcriber.clearTranscript()
                 self.pendingRecordingSave = nil
+                pendingRecordingIntelligence = nil
                 HapticFeedback.play(.recordingSaved)
             } else {
                 HapticFeedback.play(.failure)
@@ -438,6 +445,7 @@ struct TranscriptionView: View {
         pendingRecordingSave = nil
         pendingRecordingName = ""
         pendingRecordingTags = []
+        pendingRecordingIntelligence = nil
         pendingRecordingIncludesLocation = false
         locationProvider.reset()
         transcriber.clearTranscript()
@@ -492,44 +500,22 @@ struct TranscriptionView: View {
                     .font(.redditSans(.headline))
                 Spacer()
                 liveTranscriptTranslationMenu
-                Text("\(transcriber.transcriptLines.count)")
-                    .font(.redditSans(.caption2).monospacedDigit())
-                    .foregroundStyle(.secondary)
+                LiveTranscriptLineCount(
+                    finalStore: transcriber.finalTranscriptStore,
+                    interimStore: transcriber.interimTranscriptStore
+                )
             }
 
             liveTranscriptTranslationStatus
 
-            if !transcriber.transcriptLines.isEmpty {
-                ScrollViewReader { scrollProxy in
-                    ScrollView {
-                        LazyVStack(alignment: .leading, spacing: 10) {
-                            Color.clear
-                                .frame(height: 1)
-                                .id("transcript-top")
-
-                            ForEach(transcriber.transcriptLines.reversed()) { line in
-                                TranscriptionLineRow(
-                                    line: line,
-                                    translatedText: line.isFinal ? translatedLiveTranscriptByLineID[line.id] : nil,
-                                    isShowingTranslation: isShowingLiveTranslationPlaceholder(for: line)
-                                )
-                            }
-                        }
-                        .padding(.vertical, 2)
-                        .frame(maxWidth: .infinity, alignment: .topLeading)
-                    }
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
-                        .onChange(of: transcriber.transcriptLines.count) { _, _ in
-                            withAnimation(.snappy(duration: 0.2)) {
-                                scrollProxy.scrollTo("transcript-top", anchor: .top)
-                            }
-                        }
-                }
-            } else {
-                EmptyStateView(icon: "quote.bubble", titleResource: L10n.Recordings.noText)
-                    .frame(maxWidth: .infinity)
-                    .frame(maxHeight: .infinity)
-            }
+            LiveTranscriptRows(
+                finalStore: transcriber.finalTranscriptStore,
+                interimStore: transcriber.interimTranscriptStore,
+                translatedTextByLineID: translatedLiveTranscriptByLineID,
+                translatedLineSignatures: liveTranslatedLineSignatures,
+                isTranslating: isTranslatingLiveTranscript,
+                selectedTranslationLanguage: selectedLiveTranslationLanguage
+            )
         }
         .padding(14)
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -675,7 +661,7 @@ struct TranscriptionView: View {
                       let lineIDText = response.clientIdentifier,
                       let lineID = UUID(uuidString: lineIDText),
                       let signature = signatures[lineID],
-                      let currentLine = transcriber.transcriptLines.first(where: { $0.id == lineID && $0.isFinal }),
+                      let currentLine = transcriber.finalTranscriptStore.lines.first(where: { $0.id == lineID }),
                       liveTranslationSignature(for: currentLine, language: targetLanguage) == signature else {
                     continue
                 }
@@ -713,15 +699,6 @@ struct TranscriptionView: View {
         }
     }
 
-    private func isShowingLiveTranslationPlaceholder(for line: TranscriptionLine) -> Bool {
-        guard line.isFinal,
-              isTranslatingLiveTranscript,
-              let language = selectedLiveTranslationLanguage else {
-            return false
-        }
-        return liveTranslatedLineSignatures[line.id] != liveTranslationSignature(for: line, language: language)
-    }
-
     private func pruneLiveTranslationState() {
         let finalLineIDs = Set(finalTranscriptLines.map(\.id))
         translatedLiveTranscriptByLineID = translatedLiveTranscriptByLineID.filter { finalLineIDs.contains($0.key) }
@@ -751,14 +728,26 @@ struct TranscriptionView: View {
         return firstCode == secondCode
     }
 
-    private func formatDuration(_ seconds: Int) -> String {
-        TranscriptionLine.formatTimestamp(Double(seconds))
-    }
 }
 
 private struct PendingRecordingSave: Identifiable {
     let id = UUID()
     let draft: RecordingDraft
+}
+
+private struct RecordingElapsedTimeText: View {
+    @ObservedObject var clock: RecordingElapsedClock
+    let color: Color
+
+    var body: some View {
+        Text(TranscriptionLine.formatTimestamp(Double(clock.elapsedSeconds)))
+            .font(.system(size: 40, weight: .semibold, design: .monospaced))
+            .foregroundStyle(color)
+            .monospacedDigit()
+            .contentTransition(.identity)
+            .animation(nil, value: clock.elapsedSeconds)
+            .accessibilityLabel(TranscriptionLine.formatTimestamp(Double(clock.elapsedSeconds)))
+    }
 }
 
 private struct LiveTranslationLanguagePicker: View {
@@ -860,6 +849,7 @@ private struct RecordingSaveSheet: View {
     let draft: RecordingDraft
     @Binding var recordingName: String
     @Binding var tags: [String]
+    @Binding var generatedIntelligence: RecordingIntelligence?
     @Binding var includesLocation: Bool
     @ObservedObject var locationProvider: RecordingLocationProvider
     let isSaving: Bool
@@ -999,7 +989,12 @@ private struct RecordingSaveSheet: View {
                     return
                 }
                 recordingName = cleanedTitle
-                tags = RecordingItem.mergedTags(tags, suggestion.tags)
+                let mergedTags = RecordingItem.mergedTags(tags, suggestion.tags)
+                tags = mergedTags
+                let summary = suggestion.summary?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+                generatedIntelligence = summary.isEmpty
+                    ? nil
+                    : RecordingIntelligence(summary: summary, tags: mergedTags, generatedAt: Date())
                 HapticFeedback.play(.analysisComplete)
             } catch {
                 titleGenerationErrorMessage = error.localizedDescription
@@ -1421,6 +1416,110 @@ private extension View {
             RoundedRectangle(cornerRadius: AppTheme.cornerRadius, style: .continuous)
                 .stroke(AppTheme.cardBorder, lineWidth: 1)
         }
+    }
+}
+
+private struct LiveTranscriptLineCount: View {
+    @ObservedObject var finalStore: LiveFinalTranscriptStore
+    @ObservedObject var interimStore: LiveInterimTranscriptStore
+
+    var body: some View {
+        Text("\(finalStore.lines.count + (interimStore.line == nil ? 0 : 1))")
+            .font(.redditSans(.caption2).monospacedDigit())
+            .foregroundStyle(.secondary)
+    }
+}
+
+private struct LiveTranscriptRows: View {
+    @ObservedObject var finalStore: LiveFinalTranscriptStore
+    @ObservedObject var interimStore: LiveInterimTranscriptStore
+    let translatedTextByLineID: [TranscriptionLine.ID: String]
+    let translatedLineSignatures: [TranscriptionLine.ID: String]
+    let isTranslating: Bool
+    let selectedTranslationLanguage: TranscriptionLanguage?
+
+    private var totalLineCount: Int {
+        finalStore.lines.count + (interimStore.line == nil ? 0 : 1)
+    }
+
+    var body: some View {
+        if totalLineCount > 0 {
+            ScrollViewReader { scrollProxy in
+                ScrollView {
+                    LazyVStack(alignment: .leading, spacing: 10) {
+                        Color.clear
+                            .frame(height: 1)
+                            .id("transcript-top")
+
+                        LiveInterimTranscriptRow(interimStore: interimStore)
+
+                        LiveFinalTranscriptRows(
+                            finalStore: finalStore,
+                            translatedTextByLineID: translatedTextByLineID,
+                            translatedLineSignatures: translatedLineSignatures,
+                            isTranslating: isTranslating,
+                            selectedTranslationLanguage: selectedTranslationLanguage
+                        )
+                    }
+                    .padding(.vertical, 2)
+                    .frame(maxWidth: .infinity, alignment: .topLeading)
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .onChange(of: totalLineCount) { _, _ in
+                    withAnimation(.snappy(duration: 0.2)) {
+                        scrollProxy.scrollTo("transcript-top", anchor: .top)
+                    }
+                }
+            }
+        } else {
+            EmptyStateView(icon: "quote.bubble", titleResource: L10n.Recordings.noText)
+                .frame(maxWidth: .infinity)
+                .frame(maxHeight: .infinity)
+        }
+    }
+}
+
+private struct LiveInterimTranscriptRow: View {
+    @ObservedObject var interimStore: LiveInterimTranscriptStore
+
+    var body: some View {
+        if let line = interimStore.line {
+            TranscriptionLineRow(
+                line: line,
+                translatedText: nil,
+                isShowingTranslation: false
+            )
+        }
+    }
+}
+
+private struct LiveFinalTranscriptRows: View {
+    @ObservedObject var finalStore: LiveFinalTranscriptStore
+    let translatedTextByLineID: [TranscriptionLine.ID: String]
+    let translatedLineSignatures: [TranscriptionLine.ID: String]
+    let isTranslating: Bool
+    let selectedTranslationLanguage: TranscriptionLanguage?
+
+    var body: some View {
+        ForEach(finalStore.lines.reversed()) { line in
+            TranscriptionLineRow(
+                line: line,
+                translatedText: translatedTextByLineID[line.id],
+                isShowingTranslation: isShowingTranslationPlaceholder(for: line)
+            )
+        }
+    }
+
+    private func isShowingTranslationPlaceholder(for line: TranscriptionLine) -> Bool {
+        guard isTranslating,
+              let language = selectedTranslationLanguage else {
+            return false
+        }
+        return translatedLineSignatures[line.id] != liveTranslationSignature(for: line, language: language)
+    }
+
+    private func liveTranslationSignature(for line: TranscriptionLine, language: TranscriptionLanguage) -> String {
+        "\(language.id)|\(line.id.uuidString)|\(line.text.hashValue)"
     }
 }
 
