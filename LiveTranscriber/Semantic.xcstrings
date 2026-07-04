@@ -211,6 +211,48 @@
         }
       }
     },
+    "common.copy" : {
+      "comment" : "Generic copy action title.",
+      "extractionState" : "stale",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Kopieren"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Copy"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "コピー"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Kopieer"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "复制"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "複製"
+          }
+        }
+      }
+    },
     "common.delete" : {
       "comment" : "Generic delete button title.",
       "extractionState" : "stale",
@@ -1849,6 +1891,48 @@
         }
       }
     },
+    "import.status.refining_with_openai" : {
+      "comment" : "Import status shown while OpenAI refines local timed transcript segments.",
+      "extractionState" : "stale",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Verfeinern mit OpenAI"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Refining with OpenAI"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "OpenAIで調整中"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Verfijnen met OpenAI"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "正在用 OpenAI 精修"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "正在用 OpenAI 精修"
+          }
+        }
+      }
+    },
     "import.status.transcribing" : {
       "comment" : "Import status message.",
       "extractionState" : "stale",
@@ -1887,6 +1971,48 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "正在轉錄"
+          }
+        }
+      }
+    },
+    "import.status.uploading_to_openai" : {
+      "comment" : "Import status shown while uploading an audio file to OpenAI for transcription.",
+      "extractionState" : "stale",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Upload zu OpenAI"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Uploading to OpenAI"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "OpenAIへアップロード中"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Uploaden naar OpenAI"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "正在上传到 OpenAI"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "正在上傳到 OpenAI"
           }
         }
       }
@@ -2643,6 +2769,2148 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "裝置不支援"
+          }
+        }
+      }
+    },
+    "local_whisper.error.audio_conversion_failed" : {
+      "comment" : "Local Whisper audio conversion error.",
+      "extractionState" : "stale",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Die Audiodatei konnte nicht für lokale Whisper-Transkription konvertiert werden."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The audio file could not be converted for local Whisper transcription."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "音声ファイルをローカルWhisper文字起こし用に変換できませんでした。"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Het audiobestand kon niet worden geconverteerd voor lokale Whisper-transcriptie."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "无法将音频文件转换为本地 Whisper 可用格式。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "無法將音訊檔案轉換為本機 Whisper 可用格式。"
+          }
+        }
+      }
+    },
+    "local_whisper.error.context_creation_failed" : {
+      "comment" : "Local Whisper model initialization error.",
+      "extractionState" : "stale",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Lokales Whisper konnte das ausgewählte Modell nicht laden."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Local Whisper could not load the selected model."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ローカルWhisperは選択したモデルを読み込めませんでした。"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Lokale Whisper kon het geselecteerde model niet laden."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "本地 Whisper 无法加载所选模型。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "本機 Whisper 無法載入所選模型。"
+          }
+        }
+      }
+    },
+    "local_whisper.error.empty_audio" : {
+      "comment" : "Local Whisper empty audio error.",
+      "extractionState" : "stale",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Die Audiodatei enthält keine Samples zum Transkribieren."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The audio file has no samples to transcribe."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "音声ファイルに文字起こしできるサンプルがありません。"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Het audiobestand heeft geen samples om te transcriberen."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "音频文件没有可转录的采样。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "音訊檔案沒有可轉錄的取樣。"
+          }
+        }
+      }
+    },
+    "local_whisper.error.missing_model" : {
+      "comment" : "Local Whisper error when no model file can be found.",
+      "extractionState" : "stale",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Lade das lokale Whisper-Modell in den Einstellungen herunter, bevor du lokale Whisper-Transkription ausführst."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Download the Local Whisper model in Settings before running local Whisper transcription."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ローカルWhisper文字起こしを実行する前に、設定でローカルWhisperモデルをダウンロードしてください。"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Download het lokale Whisper-model in Instellingen voordat je lokale Whisper-transcriptie uitvoert."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "使用本地 Whisper 转录前，请先在设置中下载模型。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "使用本機 Whisper 轉錄前，請先在設定中下載模型。"
+          }
+        }
+      }
+    },
+    "local_whisper.error.missing_symbol.format" : {
+      "comment" : "Local Whisper error when a native function cannot be found. Parameter: symbol name.",
+      "extractionState" : "stale",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "whisper.cpp fehlt das erforderliche Symbol: %@."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "whisper.cpp is missing the required symbol: %@."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "whisper.cppに必要なシンボルがありません: %@。"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "whisper.cpp mist het vereiste symbool: %@."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "whisper.cpp 缺少必需符号：%@。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "whisper.cpp 缺少必要符號：%@。"
+          }
+        }
+      }
+    },
+    "local_whisper.error.model_download_failed" : {
+      "comment" : "Local Whisper invalid downloaded model error.",
+      "extractionState" : "stale",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Der Download des lokalen Whisper-Modells hat keine gültige Modelldatei erzeugt."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The Local Whisper model download did not produce a valid model file."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ローカルWhisperモデルのダウンロードで有効なモデルファイルが作成されませんでした。"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "De download van het lokale Whisper-model leverde geen geldig modelbestand op."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "下载的本地 Whisper 模型不是有效模型文件。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "下載的本機 Whisper 模型不是有效模型檔案。"
+          }
+        }
+      }
+    },
+    "local_whisper.error.runtime_unavailable" : {
+      "comment" : "Local Whisper error when the native runtime cannot be loaded.",
+      "extractionState" : "stale",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "whisper.cpp ist in diesem Build nicht eingebettet."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "whisper.cpp is not embedded in this build."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "このビルドにはwhisper.cppが組み込まれていません。"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "whisper.cpp is niet ingebed in deze build."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "当前构建未内置 whisper.cpp。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "目前建置未內建 whisper.cpp。"
+          }
+        }
+      }
+    },
+    "local_whisper.error.transcription_failed" : {
+      "comment" : "Local Whisper inference error.",
+      "extractionState" : "stale",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Lokale Whisper-Transkription fehlgeschlagen."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Local Whisper transcription failed."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ローカルWhisper文字起こしに失敗しました。"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Lokale Whisper-transcriptie mislukt."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "本地 Whisper 转录失败。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "本機 Whisper 轉錄失敗。"
+          }
+        }
+      }
+    },
+    "local_whisper.model.base_english.detail" : {
+      "comment" : "Local Whisper base English-only model detail.",
+      "extractionState" : "stale",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Empfohlene Balance für reine Englisch-Transkription."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Recommended balance for English-only transcription."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "英語専用文字起こしに推奨されるバランスです。"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Aanbevolen balans voor transcriptie alleen in het Engels."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "仅英语离线转录的推荐平衡选择。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "僅英文離線轉錄的建議平衡選擇。"
+          }
+        }
+      }
+    },
+    "local_whisper.model.base_english.title" : {
+      "comment" : "Local Whisper base English-only model name.",
+      "extractionState" : "stale",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Base Englisch"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Base English"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Base 英語"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Base Engels"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Base 英语"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Base 英文"
+          }
+        }
+      }
+    },
+    "local_whisper.model.base.detail" : {
+      "comment" : "Local Whisper base multilingual model detail.",
+      "extractionState" : "stale",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Empfohlene Balance für Offline-Transkription."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Recommended balance for offline transcription."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "オフライン文字起こしに推奨されるバランスです。"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Aanbevolen balans voor offline transcriptie."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "离线转录的推荐平衡选择。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "離線轉錄的建議平衡選擇。"
+          }
+        }
+      }
+    },
+    "local_whisper.model.base.title" : {
+      "comment" : "Local Whisper base multilingual model name.",
+      "extractionState" : "stale",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Base Mehrsprachig"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Base Multilingual"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Base 多言語"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Base Meertalig"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Base 多语言"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Base 多語言"
+          }
+        }
+      }
+    },
+    "local_whisper.model.bundled_detail.format" : {
+      "comment" : "Local Whisper bundled model detail. Parameters: model filename, file size.",
+      "extractionState" : "stale",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ ist in dieser App enthalten (%@)."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ is bundled with this app (%@)."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ はこのアプリに内蔵されています（%@）。"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ is meegeleverd met deze app (%@)."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ 已随 app 内置（%@）。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ 已隨 app 內建（%@）。"
+          }
+        }
+      }
+    },
+    "local_whisper.model.choice_subtitle.format" : {
+      "comment" : "Local Whisper model picker subtitle. Parameters: model detail, install status, expected model size.",
+      "extractionState" : "stale",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@. %@ - %@"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@. %@ - %@"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@。%@ - %@"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@. %@ - %@"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@，%@ - %@"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@，%@ - %@"
+          }
+        }
+      }
+    },
+    "local_whisper.model.delete_failed" : {
+      "comment" : "Alert title when deleting a local Whisper model fails.",
+      "extractionState" : "stale",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Modell löschen fehlgeschlagen"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Model Delete Failed"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "モデルの削除に失敗しました"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Model verwijderen mislukt"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "模型删除失败"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "模型刪除失敗"
+          }
+        }
+      }
+    },
+    "local_whisper.model.delete_selected" : {
+      "comment" : "Settings button title to delete the selected downloaded local Whisper model.",
+      "extractionState" : "stale",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ausgewähltes Modell löschen"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Delete Selected Model"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "選択したモデルを削除"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Geselecteerd model verwijderen"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "删除所选模型"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "刪除所選模型"
+          }
+        }
+      }
+    },
+    "local_whisper.model.download_failed" : {
+      "comment" : "Alert title when a local Whisper model download fails.",
+      "extractionState" : "stale",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Modelldownload fehlgeschlagen"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Model Download Failed"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "モデルのダウンロードに失敗しました"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Modeldownload mislukt"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "模型下载失败"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "模型下載失敗"
+          }
+        }
+      }
+    },
+    "local_whisper.model.download_selected" : {
+      "comment" : "Settings button title to download the selected local Whisper model.",
+      "extractionState" : "stale",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ausgewähltes Modell laden"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Download Selected Model"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "選択したモデルをダウンロード"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Geselecteerd model downloaden"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "下载所选模型"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "下載所選模型"
+          }
+        }
+      }
+    },
+    "local_whisper.model.downloaded_detail.format" : {
+      "comment" : "Local Whisper downloaded model detail. Parameters: model filename, file size.",
+      "extractionState" : "stale",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ wurde auf dieses iPhone geladen (%@)."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ is downloaded on this iPhone (%@)."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ はこのiPhoneにダウンロード済みです（%@）。"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ is gedownload op deze iPhone (%@)."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ 已下载到这台 iPhone（%@）。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ 已下載到這台 iPhone（%@）。"
+          }
+        }
+      }
+    },
+    "local_whisper.model.downloading.format" : {
+      "comment" : "Local Whisper model download progress. Parameter: percent complete.",
+      "extractionState" : "stale",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Lädt %.0f%%"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Downloading %.0f%%"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ダウンロード中 %.0f%%"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Downloaden %.0f%%"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "正在下载 %.0f%%"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "正在下載 %.0f%%"
+          }
+        }
+      }
+    },
+    "local_whisper.model.large_v3_q5.detail" : {
+      "comment" : "Local Whisper large v3 Q5 model detail.",
+      "extractionState" : "stale",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Größtes quantisiertes mehrsprachiges Modell; beste Qualität, höchste Laufzeitlast."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Largest quantized multilingual model; best quality option, heaviest runtime."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "最大の量子化多言語モデルです。最高品質ですが実行負荷は最も重くなります。"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Grootste gekwantiseerde meertalige model; beste kwaliteit, zwaarste runtime."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "最大的量化多语言模型；质量最好，但运行负载最重。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "最大的量化多語言模型；品質最好，但執行負載最重。"
+          }
+        }
+      }
+    },
+    "local_whisper.model.large_v3_q5.title" : {
+      "comment" : "Local Whisper large v3 Q5 model name.",
+      "extractionState" : "stale",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Large v3 Q5"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Large v3 Q5"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Large v3 Q5"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Large v3 Q5"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Large v3 Q5"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Large v3 Q5"
+          }
+        }
+      }
+    },
+    "local_whisper.model.large_v3_turbo_q5.detail" : {
+      "comment" : "Local Whisper large v3 turbo Q5 model detail.",
+      "extractionState" : "stale",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Quantisiertes Large-Turbo-Modell; stärkere Qualität bei weniger Speicherbedarf als das vollständige Large-Modell."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Large turbo model with quantization; stronger quality with lower storage than full large."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "量子化されたlarge turboモデルです。full largeより少ない容量で高い品質を提供します。"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Gekwantiseerd large turbo-model; sterkere kwaliteit met minder opslag dan de volledige large-versie."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "量化后的 large turbo 模型；质量更强，存储占用低于完整 large。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "量化後的 large turbo 模型；品質更強，儲存占用低於完整 large。"
+          }
+        }
+      }
+    },
+    "local_whisper.model.large_v3_turbo_q5.title" : {
+      "comment" : "Local Whisper large v3 turbo Q5 model name.",
+      "extractionState" : "stale",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Large v3 Turbo Q5"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Large v3 Turbo Q5"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Large v3 Turbo Q5"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Large v3 Turbo Q5"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Large v3 Turbo Q5"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Large v3 Turbo Q5"
+          }
+        }
+      }
+    },
+    "local_whisper.model.large_v3.detail" : {
+      "comment" : "Local Whisper large v3 model detail.",
+      "extractionState" : "stale",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Vollständiges großes mehrsprachiges Modell; sehr großer Download und hoher Speicherbedarf."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Full large multilingual model; very large download and memory use."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "完全版のlarge多言語モデルです。ダウンロード容量とメモリ使用量が非常に大きくなります。"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Volledig large meertalig model; zeer grote download en veel geheugengebruik."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "完整 large 多语言模型；下载体积和内存占用都很大。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "完整 large 多語言模型；下載體積和記憶體占用都很大。"
+          }
+        }
+      }
+    },
+    "local_whisper.model.large_v3.title" : {
+      "comment" : "Local Whisper large v3 model name.",
+      "extractionState" : "stale",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Large v3"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Large v3"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Large v3"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Large v3"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Large v3"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Large v3"
+          }
+        }
+      }
+    },
+    "local_whisper.model.medium_english.detail" : {
+      "comment" : "Local Whisper medium English-only model detail.",
+      "extractionState" : "stale",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Hohe Qualität für reine Englisch-Transkription."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "High quality for English-only transcription."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "英語専用文字起こし向けの高品質モデルです。"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Hoge kwaliteit voor transcriptie alleen in het Engels."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "仅英语转录的高质量模型。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "僅英文轉錄的高品質模型。"
+          }
+        }
+      }
+    },
+    "local_whisper.model.medium_english.title" : {
+      "comment" : "Local Whisper medium English-only model name.",
+      "extractionState" : "stale",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Medium Englisch"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Medium English"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Medium 英語"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Medium Engels"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Medium 英语"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Medium 英文"
+          }
+        }
+      }
+    },
+    "local_whisper.model.medium.detail" : {
+      "comment" : "Local Whisper medium multilingual model detail.",
+      "extractionState" : "stale",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Hohe Qualität, deutlich langsamer und benötigt wesentlich mehr Speicher."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "High quality, much slower and requires significantly more storage."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "高品質ですがかなり遅く、より多くのストレージが必要です。"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Hoge kwaliteit, veel trager en vereist aanzienlijk meer opslag."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "高质量，明显更慢，占用存储更多。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "高品質，明顯更慢，佔用儲存空間更多。"
+          }
+        }
+      }
+    },
+    "local_whisper.model.medium.title" : {
+      "comment" : "Local Whisper medium multilingual model name.",
+      "extractionState" : "stale",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Medium Mehrsprachig"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Medium Multilingual"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Medium 多言語"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Medium Meertalig"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Medium 多语言"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Medium 多語言"
+          }
+        }
+      }
+    },
+    "local_whisper.model.missing_detail.format" : {
+      "comment" : "Local Whisper missing model detail. Parameters: model name, expected size.",
+      "extractionState" : "stale",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Lade %@ (%@) herunter, bevor du lokale Whisper-Transkription verwendest."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Download %@ (%@) before using Local Whisper transcription."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ローカルWhisper文字起こしを使う前に %@（%@）をダウンロードしてください。"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Download %@ (%@) voordat je lokale Whisper-transcriptie gebruikt."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "使用本地 Whisper 转录前，请先下载 %@（%@）。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "使用本機 Whisper 轉錄前，請先下載 %@（%@）。"
+          }
+        }
+      }
+    },
+    "local_whisper.model.not_installed" : {
+      "comment" : "Local Whisper model status when a model is not installed.",
+      "extractionState" : "stale",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nicht installiert"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Not Installed"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "未インストール"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Niet geïnstalleerd"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "未安装"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "未安裝"
+          }
+        }
+      }
+    },
+    "local_whisper.model.ready" : {
+      "comment" : "Local Whisper model status when a model is available.",
+      "extractionState" : "stale",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bereit"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ready"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "準備完了"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Gereed"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "就绪"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "就緒"
+          }
+        }
+      }
+    },
+    "local_whisper.model.selected" : {
+      "comment" : "Settings row title for the selected local Whisper model.",
+      "extractionState" : "stale",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Geladenes Modell"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Loaded Model"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "読み込み済みモデル"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Geladen model"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已加载模型"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已載入模型"
+          }
+        }
+      }
+    },
+    "local_whisper.model.small_english.detail" : {
+      "comment" : "Local Whisper small English-only model detail.",
+      "extractionState" : "stale",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bessere Qualität für reine Englisch-Transkription."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Better quality for English-only transcription."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "英語専用文字起こしで品質が高めです。"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Betere kwaliteit voor transcriptie alleen in het Engels."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "仅英语转录质量更好。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "僅英文轉錄品質更好。"
+          }
+        }
+      }
+    },
+    "local_whisper.model.small_english.title" : {
+      "comment" : "Local Whisper small English-only model name.",
+      "extractionState" : "stale",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Small Englisch"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Small English"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Small 英語"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Small Engels"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Small 英语"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Small 英文"
+          }
+        }
+      }
+    },
+    "local_whisper.model.small.detail" : {
+      "comment" : "Local Whisper small multilingual model detail.",
+      "extractionState" : "stale",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bessere Qualität, langsamer und größer."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Better quality, slower and larger."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "品質は高めですが、遅く、容量も大きくなります。"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Betere kwaliteit, trager en groter."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "质量更好，但更慢、占用更大。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "品質更好，但更慢、占用更大。"
+          }
+        }
+      }
+    },
+    "local_whisper.model.small.title" : {
+      "comment" : "Local Whisper small multilingual model name.",
+      "extractionState" : "stale",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Small Mehrsprachig"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Small Multilingual"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Small 多言語"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Small Meertalig"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Small 多语言"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Small 多語言"
+          }
+        }
+      }
+    },
+    "local_whisper.model.status" : {
+      "comment" : "Settings metric title for local Whisper model status.",
+      "extractionState" : "stale",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Modellstatus"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Model Status"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "モデル状態"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Modelstatus"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "模型状态"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "模型狀態"
+          }
+        }
+      }
+    },
+    "local_whisper.model.tiny_english.detail" : {
+      "comment" : "Local Whisper tiny English-only model detail.",
+      "extractionState" : "stale",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Schnellstes Modell nur für Englisch."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Fastest English-only model."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "最速の英語専用モデルです。"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Snelste model alleen voor Engels."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "最快的仅英语模型。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "最快的僅英文模型。"
+          }
+        }
+      }
+    },
+    "local_whisper.model.tiny_english.title" : {
+      "comment" : "Local Whisper tiny English-only model name.",
+      "extractionState" : "stale",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tiny Englisch"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tiny English"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tiny 英語"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tiny Engels"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tiny 英语"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tiny 英文"
+          }
+        }
+      }
+    },
+    "local_whisper.model.tiny.detail" : {
+      "comment" : "Local Whisper tiny multilingual model detail.",
+      "extractionState" : "stale",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Am schnellsten, niedrigste Genauigkeit, unterstützt mehrere Sprachen."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Fastest, lowest accuracy, supports multiple languages."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "最速ですが精度は低く、複数言語に対応します。"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Snelst, laagste nauwkeurigheid, ondersteunt meerdere talen."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "最快，准确率最低，支持多语言。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "最快，準確率最低，支援多語言。"
+          }
+        }
+      }
+    },
+    "local_whisper.model.tiny.title" : {
+      "comment" : "Local Whisper tiny multilingual model name.",
+      "extractionState" : "stale",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tiny Mehrsprachig"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tiny Multilingual"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tiny 多言語"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tiny Meertalig"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tiny 多语言"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tiny 多語言"
+          }
+        }
+      }
+    },
+    "local_whisper.model.title" : {
+      "comment" : "Settings section title for local Whisper model management.",
+      "extractionState" : "stale",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Lokales Whisper-Modell"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Local Whisper Model"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ローカルWhisperモデル"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Lokaal Whisper-model"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "本地 Whisper 模型"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "本機 Whisper 模型"
+          }
+        }
+      }
+    },
+    "openai.file_transcription.error.invalid_response" : {
+      "comment" : "OpenAI file transcription invalid response error.",
+      "extractionState" : "stale",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "OpenAI hat keine verwendbare Transkription zurückgegeben."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "OpenAI did not return a usable transcription."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "OpenAIから利用可能な文字起こしが返されませんでした。"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "OpenAI gaf geen bruikbare transcriptie terug."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "OpenAI 没有返回可用的转录结果。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "OpenAI 沒有回傳可用的轉錄結果。"
+          }
+        }
+      }
+    },
+    "openai.file_transcription.error.no_refinement_segments" : {
+      "comment" : "OpenAI refinement error shown when no Apple-timed transcript segments exist.",
+      "extractionState" : "stale",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Führe zuerst lokale Transkription aus, damit OpenAI die zeitcodierten Segmente verfeinern kann."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Run local transcription first so OpenAI can refine the timed segments."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "OpenAIが時間付きセグメントを調整できるように、先にローカル文字起こしを実行してください。"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Voer eerst lokale transcriptie uit zodat OpenAI de getimede segmenten kan verfijnen."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "请先运行本地转录，这样 OpenAI 才能精修带时间戳的片段。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "請先執行本機轉錄，這樣 OpenAI 才能精修帶時間戳的片段。"
+          }
+        }
+      }
+    },
+    "openai.file_transcription.error.request_failed.format" : {
+      "comment" : "OpenAI file transcription HTTP failure. Parameter: HTTP status code.",
+      "extractionState" : "stale",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "OpenAI-Transkriptionsanfrage fehlgeschlagen (%d)."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "OpenAI transcription request failed (%d)."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "OpenAI文字起こしリクエストに失敗しました（%d）。"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "OpenAI-transcriptieverzoek mislukt (%d)."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "OpenAI 转录请求失败（%d）。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "OpenAI 轉錄請求失敗（%d）。"
+          }
+        }
+      }
+    },
+    "openai.file_transcription.error.segment_export_failed" : {
+      "comment" : "OpenAI refinement error shown when a local audio segment export fails.",
+      "extractionState" : "stale",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Das zeitcodierte Audiosegment konnte nicht für OpenAI-Transkription vorbereitet werden."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The timed audio segment could not be prepared for OpenAI transcription."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "時間付き音声セグメントをOpenAI文字起こし用に準備できませんでした。"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Het getimede audiosegment kon niet worden voorbereid voor OpenAI-transcriptie."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "无法为 OpenAI 转录准备带时间戳的音频片段。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "無法為 OpenAI 轉錄準備帶時間戳的音訊片段。"
+          }
+        }
+      }
+    },
+    "openai.transcription.error.invalid_configuration" : {
+      "comment" : "OpenAI invalid configuration error.",
+      "extractionState" : "stale",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "OpenAI-Transkription ist nicht korrekt konfiguriert."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "OpenAI transcription is not configured correctly."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "OpenAI文字起こしが正しく設定されていません。"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "OpenAI-transcriptie is niet correct geconfigureerd."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "OpenAI 转录配置不正确。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "OpenAI 轉錄設定不正確。"
+          }
+        }
+      }
+    },
+    "openai.transcription.error.keychain_unavailable" : {
+      "comment" : "OpenAI Keychain unavailable error.",
+      "extractionState" : "stale",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Der OpenAI API-Schlüssel konnte nicht aus dem Schlüsselbund gelesen oder darin gespeichert werden."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The OpenAI API key could not be read from or written to Keychain."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "OpenAI APIキーをKeychainから読み取る、またはKeychainへ書き込むことができませんでした。"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "De OpenAI API-sleutel kon niet uit Keychain worden gelezen of erin worden geschreven."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "无法从钥匙串读取或写入 OpenAI API 密钥。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "無法從鑰匙圈讀取或寫入 OpenAI API 金鑰。"
+          }
+        }
+      }
+    },
+    "openai.transcription.error.missing_api_key" : {
+      "comment" : "OpenAI missing API key error.",
+      "extractionState" : "stale",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Füge in den Einstellungen einen OpenAI API-Schlüssel hinzu, bevor du OpenAI-Transkription verwendest."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Add an OpenAI API key in Settings before using OpenAI transcription."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "OpenAI文字起こしを使う前に、設定でOpenAI APIキーを追加してください。"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Voeg een OpenAI API-sleutel toe in Instellingen voordat je OpenAI-transcriptie gebruikt."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "使用 OpenAI 转录前，请先在设置中添加 OpenAI API 密钥。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "使用 OpenAI 轉錄前，請先在設定中加入 OpenAI API 金鑰。"
           }
         }
       }
@@ -4285,6 +6553,90 @@
         }
       }
     },
+    "recordings.edit_details" : {
+      "comment" : "Action title for editing recording metadata.",
+      "extractionState" : "stale",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Details bearbeiten"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Edit Details"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "詳細を編集"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Details bewerken"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "编辑详情"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "編輯詳細資料"
+          }
+        }
+      }
+    },
+    "recordings.edit_failed" : {
+      "comment" : "Alert title when recording details could not be edited.",
+      "extractionState" : "stale",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bearbeiten fehlgeschlagen"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Edit Failed"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "編集に失敗しました"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bewerken mislukt"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "编辑失败"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "編輯失敗"
+          }
+        }
+      }
+    },
     "recordings.edit.add_location" : {
       "comment" : "Toggle title to add a recording location.",
       "extractionState" : "stale",
@@ -4491,6 +6843,90 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "錄音名稱"
+          }
+        }
+      }
+    },
+    "recordings.edit.summary" : {
+      "comment" : "Summary field title.",
+      "extractionState" : "stale",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Zusammenfassung"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Summary"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "要約"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Samenvatting"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "摘要"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "摘要"
+          }
+        }
+      }
+    },
+    "recordings.edit.summary_placeholder" : {
+      "comment" : "Placeholder for the editable recording summary field.",
+      "extractionState" : "stale",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Zusammenfassung hinzufügen"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Add a summary"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "要約を追加"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Samenvatting toevoegen"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "添加摘要"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "新增摘要"
           }
         }
       }
@@ -5755,6 +8191,48 @@
         }
       }
     },
+    "recordings.retranscribe_local_whisper" : {
+      "comment" : "Action title to retranscribe a recording with bundled local Whisper.",
+      "extractionState" : "stale",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mit lokalem Whisper transkribieren"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Transcribe with Local Whisper"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ローカルWhisperで文字起こし"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Transcriberen met lokale Whisper"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "用本地 Whisper 转录"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "用本機 Whisper 轉錄"
+          }
+        }
+      }
+    },
     "recordings.retranscribe_openai" : {
       "comment" : "Action title to retranscribe a recording with OpenAI.",
       "extractionState" : "stale",
@@ -5835,6 +8313,48 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "長段"
+          }
+        }
+      }
+    },
+    "recordings.retranscribe_openai_refined_segments" : {
+      "comment" : "OpenAI transcription option that keeps local timestamps and retranscribes each local audio segment.",
+      "extractionState" : "stale",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Lokale Segmente verfeinern"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Refine Local Segments"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ローカルセグメントを調整"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Lokale segmenten verfijnen"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "精修本地分段"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "精修本機分段"
           }
         }
       }
@@ -6129,6 +8649,384 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "轉錄文字"
+          }
+        }
+      }
+    },
+    "recordings.transcript.edit_line" : {
+      "comment" : "Action and sheet title for editing one transcript line.",
+      "extractionState" : "stale",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Transkriptzeile bearbeiten"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Edit Transcript Line"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "文字起こし行を編集"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Transcriptregel bewerken"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "编辑转录片段"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "編輯轉錄片段"
+          }
+        }
+      }
+    },
+    "recordings.transcript.line_missing" : {
+      "comment" : "Error shown when a transcript line edit cannot be applied.",
+      "extractionState" : "stale",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Transkriptzeile konnte nicht gefunden werden."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Transcript line could not be found."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "文字起こし行が見つかりませんでした。"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Transcriptregel kon niet worden gevonden."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "找不到该转录片段。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "找不到該轉錄片段。"
+          }
+        }
+      }
+    },
+    "recordings.transcript.line_text" : {
+      "comment" : "Field title for one editable transcript line.",
+      "extractionState" : "stale",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Transkripttext"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Transcript Text"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "文字起こしテキスト"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Transcripttekst"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "转录文本"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "轉錄文字"
+          }
+        }
+      }
+    },
+    "recordings.transcript.lock" : {
+      "comment" : "Menu action to lock transcript text against automatic updates.",
+      "extractionState" : "stale",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Transkript sperren"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Lock Transcript"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "文字起こしをロック"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Transcript vergrendelen"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "锁定转录文本"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "鎖定轉錄文字"
+          }
+        }
+      }
+    },
+    "recordings.transcript.locked" : {
+      "comment" : "Status shown when transcript text is locked.",
+      "extractionState" : "stale",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Transkript gesperrt"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Transcript Locked"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "文字起こしはロック中"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Transcript vergrendeld"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "转录文本已锁定"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "轉錄文字已鎖定"
+          }
+        }
+      }
+    },
+    "recordings.transcript.locked_detail" : {
+      "comment" : "Short explanation for locked transcript status.",
+      "extractionState" : "stale",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Automatische Transkriptionsupdates können dieses Transkript nicht überschreiben."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Automatic transcription updates cannot overwrite this transcript."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "自動文字起こしの更新でこの文字起こしは上書きされません。"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Automatische transcriptie-updates kunnen dit transcript niet overschrijven."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "自动转录更新不能覆盖此转录文本。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "自動轉錄更新無法覆寫此轉錄文字。"
+          }
+        }
+      }
+    },
+    "recordings.transcript.locked_error" : {
+      "comment" : "Error shown when automatic transcription tries to overwrite a locked transcript.",
+      "extractionState" : "stale",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Das Transkript ist gesperrt. Entsperre es, bevor du die Transkription erneut ausführst."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Transcript is locked. Unlock it before running transcription again."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "文字起こしはロックされています。再度文字起こしする前にロックを解除してください。"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Transcript is vergrendeld. Ontgrendel het voordat je transcriptie opnieuw uitvoert."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "转录文本已锁定。请先解锁再重新转录。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "轉錄文字已鎖定。請先解除鎖定再重新轉錄。"
+          }
+        }
+      }
+    },
+    "recordings.transcript.unlock" : {
+      "comment" : "Menu action to unlock transcript text.",
+      "extractionState" : "stale",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Transkript entsperren"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Unlock Transcript"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "文字起こしのロックを解除"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Transcript ontgrendelen"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "解锁转录文本"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "解除轉錄文字鎖定"
+          }
+        }
+      }
+    },
+    "recordings.transcript.unlocked" : {
+      "comment" : "Status shown when transcript text is not locked.",
+      "extractionState" : "stale",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Transkript entsperrt"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Transcript Unlocked"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "文字起こしは未ロック"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Transcript ontgrendeld"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "转录文本未锁定"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "轉錄文字未鎖定"
           }
         }
       }
@@ -7099,6 +9997,216 @@
         }
       }
     },
+    "settings.openai_api_key" : {
+      "comment" : "Settings secure text field title for OpenAI API key.",
+      "extractionState" : "stale",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "OpenAI API-Schlüssel"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "OpenAI API Key"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "OpenAI APIキー"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "OpenAI API-sleutel"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "OpenAI API 密钥"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "OpenAI API 金鑰"
+          }
+        }
+      }
+    },
+    "settings.openai_api_key.clear" : {
+      "comment" : "Settings button title to clear stored OpenAI API key.",
+      "extractionState" : "stale",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "API-Schlüssel löschen"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Clear API Key"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "APIキーを消去"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "API-sleutel wissen"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "清除 API 密钥"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "清除 API 金鑰"
+          }
+        }
+      }
+    },
+    "settings.openai_api_key.description" : {
+      "comment" : "Settings help text for BYOK OpenAI API key mode.",
+      "extractionState" : "stale",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Der Schlüssel wird im Schlüsselbund gespeichert und von diesem iPhone direkt zur Verbindung mit OpenAI verwendet."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The key is stored in Keychain and is used directly by this iPhone to connect to OpenAI."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "キーはKeychainに保存され、このiPhoneからOpenAIへ直接接続するために使われます。"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "De sleutel wordt opgeslagen in Keychain en rechtstreeks door deze iPhone gebruikt om verbinding te maken met OpenAI."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "密钥保存在钥匙串中，并由这台 iPhone 直接用于连接 OpenAI。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "金鑰會儲存在鑰匙圈中，並由這台 iPhone 直接用來連線 OpenAI。"
+          }
+        }
+      }
+    },
+    "settings.openai_api_key.manual_retranscription_uploads_audio" : {
+      "comment" : "Settings privacy help text for manual OpenAI retranscription.",
+      "extractionState" : "stale",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "OpenAI wird nur verwendet, wenn du für eine gespeicherte Aufnahme manuell OpenAI-Transkription auswählst; das Audio dieser Aufnahme wird direkt von diesem iPhone an OpenAI gesendet."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "OpenAI is used only when you manually choose OpenAI transcription for a saved recording; that recording audio is sent directly from this iPhone to OpenAI."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "OpenAIは、保存済み録音でOpenAI文字起こしを手動で選んだ場合にのみ使われます。その録音音声はこのiPhoneからOpenAIへ直接送信されます。"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "OpenAI wordt alleen gebruikt wanneer je handmatig OpenAI-transcriptie kiest voor een opgeslagen opname; de audio van die opname wordt rechtstreeks vanaf deze iPhone naar OpenAI verzonden."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "只有在你手动为已保存录音选择 OpenAI 转录时才会使用 OpenAI；该录音音频会由这台 iPhone 直接发送给 OpenAI。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "只有在你手動為已儲存錄音選擇 OpenAI 轉錄時才會使用 OpenAI；該錄音音訊會由這台 iPhone 直接傳送給 OpenAI。"
+          }
+        }
+      }
+    },
+    "settings.openai_api_key.prompt" : {
+      "comment" : "Settings secure text field prompt for OpenAI API key.",
+      "extractionState" : "stale",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "sk-..."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "sk-..."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "sk-..."
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "sk-..."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "sk-..."
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "sk-..."
+          }
+        }
+      }
+    },
     "settings.permission_usage" : {
       "comment" : "Settings section title for permission usage.",
       "extractionState" : "stale",
@@ -7442,37 +10550,37 @@
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Es werden keine vom Entwickler betriebenen Server, Drittanbieteranalysen, Werbung, Tracking oder eigenen Netzwerkanfragen verwendet."
+            "value" : "Es werden keine vom Entwickler betriebenen Server, keine Drittanbieter-Analysen, keine Werbung und kein Tracking verwendet. Der optionale Download des lokalen Whisper-Modells verbindet sich nur mit Hugging Face, wenn du auf „Ausgewähltes Modell laden“ tippst."
           }
         },
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "No developer-operated servers, third-party analytics, ads, tracking, or custom network requests are used."
+            "value" : "No developer-operated servers, third-party analytics, ads, or tracking are used. The optional Local Whisper model download connects to Hugging Face only when you tap Download Selected Model."
           }
         },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "開発者運営のサーバー、サードパーティ分析、広告、トラッキング、独自のネットワークリクエストは使用されません。"
+            "value" : "開発者が運用するサーバー、サードパーティ分析、広告、トラッキングは使用しません。任意のローカルWhisperモデルのダウンロードは、「選択したモデルをダウンロード」をタップした場合にのみHugging Faceに接続します。"
           }
         },
         "nl" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Er worden geen door ontwikkelaars beheerde servers, analytics van derden, advertenties, tracking of aangepaste netwerkverzoeken gebruikt."
+            "value" : "Er worden geen door de ontwikkelaar beheerde servers, analyses van derden, advertenties of tracking gebruikt. De optionele download van het lokale Whisper-model maakt alleen verbinding met Hugging Face wanneer je op Geselecteerd model downloaden tikt."
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "不使用开发者服务器、第三方分析、广告、追踪或自定义网络请求。"
+            "value" : "不使用开发者运营的服务器、第三方分析、广告或追踪。可选的本地 Whisper 模型下载只会在你点按“下载所选模型”时连接 Hugging Face。"
           }
         },
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "不使用開發者伺服器、第三方分析、廣告、追蹤或自訂網路請求。"
+            "value" : "不使用開發者營運的伺服器、第三方分析、廣告或追蹤。可選的本機 Whisper 模型下載只會在你點一下「下載所選模型」時連線 Hugging Face。"
           }
         }
       }
@@ -7484,37 +10592,37 @@
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Aufnahmen, Transkripte, Zusammenfassungen und Tags werden mit Apple-Systemframeworks auf dem Gerät verarbeitet."
+            "value" : "Aufnahmen, Transkripte, Zusammenfassungen und Tags werden auf dem Gerät mit Apple-Systemframeworks oder dem optionalen lokalen Whisper-Modell verarbeitet."
           }
         },
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Recordings, transcripts, summaries, and tags are processed on device with Apple system frameworks."
+            "value" : "Recordings, transcripts, summaries, and tags are processed on device with Apple system frameworks or the optional local Whisper model."
           }
         },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "録音、文字起こし、要約、タグはAppleのシステムフレームワークを使ってデバイス上で処理されます。"
+            "value" : "録音、文字起こし、要約、タグは、Appleのシステムフレームワークまたは任意のローカルWhisperモデルを使ってデバイス上で処理されます。"
           }
         },
         "nl" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Opnamen, transcripties, samenvattingen en tags worden op het apparaat verwerkt met Apple-systeemframeworks."
+            "value" : "Opnamen, transcripties, samenvattingen en tags worden op het apparaat verwerkt met Apple-systeemframeworks of het optionele lokale Whisper-model."
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "录音、转录文本、摘要和标签使用 Apple 系统框架在设备上处理。"
+            "value" : "录音、转录文本、摘要和标签会使用 Apple 系统框架或可选的本地 Whisper 模型在设备上处理。"
           }
         },
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "錄音、轉錄文字、摘要和標籤會使用 Apple 系統框架在裝置上處理。"
+            "value" : "錄音、轉錄文字、摘要和標籤會使用 Apple 系統框架或可選的本機 Whisper 模型在裝置上處理。"
           }
         }
       }
@@ -8420,7 +11528,7 @@
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "デザインノート"
+            "value" : "設計メモ"
           }
         },
         "nl" : {
@@ -8432,13 +11540,13 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "设计 Notes"
+            "value" : "设计笔记"
           }
         },
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "設計 Notes"
+            "value" : "設計筆記"
           }
         }
       }
@@ -8534,7 +11642,7 @@
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Erforderliche Namensnennung: Based on LiveTranscriber by William Li"
+            "value" : "Erforderliche Namensnennung: Basierend auf LiveTranscriber von William Li"
           }
         },
         "en" : {
@@ -8546,25 +11654,25 @@
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "必須の帰属表示: Based on LiveTranscriber by William Li"
+            "value" : "必須表示: William LiのLiveTranscriberに基づく"
           }
         },
         "nl" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Vereiste vermelding: Based on LiveTranscriber by William Li"
+            "value" : "Vereiste naamsvermelding: gebaseerd op LiveTranscriber door William Li"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Required attribution: Based on LiveTranscriber by William Li"
+            "value" : "必需署名：基于 William Li 的 LiveTranscriber"
           }
         },
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "必要署名：Based on LiveTranscriber by William Li"
+            "value" : "必要署名：基於 William Li 的 LiveTranscriber"
           }
         }
       }
@@ -8576,7 +11684,7 @@
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Source Available"
+            "value" : "Quellcode verfügbar"
           }
         },
         "en" : {
@@ -8588,25 +11696,25 @@
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "ソース公開"
+            "value" : "ソース利用可能"
           }
         },
         "nl" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Source Available"
+            "value" : "Bron beschikbaar"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Source Available"
+            "value" : "源码可用"
           }
         },
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Source Available"
+            "value" : "原始碼可用"
           }
         }
       }
@@ -10161,6 +13269,90 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "無損 PCM，檔案更大"
+          }
+        }
+      }
+    },
+    "transcription.backend.apple.detail" : {
+      "comment" : "Apple on-device transcription backend detail.",
+      "extractionState" : "stale",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Private lokale Transkription mit Apple Speech."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Private local transcription using Apple Speech."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Apple Speechを使ったプライベートなローカル文字起こし。"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Privé lokale transcriptie met Apple Speech."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "使用 Apple Speech 进行私有本地转录。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "使用 Apple Speech 進行私密本機轉錄。"
+          }
+        }
+      }
+    },
+    "transcription.backend.apple.title" : {
+      "comment" : "Apple on-device transcription backend title.",
+      "extractionState" : "stale",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Apple auf dem Gerät"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Apple On-Device"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Apple オンデバイス"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Apple op apparaat"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Apple 本机"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Apple 裝置端"
           }
         }
       }

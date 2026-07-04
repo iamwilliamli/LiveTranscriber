@@ -14,7 +14,8 @@ struct SettingsView: View {
     @State private var localWhisperDownloadErrorMessage: String?
     @State private var localWhisperDeleteErrorMessage: String?
     private static let repositoryURL = URL(string: "https://github.com/iamwilliamli/LiveTranscriber")!
-    private static let designNotesURL = URL(string: "https://chengqili.com/post/livetranscriber/")!
+    private static let designNotesURL = URL(string: "https://chengqili.com/post/livetranscriber")!
+    private static let localWhisperSubtitleTrailingCharacters = CharacterSet.punctuationCharacters.union(.whitespacesAndNewlines)
 
     var body: some View {
         NavigationStack {
@@ -327,8 +328,14 @@ struct SettingsView: View {
         for model: LocalWhisperModel,
         status: LocalWhisperModelStatus
     ) -> String {
+        let detail = model.detail.trimmingCharacters(in: Self.localWhisperSubtitleTrailingCharacters)
         let statusText = status.statusText
-        return "\(model.detail) \(statusText) - \(model.expectedSizeText)"
+        return String(
+            format: String(localized: L10n.LocalWhisper.modelChoiceSubtitleFormat),
+            detail,
+            statusText,
+            model.expectedSizeText
+        )
     }
 
     private func localWhisperModelIcon(for model: LocalWhisperModel) -> String {

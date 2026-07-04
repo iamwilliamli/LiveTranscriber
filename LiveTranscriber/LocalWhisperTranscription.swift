@@ -5,88 +5,66 @@ enum LocalWhisperTranscriptionService {
     static let availableModels: [LocalWhisperModel] = [
         LocalWhisperModel(
             id: "tiny",
-            displayName: "Tiny Multilingual",
-            detail: "Fastest, lowest accuracy, supports multiple languages.",
             fileName: "ggml-tiny.bin",
             downloadURL: URL(string: "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-tiny.bin")!,
             expectedByteCount: 75 * 1_024 * 1_024
         ),
         LocalWhisperModel(
             id: "tiny.en",
-            displayName: "Tiny English",
-            detail: "Fastest English-only model.",
             fileName: "ggml-tiny.en.bin",
             downloadURL: URL(string: "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-tiny.en.bin")!,
             expectedByteCount: 75 * 1_024 * 1_024
         ),
         LocalWhisperModel(
             id: "base",
-            displayName: "Base Multilingual",
-            detail: "Recommended balance for offline transcription.",
             fileName: "ggml-base.bin",
             downloadURL: URL(string: "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-base.bin")!,
             expectedByteCount: 147_951_465
         ),
         LocalWhisperModel(
             id: "base.en",
-            displayName: "Base English",
-            detail: "Recommended balance for English-only transcription.",
             fileName: "ggml-base.en.bin",
             downloadURL: URL(string: "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-base.en.bin")!,
             expectedByteCount: 142 * 1_024 * 1_024
         ),
         LocalWhisperModel(
             id: "small",
-            displayName: "Small Multilingual",
-            detail: "Better quality, slower and larger.",
             fileName: "ggml-small.bin",
             downloadURL: URL(string: "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-small.bin")!,
             expectedByteCount: 466 * 1_024 * 1_024
         ),
         LocalWhisperModel(
             id: "small.en",
-            displayName: "Small English",
-            detail: "Better quality for English-only transcription.",
             fileName: "ggml-small.en.bin",
             downloadURL: URL(string: "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-small.en.bin")!,
             expectedByteCount: 466 * 1_024 * 1_024
         ),
         LocalWhisperModel(
             id: "medium",
-            displayName: "Medium Multilingual",
-            detail: "High quality, much slower and requires significantly more storage.",
             fileName: "ggml-medium.bin",
             downloadURL: URL(string: "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-medium.bin")!,
             expectedByteCount: 1_500 * 1_024 * 1_024
         ),
         LocalWhisperModel(
             id: "medium.en",
-            displayName: "Medium English",
-            detail: "High quality for English-only transcription.",
             fileName: "ggml-medium.en.bin",
             downloadURL: URL(string: "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-medium.en.bin")!,
             expectedByteCount: 1_500 * 1_024 * 1_024
         ),
         LocalWhisperModel(
             id: "large-v3-turbo-q5_0",
-            displayName: "Large v3 Turbo Q5",
-            detail: "Large turbo model with quantization; stronger quality with lower storage than full large.",
             fileName: "ggml-large-v3-turbo-q5_0.bin",
             downloadURL: URL(string: "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-large-v3-turbo-q5_0.bin")!,
             expectedByteCount: 547 * 1_024 * 1_024
         ),
         LocalWhisperModel(
             id: "large-v3-q5_0",
-            displayName: "Large v3 Q5",
-            detail: "Largest quantized multilingual model; best quality option, heaviest runtime.",
             fileName: "ggml-large-v3-q5_0.bin",
             downloadURL: URL(string: "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-large-v3-q5_0.bin")!,
             expectedByteCount: 1_100 * 1_024 * 1_024
         ),
         LocalWhisperModel(
             id: "large-v3",
-            displayName: "Large v3",
-            detail: "Full large multilingual model; very large download and memory use.",
             fileName: "ggml-large-v3.bin",
             downloadURL: URL(string: "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-large-v3.bin")!,
             expectedByteCount: 2_900 * 1_024 * 1_024
@@ -95,8 +73,6 @@ enum LocalWhisperTranscriptionService {
 
     static let defaultModel = LocalWhisperModel(
         id: "base",
-        displayName: "Base Multilingual",
-        detail: "Recommended balance for offline transcription.",
         fileName: "ggml-base.bin",
         downloadURL: URL(string: "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-base.bin")!,
         expectedByteCount: 147_951_465
@@ -166,14 +142,78 @@ enum LocalWhisperTranscriptionService {
 
 struct LocalWhisperModel: Identifiable, Equatable {
     var id: String
-    var displayName: String
-    var detail: String
     var fileName: String
     var downloadURL: URL
     var expectedByteCount: Int64
 
+    var displayName: String {
+        String(localized: displayNameResource)
+    }
+
+    var detail: String {
+        String(localized: detailResource)
+    }
+
     var expectedSizeText: String {
         ByteCountFormatter.string(fromByteCount: expectedByteCount, countStyle: .file)
+    }
+
+    private var displayNameResource: LocalizedStringResource {
+        switch id {
+        case "tiny":
+            return L10n.LocalWhisper.modelTinyTitle
+        case "tiny.en":
+            return L10n.LocalWhisper.modelTinyEnglishTitle
+        case "base":
+            return L10n.LocalWhisper.modelBaseTitle
+        case "base.en":
+            return L10n.LocalWhisper.modelBaseEnglishTitle
+        case "small":
+            return L10n.LocalWhisper.modelSmallTitle
+        case "small.en":
+            return L10n.LocalWhisper.modelSmallEnglishTitle
+        case "medium":
+            return L10n.LocalWhisper.modelMediumTitle
+        case "medium.en":
+            return L10n.LocalWhisper.modelMediumEnglishTitle
+        case "large-v3-turbo-q5_0":
+            return L10n.LocalWhisper.modelLargeV3TurboQ5Title
+        case "large-v3-q5_0":
+            return L10n.LocalWhisper.modelLargeV3Q5Title
+        case "large-v3":
+            return L10n.LocalWhisper.modelLargeV3Title
+        default:
+            return L10n.LocalWhisper.modelBaseTitle
+        }
+    }
+
+    private var detailResource: LocalizedStringResource {
+        switch id {
+        case "tiny":
+            return L10n.LocalWhisper.modelTinyDetail
+        case "tiny.en":
+            return L10n.LocalWhisper.modelTinyEnglishDetail
+        case "base":
+            return L10n.LocalWhisper.modelBaseDetail
+        case "base.en":
+            return L10n.LocalWhisper.modelBaseEnglishDetail
+        case "small":
+            return L10n.LocalWhisper.modelSmallDetail
+        case "small.en":
+            return L10n.LocalWhisper.modelSmallEnglishDetail
+        case "medium":
+            return L10n.LocalWhisper.modelMediumDetail
+        case "medium.en":
+            return L10n.LocalWhisper.modelMediumEnglishDetail
+        case "large-v3-turbo-q5_0":
+            return L10n.LocalWhisper.modelLargeV3TurboQ5Detail
+        case "large-v3-q5_0":
+            return L10n.LocalWhisper.modelLargeV3Q5Detail
+        case "large-v3":
+            return L10n.LocalWhisper.modelLargeV3Detail
+        default:
+            return L10n.LocalWhisper.modelBaseDetail
+        }
     }
 }
 
