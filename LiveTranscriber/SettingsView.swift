@@ -5,6 +5,14 @@ struct SettingsView: View {
     @ObservedObject var transcriber: LiveTranscriptionManager
     @ObservedObject var recordingStore: RecordingStore
     @State private var iCloudSyncRefreshTick = 0
+    @State private var pendingSpeechLocaleReleaseRequest: SpeechLocaleReleaseRequest?
+    @State private var speechLocaleErrorMessage: String?
+    @State private var selectedLocalWhisperModel = LocalWhisperModelManager.selectedModel
+    @State private var localWhisperModelStatus = LocalWhisperModelManager.currentStatus()
+    @State private var isDownloadingLocalWhisperModel = false
+    @State private var localWhisperDownloadProgress: Double = 0
+    @State private var localWhisperDownloadErrorMessage: String?
+    @State private var localWhisperDeleteErrorMessage: String?
     private static let repositoryURL = URL(string: "https://github.com/iamwilliamli/LiveTranscriber")!
     private static let designNotesURL = URL(string: "https://chengqili.com/post/livetranscriber/")!
 
@@ -107,9 +115,76 @@ struct SettingsView: View {
             await transcriber.refreshSupportedLanguages()
             await recordingStore.reload()
             recordingStore.refreshIntelligenceAvailability()
+            refreshLocalWhisperModelStatus()
         }
         .task {
             await refreshICloudSyncStatusPeriodically()
+        }
+        .alert(
+            String(localized: L10n.SpeechText.releaseOldLanguagesTitle),
+            isPresented: Binding(
+                get: { pendingSpeechLocaleReleaseRequest != nil },
+                set: { isPresented in
+                    if !isPresented {
+                        pendingSpeechLocaleReleaseRequest = nil
+                    }
+                }
+            )
+        ) {
+            Button(String(localized: L10n.SpeechText.releaseOldLanguagesAction), role: .destructive) {
+                if let pendingSpeechLocaleReleaseRequest {
+                    releaseSpeechLocalesAndSelectLanguage(pendingSpeechLocaleReleaseRequest)
+                }
+                pendingSpeechLocaleReleaseRequest = nil
+            }
+            Button(String(localized: L10n.Common.cancel), role: .cancel) {}
+        } message: {
+            Text(pendingSpeechLocaleReleaseRequest?.messageText ?? "")
+        }
+        .alert(
+            String(localized: L10n.SpeechText.localeSetupFailed),
+            isPresented: Binding(
+                get: { speechLocaleErrorMessage != nil },
+                set: { isPresented in
+                    if !isPresented {
+                        speechLocaleErrorMessage = nil
+                    }
+                }
+            )
+        ) {
+            Button(String(localized: L10n.Common.ok), role: .cancel) {}
+        } message: {
+            Text(speechLocaleErrorMessage ?? "")
+        }
+        .alert(
+            String(localized: L10n.LocalWhisper.downloadFailed),
+            isPresented: Binding(
+                get: { localWhisperDownloadErrorMessage != nil },
+                set: { isPresented in
+                    if !isPresented {
+                        localWhisperDownloadErrorMessage = nil
+                    }
+                }
+            )
+        ) {
+            Button(String(localized: L10n.Common.ok), role: .cancel) {}
+        } message: {
+            Text(localWhisperDownloadErrorMessage ?? "")
+        }
+        .alert(
+            String(localized: L10n.LocalWhisper.deleteFailed),
+            isPresented: Binding(
+                get: { localWhisperDeleteErrorMessage != nil },
+                set: { isPresented in
+                    if !isPresented {
+                        localWhisperDeleteErrorMessage = nil
+                    }
+                }
+            )
+        ) {
+            Button(String(localized: L10n.Common.ok), role: .cancel) {}
+        } message: {
+            Text(localWhisperDeleteErrorMessage ?? "")
         }
     }
 
@@ -130,10 +205,228 @@ struct SettingsView: View {
                 .buttonStyle(.plain)
                 .disabled(transcriber.isRecording || transcriber.isPreparing)
 
+                openAITranscriptionAPIKeySettings
+
+                localWhisperModelSettings
+
                 if transcriber.isRecording || transcriber.isPreparing {
                     SettingsStatusRow(icon: "lock.fill", textResource: L10n.Settings.cannotChangeLanguageWhileRecording, tint: AppTheme.warning)
                 }
             }
+        }
+    }
+
+    private var localWhisperModelSettings: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            NavigationLink {
+                localWhisperModelPage
+            } label: {
+                SettingsNavigationRow(
+                    icon: "cube",
+                    titleResource: L10n.LocalWhisper.selectedModel,
+                    value: selectedLocalWhisperModel.displayName,
+                    subtitle: selectedLocalWhisperModel.detail,
+                    tint: AppTheme.info
+                )
+            }
+            .buttonStyle(.plain)
+            .disabled(isDownloadingLocalWhisperModel)
+
+            SettingsMetricRow(
+                icon: "iphone",
+                titleResource: L10n.LocalWhisper.modelStatus,
+                value: isDownloadingLocalWhisperModel ? localWhisperDownloadProgressText : localWhisperModelStatus.statusText,
+                tint: localWhisperModelStatus.isAvailable ? AppTheme.success : AppTheme.warning
+            )
+
+            SettingsVerbatimStatusRow(
+                icon: localWhisperModelStatus.isAvailable ? "checkmark.circle" : "arrow.down.circle",
+                text: localWhisperModelStatus.detailText,
+                tint: localWhisperModelStatus.isAvailable ? AppTheme.success : AppTheme.info
+            )
+
+            if isDownloadingLocalWhisperModel {
+                ProgressView(value: localWhisperDownloadProgress)
+                    .tint(AppTheme.info)
+                    .frame(maxWidth: .infinity)
+            }
+
+            if !localWhisperModelStatus.isAvailable {
+                Button {
+                    downloadLocalWhisperModel()
+                } label: {
+                    SettingsCommandRow(
+                        icon: "arrow.down.circle",
+                        titleResource: L10n.LocalWhisper.downloadSelectedModel,
+                        tint: AppTheme.info
+                    )
+                }
+                .buttonStyle(.plain)
+                .disabled(isDownloadingLocalWhisperModel)
+            }
+
+            if localWhisperModelStatus.isUserInstalled {
+                Button(role: .destructive) {
+                    deleteLocalWhisperModel()
+                } label: {
+                    SettingsCommandRow(
+                        icon: "trash",
+                        titleResource: L10n.LocalWhisper.deleteSelectedModel,
+                        tint: AppTheme.danger
+                    )
+                }
+                .buttonStyle(.plain)
+                .disabled(isDownloadingLocalWhisperModel)
+            }
+        }
+    }
+
+    private var localWhisperModelPage: some View {
+        SettingsDetailPage(titleResource: L10n.LocalWhisper.selectedModel) {
+            SettingsSection(titleResource: L10n.LocalWhisper.modelTitle, systemImage: "cube", tint: AppTheme.info) {
+                ForEach(LocalWhisperModelManager.availableModels) { model in
+                    let status = LocalWhisperModelManager.status(for: model)
+                    Button {
+                        selectLocalWhisperModel(model)
+                    } label: {
+                        SettingsSelectionRow(
+                            icon: localWhisperModelIcon(for: model),
+                            title: model.displayName,
+                            subtitle: localWhisperModelSubtitle(for: model, status: status),
+                            isSelected: model.id == selectedLocalWhisperModel.id,
+                            tint: status.isAvailable ? AppTheme.success : AppTheme.info
+                        )
+                    }
+                    .buttonStyle(.plain)
+                    .disabled(isDownloadingLocalWhisperModel)
+                }
+            }
+        }
+    }
+
+    private var localWhisperDownloadProgressText: String {
+        String(
+            format: String(localized: L10n.LocalWhisper.downloadingModelFormat),
+            localWhisperDownloadProgress * 100
+        )
+    }
+
+    private func refreshLocalWhisperModelStatus() {
+        selectedLocalWhisperModel = LocalWhisperModelManager.selectedModel
+        localWhisperModelStatus = LocalWhisperModelManager.currentStatus()
+    }
+
+    private func selectLocalWhisperModel(_ model: LocalWhisperModel) {
+        HapticFeedback.play(.menuSelection)
+        LocalWhisperModelManager.selectModel(model)
+        selectedLocalWhisperModel = model
+        localWhisperModelStatus = LocalWhisperModelManager.status(for: model)
+    }
+
+    private func localWhisperModelSubtitle(
+        for model: LocalWhisperModel,
+        status: LocalWhisperModelStatus
+    ) -> String {
+        let statusText = status.statusText
+        return "\(model.detail) \(statusText) - \(model.expectedSizeText)"
+    }
+
+    private func localWhisperModelIcon(for model: LocalWhisperModel) -> String {
+        if model.id.contains("large") {
+            return "archivebox.fill"
+        }
+        if model.id.contains("medium") {
+            return "shippingbox.fill"
+        }
+        if model.id.contains("small") {
+            return "cube.fill"
+        }
+        if model.id.contains("tiny") {
+            return "cube"
+        }
+        return "shippingbox"
+    }
+
+    private func downloadLocalWhisperModel() {
+        guard !isDownloadingLocalWhisperModel else {
+            return
+        }
+
+        isDownloadingLocalWhisperModel = true
+        localWhisperDownloadProgress = 0
+        HapticFeedback.play(.menuSelection)
+
+        Task {
+            do {
+                let status = try await LocalWhisperModelManager.downloadSelectedModel { progress in
+                    Task { @MainActor in
+                        localWhisperDownloadProgress = progress
+                    }
+                }
+
+                await MainActor.run {
+                    selectedLocalWhisperModel = status.model
+                    localWhisperModelStatus = status
+                    isDownloadingLocalWhisperModel = false
+                    localWhisperDownloadProgress = 1
+                    HapticFeedback.play(.menuSelection)
+                }
+            } catch {
+                await MainActor.run {
+                    isDownloadingLocalWhisperModel = false
+                    localWhisperDownloadErrorMessage = error.localizedDescription
+                    HapticFeedback.play(.failure)
+                }
+            }
+        }
+    }
+
+    private func deleteLocalWhisperModel() {
+        HapticFeedback.play(.menuSelection)
+        do {
+            localWhisperModelStatus = try LocalWhisperModelManager.deleteSelectedModel()
+        } catch {
+            localWhisperDeleteErrorMessage = error.localizedDescription
+            HapticFeedback.play(.failure)
+        }
+    }
+
+    private var openAITranscriptionAPIKeySettings: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            SettingsSecureTextFieldRow(
+                icon: "key",
+                titleResource: L10n.Settings.openAIAPIKey,
+                promptResource: L10n.Settings.openAIAPIKeyPrompt,
+                text: openAIAPIKeyBinding,
+                tint: AppTheme.purple
+            )
+            .disabled(transcriber.isRecording || transcriber.isPreparing)
+
+            SettingsStatusRow(icon: "key", textResource: L10n.Settings.openAIAPIKeyDescription, tint: AppTheme.warning)
+            SettingsStatusRow(icon: "cloud", textResource: L10n.Settings.openAIManualRetranscriptionUploadsAudio, tint: AppTheme.warning)
+
+            if !transcriber.openAIAPIKey.isEmpty {
+                Button(role: .destructive) {
+                    HapticFeedback.play(.menuSelection)
+                    transcriber.openAIAPIKey = ""
+                } label: {
+                    SettingsCommandRow(
+                        icon: "trash",
+                        titleResource: L10n.Settings.clearOpenAIAPIKey,
+                        tint: AppTheme.danger
+                    )
+                }
+                .buttonStyle(.plain)
+                .disabled(transcriber.isRecording || transcriber.isPreparing)
+            }
+        }
+    }
+
+    private var openAIAPIKeyBinding: Binding<String> {
+        Binding {
+            transcriber.openAIAPIKey
+        } set: { value in
+            transcriber.openAIAPIKey = value
         }
     }
 
@@ -142,8 +435,7 @@ struct SettingsView: View {
             SettingsSection(titleResource: L10n.Settings.transcriptionLanguage, systemImage: "globe", tint: AppTheme.info) {
                 ForEach(transcriber.supportedLanguages) { language in
                     Button {
-                        HapticFeedback.play(.menuSelection)
-                        transcriber.selectedLanguageID = language.id
+                        requestLanguageSelection(language)
                     } label: {
                         SettingsSelectionRow(
                             icon: "globe",
@@ -156,6 +448,50 @@ struct SettingsView: View {
                     .buttonStyle(.plain)
                     .disabled(transcriber.isRecording || transcriber.isPreparing)
                 }
+            }
+        }
+    }
+
+    private func requestLanguageSelection(_ language: TranscriptionLanguage) {
+        HapticFeedback.play(.menuSelection)
+        guard language.id != transcriber.selectedLanguageID else {
+            return
+        }
+
+        guard transcriber.selectedTranscriptionBackend.requiresAppleSpeech else {
+            transcriber.selectedLanguageID = language.id
+            return
+        }
+
+        Task {
+            do {
+                let preparation = try await transcriber.prepareSpeechLocaleForUse(
+                    language,
+                    preservingLanguageIDs: [transcriber.selectedLanguageID]
+                )
+                switch preparation {
+                case .ready:
+                    transcriber.selectedLanguageID = language.id
+                case .needsRelease(let request):
+                    pendingSpeechLocaleReleaseRequest = request
+                    HapticFeedback.play(.warning)
+                }
+            } catch {
+                speechLocaleErrorMessage = error.localizedDescription
+                HapticFeedback.play(.failure)
+            }
+        }
+    }
+
+    private func releaseSpeechLocalesAndSelectLanguage(_ request: SpeechLocaleReleaseRequest) {
+        Task {
+            do {
+                try await transcriber.releaseSpeechLocalesAndReserveTarget(request)
+                transcriber.selectedLanguageID = request.targetLanguage.id
+                HapticFeedback.play(.menuSelection)
+            } catch {
+                speechLocaleErrorMessage = error.localizedDescription
+                HapticFeedback.play(.failure)
             }
         }
     }
@@ -232,7 +568,11 @@ struct SettingsView: View {
 
     private var privacySettingsPage: some View {
         SettingsDetailPage(titleResource: L10n.Settings.privacy) {
-            SettingsSection(titleResource: L10n.Settings.localProcessing, systemImage: "lock.shield", tint: AppTheme.success) {
+            SettingsSection(
+                titleResource: L10n.Settings.localProcessing,
+                systemImage: "lock.shield",
+                tint: AppTheme.success
+            ) {
                 SettingsStatusRow(
                     icon: "server.rack",
                     textResource: L10n.Settings.noDeveloperServers,
@@ -243,6 +583,12 @@ struct SettingsView: View {
                     icon: "waveform.badge.mic",
                     textResource: L10n.Settings.onDeviceProcessing,
                     tint: AppTheme.info
+                )
+
+                SettingsStatusRow(
+                    icon: "cloud",
+                    textResource: L10n.Settings.openAIManualRetranscriptionUploadsAudio,
+                    tint: AppTheme.warning
                 )
 
                 SettingsStatusRow(
@@ -510,19 +856,21 @@ struct SettingsView: View {
                 tint: AppTheme.brand
             )
 
-            NavigationLink {
-                speechPipelineModePage
-            } label: {
-                SettingsNavigationRow(
-                    icon: "slider.horizontal.3",
-                    titleResource: L10n.Settings.speechPipelineMode,
-                    value: pipeline.configuredPipelineName,
-                    subtitleResource: L10n.Settings.switchPipelineSubtitle,
-                    tint: AppTheme.brand
-                )
+            if transcriber.selectedTranscriptionBackend.requiresAppleSpeech {
+                NavigationLink {
+                    speechPipelineModePage
+                } label: {
+                    SettingsNavigationRow(
+                        icon: "slider.horizontal.3",
+                        titleResource: L10n.Settings.speechPipelineMode,
+                        value: pipeline.configuredPipelineName,
+                        subtitleResource: L10n.Settings.switchPipelineSubtitle,
+                        tint: AppTheme.brand
+                    )
+                }
+                .buttonStyle(.plain)
+                .disabled(transcriber.isRecording || transcriber.isPreparing)
             }
-            .buttonStyle(.plain)
-            .disabled(transcriber.isRecording || transcriber.isPreparing)
 
             SettingsVerbatimStatusRow(
                 icon: "slider.horizontal.3",
@@ -673,6 +1021,20 @@ private struct SettingsNavigationRow: View {
         self.tint = tint
     }
 
+    init(
+        icon: String,
+        titleResource: LocalizedStringResource,
+        value: String,
+        subtitle: String,
+        tint: Color
+    ) {
+        self.icon = icon
+        self.title = Text(titleResource)
+        self.value = value
+        self.subtitle = Text(verbatim: subtitle)
+        self.tint = tint
+    }
+
     var body: some View {
         HStack(spacing: 12) {
             SettingsIcon(systemImage: icon, tint: tint)
@@ -819,6 +1181,75 @@ private struct SettingsMetricRow: View {
                 .minimumScaleFactor(0.75)
         }
         .frame(minHeight: 42)
+    }
+}
+
+private struct SettingsSecureTextFieldRow: View {
+    let icon: String
+    let title: Text
+    let prompt: String
+    @Binding var text: String
+    let tint: Color
+
+    init(
+        icon: String,
+        titleResource: LocalizedStringResource,
+        promptResource: LocalizedStringResource,
+        text: Binding<String>,
+        tint: Color
+    ) {
+        self.icon = icon
+        self.title = Text(titleResource)
+        self.prompt = String(localized: promptResource)
+        self._text = text
+        self.tint = tint
+    }
+
+    var body: some View {
+        HStack(alignment: .top, spacing: 10) {
+            SettingsIcon(systemImage: icon, tint: tint)
+
+            VStack(alignment: .leading, spacing: 6) {
+                title
+                    .font(.redditSans(.subheadline, weight: .semibold))
+                    .foregroundStyle(.primary)
+
+                SecureField(prompt, text: $text)
+                    .font(.redditSans(.caption))
+                    .textInputAutocapitalization(.never)
+                    .autocorrectionDisabled()
+                    .keyboardType(.asciiCapable)
+                    .textContentType(.password)
+                    .submitLabel(.done)
+            }
+        }
+        .frame(minHeight: 48)
+    }
+}
+
+private struct SettingsCommandRow: View {
+    let icon: String
+    let title: Text
+    let tint: Color
+
+    init(icon: String, titleResource: LocalizedStringResource, tint: Color) {
+        self.icon = icon
+        self.title = Text(titleResource)
+        self.tint = tint
+    }
+
+    var body: some View {
+        HStack(spacing: 10) {
+            SettingsIcon(systemImage: icon, tint: tint)
+
+            title
+                .font(.redditSans(.subheadline, weight: .semibold))
+                .foregroundStyle(tint)
+
+            Spacer(minLength: 12)
+        }
+        .frame(minHeight: 42)
+        .contentShape(Rectangle())
     }
 }
 

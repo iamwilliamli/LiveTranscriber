@@ -32,6 +32,11 @@ enum L10n {
             defaultValue: "Cancel",
             comment: "Generic cancel button title."
         )
+        static let copy = L10n.resource(
+            "common.copy",
+            defaultValue: "Copy",
+            comment: "Generic copy action title."
+        )
         static let done = L10n.resource(
             "common.done",
             defaultValue: "Done",
@@ -84,12 +89,17 @@ enum L10n {
         static let dataBoundariesAndPermissions = L10n.resource("settings.subtitle.data_boundaries_permissions", defaultValue: "Data boundaries and permission usage", comment: "Settings row subtitle.")
         static let deviceAndPipelineDiagnostics = L10n.resource("settings.subtitle.device_pipeline_diagnostics", defaultValue: "Device and pipeline diagnostics", comment: "Settings row subtitle.")
         static let transcriptionLanguage = L10n.resource("settings.transcription_language", defaultValue: "Transcription Language", comment: "Settings row title for transcription language.")
+        static let openAIAPIKey = L10n.resource("settings.openai_api_key", defaultValue: "OpenAI API Key", comment: "Settings secure text field title for OpenAI API key.")
+        static let openAIAPIKeyPrompt = L10n.resource("settings.openai_api_key.prompt", defaultValue: "sk-...", comment: "Settings secure text field prompt for OpenAI API key.")
+        static let openAIAPIKeyDescription = L10n.resource("settings.openai_api_key.description", defaultValue: "The key is stored in Keychain and is used directly by this iPhone to connect to OpenAI.", comment: "Settings help text for BYOK OpenAI API key mode.")
+        static let openAIManualRetranscriptionUploadsAudio = L10n.resource("settings.openai_api_key.manual_retranscription_uploads_audio", defaultValue: "OpenAI is used only when you manually choose OpenAI transcription for a saved recording; that recording audio is sent directly from this iPhone to OpenAI.", comment: "Settings privacy help text for manual OpenAI retranscription.")
+        static let clearOpenAIAPIKey = L10n.resource("settings.openai_api_key.clear", defaultValue: "Clear API Key", comment: "Settings button title to clear stored OpenAI API key.")
         static let nextStartUsesLanguage = L10n.resource("settings.next_start_uses_language", defaultValue: "The selected language will be used next time recording starts", comment: "Transcription language row subtitle.")
         static let cannotChangeLanguageWhileRecording = L10n.resource("settings.cannot_change_language_while_recording", defaultValue: "Language cannot be changed while recording", comment: "Warning shown while recording.")
         static let recordingFormat = L10n.resource("settings.recording_format", defaultValue: "Recording Format", comment: "Settings row title for recording format.")
         static let cannotChangeFormatWhileRecording = L10n.resource("settings.cannot_change_format_while_recording", defaultValue: "Format cannot be changed while recording", comment: "Warning shown while recording.")
-        static let noDeveloperServers = L10n.resource("settings.privacy.no_developer_servers", defaultValue: "No developer-operated servers, third-party analytics, ads, tracking, or custom network requests are used.", comment: "Privacy explanation.")
-        static let onDeviceProcessing = L10n.resource("settings.privacy.on_device_processing", defaultValue: "Recordings, transcripts, summaries, and tags are processed on device with Apple system frameworks.", comment: "Privacy explanation.")
+        static let noDeveloperServers = L10n.resource("settings.privacy.no_developer_servers", defaultValue: "No developer-operated servers, third-party analytics, ads, or tracking are used. The optional Local Whisper model download connects to Hugging Face only when you tap Download Selected Model.", comment: "Privacy explanation.")
+        static let onDeviceProcessing = L10n.resource("settings.privacy.on_device_processing", defaultValue: "Recordings, transcripts, summaries, and tags are processed on device with Apple system frameworks or the optional local Whisper model.", comment: "Privacy explanation.")
         static let developerCannotAccessContent = L10n.resource("settings.privacy.developer_cannot_access_content", defaultValue: "Audio and transcripts are not uploaded to developer servers, and the developer cannot access user content.", comment: "Privacy explanation.")
         static let storage = L10n.resource("settings.storage", defaultValue: "Storage", comment: "Settings section title for storage.")
         static let currentLocation = L10n.resource("settings.current_location", defaultValue: "Current Location", comment: "Settings metric title for current storage location.")
@@ -140,6 +150,45 @@ enum L10n {
         static let generateTitleAndTagsAccessibility = L10n.resource("transcription.generate_title_tags_accessibility", defaultValue: "Generate title, summary, and tags with AI", comment: "Accessibility label for title, summary, and tag generation button.")
     }
 
+    enum TranscriptionBackend {
+        static let appleOnDeviceTitle = L10n.resource("transcription.backend.apple.title", defaultValue: "Apple On-Device", comment: "Apple on-device transcription backend title.")
+        static let appleOnDeviceDetail = L10n.resource("transcription.backend.apple.detail", defaultValue: "Private local transcription using Apple Speech.", comment: "Apple on-device transcription backend detail.")
+    }
+
+    enum OpenAITranscription {
+        static let missingAPIKey = L10n.resource("openai.transcription.error.missing_api_key", defaultValue: "Add an OpenAI API key in Settings before using OpenAI transcription.", comment: "OpenAI missing API key error.")
+        static let keychainUnavailable = L10n.resource("openai.transcription.error.keychain_unavailable", defaultValue: "The OpenAI API key could not be read from or written to Keychain.", comment: "OpenAI Keychain unavailable error.")
+        static let invalidConfiguration = L10n.resource("openai.transcription.error.invalid_configuration", defaultValue: "OpenAI transcription is not configured correctly.", comment: "OpenAI invalid configuration error.")
+        static let fileTranscriptionFailedFormat = L10n.resource("openai.file_transcription.error.request_failed.format", defaultValue: "OpenAI transcription request failed (%d).", comment: "OpenAI file transcription HTTP failure. Parameter: HTTP status code.")
+        static let invalidFileTranscriptionResponse = L10n.resource("openai.file_transcription.error.invalid_response", defaultValue: "OpenAI did not return a usable transcription.", comment: "OpenAI file transcription invalid response error.")
+        static let noRefinementSegments = L10n.resource("openai.file_transcription.error.no_refinement_segments", defaultValue: "Run local transcription first so OpenAI can refine the timed segments.", comment: "OpenAI refinement error shown when no Apple-timed transcript segments exist.")
+        static let segmentExportFailed = L10n.resource("openai.file_transcription.error.segment_export_failed", defaultValue: "The timed audio segment could not be prepared for OpenAI transcription.", comment: "OpenAI refinement error shown when a local audio segment export fails.")
+    }
+
+    enum LocalWhisper {
+        static let modelTitle = L10n.resource("local_whisper.model.title", defaultValue: "Local Whisper Model", comment: "Settings section title for local Whisper model management.")
+        static let selectedModel = L10n.resource("local_whisper.model.selected", defaultValue: "Loaded Model", comment: "Settings row title for the selected local Whisper model.")
+        static let modelStatus = L10n.resource("local_whisper.model.status", defaultValue: "Model Status", comment: "Settings metric title for local Whisper model status.")
+        static let modelReady = L10n.resource("local_whisper.model.ready", defaultValue: "Ready", comment: "Local Whisper model status when a model is available.")
+        static let modelNotInstalled = L10n.resource("local_whisper.model.not_installed", defaultValue: "Not Installed", comment: "Local Whisper model status when a model is not installed.")
+        static let modelDownloadedDetailFormat = L10n.resource("local_whisper.model.downloaded_detail.format", defaultValue: "%@ is downloaded on this iPhone (%@).", comment: "Local Whisper downloaded model detail. Parameters: model filename, file size.")
+        static let modelBundledDetailFormat = L10n.resource("local_whisper.model.bundled_detail.format", defaultValue: "%@ is bundled with this app (%@).", comment: "Local Whisper bundled model detail. Parameters: model filename, file size.")
+        static let modelMissingDetailFormat = L10n.resource("local_whisper.model.missing_detail.format", defaultValue: "Download %@ (%@) before using Local Whisper transcription.", comment: "Local Whisper missing model detail. Parameters: model name, expected size.")
+        static let downloadSelectedModel = L10n.resource("local_whisper.model.download_selected", defaultValue: "Download Selected Model", comment: "Settings button title to download the selected local Whisper model.")
+        static let deleteSelectedModel = L10n.resource("local_whisper.model.delete_selected", defaultValue: "Delete Selected Model", comment: "Settings button title to delete the selected downloaded local Whisper model.")
+        static let downloadingModelFormat = L10n.resource("local_whisper.model.downloading.format", defaultValue: "Downloading %.0f%%", comment: "Local Whisper model download progress. Parameter: percent complete.")
+        static let downloadFailed = L10n.resource("local_whisper.model.download_failed", defaultValue: "Model Download Failed", comment: "Alert title when a local Whisper model download fails.")
+        static let deleteFailed = L10n.resource("local_whisper.model.delete_failed", defaultValue: "Model Delete Failed", comment: "Alert title when deleting a local Whisper model fails.")
+        static let runtimeUnavailable = L10n.resource("local_whisper.error.runtime_unavailable", defaultValue: "whisper.cpp is not embedded in this build.", comment: "Local Whisper error when the native runtime cannot be loaded.")
+        static let missingSymbolFormat = L10n.resource("local_whisper.error.missing_symbol.format", defaultValue: "whisper.cpp is missing the required symbol: %@.", comment: "Local Whisper error when a native function cannot be found. Parameter: symbol name.")
+        static let missingModel = L10n.resource("local_whisper.error.missing_model", defaultValue: "Download the Local Whisper model in Settings before running local Whisper transcription.", comment: "Local Whisper error when no model file can be found.")
+        static let audioConversionFailed = L10n.resource("local_whisper.error.audio_conversion_failed", defaultValue: "The audio file could not be converted for local Whisper transcription.", comment: "Local Whisper audio conversion error.")
+        static let emptyAudio = L10n.resource("local_whisper.error.empty_audio", defaultValue: "The audio file has no samples to transcribe.", comment: "Local Whisper empty audio error.")
+        static let modelDownloadFailed = L10n.resource("local_whisper.error.model_download_failed", defaultValue: "The Local Whisper model download did not produce a valid model file.", comment: "Local Whisper invalid downloaded model error.")
+        static let contextCreationFailed = L10n.resource("local_whisper.error.context_creation_failed", defaultValue: "Local Whisper could not load the selected model.", comment: "Local Whisper model initialization error.")
+        static let transcriptionFailed = L10n.resource("local_whisper.error.transcription_failed", defaultValue: "Local Whisper transcription failed.", comment: "Local Whisper inference error.")
+    }
+
     enum SpeechText {
         static let runtimeInputWaitingRecording = L10n.resource("speech.runtime_input.waiting_recording", defaultValue: "Runtime Analyzer input: waiting for recording", comment: "Developer speech pipeline diagnostic.")
         static let runtimeInputWaitingFirstBuffer = L10n.resource("speech.runtime_input.waiting_first_buffer", defaultValue: "Runtime Analyzer input: waiting for first buffer", comment: "Developer speech pipeline diagnostic.")
@@ -147,6 +196,11 @@ enum L10n {
         static let recordingStartFailedFormat = L10n.resource("speech.error.recording_start_failed.format", defaultValue: "Recording failed to start: %@", comment: "Recording start error. Parameter: error description.")
         static let recordingResumeFailed = L10n.resource("speech.error.recording_resume_failed", defaultValue: "Recording resume failed", comment: "Recording resume error.")
         static let recordingResumeFailedFormat = L10n.resource("speech.error.recording_resume_failed.format", defaultValue: "Recording resume failed: %@", comment: "Recording resume error. Parameter: error description.")
+        static let localeSetupFailed = L10n.resource("speech.locale.setup_failed", defaultValue: "Speech language setup failed", comment: "Speech language asset setup error title.")
+        static let releaseOldLanguagesTitle = L10n.resource("speech.locale.release_old.title", defaultValue: "Release old speech languages?", comment: "Confirmation title before releasing older speech language assets.")
+        static let releaseOldLanguagesAction = L10n.resource("speech.locale.release_old.action", defaultValue: "Release and Continue", comment: "Confirmation action for releasing older speech language assets.")
+        static let releaseOldLanguagesMessageFormat = L10n.resource("speech.locale.release_old.message.format", defaultValue: "Speech can keep up to %d languages ready. To use %@, release these older languages: %@.", comment: "Confirmation message before releasing older speech language assets. Parameters: maximum language count, target language name, released language names.")
+        static let noReleasableLanguages = L10n.resource("speech.locale.no_releasable_languages", defaultValue: "No old speech languages can be released safely.", comment: "Speech language asset setup error when quota is full and there are no release candidates.")
         static let speechRestricted = L10n.resource("speech.error.restricted", defaultValue: "Speech recognition is restricted by the system", comment: "Speech permission error.")
         static let speechDenied = L10n.resource("speech.error.denied", defaultValue: "Speech recognition permission was denied", comment: "Speech permission error.")
         static let microphoneDenied = L10n.resource("speech.error.microphone_denied", defaultValue: "Microphone permission was denied", comment: "Microphone permission error.")
@@ -176,6 +230,8 @@ enum L10n {
         static let recordingFileNotFound = L10n.resource("import.error.recording_file_not_found", defaultValue: "Recording file could not be found", comment: "Recording detail validation error.")
         static let noRecognizedText = L10n.resource("import.error.no_recognized_text", defaultValue: "No text was recognized in the imported recording", comment: "Import transcription error.")
         static let saveFailed = L10n.resource("import.error.save_failed", defaultValue: "Imported recording could not be saved", comment: "Import save error.")
+        static let uploadingToOpenAI = L10n.resource("import.status.uploading_to_openai", defaultValue: "Uploading to OpenAI", comment: "Import status shown while uploading an audio file to OpenAI for transcription.")
+        static let refiningWithOpenAI = L10n.resource("import.status.refining_with_openai", defaultValue: "Refining with OpenAI", comment: "Import status shown while OpenAI refines local timed transcript segments.")
     }
 
     enum Recordings {
@@ -195,7 +251,12 @@ enum L10n {
         static let copyTranscript = L10n.resource("recordings.copy_transcript", defaultValue: "Copy Transcript", comment: "Copy transcript action title.")
         static let generateTagsAndSummary = L10n.resource("recordings.generate_tags_and_summary", defaultValue: "Generate Tags and Summary", comment: "Action title to generate tags and summary.")
         static let analyzeAgain = L10n.resource("recordings.analyze_again", defaultValue: "Analyze Again", comment: "Action title to analyze a recording again.")
-        static let retranscribe = L10n.resource("recordings.retranscribe", defaultValue: "Transcribe Again", comment: "Action title to retranscribe a recording.")
+        static let retranscribe = L10n.resource("recordings.retranscribe", defaultValue: "Local Transcribe Again", comment: "Action title to retranscribe a recording with the local speech recognizer.")
+        static let retranscribeWithOpenAI = L10n.resource("recordings.retranscribe_openai", defaultValue: "Transcribe with OpenAI", comment: "Action title to retranscribe a recording with OpenAI.")
+        static let retranscribeWithOpenAILongForm = L10n.resource("recordings.retranscribe_openai_long_form", defaultValue: "Long Form", comment: "OpenAI transcription option using a high-accuracy model that returns one transcript block.")
+        static let retranscribeWithOpenAISegmented = L10n.resource("recordings.retranscribe_openai_segmented", defaultValue: "Segmented", comment: "OpenAI transcription option using segment timestamps.")
+        static let retranscribeWithOpenAIRefinedSegments = L10n.resource("recordings.retranscribe_openai_refined_segments", defaultValue: "Refine Local Segments", comment: "OpenAI transcription option that keeps local timestamps and retranscribes each local audio segment.")
+        static let retranscribeWithLocalWhisper = L10n.resource("recordings.retranscribe_local_whisper", defaultValue: "Transcribe with Local Whisper", comment: "Action title to retranscribe a recording with bundled local Whisper.")
         static let analyze = L10n.resource("recordings.analyze", defaultValue: "Analyze", comment: "Analyze action title.")
         static let noLocatedRecordings = L10n.resource("recordings.no_located_recordings", defaultValue: "No Recordings with Location", comment: "Empty state title for map with no located recordings.")
         static let mapTitle = L10n.resource("recordings.map_title", defaultValue: "Recording Map", comment: "Recording map screen title.")
@@ -203,6 +264,8 @@ enum L10n {
         static let audioParameters = L10n.resource("recordings.audio_parameters", defaultValue: "Audio Parameters", comment: "Audio parameters screen or section title.")
         static let renameFailed = L10n.resource("recordings.rename_failed", defaultValue: "Rename Failed", comment: "Alert title for rename failure.")
         static let rename = L10n.resource("recordings.rename", defaultValue: "Rename", comment: "Rename action title.")
+        static let editFailed = L10n.resource("recordings.edit_failed", defaultValue: "Edit Failed", comment: "Alert title when recording details could not be edited.")
+        static let editDetails = L10n.resource("recordings.edit_details", defaultValue: "Edit Details", comment: "Action title for editing recording metadata.")
         static let shareAudio = L10n.resource("recordings.share_audio", defaultValue: "Share Audio", comment: "Share audio action title.")
         static let shareTranscript = L10n.resource("recordings.share_transcript", defaultValue: "Share Transcript Text", comment: "Share transcript text action title.")
         static let share = L10n.resource("recordings.share", defaultValue: "Share", comment: "Share menu title.")
@@ -223,6 +286,15 @@ enum L10n {
         static let pause = L10n.resource("recordings.playback.pause", defaultValue: "Pause", comment: "Playback pause button accessibility label.")
         static let play = L10n.resource("recordings.playback.play", defaultValue: "Play", comment: "Playback play button accessibility label.")
         static let transcript = L10n.resource("recordings.transcript", defaultValue: "Transcript", comment: "Transcript section title.")
+        static let editTranscriptLine = L10n.resource("recordings.transcript.edit_line", defaultValue: "Edit Transcript Line", comment: "Action and sheet title for editing one transcript line.")
+        static let transcriptLineText = L10n.resource("recordings.transcript.line_text", defaultValue: "Transcript Text", comment: "Field title for one editable transcript line.")
+        static let lockTranscript = L10n.resource("recordings.transcript.lock", defaultValue: "Lock Transcript", comment: "Menu action to lock transcript text against automatic updates.")
+        static let unlockTranscript = L10n.resource("recordings.transcript.unlock", defaultValue: "Unlock Transcript", comment: "Menu action to unlock transcript text.")
+        static let transcriptLocked = L10n.resource("recordings.transcript.locked", defaultValue: "Transcript Locked", comment: "Status shown when transcript text is locked.")
+        static let transcriptUnlocked = L10n.resource("recordings.transcript.unlocked", defaultValue: "Transcript Unlocked", comment: "Status shown when transcript text is not locked.")
+        static let transcriptLockedDetail = L10n.resource("recordings.transcript.locked_detail", defaultValue: "Automatic transcription updates cannot overwrite this transcript.", comment: "Short explanation for locked transcript status.")
+        static let transcriptLockedError = L10n.resource("recordings.transcript.locked_error", defaultValue: "Transcript is locked. Unlock it before running transcription again.", comment: "Error shown when automatic transcription tries to overwrite a locked transcript.")
+        static let transcriptLineMissing = L10n.resource("recordings.transcript.line_missing", defaultValue: "Transcript line could not be found.", comment: "Error shown when a transcript line edit cannot be applied.")
         static let noText = L10n.resource("recordings.no_text", defaultValue: "No Text", comment: "Empty state title when no transcript text exists.")
         static let original = L10n.resource("recordings.translation.original", defaultValue: "Original", comment: "Translation menu option for original transcript.")
         static let translate = L10n.resource("recordings.translation.translate", defaultValue: "Translate", comment: "Translate menu button title.")
@@ -233,6 +305,8 @@ enum L10n {
         static let audioInfoReadFailedFormat = L10n.resource("recordings.audio.read_failed.format", defaultValue: "Could not read audio parameters: %@", comment: "Audio info read failure. Parameter: error description.")
         static let editRecordingTitle = L10n.resource("recordings.edit.title", defaultValue: "Edit Recording", comment: "Edit recording screen title.")
         static let recordingName = L10n.resource("recordings.edit.recording_name", defaultValue: "Recording Name", comment: "Recording name field title.")
+        static let summary = L10n.resource("recordings.edit.summary", defaultValue: "Summary", comment: "Summary field title.")
+        static let summaryPlaceholder = L10n.resource("recordings.edit.summary_placeholder", defaultValue: "Add a summary", comment: "Placeholder for the editable recording summary field.")
         static let tags = L10n.resource("recordings.edit.tags", defaultValue: "Tags", comment: "Tags field title.")
         static let notAdded = L10n.resource("recordings.edit.not_added", defaultValue: "Not Added", comment: "Status shown when no optional metadata has been added.")
         static let addLocation = L10n.resource("recordings.edit.add_location", defaultValue: "Add Location", comment: "Toggle title to add a recording location.")

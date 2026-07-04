@@ -14,7 +14,7 @@ LiveTranscriber 是一个 iOS 26+ 的本地录音和实时转录工具。iOS 27 
 - 灵动岛和锁屏 Live Activity 显示录音状态、最新转录内容和持续计时。
 - 尽量使用 Apple 原生 SDK，降低维护成本，保持 iOS 系统风格。
 
-当前 app 不是云转录工具，默认不把音频或文本上传到第三方服务。主要依赖 Apple Speech 本机模型和系统权限。
+当前 app 不是云端实时转录工具，实时录音路径不会把麦克风音频流上传到第三方服务。主要路径依赖 Apple Speech 本机模型和系统权限。为了处理法语、医学术语、口音和复杂专有名词等 Apple 本机模型效果不足的场景，已保存录音可以由用户手动选择 OpenAI 文件转录；只有用户显式选择该操作并配置自己的 OpenAI API key 后，该录音文件才会从 iPhone 直接上传到 OpenAI。
 
 ## 平台和 SDK 取舍
 
@@ -25,7 +25,7 @@ LiveTranscriber 是一个 iOS 26+ 的本地录音和实时转录工具。iOS 27 
 - `AnalyzerInputConverter` 只在 iOS 27 Native Pipeline 中使用。
 - `ActivityKit` 和 Widget extension 用于灵动岛与锁屏状态展示。
 
-当前保留两条实时转录 Pipeline：
+当前保留两条 Apple 实时转录 Pipeline：
 
 - Compatible Pipeline：iOS 26/27 默认稳定路径，`AVAudioConverter -> 16 kHz / mono / Int16 PCM`，再送入 `SpeechAnalyzer.prepareToAnalyze(in: analyzerInputFormat)`。
 - iOS 27 Native Pipeline：使用 `AnalyzerInputConverter.converter(compatibleWith: modules)` 和 `SpeechAnalyzer.prepareToAnalyze(in: nil)`，让系统选择输入格式。
@@ -44,7 +44,7 @@ LiveTranscriber 是一个 iOS 26+ 的本地录音和实时转录工具。iOS 27 
 
 入口在 `LiveTranscriptionManager`。
 
-流程：
+默认 Apple 本机后端流程：
 
 1. 请求语音识别和麦克风权限。
 2. 配置 `AVAudioSession`。
@@ -52,6 +52,8 @@ LiveTranscriber 是一个 iOS 26+ 的本地录音和实时转录工具。iOS 27 
 4. 准备 SpeechAnalyzer 模块和语言模型。
 5. 启动采集，把音频 buffer 写入本地音频文件并送入 SpeechAnalyzer。
 6. Speech SDK 返回实时结果后更新转录行和 Live Activity。
+
+OpenAI 只用于已保存录音的手动重新转录。不要把开发者自己的标准 OpenAI API key 打包进 iOS app。OpenAI 转录使用 BYOK：用户在设置里输入自己的 OpenAI API key，App 存到 iOS Keychain，并由 iPhone 直接调用 OpenAI Audio Transcriptions。Long-form 模式使用 `gpt-4o-transcribe`，Segmented 模式使用 `whisper-1` 和 segment timestamps。用户体验会受用户自己的 OpenAI billing、权限、rate limit 和 key 生命周期影响。
 
 暂停时会停止当前采集源并冻结计时。继续录音时重新启动采集，沿用原来的 analyzer pipeline 和音频 writer。
 

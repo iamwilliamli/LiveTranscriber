@@ -118,10 +118,28 @@ final class LiveTranscriptionManager: ObservableObject {
             UserDefaults.standard.set(selectedSpeechPipelineMode.rawValue, forKey: Self.speechPipelineModeDefaultsKey)
         }
     }
+    @Published var selectedTranscriptionBackend: LiveTranscriptionBackend {
+        didSet {
+            UserDefaults.standard.set(selectedTranscriptionBackend.rawValue, forKey: Self.transcriptionBackendDefaultsKey)
+            if !isRecording && !isPreparing {
+                statusText = String(localized: L10n.RecordingStatus.ready)
+            }
+        }
+    }
+    @Published var openAIAPIKey: String {
+        didSet {
+            do {
+                try OpenAIAPIKeyStore.save(openAIAPIKey)
+            } catch {
+                errorText = error.localizedDescription
+            }
+        }
+    }
 
     private static let languageDefaultsKey = "transcription.language"
     private static let audioFormatDefaultsKey = "recording.audioFormat"
     private static let speechPipelineModeDefaultsKey = "speech.pipelineMode"
+    private static let transcriptionBackendDefaultsKey = "transcription.backend"
     private static let analyzerSampleRate: Double = 16_000
     private static let inputLevelHistoryCount = 72
     private static let inputLevelHistorySampleInterval: TimeInterval = 0.08
@@ -144,6 +162,7 @@ final class LiveTranscriptionManager: ObservableObject {
     private var lastInputLevelHistorySampleAt: TimeInterval = 0
     private var finalizedLines: [TranscriptionLine] = []
     private var interimLine: TranscriptionLine?
+    private var manuallyEditedFinalLineIDs = Set<TranscriptionLine.ID>()
     private var lastLiveActivitySnapshot: LiveActivitySnapshot?
     private var lastSpeechPipelineRuntimeFormat: SpeechPipelineRuntimeFormat?
 
@@ -171,6 +190,7 @@ final class LiveTranscriptionManager: ObservableObject {
 
     var speechPipelineDiagnostics: SpeechProcessingPipelineDiagnostics {
         .current(
+            backend: selectedTranscriptionBackend,
             configuredMode: selectedSpeechPipelineMode,
             runtimeAnalyzerFormatText: speechPipelineRuntimeFormatText
         )
@@ -193,6 +213,14 @@ final class LiveTranscriptionManager: ObservableObject {
             selectedAudioFormat = .defaultFormat
         }
 
+        if let rawBackend = UserDefaults.standard.string(forKey: Self.transcriptionBackendDefaultsKey),
+           let storedBackend = LiveTranscriptionBackend(rawValue: rawBackend) {
+            selectedTranscriptionBackend = storedBackend
+        } else {
+            selectedTranscriptionBackend = .defaultBackend
+        }
+
+        openAIAPIKey = (try? OpenAIAPIKeyStore.load()) ?? ""
     }
 
     func refreshSupportedLanguages() async {
@@ -213,6 +241,56 @@ final class LiveTranscriptionManager: ObservableObject {
                 }
             }
         }
+    }
+
+    func prepareSpeechLocaleForUse(
+        _ language: TranscriptionLanguage,
+        preservingLanguageIDs: Set<String> = []
+    ) async throws -> SpeechLocalePreparation {
+        let targetLocale = await Self.resolvedSpeechLocale(for: language)
+        let reservedLocales = await AssetInventory.reservedLocales
+        if Self.containsReservedLocale(targetLocale, in: reservedLocales) {
+            return .ready
+        }
+
+        let maximumReservedLocales = AssetInventory.maximumReservedLocales
+        guard maximumReservedLocales > 0 else {
+            try await Self.reserveSpeechLocale(targetLocale)
+            return .ready
+        }
+
+        if reservedLocales.count < maximumReservedLocales {
+            try await Self.reserveSpeechLocale(targetLocale)
+            return .ready
+        }
+
+        let protectedLocaleKeys = await Self.protectedSpeechLocaleKeys(
+            preservingLanguageIDs: preservingLanguageIDs,
+            targetLocale: targetLocale
+        )
+        let releaseLocales = reservedLocales.filter { locale in
+            !protectedLocaleKeys.contains(Self.speechLocaleKey(locale))
+        }
+        guard !releaseLocales.isEmpty else {
+            throw SpeechLocaleManagementError.noReleasableLanguages
+        }
+
+        return .needsRelease(
+            SpeechLocaleReleaseRequest(
+                targetLanguage: language,
+                targetLocaleIdentifier: targetLocale.identifier,
+                releaseLocaleIdentifiers: releaseLocales.map(\.identifier),
+                maximumReservedLocaleCount: maximumReservedLocales
+            )
+        )
+    }
+
+    func releaseSpeechLocalesAndReserveTarget(_ request: SpeechLocaleReleaseRequest) async throws {
+        for identifier in request.releaseLocaleIdentifiers {
+            _ = await AssetInventory.release(reservedLocale: Locale(identifier: identifier))
+        }
+
+        try await Self.reserveSpeechLocale(Locale(identifier: request.targetLocaleIdentifier))
     }
 
     func toggleRecording() async -> RecordingDraft? {
@@ -268,6 +346,10 @@ final class LiveTranscriptionManager: ObservableObject {
     }
 
     private func startCaptureSessionRecording(language: TranscriptionLanguage) async throws {
+        try await startAppleSpeechCaptureSessionRecording(language: language)
+    }
+
+    private func startAppleSpeechCaptureSessionRecording(language: TranscriptionLanguage) async throws {
         statusText = String(localized: L10n.RecordingStatus.configuringAudioInput)
         try await configureAudioSession()
 
@@ -414,6 +496,34 @@ final class LiveTranscriptionManager: ObservableObject {
             accumulatedRecordingSeconds = 0
             recordingStartedAt = nil
             activeSegmentStartedAt = nil
+        }
+    }
+
+    func updateFinalTranscriptLine(id: TranscriptionLine.ID, text: String) {
+        let cleanedText = text
+            .replacingOccurrences(of: "\r\n", with: "\n")
+            .replacingOccurrences(of: "\r", with: "\n")
+            .components(separatedBy: .newlines)
+            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .filter { !$0.isEmpty }
+            .joined(separator: " ")
+
+        guard let index = finalizedLines.firstIndex(where: { $0.id == id }) else {
+            return
+        }
+
+        if cleanedText.isEmpty {
+            finalizedLines.remove(at: index)
+            manuallyEditedFinalLineIDs.remove(id)
+        } else {
+            finalizedLines[index].text = cleanedText
+            finalizedLines[index].isFinal = true
+            manuallyEditedFinalLineIDs.insert(id)
+        }
+
+        finalTranscriptStore.publish(finalizedLines, incrementsRevision: true)
+        Task {
+            await updateLiveActivityFromCurrentState()
         }
     }
 
@@ -634,13 +744,15 @@ final class LiveTranscriptionManager: ObservableObject {
     }
 
     private func requestPermissions() async -> Bool {
-        let speechStatus = await resolvedSpeechAuthorization()
-        guard speechStatus == .authorized else {
-            let message = speechStatus == .restricted
-                ? String(localized: L10n.SpeechText.speechRestricted)
-                : String(localized: L10n.SpeechText.speechDenied)
-            fail(with: message)
-            return false
+        if selectedTranscriptionBackend.requiresAppleSpeech {
+            let speechStatus = await resolvedSpeechAuthorization()
+            guard speechStatus == .authorized else {
+                let message = speechStatus == .restricted
+                    ? String(localized: L10n.SpeechText.speechRestricted)
+                    : String(localized: L10n.SpeechText.speechDenied)
+                fail(with: message)
+                return false
+            }
         }
 
         guard await requestMicrophoneAuthorization() else {
@@ -686,6 +798,43 @@ final class LiveTranscriptionManager: ObservableObject {
                 continuation.resume(returning: allowed)
             }
         }
+    }
+
+    private static func resolvedSpeechLocale(for language: TranscriptionLanguage) async -> Locale {
+        let preferredLocale = Locale(identifier: language.id)
+        return await SpeechTranscriber.supportedLocale(equivalentTo: preferredLocale) ?? preferredLocale
+    }
+
+    private static func reserveSpeechLocale(_ locale: Locale) async throws {
+        let reservedLocales = await AssetInventory.reservedLocales
+        guard !containsReservedLocale(locale, in: reservedLocales) else {
+            return
+        }
+
+        try await AssetInventory.reserve(locale: locale)
+    }
+
+    private static func protectedSpeechLocaleKeys(
+        preservingLanguageIDs: Set<String>,
+        targetLocale: Locale
+    ) async -> Set<String> {
+        var keys = [Self.speechLocaleKey(targetLocale)]
+        for languageID in preservingLanguageIDs {
+            let locale = await resolvedSpeechLocale(for: TranscriptionLanguage(id: languageID))
+            keys.append(Self.speechLocaleKey(locale))
+        }
+        return Set(keys)
+    }
+
+    private static func containsReservedLocale(_ locale: Locale, in reservedLocales: [Locale]) -> Bool {
+        let key = speechLocaleKey(locale)
+        return reservedLocales.contains { speechLocaleKey($0) == key }
+    }
+
+    private static func speechLocaleKey(_ locale: Locale) -> String {
+        locale.identifier
+            .replacingOccurrences(of: "_", with: "-")
+            .lowercased()
     }
 
     private func configureAudioSession() async throws {
@@ -751,7 +900,9 @@ final class LiveTranscriptionManager: ObservableObject {
         if result.isFinal {
             if let index = finalizedLines.firstIndex(where: { abs($0.startSeconds - startSeconds) < 0.1 }) {
                 line.id = finalizedLines[index].id
-                finalizedLines[index] = line
+                if !manuallyEditedFinalLineIDs.contains(line.id) {
+                    finalizedLines[index] = line
+                }
             } else {
                 insertFinalizedLine(line)
             }
@@ -801,6 +952,9 @@ final class LiveTranscriptionManager: ObservableObject {
 
         var lines = finalizedLines
         if let index = lines.firstIndex(where: { abs($0.startSeconds - interimLine.startSeconds) < 0.1 }) {
+            if manuallyEditedFinalLineIDs.contains(lines[index].id) {
+                return lines
+            }
             lines[index] = interimLine
             return lines
         }
@@ -819,6 +973,7 @@ final class LiveTranscriptionManager: ObservableObject {
     private func resetTranscriptStorage() {
         finalizedLines = []
         interimLine = nil
+        manuallyEditedFinalLineIDs = []
         finalTranscriptStore.reset()
         interimTranscriptStore.reset()
     }
@@ -962,6 +1117,45 @@ private struct LiveActivitySnapshot: Equatable {
     var elapsedSeconds: Int
     var lineCount: Int
     var isRecording: Bool
+}
+
+struct SpeechLocaleReleaseRequest: Identifiable, Equatable {
+    let id = UUID()
+    var targetLanguage: TranscriptionLanguage
+    var targetLocaleIdentifier: String
+    var releaseLocaleIdentifiers: [String]
+    var maximumReservedLocaleCount: Int
+
+    var releaseLanguageNames: String {
+        releaseLocaleIdentifiers
+            .map { TranscriptionLanguage(id: $0).displayName }
+            .joined(separator: ", ")
+    }
+
+    var messageText: String {
+        String(
+            format: String(localized: L10n.SpeechText.releaseOldLanguagesMessageFormat),
+            maximumReservedLocaleCount,
+            targetLanguage.displayName,
+            releaseLanguageNames
+        )
+    }
+}
+
+enum SpeechLocalePreparation {
+    case ready
+    case needsRelease(SpeechLocaleReleaseRequest)
+}
+
+private enum SpeechLocaleManagementError: LocalizedError {
+    case noReleasableLanguages
+
+    var errorDescription: String? {
+        switch self {
+        case .noReleasableLanguages:
+            return String(localized: L10n.SpeechText.noReleasableLanguages)
+        }
+    }
 }
 
 private extension Array where Element == TranscriptionLine {
@@ -1360,7 +1554,7 @@ private final class CaptureSessionRecordingPipeline: NSObject, AVCaptureAudioDat
     private let recordingFormat: AVAudioFormat
     private let analyzerSourceFormat: AVAudioFormat
     private let writer: AudioFileWriter
-    private let analyzerPipeline: AnalyzerInputPipeline
+    private let analyzerPipeline: AnalyzerInputPipeline?
     private let inputLevelObserver: (@Sendable (Float) -> Void)?
     private let recordingConverter: CaptureSampleBufferAudioConverter
     private let analyzerConverter: CaptureSampleBufferAudioConverter
@@ -1376,7 +1570,7 @@ private final class CaptureSessionRecordingPipeline: NSObject, AVCaptureAudioDat
         recordingFormat: AVAudioFormat,
         analyzerSourceFormat: AVAudioFormat,
         writer: AudioFileWriter,
-        analyzerPipeline: AnalyzerInputPipeline,
+        analyzerPipeline: AnalyzerInputPipeline?,
         inputLevelObserver: (@Sendable (Float) -> Void)? = nil
     ) {
         self.recordingFormat = recordingFormat
@@ -1482,7 +1676,7 @@ private final class CaptureSessionRecordingPipeline: NSObject, AVCaptureAudioDat
                 analyzerSourceFormat: analyzerBuffer.format
             )
             writer.write(recordingBuffer)
-            analyzerPipeline.process(analyzerBuffer, audioTime: Self.audioTime(for: sampleBuffer, format: analyzerBuffer.format))
+            analyzerPipeline?.process(analyzerBuffer, audioTime: Self.audioTime(for: sampleBuffer, format: analyzerBuffer.format))
         } catch {
             reportConversionFailureIfNeeded(error)
         }
@@ -1917,6 +2111,7 @@ struct SpeechProcessingPipelineDiagnostics: Equatable {
     var runtimeAnalyzerFormatText: String
 
     static func current(
+        backend: LiveTranscriptionBackend,
         configuredMode: SpeechPipelineMode,
         runtimeAnalyzerFormatText: String
     ) -> SpeechProcessingPipelineDiagnostics {

@@ -2,9 +2,9 @@
 
 ![LiveTranscriber README poster](docs/assets/readme-poster.png)
 
-LiveTranscriber is an iOS 26+ local recording and live transcription app. It records audio, transcribes speech on device with Apple's Speech APIs, saves audio and transcript files, and keeps recording status visible through Lock Screen Live Activities and Dynamic Island.
+LiveTranscriber is an iOS 26+ recording and live transcription app. It records audio, transcribes live speech on device with Apple's Speech APIs, saves audio and transcript files, and keeps recording status visible through Lock Screen Live Activities and Dynamic Island.
 
-The project is designed as a native iOS utility rather than a cloud transcription client. Audio, transcripts, and the recording index stay in the local app-private container by default. Users can enable iCloud in Settings to move storage into an app-private iCloud container for cross-device sync.
+The project is designed as a native, local-first iOS utility. Audio, transcripts, and the recording index stay in the local app-private container by default. Users can enable iCloud in Settings to move storage into an app-private iCloud container for cross-device sync. Users can also manually re-transcribe saved recordings with OpenAI file transcription using their own API key.
 
 ## Source Availability and Commercial Attribution
 
@@ -46,13 +46,14 @@ Attribution-free, private-label, or white-label commercial use requires separate
 - Home Screen widget with quick links to recording, saved files, and settings.
 - Local Apple Intelligence summary and topic tag generation for saved transcripts.
 - Selectable speech processing pipelines: a stable iOS 26/27 compatible pipeline and an iOS 27 native `AnalyzerInputConverter` pipeline.
+- Optional OpenAI re-transcription for saved recordings, with long-form and segmented modes using a user-supplied OpenAI API key stored in Keychain.
 - Recording detail audio parameters, including sample rate, channel count, encoding, duration, frame count, and file size.
 - Shared visual system based on Reddit Sans, grouped backgrounds, compact card surfaces, red recording actions, and system SF Symbols.
 - English, Simplified Chinese, Traditional Chinese, German, Dutch, and Japanese localization.
 
 ## How It Works
 
-LiveTranscriber is a local-first iOS app. The main recording path captures stereo audio once, writes that audio to a file, and downmixes the same live sample buffers into the Speech pipeline for real-time transcripts. Saved recordings, transcript text, search metadata, summaries, and tags stay in the app-private container by default. If the user enables iCloud, app-managed files move to the app-private iCloud container and the SwiftData index syncs through the user's private CloudKit database.
+LiveTranscriber is a local-first iOS app. The main recording path captures stereo audio once, writes that audio to a file, and downmixes the same live sample buffers into the local Apple Speech pipeline for real-time transcripts. Saved recordings, transcript text, search metadata, summaries, and tags stay in the app-private container by default. If the user enables iCloud, app-managed files move to the app-private iCloud container and the SwiftData index syncs through the user's private CloudKit database.
 
 ```mermaid
 flowchart TB
@@ -63,6 +64,7 @@ flowchart TB
     fileWriter["Audio File Writer\nWAV / M4A"]
     speechInput["Analyzer Input Pipeline\nmonotonic timestamps"]
     speech["Apple Speech\nSpeechAnalyzer + SpeechTranscriber"]
+    openai["OpenAI Audio Transcriptions\nmanual saved-recording retranscribe"]
     liveText["Live Transcript Lines"]
     activity["ActivityKit + WidgetKit\nLock Screen, Dynamic Island, Home Widget"]
     store["RecordingStore\nmetadata, files, search, import"]
@@ -91,6 +93,8 @@ flowchart TB
     store -. "when iCloud is enabled" .-> icloudFiles
     swiftData -. "when iCloud is enabled" .-> cloudKit
     store --> detail
+    detail --> openai
+    openai --> store
     detail --> intelligence
     intelligence --> store
 ```
@@ -111,6 +115,12 @@ LiveTranscriber exposes the active speech pipeline in Settings > Developer Optio
 - iOS 27 Native Pipeline: available on iOS 27. Uses `SpeechTranscriber` with `preset: .timeIndexedProgressiveTranscription`, `SpeechAnalyzer.Options(priority: .userInitiated, modelRetention: .whileInUse, ignoresResourceLimits: true)`, `AnalyzerInputConverter.converter(compatibleWith: modules)`, and `SpeechAnalyzer.prepareToAnalyze(in: nil)` so the system chooses the compatible input format.
 
 Both live pipelines use a monotonic audio timeline for `AnalyzerInput.bufferStartTime` so transcript timestamps stay stable across iOS 26 and iOS 27.
+
+## Optional OpenAI Saved-Recording Transcription
+
+Live recording uses Apple on-device Speech only. For saved recordings, the recording detail menu can manually run OpenAI file transcription when the user needs a higher-accuracy pass for difficult languages, accents, or domain vocabulary.
+
+OpenAI transcription uses a bring-your-own-key setup in Settings. The user enters their own OpenAI API key, the key is stored in iOS Keychain, and the iPhone uploads the selected saved recording directly to OpenAI only when the user chooses an OpenAI re-transcription action. Long-form mode uses `gpt-4o-transcribe`; segmented mode uses `whisper-1` with segment timestamps.
 
 ## Requirements
 
@@ -170,10 +180,11 @@ Reddit Sans is included under the SIL Open Font License, Version 1.1. The font m
 
 ## Privacy Model
 
-LiveTranscriber is built around local processing. Recording, transcription, summary, and tagging use Apple system frameworks on device when available.
+LiveTranscriber is built around local processing by default. Live recording, live transcription, summary, and tagging use Apple system frameworks on device.
 
-- The app does not use developer-operated servers, third-party analytics, ads, tracking, or custom network requests.
-- Audio and transcript text are not uploaded to developer servers.
+- Live recording does not use developer-operated transcription servers, third-party analytics, ads, tracking, or custom network requests.
+- OpenAI is used only when the user manually chooses OpenAI transcription for a saved recording; that recording audio is sent directly from the iPhone to OpenAI.
+- OpenAI transcription stores the user's own OpenAI API key in Keychain and uses it directly from the device.
 - Files are stored in the local app-private container by default. When iCloud storage is enabled in Settings, app-managed recording files sync through an app-private iCloud container instead of a visible iCloud Drive folder.
 - Recording metadata is stored with SwiftData locally by default. When iCloud storage is enabled, it syncs through the user's CloudKit private database.
 - The camera is not used for photos or video. `NSCameraUsageDescription` is present because Apple static review requires it when the app uses `AVCaptureSession` / `AVCaptureDeviceInput` for microphone recording.

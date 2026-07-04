@@ -31,6 +31,7 @@ struct RecordingsView: View {
     @State private var transcriptionErrorMessage: String?
     @State private var deleteErrorMessage: String?
     @State private var pendingImport: PendingImport?
+    @State private var pendingSpeechLocaleReleaseAction: PendingSpeechLocaleReleaseAction?
     @State private var searchText = ""
     @State private var isShowingRecordingsMap = false
     @State private var hidesTabBarForRecordingDetail = false
@@ -112,7 +113,7 @@ struct RecordingsView: View {
             if let pendingImport {
                 ForEach(transcriber.supportedLanguages) { language in
                     Button {
-                        importRecording(from: pendingImport.url, language: language)
+                        requestImportRecording(from: pendingImport.url, language: language)
                     } label: {
                         Label(
                             language.displayName,
@@ -125,6 +126,27 @@ struct RecordingsView: View {
             Button(localized(L10n.Common.cancel), role: .cancel) {}
         } message: {
             Text(L10n.Recordings.importRecording)
+        }
+        .alert(
+            localized(L10n.SpeechText.releaseOldLanguagesTitle),
+            isPresented: Binding(
+                get: { pendingSpeechLocaleReleaseAction != nil },
+                set: { isPresented in
+                    if !isPresented {
+                        pendingSpeechLocaleReleaseAction = nil
+                    }
+                }
+            )
+        ) {
+            Button(localized(L10n.SpeechText.releaseOldLanguagesAction), role: .destructive) {
+                if let pendingSpeechLocaleReleaseAction {
+                    releaseSpeechLocalesAndContinue(pendingSpeechLocaleReleaseAction)
+                }
+                pendingSpeechLocaleReleaseAction = nil
+            }
+            Button(localized(L10n.Common.cancel), role: .cancel) {}
+        } message: {
+            Text(pendingSpeechLocaleReleaseAction?.request.messageText ?? "")
         }
         .alert(
             localized(L10n.Recordings.analysisFailed),
@@ -311,7 +333,7 @@ struct RecordingsView: View {
             Menu {
                 ForEach(transcriber.supportedLanguages) { language in
                     Button {
-                        retranscribe(item, language: language)
+                        requestRetranscription(item, language: language)
                     } label: {
                         Label(
                             language.displayName,
@@ -323,6 +345,45 @@ struct RecordingsView: View {
                 Label(localized(L10n.Recordings.retranscribe), systemImage: "arrow.triangle.2.circlepath")
             }
             .disabled(item.importStatus?.isFailed == false || transcriber.isRecording || transcriber.isPreparing)
+
+            Menu {
+                Button {
+                    retranscribeWithOpenAI(item, mode: .longForm)
+                } label: {
+                    Label(localized(L10n.Recordings.retranscribeWithOpenAILongForm), systemImage: "text.alignleft")
+                }
+
+                Button {
+                    retranscribeWithOpenAI(item, mode: .segmented)
+                } label: {
+                    Label(localized(L10n.Recordings.retranscribeWithOpenAISegmented), systemImage: "list.bullet.rectangle")
+                }
+
+                Button {
+                    retranscribeWithOpenAI(item, mode: .refinedSegments)
+                } label: {
+                    Label(localized(L10n.Recordings.retranscribeWithOpenAIRefinedSegments), systemImage: "wand.and.sparkles")
+                }
+            } label: {
+                Label(localized(L10n.Recordings.retranscribeWithOpenAI), systemImage: "cloud")
+            }
+            .disabled(item.importStatus?.isFailed == false || transcriber.isRecording || transcriber.isPreparing)
+
+            Menu {
+                ForEach(transcriber.supportedLanguages) { language in
+                    Button {
+                        retranscribeWithLocalWhisper(item, language: language)
+                    } label: {
+                        Label(
+                            language.displayName,
+                            systemImage: language.id == item.languageID ? "checkmark" : "waveform"
+                        )
+                    }
+                }
+            } label: {
+                Label(localized(L10n.Recordings.retranscribeWithLocalWhisper), systemImage: "iphone")
+            }
+            .disabled(item.isTranscriptLocked || item.importStatus?.isFailed == false || transcriber.isRecording || transcriber.isPreparing)
 
             Button(role: .destructive) {
                 requestDelete(item)
@@ -391,6 +452,36 @@ struct RecordingsView: View {
         HapticFeedback.play(.importQueued)
     }
 
+    private func requestImportRecording(from url: URL, language: TranscriptionLanguage) {
+        guard !isImporting else {
+            HapticFeedback.play(.blocked)
+            return
+        }
+
+        pendingImport = nil
+        Task {
+            do {
+                let preparation = try await transcriber.prepareSpeechLocaleForUse(
+                    language,
+                    preservingLanguageIDs: [transcriber.selectedLanguageID]
+                )
+                switch preparation {
+                case .ready:
+                    importRecording(from: url, language: language)
+                case .needsRelease(let request):
+                    pendingSpeechLocaleReleaseAction = PendingSpeechLocaleReleaseAction(
+                        request: request,
+                        operation: .importRecording(url)
+                    )
+                    HapticFeedback.play(.warning)
+                }
+            } catch {
+                importErrorMessage = error.localizedDescription
+                HapticFeedback.play(.failure)
+            }
+        }
+    }
+
     private func importRecording(from url: URL, language: TranscriptionLanguage) {
         guard !isImporting else {
             HapticFeedback.play(.blocked)
@@ -412,6 +503,57 @@ struct RecordingsView: View {
                 HapticFeedback.play(.failure)
             }
             isImporting = false
+        }
+    }
+
+    private func requestRetranscription(_ item: RecordingItem, language: TranscriptionLanguage) {
+        guard !transcriber.isRecording, !transcriber.isPreparing else {
+            HapticFeedback.play(.blocked)
+            return
+        }
+
+        Task {
+            do {
+                let preparation = try await transcriber.prepareSpeechLocaleForUse(
+                    language,
+                    preservingLanguageIDs: [transcriber.selectedLanguageID, item.languageID]
+                )
+                switch preparation {
+                case .ready:
+                    retranscribe(item, language: language)
+                case .needsRelease(let request):
+                    pendingSpeechLocaleReleaseAction = PendingSpeechLocaleReleaseAction(
+                        request: request,
+                        operation: .retranscribe(item)
+                    )
+                    HapticFeedback.play(.warning)
+                }
+            } catch {
+                transcriptionErrorMessage = error.localizedDescription
+                HapticFeedback.play(.failure)
+            }
+        }
+    }
+
+    private func releaseSpeechLocalesAndContinue(_ pendingAction: PendingSpeechLocaleReleaseAction) {
+        Task {
+            do {
+                try await transcriber.releaseSpeechLocalesAndReserveTarget(pendingAction.request)
+                switch pendingAction.operation {
+                case .importRecording(let url):
+                    importRecording(from: url, language: pendingAction.request.targetLanguage)
+                case .retranscribe(let item):
+                    retranscribe(item, language: pendingAction.request.targetLanguage)
+                }
+            } catch {
+                switch pendingAction.operation {
+                case .importRecording:
+                    importErrorMessage = error.localizedDescription
+                case .retranscribe:
+                    transcriptionErrorMessage = error.localizedDescription
+                }
+                HapticFeedback.play(.failure)
+            }
         }
     }
 
@@ -489,6 +631,56 @@ struct RecordingsView: View {
         }
     }
 
+    private func retranscribeWithOpenAI(_ item: RecordingItem, mode: OpenAIFileTranscriptionMode) {
+        guard item.importStatus?.isFailed != false else {
+            HapticFeedback.play(.blocked)
+            return
+        }
+        guard !transcriber.isRecording, !transcriber.isPreparing else {
+            HapticFeedback.play(.blocked)
+            return
+        }
+
+        let language = TranscriptionLanguage(id: item.languageID)
+        Task {
+            HapticFeedback.play(.retranscribeStart)
+            do {
+                try await store.retranscribeWithOpenAI(
+                    item,
+                    language: language,
+                    apiKey: transcriber.openAIAPIKey,
+                    mode: mode
+                )
+                HapticFeedback.play(.retranscribeComplete)
+            } catch {
+                transcriptionErrorMessage = error.localizedDescription
+                HapticFeedback.play(.failure)
+            }
+        }
+    }
+
+    private func retranscribeWithLocalWhisper(_ item: RecordingItem, language: TranscriptionLanguage) {
+        guard item.importStatus?.isFailed != false else {
+            HapticFeedback.play(.blocked)
+            return
+        }
+        guard !transcriber.isRecording, !transcriber.isPreparing else {
+            HapticFeedback.play(.blocked)
+            return
+        }
+
+        Task {
+            HapticFeedback.play(.retranscribeStart)
+            do {
+                try await store.retranscribeWithLocalWhisper(item, language: language)
+                HapticFeedback.play(.retranscribeComplete)
+            } catch {
+                transcriptionErrorMessage = error.localizedDescription
+                HapticFeedback.play(.failure)
+            }
+        }
+    }
+
     private func requestDelete(_ item: RecordingItem) {
         guard store.recording(withID: item.id) != nil else {
             HapticFeedback.play(.warning)
@@ -526,6 +718,39 @@ struct RecordingsView: View {
 private struct PendingImport: Identifiable {
     let id = UUID()
     let url: URL
+}
+
+private struct PendingSpeechLocaleReleaseAction: Identifiable {
+    let request: SpeechLocaleReleaseRequest
+    let operation: SpeechLocaleReleaseOperation
+
+    var id: UUID {
+        request.id
+    }
+}
+
+private enum SpeechLocaleReleaseOperation {
+    case importRecording(URL)
+    case retranscribe(RecordingItem)
+}
+
+private struct TranscriptLineEditRequest: Identifiable {
+    let lineID: String
+    let timeText: String
+
+    var id: String {
+        lineID
+    }
+
+    init(line: StoredTranscriptLine) {
+        lineID = line.id
+        timeText = line.timeText
+    }
+
+    init(line: TranscriptionLine) {
+        lineID = line.id.uuidString
+        timeText = line.timestampText
+    }
 }
 
 private struct RecordingDeleteRequest: Identifiable {
@@ -1039,6 +1264,7 @@ struct RecordingDetailView: View {
     @State private var deleteRequest: RecordingDeleteRequest?
     @State private var isAnalyzing = false
     @State private var analysisErrorMessage: String?
+    @State private var transcriptionErrorMessage: String?
     @State private var deleteErrorMessage: String?
     @State private var audioFileInfo: RecordingAudioFileInfo?
     @State private var audioFileInfoError: String?
@@ -1047,9 +1273,13 @@ struct RecordingDetailView: View {
     @State private var isShowingRecordingEditSheet = false
     @State private var editRecordingName = ""
     @State private var editRecordingTags: [String] = []
+    @State private var editRecordingSummary = ""
     @State private var editRecordingIncludesLocation = false
     @State private var isSavingRecordingEdit = false
-    @State private var renameErrorMessage: String?
+    @State private var editErrorMessage: String?
+    @State private var transcriptLineEditRequest: TranscriptLineEditRequest?
+    @State private var editedTranscriptLineText = ""
+    @State private var isSavingTranscriptLineEdit = false
     @State private var cachedTranscriptLines: [StoredTranscriptLine] = []
     @State private var scrubbedPlaybackTime: TimeInterval?
     @State private var translationConfiguration: TranslationSession.Configuration?
@@ -1058,6 +1288,7 @@ struct RecordingDetailView: View {
     @State private var translatedTranscriptCache: [String: [StoredTranscriptLine.ID: String]] = [:]
     @State private var isTranslatingTranscript = false
     @State private var translationErrorMessage: String?
+    @State private var pendingSpeechLocaleReleaseAction: PendingSpeechLocaleReleaseAction?
 
     private var currentItem: RecordingItem {
         store.recording(withID: item.id) ?? item
@@ -1075,6 +1306,10 @@ struct RecordingDetailView: View {
 
     private var isTranscriptionRunning: Bool {
         currentItem.importStatus?.isFailed == false
+    }
+
+    private var pendingSpeechLocaleReleaseMessage: String {
+        pendingSpeechLocaleReleaseAction?.request.messageText ?? ""
     }
 
     var body: some View {
@@ -1139,6 +1374,7 @@ struct RecordingDetailView: View {
                 item: currentItem,
                 recordingName: $editRecordingName,
                 tags: $editRecordingTags,
+                summary: $editRecordingSummary,
                 includesLocation: $editRecordingIncludesLocation,
                 locationProvider: editLocationProvider,
                 isSaving: isSavingRecordingEdit,
@@ -1157,6 +1393,20 @@ struct RecordingDetailView: View {
                     editLocationProvider.reset()
                 }
             }
+        }
+        .sheet(item: $transcriptLineEditRequest) { request in
+            TranscriptLineEditSheet(
+                timeText: request.timeText,
+                text: $editedTranscriptLineText,
+                isSaving: isSavingTranscriptLineEdit,
+                onSave: saveTranscriptLineEdit,
+                onCancel: {
+                    transcriptLineEditRequest = nil
+                }
+            )
+            .interactiveDismissDisabled(isSavingTranscriptLineEdit)
+            .presentationDetents([.medium, .large])
+            .presentationDragIndicator(.visible)
         }
         .onAppear {
             Task {
@@ -1184,6 +1434,27 @@ struct RecordingDetailView: View {
             }
         }
         .alert(
+            localized(L10n.SpeechText.releaseOldLanguagesTitle),
+            isPresented: Binding(
+                get: { pendingSpeechLocaleReleaseAction != nil },
+                set: { isPresented in
+                    if !isPresented {
+                        pendingSpeechLocaleReleaseAction = nil
+                    }
+                }
+            )
+        ) {
+            Button(localized(L10n.SpeechText.releaseOldLanguagesAction), role: .destructive) {
+                if let pendingSpeechLocaleReleaseAction {
+                    releaseSpeechLocalesAndContinue(pendingSpeechLocaleReleaseAction)
+                }
+                pendingSpeechLocaleReleaseAction = nil
+            }
+            Button(localized(L10n.Common.cancel), role: .cancel) {}
+        } message: {
+            Text(pendingSpeechLocaleReleaseMessage)
+        }
+        .alert(
             localized(L10n.Recordings.analysisFailed),
             isPresented: Binding(
                 get: { analysisErrorMessage != nil },
@@ -1197,6 +1468,21 @@ struct RecordingDetailView: View {
             Button(localized(L10n.Common.ok), role: .cancel) {}
         } message: {
             Text(analysisErrorMessage ?? "")
+        }
+        .alert(
+            localized(L10n.Recordings.transcriptionFailed),
+            isPresented: Binding(
+                get: { transcriptionErrorMessage != nil },
+                set: { isPresented in
+                    if !isPresented {
+                        transcriptionErrorMessage = nil
+                    }
+                }
+            )
+        ) {
+            Button(localized(L10n.Common.ok), role: .cancel) {}
+        } message: {
+            Text(transcriptionErrorMessage ?? "")
         }
         .alert(
             localized(L10n.Recordings.deleteRecording),
@@ -1235,19 +1521,19 @@ struct RecordingDetailView: View {
             Text(deleteErrorMessage ?? "")
         }
         .alert(
-            localized(L10n.Recordings.renameFailed),
+            localized(L10n.Recordings.editFailed),
             isPresented: Binding(
-                get: { renameErrorMessage != nil },
+                get: { editErrorMessage != nil },
                 set: { isPresented in
                     if !isPresented {
-                        renameErrorMessage = nil
+                        editErrorMessage = nil
                     }
                 }
             )
         ) {
             Button(localized(L10n.Common.ok), role: .cancel) {}
         } message: {
-            Text(renameErrorMessage ?? "")
+            Text(editErrorMessage ?? "")
         }
     }
 
@@ -1258,7 +1544,17 @@ struct RecordingDetailView: View {
             Button {
                 prepareRecordingEditSheet()
             } label: {
-                Label(localized(L10n.Recordings.rename), systemImage: "pencil")
+                Label(localized(L10n.Recordings.editDetails), systemImage: "pencil")
+            }
+            .disabled(isTranscriptionRunning)
+
+            Button {
+                toggleTranscriptLock()
+            } label: {
+                Label(
+                    localized(currentItem.isTranscriptLocked ? L10n.Recordings.unlockTranscript : L10n.Recordings.lockTranscript),
+                    systemImage: currentItem.isTranscriptLocked ? "lock.open" : "lock"
+                )
             }
             .disabled(isTranscriptionRunning)
 
@@ -1286,7 +1582,7 @@ struct RecordingDetailView: View {
             Menu {
                 ForEach(transcriber.supportedLanguages) { language in
                     Button {
-                        retranscribeCurrentItem(language: language)
+                        requestCurrentItemRetranscription(language: language)
                     } label: {
                         Label(
                             language.displayName,
@@ -1297,7 +1593,46 @@ struct RecordingDetailView: View {
             } label: {
                 Label(localized(L10n.Recordings.retranscribe), systemImage: isTranscriptionRunning ? "hourglass" : "arrow.triangle.2.circlepath")
             }
-            .disabled(isTranscriptionRunning || transcriber.isRecording || transcriber.isPreparing)
+            .disabled(currentItem.isTranscriptLocked || isTranscriptionRunning || transcriber.isRecording || transcriber.isPreparing)
+
+            Menu {
+                Button {
+                    retranscribeCurrentItemWithOpenAI(mode: .longForm)
+                } label: {
+                    Label(localized(L10n.Recordings.retranscribeWithOpenAILongForm), systemImage: "text.alignleft")
+                }
+
+                Button {
+                    retranscribeCurrentItemWithOpenAI(mode: .segmented)
+                } label: {
+                    Label(localized(L10n.Recordings.retranscribeWithOpenAISegmented), systemImage: "list.bullet.rectangle")
+                }
+
+                Button {
+                    retranscribeCurrentItemWithOpenAI(mode: .refinedSegments)
+                } label: {
+                    Label(localized(L10n.Recordings.retranscribeWithOpenAIRefinedSegments), systemImage: "wand.and.sparkles")
+                }
+            } label: {
+                Label(localized(L10n.Recordings.retranscribeWithOpenAI), systemImage: "cloud")
+            }
+            .disabled(currentItem.isTranscriptLocked || isTranscriptionRunning || transcriber.isRecording || transcriber.isPreparing)
+
+            Menu {
+                ForEach(transcriber.supportedLanguages) { language in
+                    Button {
+                        retranscribeCurrentItemWithLocalWhisper(language: language)
+                    } label: {
+                        Label(
+                            language.displayName,
+                            systemImage: language.id == currentItem.languageID ? "checkmark" : "waveform"
+                        )
+                    }
+                }
+            } label: {
+                Label(localized(L10n.Recordings.retranscribeWithLocalWhisper), systemImage: "iphone")
+            }
+            .disabled(currentItem.isTranscriptLocked || isTranscriptionRunning || transcriber.isRecording || transcriber.isPreparing)
 
             Button {
                 HapticFeedback.play(.copy)
@@ -1611,6 +1946,17 @@ struct RecordingDetailView: View {
                 Label(localized(L10n.Recordings.transcript), systemImage: "text.alignleft")
                     .font(.redditSans(.headline))
 
+                if item.isTranscriptLocked {
+                    Label(localized(L10n.Recordings.transcriptLocked), systemImage: "lock.fill")
+                        .font(.redditSans(.caption, weight: .semibold))
+                        .foregroundStyle(AppTheme.warning)
+                        .lineLimit(1)
+                        .padding(.horizontal, 8)
+                        .frame(height: 24)
+                        .background(AppTheme.warning.opacity(0.12), in: Capsule())
+                        .accessibilityHint(localized(L10n.Recordings.transcriptLockedDetail))
+                }
+
                 Spacer(minLength: 8)
 
                 transcriptTranslationMenu
@@ -1641,6 +1987,8 @@ struct RecordingDetailView: View {
                             HapticFeedback.play(.timelineSeek)
                             scrubbedPlaybackTime = nil
                             player.seek(to: line.startSeconds)
+                        } onEdit: {
+                            beginTranscriptLineEdit(line)
                         }
                     }
                 }
@@ -1766,26 +2114,71 @@ struct RecordingDetailView: View {
             return nil
         }
 
-        let translatedLineCount = cachedTranscriptLines.reduce(0) { count, line in
-            let translatedText = translatedTranscriptByLineID[line.id]?.trimmingCharacters(in: .whitespacesAndNewlines)
-            return translatedText?.isEmpty == false ? count + 1 : count
-        }
-        guard translatedLineCount > 0 else {
-            return nil
-        }
-
-        let transcript = cachedTranscriptLines
-            .map { line in
-                translatedTranscriptByLineID[line.id]?.trimmingCharacters(in: .whitespacesAndNewlines)
-                    ?? line.text.trimmingCharacters(in: .whitespacesAndNewlines)
+        var translatedLines: [String] = []
+        for line in cachedTranscriptLines {
+            guard !line.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+                continue
             }
-            .filter { !$0.isEmpty }
-            .joined(separator: "\n")
-        guard !transcript.isEmpty else {
+            guard let translatedText = translatedTranscriptByLineID[line.id]?.trimmingCharacters(in: .whitespacesAndNewlines),
+                  !translatedText.isEmpty else {
+                return nil
+            }
+            translatedLines.append(translatedText)
+        }
+
+        guard !translatedLines.isEmpty else {
             return nil
         }
 
-        return (transcript, selectedTranslationLanguage.displayName)
+        return (translatedLines.joined(separator: "\n"), selectedTranslationLanguage.displayName)
+    }
+
+    private func requestCurrentItemRetranscription(language: TranscriptionLanguage) {
+        guard !isTranscriptionRunning else {
+            HapticFeedback.play(.blocked)
+            return
+        }
+        guard !transcriber.isRecording, !transcriber.isPreparing else {
+            HapticFeedback.play(.blocked)
+            return
+        }
+
+        let item = currentItem
+        Task {
+            do {
+                let preparation = try await transcriber.prepareSpeechLocaleForUse(
+                    language,
+                    preservingLanguageIDs: [transcriber.selectedLanguageID, item.languageID]
+                )
+                switch preparation {
+                case .ready:
+                    retranscribeCurrentItem(language: language)
+                case .needsRelease(let request):
+                    pendingSpeechLocaleReleaseAction = PendingSpeechLocaleReleaseAction(
+                        request: request,
+                        operation: .retranscribe(item)
+                    )
+                    HapticFeedback.play(.warning)
+                }
+            } catch {
+                transcriptionErrorMessage = error.localizedDescription
+                HapticFeedback.play(.failure)
+            }
+        }
+    }
+
+    private func releaseSpeechLocalesAndContinue(_ pendingAction: PendingSpeechLocaleReleaseAction) {
+        Task {
+            do {
+                try await transcriber.releaseSpeechLocalesAndReserveTarget(pendingAction.request)
+                if case .retranscribe = pendingAction.operation {
+                    retranscribeCurrentItem(language: pendingAction.request.targetLanguage)
+                }
+            } catch {
+                transcriptionErrorMessage = error.localizedDescription
+                HapticFeedback.play(.failure)
+            }
+        }
     }
 
     private func retranscribeCurrentItem(language: TranscriptionLanguage) {
@@ -1805,7 +2198,59 @@ struct RecordingDetailView: View {
                 try await store.retranscribe(item, language: language)
                 HapticFeedback.play(.retranscribeComplete)
             } catch {
-                analysisErrorMessage = error.localizedDescription
+                transcriptionErrorMessage = error.localizedDescription
+                HapticFeedback.play(.failure)
+            }
+        }
+    }
+
+    private func retranscribeCurrentItemWithOpenAI(mode: OpenAIFileTranscriptionMode) {
+        guard !isTranscriptionRunning else {
+            HapticFeedback.play(.blocked)
+            return
+        }
+        guard !transcriber.isRecording, !transcriber.isPreparing else {
+            HapticFeedback.play(.blocked)
+            return
+        }
+
+        let item = currentItem
+        let language = TranscriptionLanguage(id: item.languageID)
+        Task {
+            HapticFeedback.play(.retranscribeStart)
+            do {
+                try await store.retranscribeWithOpenAI(
+                    item,
+                    language: language,
+                    apiKey: transcriber.openAIAPIKey,
+                    mode: mode
+                )
+                HapticFeedback.play(.retranscribeComplete)
+            } catch {
+                transcriptionErrorMessage = error.localizedDescription
+                HapticFeedback.play(.failure)
+            }
+        }
+    }
+
+    private func retranscribeCurrentItemWithLocalWhisper(language: TranscriptionLanguage) {
+        guard !isTranscriptionRunning else {
+            HapticFeedback.play(.blocked)
+            return
+        }
+        guard !transcriber.isRecording, !transcriber.isPreparing else {
+            HapticFeedback.play(.blocked)
+            return
+        }
+
+        let item = currentItem
+        Task {
+            HapticFeedback.play(.retranscribeStart)
+            do {
+                try await store.retranscribeWithLocalWhisper(item, language: language)
+                HapticFeedback.play(.retranscribeComplete)
+            } catch {
+                transcriptionErrorMessage = error.localizedDescription
                 HapticFeedback.play(.failure)
             }
         }
@@ -1847,6 +2292,58 @@ struct RecordingDetailView: View {
 
         if let selectedTranslationLanguage {
             requestTranscriptTranslation(to: selectedTranslationLanguage)
+        }
+    }
+
+    private func beginTranscriptLineEdit(_ line: StoredTranscriptLine) {
+        HapticFeedback.play(.menuSelection)
+        editedTranscriptLineText = line.text
+        transcriptLineEditRequest = TranscriptLineEditRequest(line: line)
+    }
+
+    private func saveTranscriptLineEdit() {
+        guard let transcriptLineEditRequest,
+              !isSavingTranscriptLineEdit else {
+            return
+        }
+
+        isSavingTranscriptLineEdit = true
+        do {
+            let updatedItem = try store.updateTranscriptLine(
+                for: currentItem,
+                lineID: transcriptLineEditRequest.lineID,
+                text: editedTranscriptLineText
+            )
+            cachedTranscriptLines = StoredTranscriptLine.parse(store.transcriptText(for: updatedItem))
+            clearTranscriptTranslationState()
+            self.transcriptLineEditRequest = nil
+            HapticFeedback.play(.recordingSaved)
+        } catch {
+            editErrorMessage = error.localizedDescription
+            HapticFeedback.play(.failure)
+        }
+        isSavingTranscriptLineEdit = false
+    }
+
+    private func clearTranscriptTranslationState() {
+        selectedTranslationLanguage = nil
+        translatedTranscriptByLineID = [:]
+        translatedTranscriptCache = [:]
+        translationErrorMessage = nil
+        isTranslatingTranscript = false
+        translationConfiguration = nil
+    }
+
+    private func toggleTranscriptLock() {
+        do {
+            _ = try store.setTranscriptLocked(
+                for: currentItem,
+                isLocked: !currentItem.isTranscriptLocked
+            )
+            HapticFeedback.play(.menuSelection)
+        } catch {
+            editErrorMessage = error.localizedDescription
+            HapticFeedback.play(.failure)
         }
     }
 
@@ -2005,6 +2502,7 @@ struct RecordingDetailView: View {
         let item = currentItem
         editRecordingName = (item.audioFileName as NSString).deletingPathExtension
         editRecordingTags = item.combinedTags
+        editRecordingSummary = item.intelligence?.summary ?? ""
         editRecordingIncludesLocation = item.location != nil
         editLocationProvider.reset()
         isShowingRecordingEditSheet = true
@@ -2029,6 +2527,7 @@ struct RecordingDetailView: View {
                 for: currentItem,
                 proposedName: editRecordingName,
                 manualTags: editRecordingTags,
+                summary: editRecordingSummary,
                 location: location
             )
             HapticFeedback.play(.primaryAction)
@@ -2039,7 +2538,7 @@ struct RecordingDetailView: View {
                 await refreshTranscriptCache()
             }
         } catch {
-            renameErrorMessage = error.localizedDescription
+            editErrorMessage = error.localizedDescription
             HapticFeedback.play(.failure)
         }
         isSavingRecordingEdit = false
@@ -2066,6 +2565,7 @@ private struct RecordingEditSheet: View {
     let item: RecordingItem
     @Binding var recordingName: String
     @Binding var tags: [String]
+    @Binding var summary: String
     @Binding var includesLocation: Bool
     @ObservedObject var locationProvider: RecordingEditLocationProvider
     let isSaving: Bool
@@ -2077,6 +2577,7 @@ private struct RecordingEditSheet: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: 14) {
                     nameSection
+                    summarySection
                     tagsEntry
                     durationRow
                     locationSection
@@ -2125,6 +2626,36 @@ private struct RecordingEditSheet: View {
                 .padding(.horizontal, 12)
                 .frame(height: 48)
                 .background(AppTheme.elevatedBackground, in: RoundedRectangle(cornerRadius: AppTheme.compactCornerRadius, style: .continuous))
+        }
+        .recordingEditSectionSurface()
+    }
+
+    private var summarySection: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Label(localized(L10n.Recordings.summary), systemImage: "text.alignleft")
+                .font(.redditSans(.caption, weight: .semibold))
+                .foregroundStyle(.secondary)
+
+            ZStack(alignment: .topLeading) {
+                if summary.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                    Text(L10n.Recordings.summaryPlaceholder)
+                        .font(.redditSans(.body))
+                        .foregroundStyle(.tertiary)
+                        .padding(.horizontal, 5)
+                        .padding(.vertical, 8)
+                        .allowsHitTesting(false)
+                }
+
+                TextEditor(text: $summary)
+                    .font(.redditSans(.body))
+                    .scrollContentBackground(.hidden)
+                    .frame(minHeight: 112)
+                    .padding(.horizontal, -4)
+                    .background(Color.clear)
+            }
+            .padding(.horizontal, 12)
+            .padding(.vertical, 8)
+            .background(AppTheme.elevatedBackground, in: RoundedRectangle(cornerRadius: AppTheme.compactCornerRadius, style: .continuous))
         }
         .recordingEditSectionSurface()
     }
@@ -2858,6 +3389,7 @@ private struct StoredTranscriptLineRow: View {
     let isShowingTranslation: Bool
     let isCurrent: Bool
     let onTap: () -> Void
+    let onEdit: () -> Void
 
     var body: some View {
         Button(action: onTap) {
@@ -2898,6 +3430,20 @@ private struct StoredTranscriptLineRow: View {
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
+        .contextMenu {
+            Button {
+                HapticFeedback.play(.copy)
+                UIPasteboard.general.string = line.text
+            } label: {
+                Label(localized(L10n.Common.copy), systemImage: "doc.on.doc")
+            }
+
+            Button {
+                onEdit()
+            } label: {
+                Label(localized(L10n.Recordings.editTranscriptLine), systemImage: "pencil")
+            }
+        }
         .accessibilityLabel(accessibilityText)
     }
 

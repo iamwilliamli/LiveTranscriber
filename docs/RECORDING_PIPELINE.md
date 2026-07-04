@@ -23,12 +23,13 @@ CMSampleBuffer
   -> AVAudioPCMBuffer source
   -> recording converter: 48 kHz or session sample rate / stereo / Float32 / non-interleaved
      -> AudioFileWriter
-  -> analyzer converter: same sample rate / mono / Float32 / non-interleaved
-     -> AnalyzerInputPipeline
-     -> SpeechAnalyzer
+  -> live transcription converter:
+     same sample rate / mono / Float32 / non-interleaved
+       -> AnalyzerInputPipeline
+       -> SpeechAnalyzer
 ```
 
-The stereo file path and mono analyzer path are intentionally separate. The app writes the stereo buffer first, then sends the mono buffer to the live SpeechAnalyzer pipeline.
+The stereo file path and mono transcription path are intentionally separate. The app writes the stereo buffer first, then sends the mono buffer to the Apple live transcription pipeline.
 
 Current target formats:
 
@@ -39,7 +40,7 @@ recordingFormat:
   channels = 2
   interleaved = false
 
-analyzerSourceFormat:
+Apple analyzerSourceFormat:
   commonFormat = .pcmFormatFloat32
   sampleRate = recordingFormat.sampleRate
   channels = 1
@@ -58,6 +59,14 @@ Diagnostics:
 
 - Recording Details shows the saved file parameters, including sample rate and whether the saved file is mono or stereo.
 - Xcode logs include capture setup, first-buffer format, and conversion failures for debugging.
+
+## Live Transcription Backend
+
+Live recording uses the Apple on-device backend:
+
+- Apple On-Device: the default local path using `SpeechAnalyzer` and `SpeechTranscriber`.
+
+Saved recordings can still be manually re-transcribed with OpenAI file transcription from the recording detail menu. That path uploads the selected saved recording file only after explicit user action and is not part of live microphone transcription.
 
 ## Speech Analyzer Pipelines
 
@@ -115,12 +124,20 @@ AnalyzerInput retiming:
 
 The important detail is that the app does not pass `nil` audio times into the converter during live recording. It supplies a synthetic monotonic `AVAudioTime`, then rebuilds each emitted `AnalyzerInput.bufferStartTime` with exact frame-count accumulation. This avoids `Audio input timestamp overlaps or precedes prior audio input` failures when the input tap or converter emits buffers with ambiguous timestamps.
 
+## OpenAI Saved-Recording Re-Transcription
+
+OpenAI is used only for manual re-transcription of saved recordings. The user supplies their own OpenAI API key in Settings; the key is stored in Keychain and used directly from the iPhone when the user chooses an OpenAI transcription action.
+
+- Long-form mode: `gpt-4o-transcribe`, JSON response, one transcript block starting at 0 seconds.
+- Segmented mode: `whisper-1`, `verbose_json`, `timestamp_granularities[]=segment`, preserving segment timestamps from the API response.
+- Standard developer-owned OpenAI API keys must not be bundled into the app.
+
 ## Stop Stage
 
 When recording stops:
 
 1. Stop the `AVCaptureSession`.
-2. Finish the analyzer pipeline and wait for SpeechAnalyzer to flush final transcript results.
+2. Finish the Apple analyzer pipeline and wait for SpeechAnalyzer to flush final transcript results.
 3. Return a recording draft with the captured audio URL, transcript lines, language metadata, and elapsed duration.
 4. Let `TranscriptionView` present the save sheet before the draft is committed to the library.
 

@@ -41,6 +41,12 @@
 		7B0000000000000000000022 /* Semantic.xcstrings in Resources */ = {isa = PBXBuildFile; fileRef = 7B0000000000000000001022 /* Semantic.xcstrings */; };
 		7B0000000000000000000023 /* StructuredFoundationModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7B0000000000000000001027 /* StructuredFoundationModels.swift */; };
 		7B0000000000000000000024 /* LiveTranscriberStructuredFoundationModels.framework in Embed Frameworks */ = {isa = PBXBuildFile; fileRef = 7B0000000000000000001028 /* LiveTranscriberStructuredFoundationModels.framework */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
+		7B0000000000000000000025 /* OpenAITranscription.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7B0000000000000000001029 /* OpenAITranscription.swift */; };
+		7B0000000000000000000026 /* TranscriptLineEditSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7B000000000000000000102A /* TranscriptLineEditSheet.swift */; };
+		7B0000000000000000000027 /* LocalWhisperTranscription.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7B000000000000000000102B /* LocalWhisperTranscription.swift */; };
+		7B0000000000000000000028 /* LocalWhisperBridge.m in Sources */ = {isa = PBXBuildFile; fileRef = 7B000000000000000000102D /* LocalWhisperBridge.m */; };
+		7B0000000000000000000029 /* whisper.xcframework in Frameworks */ = {isa = PBXBuildFile; fileRef = 7B000000000000000000102F /* whisper.xcframework */; };
+		7B000000000000000000002A /* whisper.xcframework in Embed Frameworks */ = {isa = PBXBuildFile; fileRef = 7B000000000000000000102F /* whisper.xcframework */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -79,6 +85,7 @@
 			dstSubfolderSpec = 10;
 			files = (
 				7B0000000000000000000024 /* LiveTranscriberStructuredFoundationModels.framework in Embed Frameworks */,
+				7B000000000000000000002A /* whisper.xcframework in Embed Frameworks */,
 			);
 			name = "Embed Frameworks";
 			runOnlyForDeploymentPostprocessing = 0;
@@ -123,6 +130,13 @@
 		7B0000000000000000001022 /* Semantic.xcstrings */ = {isa = PBXFileReference; lastKnownFileType = text.json.xcstrings; path = Semantic.xcstrings; sourceTree = "<group>"; };
 		7B0000000000000000001027 /* StructuredFoundationModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StructuredFoundationModels.swift; sourceTree = "<group>"; };
 		7B0000000000000000001028 /* LiveTranscriberStructuredFoundationModels.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; includeInIndex = 0; path = LiveTranscriberStructuredFoundationModels.framework; sourceTree = BUILT_PRODUCTS_DIR; };
+		7B0000000000000000001029 /* OpenAITranscription.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OpenAITranscription.swift; sourceTree = "<group>"; };
+		7B000000000000000000102A /* TranscriptLineEditSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TranscriptLineEditSheet.swift; sourceTree = "<group>"; };
+		7B000000000000000000102B /* LocalWhisperTranscription.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocalWhisperTranscription.swift; sourceTree = "<group>"; };
+		7B000000000000000000102C /* LocalWhisperBridge.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = LocalWhisperBridge.h; sourceTree = "<group>"; };
+		7B000000000000000000102D /* LocalWhisperBridge.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = LocalWhisperBridge.m; sourceTree = "<group>"; };
+		7B000000000000000000102E /* LiveTranscriber-Bridging-Header.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = "LiveTranscriber-Bridging-Header.h"; sourceTree = "<group>"; };
+		7B000000000000000000102F /* whisper.xcframework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.xcframework; path = whisper.xcframework; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -130,6 +144,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				7B0000000000000000000029 /* whisper.xcframework in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -156,6 +171,7 @@
 				7B0000000000000000003002 /* LiveTranscriber */,
 				7B0000000000000000003004 /* LiveTranscriberWidget */,
 				7B0000000000000000003005 /* LiveTranscriberStructuredFoundationModels */,
+				7B0000000000000000003011 /* Vendor */,
 				7B0000000000000000003003 /* Products */,
 			);
 			sourceTree = "<group>";
@@ -169,11 +185,17 @@
 				7B0000000000000000001004 /* ContentView.swift */,
 				7B0000000000000000001005 /* TranscriptionView.swift */,
 				7B0000000000000000001006 /* LiveTranscriptionManager.swift */,
+				7B0000000000000000001029 /* OpenAITranscription.swift */,
+				7B000000000000000000102B /* LocalWhisperTranscription.swift */,
+				7B000000000000000000102C /* LocalWhisperBridge.h */,
+				7B000000000000000000102D /* LocalWhisperBridge.m */,
+				7B000000000000000000102E /* LiveTranscriber-Bridging-Header.h */,
 				7B0000000000000000001015 /* TranscriptionLanguage.swift */,
 				7B0000000000000000001020 /* HapticFeedback.swift */,
 				7B0000000000000000001021 /* L10n.swift */,
 				7B0000000000000000001016 /* RecordingStore.swift */,
 				7B0000000000000000001017 /* RecordingsView.swift */,
+				7B000000000000000000102A /* TranscriptLineEditSheet.swift */,
 				7B0000000000000000001018 /* SettingsView.swift */,
 				7B0000000000000000001019 /* TranscriptionActivityAttributes.swift */,
 				7B000000000000000000101A /* TranscriptionLiveActivityCoordinator.swift */,
@@ -226,6 +248,14 @@
 				7B0000000000000000001014 /* RedditSans-Italic.ttf */,
 			);
 			path = Fonts;
+			sourceTree = "<group>";
+		};
+		7B0000000000000000003011 /* Vendor */ = {
+			isa = PBXGroup;
+			children = (
+				7B000000000000000000102F /* whisper.xcframework */,
+			);
+			path = Vendor;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -373,11 +403,15 @@
 				7B0000000000000000000004 /* ContentView.swift in Sources */,
 				7B0000000000000000000005 /* TranscriptionView.swift in Sources */,
 				7B0000000000000000000006 /* LiveTranscriptionManager.swift in Sources */,
+				7B0000000000000000000025 /* OpenAITranscription.swift in Sources */,
+				7B0000000000000000000027 /* LocalWhisperTranscription.swift in Sources */,
+				7B0000000000000000000028 /* LocalWhisperBridge.m in Sources */,
 				7B0000000000000000000011 /* TranscriptionLanguage.swift in Sources */,
 				7B0000000000000000000012 /* RecordingStore.swift in Sources */,
 				7B0000000000000000000020 /* HapticFeedback.swift in Sources */,
 				7B0000000000000000000021 /* L10n.swift in Sources */,
 				7B0000000000000000000013 /* RecordingsView.swift in Sources */,
+				7B0000000000000000000026 /* TranscriptLineEditSheet.swift in Sources */,
 				7B0000000000000000000014 /* SettingsView.swift in Sources */,
 				7B0000000000000000000015 /* TranscriptionActivityAttributes.swift in Sources */,
 				7B0000000000000000000016 /* TranscriptionLiveActivityCoordinator.swift in Sources */,
@@ -585,6 +619,7 @@
 				"SWIFT_ACTIVE_COMPILATION_CONDITIONS[sdk=iphoneos27.*]" = "DEBUG HAS_IOS27_SDK";
 				"SWIFT_ACTIVE_COMPILATION_CONDITIONS[sdk=iphonesimulator27.*]" = "DEBUG HAS_IOS27_SDK";
 				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_OBJC_BRIDGING_HEADER = "LiveTranscriber/LiveTranscriber-Bridging-Header.h";
 				SWIFT_VERSION = 5.0;
 				TARGETED_DEVICE_FAMILY = "1,2";
 			};
@@ -613,6 +648,7 @@
 				"SWIFT_ACTIVE_COMPILATION_CONDITIONS[sdk=iphoneos27.*]" = HAS_IOS27_SDK;
 				"SWIFT_ACTIVE_COMPILATION_CONDITIONS[sdk=iphonesimulator27.*]" = HAS_IOS27_SDK;
 				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_OBJC_BRIDGING_HEADER = "LiveTranscriber/LiveTranscriber-Bridging-Header.h";
 				SWIFT_VERSION = 5.0;
 				TARGETED_DEVICE_FAMILY = "1,2";
 			};

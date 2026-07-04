@@ -3,6 +3,7 @@ import CoreLocation
 import MapKit
 import SwiftUI
 import Translation
+import UIKit
 
 private func localized(_ resource: LocalizedStringResource) -> String {
     String(localized: resource)
@@ -34,6 +35,11 @@ struct TranscriptionView: View {
     @State private var isTranslatingLiveTranscript = false
     @State private var liveTranslationErrorMessage: String?
     @State private var isShowingLiveTranslationLanguagePicker = false
+    @State private var pendingSpeechLocaleReleaseAction: PendingTranscriptionSpeechLocaleReleaseAction?
+    @State private var speechLocaleErrorMessage: String?
+    @State private var liveTranscriptLineEditRequest: LiveTranscriptLineEditRequest?
+    @State private var editedLiveTranscriptLineText = ""
+    @State private var isSavingLiveTranscriptLineEdit = false
 
     private var isCompletingRecording: Bool {
         pendingRecordingSave != nil || isSavingPendingRecording
@@ -107,6 +113,56 @@ struct TranscriptionView: View {
             )
             .presentationDetents([.medium, .large])
             .presentationDragIndicator(.visible)
+        }
+        .sheet(item: $liveTranscriptLineEditRequest) { request in
+            TranscriptLineEditSheet(
+                timeText: request.timeText,
+                text: $editedLiveTranscriptLineText,
+                isSaving: isSavingLiveTranscriptLineEdit,
+                onSave: saveLiveTranscriptLineEdit,
+                onCancel: {
+                    liveTranscriptLineEditRequest = nil
+                }
+            )
+            .interactiveDismissDisabled(isSavingLiveTranscriptLineEdit)
+            .presentationDetents([.medium, .large])
+            .presentationDragIndicator(.visible)
+        }
+        .alert(
+            localized(L10n.SpeechText.releaseOldLanguagesTitle),
+            isPresented: Binding(
+                get: { pendingSpeechLocaleReleaseAction != nil },
+                set: { isPresented in
+                    if !isPresented {
+                        pendingSpeechLocaleReleaseAction = nil
+                    }
+                }
+            )
+        ) {
+            Button(localized(L10n.SpeechText.releaseOldLanguagesAction), role: .destructive) {
+                if let pendingSpeechLocaleReleaseAction {
+                    releaseSpeechLocalesAndContinue(pendingSpeechLocaleReleaseAction)
+                }
+                pendingSpeechLocaleReleaseAction = nil
+            }
+            Button(localized(L10n.Common.cancel), role: .cancel) {}
+        } message: {
+            Text(pendingSpeechLocaleReleaseAction?.request.messageText ?? "")
+        }
+        .alert(
+            localized(L10n.SpeechText.localeSetupFailed),
+            isPresented: Binding(
+                get: { speechLocaleErrorMessage != nil },
+                set: { isPresented in
+                    if !isPresented {
+                        speechLocaleErrorMessage = nil
+                    }
+                }
+            )
+        ) {
+            Button(localized(L10n.Common.ok), role: .cancel) {}
+        } message: {
+            Text(speechLocaleErrorMessage ?? "")
         }
         .sheet(item: $pendingRecordingSave) { pendingSave in
             RecordingSaveSheet(
@@ -270,8 +326,7 @@ struct TranscriptionView: View {
         Menu {
                 ForEach(transcriber.supportedLanguages) { language in
                     Button {
-                        HapticFeedback.play(.menuSelection)
-                        transcriber.selectedLanguageID = language.id
+                        requestLanguageSelection(language)
                     } label: {
                         Label(
                             language.displayName,
@@ -288,6 +343,59 @@ struct TranscriptionView: View {
         }
         .buttonStyle(.plain)
         .disabled(transcriber.isRecording || transcriber.isPreparing)
+    }
+
+    private func requestLanguageSelection(_ language: TranscriptionLanguage) {
+        HapticFeedback.play(.menuSelection)
+        guard language.id != transcriber.selectedLanguageID else {
+            return
+        }
+
+        guard transcriber.selectedTranscriptionBackend.requiresAppleSpeech else {
+            transcriber.selectedLanguageID = language.id
+            return
+        }
+
+        Task {
+            do {
+                let preparation = try await transcriber.prepareSpeechLocaleForUse(
+                    language,
+                    preservingLanguageIDs: [transcriber.selectedLanguageID]
+                )
+                switch preparation {
+                case .ready:
+                    transcriber.selectedLanguageID = language.id
+                case .needsRelease(let request):
+                    pendingSpeechLocaleReleaseAction = PendingTranscriptionSpeechLocaleReleaseAction(
+                        request: request,
+                        operation: .selectLanguage
+                    )
+                    HapticFeedback.play(.warning)
+                }
+            } catch {
+                speechLocaleErrorMessage = error.localizedDescription
+                HapticFeedback.play(.failure)
+            }
+        }
+    }
+
+    private func releaseSpeechLocalesAndContinue(_ pendingAction: PendingTranscriptionSpeechLocaleReleaseAction) {
+        Task {
+            do {
+                try await transcriber.releaseSpeechLocalesAndReserveTarget(pendingAction.request)
+                switch pendingAction.operation {
+                case .selectLanguage:
+                    transcriber.selectedLanguageID = pendingAction.request.targetLanguage.id
+                    HapticFeedback.play(.menuSelection)
+                case .startRecording:
+                    HapticFeedback.play(.recordingStart)
+                    await transcriber.startRecording()
+                }
+            } catch {
+                speechLocaleErrorMessage = error.localizedDescription
+                HapticFeedback.play(.failure)
+            }
+        }
     }
 
     @ViewBuilder
@@ -353,10 +461,36 @@ struct TranscriptionView: View {
         guard !isCompletingRecording else {
             return
         }
-        HapticFeedback.play(.recordingStart)
         hideSavedRecordingBanner()
+        guard transcriber.selectedTranscriptionBackend.requiresAppleSpeech else {
+            HapticFeedback.play(.recordingStart)
+            Task {
+                await transcriber.startRecording()
+            }
+            return
+        }
+
         Task {
-            await transcriber.startRecording()
+            do {
+                let preparation = try await transcriber.prepareSpeechLocaleForUse(
+                    transcriber.selectedLanguage,
+                    preservingLanguageIDs: [transcriber.selectedLanguageID]
+                )
+                switch preparation {
+                case .ready:
+                    HapticFeedback.play(.recordingStart)
+                    await transcriber.startRecording()
+                case .needsRelease(let request):
+                    pendingSpeechLocaleReleaseAction = PendingTranscriptionSpeechLocaleReleaseAction(
+                        request: request,
+                        operation: .startRecording
+                    )
+                    HapticFeedback.play(.warning)
+                }
+            } catch {
+                speechLocaleErrorMessage = error.localizedDescription
+                HapticFeedback.play(.failure)
+            }
         }
     }
 
@@ -452,6 +586,33 @@ struct TranscriptionView: View {
         HapticFeedback.play(.deleteConfirmed)
     }
 
+    private func beginLiveTranscriptLineEdit(_ line: TranscriptionLine) {
+        guard line.isFinal else {
+            return
+        }
+        HapticFeedback.play(.menuSelection)
+        editedLiveTranscriptLineText = line.text
+        liveTranscriptLineEditRequest = LiveTranscriptLineEditRequest(line: line)
+    }
+
+    private func saveLiveTranscriptLineEdit() {
+        guard let liveTranscriptLineEditRequest,
+              !isSavingLiveTranscriptLineEdit else {
+            return
+        }
+
+        isSavingLiveTranscriptLineEdit = true
+        transcriber.updateFinalTranscriptLine(
+            id: liveTranscriptLineEditRequest.lineID,
+            text: editedLiveTranscriptLineText
+        )
+        translatedLiveTranscriptByLineID[liveTranscriptLineEditRequest.lineID] = nil
+        liveTranslatedLineSignatures[liveTranscriptLineEditRequest.lineID] = nil
+        self.liveTranscriptLineEditRequest = nil
+        HapticFeedback.play(.recordingSaved)
+        isSavingLiveTranscriptLineEdit = false
+    }
+
     private func showSavedRecordingBanner(fileName: String) {
         savedRecordingBannerTask?.cancel()
         savedRecordingName = fileName
@@ -514,7 +675,8 @@ struct TranscriptionView: View {
                 translatedTextByLineID: translatedLiveTranscriptByLineID,
                 translatedLineSignatures: liveTranslatedLineSignatures,
                 isTranslating: isTranslatingLiveTranscript,
-                selectedTranslationLanguage: selectedLiveTranslationLanguage
+                selectedTranslationLanguage: selectedLiveTranslationLanguage,
+                onEditFinalLine: beginLiveTranscriptLineEdit
             )
         }
         .padding(14)
@@ -733,6 +895,20 @@ struct TranscriptionView: View {
 private struct PendingRecordingSave: Identifiable {
     let id = UUID()
     let draft: RecordingDraft
+}
+
+private struct PendingTranscriptionSpeechLocaleReleaseAction: Identifiable {
+    let request: SpeechLocaleReleaseRequest
+    let operation: TranscriptionSpeechLocaleReleaseOperation
+
+    var id: UUID {
+        request.id
+    }
+}
+
+private enum TranscriptionSpeechLocaleReleaseOperation {
+    case selectLanguage
+    case startRecording
 }
 
 private struct RecordingElapsedTimeText: View {
@@ -1430,6 +1606,20 @@ private struct LiveTranscriptLineCount: View {
     }
 }
 
+private struct LiveTranscriptLineEditRequest: Identifiable {
+    let lineID: TranscriptionLine.ID
+    let timeText: String
+
+    var id: TranscriptionLine.ID {
+        lineID
+    }
+
+    init(line: TranscriptionLine) {
+        lineID = line.id
+        timeText = line.timestampText
+    }
+}
+
 private struct LiveTranscriptRows: View {
     @ObservedObject var finalStore: LiveFinalTranscriptStore
     @ObservedObject var interimStore: LiveInterimTranscriptStore
@@ -1437,6 +1627,7 @@ private struct LiveTranscriptRows: View {
     let translatedLineSignatures: [TranscriptionLine.ID: String]
     let isTranslating: Bool
     let selectedTranslationLanguage: TranscriptionLanguage?
+    let onEditFinalLine: (TranscriptionLine) -> Void
 
     private var totalLineCount: Int {
         finalStore.lines.count + (interimStore.line == nil ? 0 : 1)
@@ -1458,7 +1649,8 @@ private struct LiveTranscriptRows: View {
                             translatedTextByLineID: translatedTextByLineID,
                             translatedLineSignatures: translatedLineSignatures,
                             isTranslating: isTranslating,
-                            selectedTranslationLanguage: selectedTranslationLanguage
+                            selectedTranslationLanguage: selectedTranslationLanguage,
+                            onEdit: onEditFinalLine
                         )
                     }
                     .padding(.vertical, 2)
@@ -1487,7 +1679,8 @@ private struct LiveInterimTranscriptRow: View {
             TranscriptionLineRow(
                 line: line,
                 translatedText: nil,
-                isShowingTranslation: false
+                isShowingTranslation: false,
+                onEdit: nil
             )
         }
     }
@@ -1499,13 +1692,17 @@ private struct LiveFinalTranscriptRows: View {
     let translatedLineSignatures: [TranscriptionLine.ID: String]
     let isTranslating: Bool
     let selectedTranslationLanguage: TranscriptionLanguage?
+    let onEdit: (TranscriptionLine) -> Void
 
     var body: some View {
         ForEach(finalStore.lines.reversed()) { line in
             TranscriptionLineRow(
                 line: line,
                 translatedText: translatedTextByLineID[line.id],
-                isShowingTranslation: isShowingTranslationPlaceholder(for: line)
+                isShowingTranslation: isShowingTranslationPlaceholder(for: line),
+                onEdit: {
+                    onEdit(line)
+                }
             )
         }
     }
@@ -1527,6 +1724,7 @@ private struct TranscriptionLineRow: View {
     let line: TranscriptionLine
     let translatedText: String?
     let isShowingTranslation: Bool
+    let onEdit: (() -> Void)?
 
     var body: some View {
         HStack(alignment: .top, spacing: 10) {
@@ -1561,6 +1759,22 @@ private struct TranscriptionLineRow: View {
             }
         }
         .padding(.vertical, 2)
+        .contextMenu {
+            Button {
+                HapticFeedback.play(.copy)
+                UIPasteboard.general.string = line.text
+            } label: {
+                Label(localized(L10n.Common.copy), systemImage: "doc.on.doc")
+            }
+
+            if let onEdit {
+                Button {
+                    onEdit()
+                } label: {
+                    Label(localized(L10n.Recordings.editTranscriptLine), systemImage: "pencil")
+                }
+            }
+        }
         .accessibilityLabel(accessibilityText)
     }
 

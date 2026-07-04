@@ -18,3 +18,10 @@ Third-party notices:
 
 Reddit Sans is included under the SIL Open Font License, Version 1.1. See
 LiveTranscriber/Fonts/OFL.txt for the full font license and copyright notice.
+
+whisper.cpp is included under the MIT License.
+Source: https://github.com/ggml-org/whisper.cpp
+
+Optional local Whisper ggml model files are downloaded on demand from the
+ggerganov/whisper.cpp Hugging Face repository:
+https://huggingface.co/ggerganov/whisper.cpp

@@ -8,6 +8,8 @@ struct ContentView: View {
     @State private var selectedTab: AppTab = .transcribe
     @State private var incomingRecordingImportURL: URL?
     @State private var pendingRecordingDraftFromLiveActivity: RecordingDraft?
+    @State private var pendingDeepLinkSpeechLocaleReleaseRequest: SpeechLocaleReleaseRequest?
+    @State private var speechLocaleErrorMessage: String?
 
     var body: some View {
         TabView(selection: tabSelection) {
@@ -46,6 +48,42 @@ struct ContentView: View {
         }
         .onOpenURL { url in
             handleOpenedURL(url)
+        }
+        .alert(
+            String(localized: L10n.SpeechText.releaseOldLanguagesTitle),
+            isPresented: Binding(
+                get: { pendingDeepLinkSpeechLocaleReleaseRequest != nil },
+                set: { isPresented in
+                    if !isPresented {
+                        pendingDeepLinkSpeechLocaleReleaseRequest = nil
+                    }
+                }
+            )
+        ) {
+            Button(String(localized: L10n.SpeechText.releaseOldLanguagesAction), role: .destructive) {
+                if let pendingDeepLinkSpeechLocaleReleaseRequest {
+                    releaseSpeechLocalesAndStartRecording(pendingDeepLinkSpeechLocaleReleaseRequest)
+                }
+                pendingDeepLinkSpeechLocaleReleaseRequest = nil
+            }
+            Button(String(localized: L10n.Common.cancel), role: .cancel) {}
+        } message: {
+            Text(pendingDeepLinkSpeechLocaleReleaseRequest?.messageText ?? "")
+        }
+        .alert(
+            String(localized: L10n.SpeechText.localeSetupFailed),
+            isPresented: Binding(
+                get: { speechLocaleErrorMessage != nil },
+                set: { isPresented in
+                    if !isPresented {
+                        speechLocaleErrorMessage = nil
+                    }
+                }
+            )
+        ) {
+            Button(String(localized: L10n.Common.ok), role: .cancel) {}
+        } message: {
+            Text(speechLocaleErrorMessage ?? "")
         }
     }
 
@@ -121,9 +159,47 @@ struct ContentView: View {
             return
         }
 
-        HapticFeedback.play(.recordingStart)
+        guard transcriber.selectedTranscriptionBackend.requiresAppleSpeech else {
+            HapticFeedback.play(.recordingStart)
+            Task {
+                await transcriber.startRecording()
+            }
+            return
+        }
+
         Task {
-            await transcriber.startRecording()
+            do {
+                let preparation = try await transcriber.prepareSpeechLocaleForUse(
+                    transcriber.selectedLanguage,
+                    preservingLanguageIDs: [transcriber.selectedLanguageID]
+                )
+                switch preparation {
+                case .ready:
+                    HapticFeedback.play(.recordingStart)
+                    await transcriber.startRecording()
+                case .needsRelease(let request):
+                    selectedTab = .transcribe
+                    pendingDeepLinkSpeechLocaleReleaseRequest = request
+                    HapticFeedback.play(.warning)
+                }
+            } catch {
+                speechLocaleErrorMessage = error.localizedDescription
+                HapticFeedback.play(.failure)
+            }
+        }
+    }
+
+    private func releaseSpeechLocalesAndStartRecording(_ request: SpeechLocaleReleaseRequest) {
+        Task {
+            do {
+                try await transcriber.releaseSpeechLocalesAndReserveTarget(request)
+                selectedTab = .transcribe
+                HapticFeedback.play(.recordingStart)
+                await transcriber.startRecording()
+            } catch {
+                speechLocaleErrorMessage = error.localizedDescription
+                HapticFeedback.play(.failure)
+            }
         }
     }
 
