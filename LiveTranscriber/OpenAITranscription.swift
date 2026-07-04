@@ -4,6 +4,7 @@ import Security
 
 enum LiveTranscriptionBackend: String, CaseIterable, Identifiable, Codable, Sendable {
     case appleOnDevice
+    case localWhisperBeta
 
     var id: String {
         rawValue
@@ -17,6 +18,8 @@ enum LiveTranscriptionBackend: String, CaseIterable, Identifiable, Codable, Send
         switch self {
         case .appleOnDevice:
             return L10n.TranscriptionBackend.appleOnDeviceTitle
+        case .localWhisperBeta:
+            return L10n.TranscriptionBackend.localWhisperBetaTitle
         }
     }
 
@@ -24,11 +27,27 @@ enum LiveTranscriptionBackend: String, CaseIterable, Identifiable, Codable, Send
         switch self {
         case .appleOnDevice:
             return L10n.TranscriptionBackend.appleOnDeviceDetail
+        case .localWhisperBeta:
+            return L10n.TranscriptionBackend.localWhisperBetaDetail
         }
     }
 
     var requiresAppleSpeech: Bool {
-        true
+        switch self {
+        case .appleOnDevice:
+            return true
+        case .localWhisperBeta:
+            return false
+        }
+    }
+
+    var usesLocalWhisper: Bool {
+        switch self {
+        case .appleOnDevice:
+            return false
+        case .localWhisperBeta:
+            return true
+        }
     }
 
     static var defaultBackend: LiveTranscriptionBackend {

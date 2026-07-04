@@ -47,6 +47,8 @@
 		7B0000000000000000000028 /* LocalWhisperBridge.m in Sources */ = {isa = PBXBuildFile; fileRef = 7B000000000000000000102D /* LocalWhisperBridge.m */; };
 		7B0000000000000000000029 /* whisper.xcframework in Frameworks */ = {isa = PBXBuildFile; fileRef = 7B000000000000000000102F /* whisper.xcframework */; };
 		7B000000000000000000002A /* whisper.xcframework in Embed Frameworks */ = {isa = PBXBuildFile; fileRef = 7B000000000000000000102F /* whisper.xcframework */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
+		7B000000000000000000002B /* AppleTranslationLanguages.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7B0000000000000000001030 /* AppleTranslationLanguages.swift */; };
+		7B000000000000000000002C /* AppleSpeechTranscriptionSupport.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7B0000000000000000001031 /* AppleSpeechTranscriptionSupport.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -137,6 +139,8 @@
 		7B000000000000000000102D /* LocalWhisperBridge.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = LocalWhisperBridge.m; sourceTree = "<group>"; };
 		7B000000000000000000102E /* LiveTranscriber-Bridging-Header.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = "LiveTranscriber-Bridging-Header.h"; sourceTree = "<group>"; };
 		7B000000000000000000102F /* whisper.xcframework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.xcframework; path = whisper.xcframework; sourceTree = "<group>"; };
+		7B0000000000000000001030 /* AppleTranslationLanguages.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppleTranslationLanguages.swift; sourceTree = "<group>"; };
+		7B0000000000000000001031 /* AppleSpeechTranscriptionSupport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppleSpeechTranscriptionSupport.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -185,6 +189,8 @@
 				7B0000000000000000001004 /* ContentView.swift */,
 				7B0000000000000000001005 /* TranscriptionView.swift */,
 				7B0000000000000000001006 /* LiveTranscriptionManager.swift */,
+				7B0000000000000000001030 /* AppleTranslationLanguages.swift */,
+				7B0000000000000000001031 /* AppleSpeechTranscriptionSupport.swift */,
 				7B0000000000000000001029 /* OpenAITranscription.swift */,
 				7B000000000000000000102B /* LocalWhisperTranscription.swift */,
 				7B000000000000000000102C /* LocalWhisperBridge.h */,
@@ -403,6 +409,8 @@
 				7B0000000000000000000004 /* ContentView.swift in Sources */,
 				7B0000000000000000000005 /* TranscriptionView.swift in Sources */,
 				7B0000000000000000000006 /* LiveTranscriptionManager.swift in Sources */,
+				7B000000000000000000002B /* AppleTranslationLanguages.swift in Sources */,
+				7B000000000000000000002C /* AppleSpeechTranscriptionSupport.swift in Sources */,
 				7B0000000000000000000025 /* OpenAITranscription.swift in Sources */,
 				7B0000000000000000000027 /* LocalWhisperTranscription.swift in Sources */,
 				7B0000000000000000000028 /* LocalWhisperBridge.m in Sources */,

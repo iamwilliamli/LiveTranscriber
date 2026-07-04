@@ -124,6 +124,14 @@ final class LiveTranscriptionManager: ObservableObject {
             if !isRecording && !isPreparing {
                 statusText = String(localized: L10n.RecordingStatus.ready)
             }
+            Task { @MainActor in
+                await self.refreshSupportedLanguages()
+            }
+        }
+    }
+    @Published var isOpenAITranscriptionEnabled: Bool {
+        didSet {
+            UserDefaults.standard.set(isOpenAITranscriptionEnabled, forKey: Self.openAITranscriptionEnabledDefaultsKey)
         }
     }
     @Published var openAIAPIKey: String {
@@ -140,6 +148,7 @@ final class LiveTranscriptionManager: ObservableObject {
     private static let audioFormatDefaultsKey = "recording.audioFormat"
     private static let speechPipelineModeDefaultsKey = "speech.pipelineMode"
     private static let transcriptionBackendDefaultsKey = "transcription.backend"
+    private static let openAITranscriptionEnabledDefaultsKey = "openai.transcription.enabled"
     private static let analyzerSampleRate: Double = 16_000
     private static let inputLevelHistoryCount = 72
     private static let inputLevelHistorySampleInterval: TimeInterval = 0.08
@@ -148,6 +157,7 @@ final class LiveTranscriptionManager: ObservableObject {
     private var analyzer: SpeechAnalyzer?
     private var speechTranscriber: SpeechTranscriber?
     private var analyzerPipeline: AnalyzerInputPipeline?
+    private var localWhisperPipeline: LiveLocalWhisperPipeline?
     private var captureRecordingPipeline: CaptureSessionRecordingPipeline?
     private var audioWriter: AudioFileWriter?
     private var analyzerTask: Task<Void, Never>?
@@ -196,6 +206,10 @@ final class LiveTranscriptionManager: ObservableObject {
         )
     }
 
+    var selectedLocalWhisperLiveModel: LocalWhisperModel? {
+        LocalWhisperModelManager.selectedLiveModel
+    }
+
     init() {
         selectedLanguageID = UserDefaults.standard.string(forKey: Self.languageDefaultsKey) ?? TranscriptionLanguage.defaultLanguageID
         if let rawMode = UserDefaults.standard.string(forKey: Self.speechPipelineModeDefaultsKey),
@@ -220,26 +234,84 @@ final class LiveTranscriptionManager: ObservableObject {
             selectedTranscriptionBackend = .defaultBackend
         }
 
+        isOpenAITranscriptionEnabled = UserDefaults.standard.bool(forKey: Self.openAITranscriptionEnabledDefaultsKey)
         openAIAPIKey = (try? OpenAIAPIKeyStore.load()) ?? ""
     }
 
     func refreshSupportedLanguages() async {
-        let locales = await SpeechTranscriber.supportedLocales
-        let languages = locales
-            .map { TranscriptionLanguage(id: $0.identifier) }
-            .sorted { $0.displayName.localizedCaseInsensitiveCompare($1.displayName) == .orderedAscending }
+        let languages: [TranscriptionLanguage]
+        if selectedTranscriptionBackend.usesLocalWhisper {
+            guard let liveModel = LocalWhisperModelManager.selectedLiveModel else {
+                supportedLanguages = []
+                return
+            }
+            languages = LocalWhisperTranscriptionService.supportedLanguages(for: liveModel)
+        } else {
+            languages = await AppleSpeechTranscriptionSupport.supportedLanguages()
+        }
 
         if !languages.isEmpty {
             supportedLanguages = languages
             if !languages.contains(where: { $0.id == selectedLanguageID }) {
-                if let equivalent = await SpeechTranscriber.supportedLocale(equivalentTo: Locale(identifier: selectedLanguageID)) {
-                    selectedLanguageID = equivalent.identifier
-                } else if let preferred = languages.first(where: { $0.id == TranscriptionLanguage.defaultLanguageID }) {
+                if let equivalent = await equivalentSupportedLanguage(for: selectedLanguageID, in: languages) {
+                    selectedLanguageID = equivalent.id
+                } else if let preferred = preferredSupportedLanguage(in: languages) {
                     selectedLanguageID = preferred.id
                 } else if let first = languages.first {
                     selectedLanguageID = first.id
                 }
             }
+        }
+    }
+
+    private func equivalentSupportedLanguage(
+        for languageID: String,
+        in languages: [TranscriptionLanguage]
+    ) async -> TranscriptionLanguage? {
+        if selectedTranscriptionBackend.requiresAppleSpeech {
+            return await AppleSpeechTranscriptionSupport.equivalentLanguage(
+                for: languageID,
+                in: languages
+            )
+        }
+
+        return Self.equivalentLanguage(for: languageID, in: languages)
+    }
+
+    private func preferredSupportedLanguage(in languages: [TranscriptionLanguage]) -> TranscriptionLanguage? {
+        if let exactDefault = languages.first(where: { $0.id == TranscriptionLanguage.defaultLanguageID }) {
+            return exactDefault
+        }
+        if let equivalentDefault = Self.equivalentLanguage(for: TranscriptionLanguage.defaultLanguageID, in: languages) {
+            return equivalentDefault
+        }
+        if let equivalentCurrent = Self.equivalentLanguage(for: Locale.current.identifier, in: languages) {
+            return equivalentCurrent
+        }
+        return languages.first(where: { $0.id == "en" || $0.id == "en-US" })
+    }
+
+    private static func equivalentLanguage(
+        for languageID: String,
+        in languages: [TranscriptionLanguage]
+    ) -> TranscriptionLanguage? {
+        let targetLanguage = Locale(identifier: languageID).language
+        guard let targetCode = targetLanguage.languageCode?.identifier else {
+            return nil
+        }
+
+        return languages.first { language in
+            let candidate = language.locale.language
+            guard candidate.languageCode?.identifier == targetCode else {
+                return false
+            }
+
+            let targetScript = targetLanguage.script?.identifier
+            let candidateScript = candidate.script?.identifier
+            if targetScript != nil || candidateScript != nil {
+                return targetScript == candidateScript
+            }
+            return true
         }
     }
 
@@ -346,7 +418,11 @@ final class LiveTranscriptionManager: ObservableObject {
     }
 
     private func startCaptureSessionRecording(language: TranscriptionLanguage) async throws {
-        try await startAppleSpeechCaptureSessionRecording(language: language)
+        if selectedTranscriptionBackend.usesLocalWhisper {
+            try await startLocalWhisperCaptureSessionRecording(language: language)
+        } else {
+            try await startAppleSpeechCaptureSessionRecording(language: language)
+        }
     }
 
     private func startAppleSpeechCaptureSessionRecording(language: TranscriptionLanguage) async throws {
@@ -377,6 +453,57 @@ final class LiveTranscriptionManager: ObservableObject {
 
         startResultReader(for: prepared.transcriber)
         startAnalyzer(prepared.analyzer, stream: prepared.stream)
+        try await capturePipeline.start()
+    }
+
+    private func startLocalWhisperCaptureSessionRecording(language: TranscriptionLanguage) async throws {
+        statusText = String(localized: L10n.RecordingStatus.preparingLanguageModel)
+        guard let liveModel = LocalWhisperModelManager.selectedLiveModel else {
+            throw LocalWhisperTranscriptionError.missingLiveModel
+        }
+        let modelURL = try LocalWhisperTranscriptionService.modelURL(for: liveModel)
+        let languageCode = LocalWhisperTranscriptionService.languageCode(for: language)
+
+        statusText = String(localized: L10n.RecordingStatus.configuringAudioInput)
+        try await configureAudioSession()
+
+        let audioFormat = selectedAudioFormat
+        let recordingFormat = try Self.makeCaptureSessionRecordingFormat()
+        let localWhisperFormat = try Self.makeLocalWhisperInputFormat()
+        statusText = String(localized: L10n.RecordingStatus.startingRecorder)
+
+        let recordingURL = try Self.makeTemporaryRecordingURL(format: audioFormat)
+        let writer = try AudioFileWriter(url: recordingURL, inputFormat: recordingFormat, outputFormat: audioFormat)
+        let localWhisperPipeline = LiveLocalWhisperPipeline(
+            inputSampleRate: localWhisperFormat.sampleRate,
+            modelURL: modelURL,
+            languageCode: languageCode,
+            useCoreMLEncoder: LocalWhisperModelManager.isCoreMLEncoderLoadingEnabled,
+            resultHandler: { [weak self] finalLines, interimLine in
+                Task { @MainActor [weak self] in
+                    self?.handleLocalWhisperResult(finalLines: finalLines, interimLine: interimLine)
+                }
+            },
+            errorHandler: { [weak self] error in
+                Task { @MainActor [weak self] in
+                    self?.errorText = error.localizedDescription
+                }
+            }
+        )
+        let capturePipeline = CaptureSessionRecordingPipeline(
+            recordingFormat: recordingFormat,
+            analyzerSourceFormat: localWhisperFormat,
+            writer: writer,
+            analyzerPipeline: nil,
+            localWhisperPipeline: localWhisperPipeline
+        )
+
+        self.localWhisperPipeline = localWhisperPipeline
+        captureRecordingPipeline = capturePipeline
+        audioWriter = writer
+        currentAudioURL = recordingURL
+        currentRecordingFormat = recordingFormat
+
         try await capturePipeline.start()
     }
 
@@ -430,6 +557,10 @@ final class LiveTranscriptionManager: ObservableObject {
         captureRecordingPipeline = nil
         await pendingCapturePipeline?.stop()
 
+        let pendingLocalWhisperPipeline = localWhisperPipeline
+        localWhisperPipeline = nil
+        pendingLocalWhisperPipeline?.cancel()
+
         analyzerPipeline?.finish()
         let pendingAnalyzerTask = analyzerTask
         let pendingResultsTask = resultsTask
@@ -446,6 +577,7 @@ final class LiveTranscriptionManager: ObservableObject {
         analyzer = nil
         speechTranscriber = nil
         analyzerPipeline = nil
+        localWhisperPipeline = nil
         captureRecordingPipeline = nil
         audioWriter = nil
         currentRecordingFormat = nil
@@ -536,8 +668,7 @@ final class LiveTranscriptionManager: ObservableObject {
             throw LiveTranscriptionError.analyzerUnavailable
         }
 
-        let preferredLocale = Locale(identifier: language.id)
-        let locale = await SpeechTranscriber.supportedLocale(equivalentTo: preferredLocale) ?? preferredLocale
+        let locale = await AppleSpeechTranscriptionSupport.resolvedLocale(for: language)
         let transcriber = SpeechTranscriber(
             locale: locale,
             preset: .timeIndexedProgressiveTranscription
@@ -658,6 +789,18 @@ final class LiveTranscriptionManager: ObservableObject {
         return format
     }
 
+    private static func makeLocalWhisperInputFormat() throws -> AVAudioFormat {
+        guard let format = AVAudioFormat(
+            commonFormat: .pcmFormatFloat32,
+            sampleRate: analyzerSampleRate,
+            channels: 1,
+            interleaved: false
+        ) else {
+            throw LiveTranscriptionError.invalidAudioInput
+        }
+        return format
+    }
+
     private static func makeCaptureSessionRecordingFormat() throws -> AVAudioFormat {
         let sessionSampleRate = AVAudioSession.sharedInstance().sampleRate
         let sampleRate = sessionSampleRate.isFinite && sessionSampleRate > 0 ? sessionSampleRate : 48_000
@@ -730,7 +873,7 @@ final class LiveTranscriptionManager: ObservableObject {
             do {
                 for try await result in transcriber.results {
                     await MainActor.run {
-                        self.handleTranscriptionResult(result)
+                        self.handleSpeechTranscriptionResult(result)
                     }
                 }
             } catch is CancellationError {
@@ -801,8 +944,7 @@ final class LiveTranscriptionManager: ObservableObject {
     }
 
     private static func resolvedSpeechLocale(for language: TranscriptionLanguage) async -> Locale {
-        let preferredLocale = Locale(identifier: language.id)
-        return await SpeechTranscriber.supportedLocale(equivalentTo: preferredLocale) ?? preferredLocale
+        await AppleSpeechTranscriptionSupport.resolvedLocale(for: language)
     }
 
     private static func reserveSpeechLocale(_ locale: Locale) async throws {
@@ -884,20 +1026,51 @@ final class LiveTranscriptionManager: ObservableObject {
         }
     }
 
-    private func handleTranscriptionResult(_ result: SpeechTranscriber.Result) {
-        let text = String(result.text.characters).trimmingCharacters(in: .whitespacesAndNewlines)
+    private func handleSpeechTranscriptionResult(_ result: SpeechTranscriber.Result) {
+        handleTranscriptionResult(text: result.text, range: result.range, isFinal: result.isFinal)
+    }
+
+    private func handleLocalWhisperResult(finalLines: [TranscriptionLine], interimLine: TranscriptionLine?) {
+        for line in finalLines {
+            handleTranscriptionResult(
+                text: AttributedString(line.text),
+                range: CMTimeRange(
+                    start: CMTime(seconds: line.startSeconds, preferredTimescale: 1_000),
+                    duration: .invalid
+                ),
+                isFinal: true
+            )
+        }
+
+        if let interimLine {
+            handleTranscriptionResult(
+                text: AttributedString(interimLine.text),
+                range: CMTimeRange(
+                    start: CMTime(seconds: interimLine.startSeconds, preferredTimescale: 1_000),
+                    duration: .invalid
+                ),
+                isFinal: false
+            )
+        } else if !finalLines.isEmpty {
+            self.interimLine = nil
+            interimTranscriptStore.publish(nil)
+        }
+    }
+
+    private func handleTranscriptionResult(text resultText: AttributedString, range: CMTimeRange, isFinal: Bool) {
+        let text = String(resultText.characters).trimmingCharacters(in: .whitespacesAndNewlines)
         guard !text.isEmpty else {
             return
         }
 
-        let startSeconds = result.range.start.seconds.isFinite ? result.range.start.seconds : 0
+        let startSeconds = range.start.seconds.isFinite ? range.start.seconds : 0
         var line = TranscriptionLine(
             startSeconds: startSeconds,
             text: text,
-            isFinal: result.isFinal
+            isFinal: isFinal
         )
 
-        if result.isFinal {
+        if isFinal {
             if let index = finalizedLines.firstIndex(where: { abs($0.startSeconds - startSeconds) < 0.1 }) {
                 line.id = finalizedLines[index].id
                 if !manuallyEditedFinalLineIDs.contains(line.id) {
@@ -924,7 +1097,7 @@ final class LiveTranscriptionManager: ObservableObject {
             }
         }
 
-        if result.isFinal {
+        if isFinal {
             Task {
                 await self.updateLiveActivityFromCurrentState(isRecording: self.isRecording && !self.isPaused)
             }
@@ -1555,6 +1728,7 @@ private final class CaptureSessionRecordingPipeline: NSObject, AVCaptureAudioDat
     private let analyzerSourceFormat: AVAudioFormat
     private let writer: AudioFileWriter
     private let analyzerPipeline: AnalyzerInputPipeline?
+    private let localWhisperPipeline: LiveLocalWhisperPipeline?
     private let inputLevelObserver: (@Sendable (Float) -> Void)?
     private let recordingConverter: CaptureSampleBufferAudioConverter
     private let analyzerConverter: CaptureSampleBufferAudioConverter
@@ -1571,12 +1745,14 @@ private final class CaptureSessionRecordingPipeline: NSObject, AVCaptureAudioDat
         analyzerSourceFormat: AVAudioFormat,
         writer: AudioFileWriter,
         analyzerPipeline: AnalyzerInputPipeline?,
+        localWhisperPipeline: LiveLocalWhisperPipeline? = nil,
         inputLevelObserver: (@Sendable (Float) -> Void)? = nil
     ) {
         self.recordingFormat = recordingFormat
         self.analyzerSourceFormat = analyzerSourceFormat
         self.writer = writer
         self.analyzerPipeline = analyzerPipeline
+        self.localWhisperPipeline = localWhisperPipeline
         self.inputLevelObserver = inputLevelObserver
         recordingConverter = CaptureSampleBufferAudioConverter(targetFormat: recordingFormat)
         analyzerConverter = CaptureSampleBufferAudioConverter(targetFormat: analyzerSourceFormat)
@@ -1677,6 +1853,7 @@ private final class CaptureSessionRecordingPipeline: NSObject, AVCaptureAudioDat
             )
             writer.write(recordingBuffer)
             analyzerPipeline?.process(analyzerBuffer, audioTime: Self.audioTime(for: sampleBuffer, format: analyzerBuffer.format))
+            localWhisperPipeline?.process(analyzerBuffer)
         } catch {
             reportConversionFailureIfNeeded(error)
         }
@@ -1977,6 +2154,181 @@ private extension AVAudioFormat {
     }
 }
 
+private final class LiveLocalWhisperPipeline: @unchecked Sendable {
+    typealias ResultHandler = @Sendable (_ finalLines: [TranscriptionLine], _ interimLine: TranscriptionLine?) -> Void
+    typealias ErrorHandler = @Sendable (_ error: Error) -> Void
+
+    private let queue = DispatchQueue(label: "com.reddownloader.live-transcription.local-whisper", qos: .userInitiated)
+    private let inputSampleRate: Double
+    private let modelURL: URL
+    private let languageCode: String
+    private let useCoreMLEncoder: Bool
+    private let resultHandler: ResultHandler
+    private let errorHandler: ErrorHandler
+    private let chunkFrameCount: Int
+    private let stateLock = NSLock()
+
+    private var bufferedSamples: [Float] = []
+    private var bufferedStartFrame = 0
+    private var isFinished = false
+    private var isCancelled = false
+
+    init(
+        inputSampleRate: Double,
+        modelURL: URL,
+        languageCode: String,
+        useCoreMLEncoder: Bool,
+        resultHandler: @escaping ResultHandler,
+        errorHandler: @escaping ErrorHandler
+    ) {
+        self.inputSampleRate = inputSampleRate
+        self.modelURL = modelURL
+        self.languageCode = languageCode
+        self.useCoreMLEncoder = useCoreMLEncoder
+        self.resultHandler = resultHandler
+        self.errorHandler = errorHandler
+        chunkFrameCount = max(1, Int((inputSampleRate * 8).rounded()))
+    }
+
+    func process(_ buffer: AVAudioPCMBuffer) {
+        guard !cancelled else {
+            return
+        }
+        guard buffer.frameLength > 0,
+              buffer.format.commonFormat == .pcmFormatFloat32,
+              let channelData = buffer.floatChannelData else {
+            return
+        }
+
+        let frameCount = Int(buffer.frameLength)
+        var samples = [Float](repeating: 0, count: frameCount)
+        samples.withUnsafeMutableBufferPointer { destination in
+            guard let baseAddress = destination.baseAddress else {
+                return
+            }
+            baseAddress.update(from: channelData[0], count: frameCount)
+        }
+
+        queue.async {
+            guard !self.isFinished, !self.cancelled else {
+                return
+            }
+
+            self.bufferedSamples.append(contentsOf: samples)
+            self.runAvailableChunks()
+        }
+    }
+
+    func cancel() {
+        stateLock.lock()
+        isCancelled = true
+        isFinished = true
+        stateLock.unlock()
+    }
+
+    func finish() async {
+        await withCheckedContinuation { continuation in
+            queue.async {
+                guard !self.cancelled else {
+                    continuation.resume()
+                    return
+                }
+                self.isFinished = true
+                self.runRemainingChunk()
+                continuation.resume()
+            }
+        }
+    }
+
+    private func runAvailableChunks() {
+        while !cancelled, bufferedSamples.count >= chunkFrameCount {
+            runInference(frameCount: chunkFrameCount)
+        }
+    }
+
+    private func runRemainingChunk() {
+        guard !bufferedSamples.isEmpty else {
+            resultHandler([], nil)
+            return
+        }
+        runInference(frameCount: bufferedSamples.count)
+    }
+
+    private func runInference(frameCount requestedFrameCount: Int) {
+        guard !cancelled else {
+            return
+        }
+        guard !bufferedSamples.isEmpty else {
+            return
+        }
+
+        let frameCount = min(max(requestedFrameCount, 0), bufferedSamples.count)
+        guard frameCount > 0 else {
+            return
+        }
+
+        let chunkStartFrame = bufferedStartFrame
+        let chunkSamples = Array(bufferedSamples[0..<frameCount])
+        let chunkStartSeconds = Double(chunkStartFrame) / inputSampleRate
+
+        do {
+            let segments = try transcribe(chunkSamples)
+            guard !cancelled else {
+                return
+            }
+            var finalLines: [TranscriptionLine] = []
+
+            for segment in segments {
+                let text = segment.text.trimmingCharacters(in: .whitespacesAndNewlines)
+                guard !text.isEmpty else {
+                    continue
+                }
+
+                finalLines.append(TranscriptionLine(
+                    startSeconds: chunkStartSeconds + max(segment.startSeconds, 0),
+                    text: text,
+                    isFinal: true
+                ))
+            }
+
+            resultHandler(finalLines, nil)
+            bufferedSamples.removeFirst(frameCount)
+            bufferedStartFrame += frameCount
+        } catch {
+            if !cancelled {
+                errorHandler(error)
+            }
+        }
+    }
+
+    private var cancelled: Bool {
+        stateLock.lock()
+        let value = isCancelled
+        stateLock.unlock()
+        return value
+    }
+
+    private func transcribe(_ samples: [Float]) throws -> [LocalWhisperBridgeSegment] {
+        guard !samples.isEmpty else {
+            return []
+        }
+
+        let sampleData = samples.withUnsafeBufferPointer { buffer -> Data in
+            guard let baseAddress = buffer.baseAddress else {
+                return Data()
+            }
+            return Data(bytes: baseAddress, count: buffer.count * MemoryLayout<Float>.stride)
+        }
+
+        return try LocalWhisperBridge.transcribeSamples(
+            sampleData,
+            modelPath: modelURL.path,
+            languageCode: languageCode.isEmpty ? "auto" : languageCode,
+            useCoreMLEncoder: useCoreMLEncoder
+        )
+    }
+}
+
 private final class AudioFileWriter: @unchecked Sendable {
     private let file: AVAudioFile
     private let lock = NSLock()
@@ -2115,6 +2467,16 @@ struct SpeechProcessingPipelineDiagnostics: Equatable {
         configuredMode: SpeechPipelineMode,
         runtimeAnalyzerFormatText: String
     ) -> SpeechProcessingPipelineDiagnostics {
+        if backend.usesLocalWhisper {
+            return SpeechProcessingPipelineDiagnostics(
+                configuredPipelineName: backend.title,
+                activePipelineName: String(localized: L10n.SpeechText.activeLocalWhisper),
+                supportedPipelinesText: String(localized: L10n.SpeechText.supportedPipelinesLocalWhisper),
+                analyzerFormatText: String(localized: L10n.SpeechText.localWhisperInput16K),
+                runtimeAnalyzerFormatText: String(localized: L10n.SpeechText.localWhisperInput16K)
+            )
+        }
+
         #if HAS_IOS27_SDK
         if #available(iOS 27.0, *), configuredMode == .nativeIOS27 {
             return SpeechProcessingPipelineDiagnostics(

@@ -7,15 +7,33 @@ struct SettingsView: View {
     @State private var iCloudSyncRefreshTick = 0
     @State private var pendingSpeechLocaleReleaseRequest: SpeechLocaleReleaseRequest?
     @State private var speechLocaleErrorMessage: String?
+    @State private var feedbackErrorMessage: String?
     @State private var selectedLocalWhisperModel = LocalWhisperModelManager.selectedModel
     @State private var localWhisperModelStatus = LocalWhisperModelManager.currentStatus()
+    @State private var localWhisperCoreMLEncoderStatus = LocalWhisperModelManager.currentCoreMLEncoderStatus()
+    @State private var isLocalWhisperCoreMLEncoderLoadingEnabled = LocalWhisperModelManager.isCoreMLEncoderLoadingEnabled
+    @State private var selectedLiveWhisperModel = LocalWhisperModelManager.selectedLiveModel
+    @State private var liveWhisperModelStatus = LocalWhisperModelManager.currentLiveStatus()
+    @State private var liveWhisperCoreMLEncoderStatus = LocalWhisperModelManager.currentLiveCoreMLEncoderStatus()
     @State private var isDownloadingLocalWhisperModel = false
+    @State private var isDownloadingLocalWhisperCoreMLEncoder = false
+    @State private var isDownloadingLiveWhisperModel = false
+    @State private var isDownloadingLiveWhisperCoreMLEncoder = false
     @State private var localWhisperDownloadProgress: Double = 0
+    @State private var localWhisperCoreMLEncoderDownloadProgress: Double = 0
+    @State private var liveWhisperDownloadProgress: Double = 0
+    @State private var liveWhisperCoreMLEncoderDownloadProgress: Double = 0
     @State private var localWhisperDownloadErrorMessage: String?
     @State private var localWhisperDeleteErrorMessage: String?
     @State private var localWhisperModelRefreshTick = 0
     private static let repositoryURL = URL(string: "https://github.com/iamwilliamli/LiveTranscriber")!
     private static let designNotesURL = URL(string: "https://chengqili.com/post/livetranscriber")!
+    private static let feedbackRecipient = "lichengqi0805@gmail.com"
+    private static let mailtoQueryAllowedCharacters: CharacterSet = {
+        var allowed = CharacterSet.urlQueryAllowed
+        allowed.remove(charactersIn: "&=?+")
+        return allowed
+    }()
     private static let localWhisperSubtitleTrailingCharacters = CharacterSet.punctuationCharacters.union(.whitespacesAndNewlines)
 
     var body: some View {
@@ -105,6 +123,18 @@ struct SettingsView: View {
                     }
                     .buttonStyle(.plain)
                     .settingsSurface()
+
+                    Button {
+                        sendFeedbackEmail()
+                    } label: {
+                        SettingsCommandRow(
+                            icon: "envelope",
+                            titleResource: L10n.Settings.feedback,
+                            tint: AppTheme.brand
+                        )
+                    }
+                    .buttonStyle(.plain)
+                    .settingsSurface()
                 }
                 .padding()
             }
@@ -188,6 +218,21 @@ struct SettingsView: View {
         } message: {
             Text(localWhisperDeleteErrorMessage ?? "")
         }
+        .alert(
+            String(localized: L10n.Settings.feedbackUnavailable),
+            isPresented: Binding(
+                get: { feedbackErrorMessage != nil },
+                set: { isPresented in
+                    if !isPresented {
+                        feedbackErrorMessage = nil
+                    }
+                }
+            )
+        ) {
+            Button(String(localized: L10n.Common.ok), role: .cancel) {}
+        } message: {
+            Text(feedbackErrorMessage ?? "")
+        }
     }
 
     private var transcriptionSettingsPage: some View {
@@ -207,13 +252,21 @@ struct SettingsView: View {
                 .buttonStyle(.plain)
                 .disabled(transcriber.isRecording || transcriber.isPreparing)
 
-                openAITranscriptionAPIKeySettings
+                openAITranscriptionToggleSettings
+
+                if transcriber.isOpenAITranscriptionEnabled {
+                    openAITranscriptionAPIKeySettings
+                }
 
                 localWhisperModelSettings
 
                 if transcriber.isRecording || transcriber.isPreparing {
                     SettingsStatusRow(icon: "lock.fill", textResource: L10n.Settings.cannotChangeLanguageWhileRecording, tint: AppTheme.warning)
                 }
+            }
+
+            SettingsSection(titleResource: L10n.Settings.betaFeatures, systemImage: "testtube.2", tint: AppTheme.purple) {
+                localWhisperLiveBetaSettings
             }
         }
     }
@@ -232,7 +285,7 @@ struct SettingsView: View {
                 )
             }
             .buttonStyle(.plain)
-            .disabled(isDownloadingLocalWhisperModel)
+            .disabled(isDownloadingLocalWhisperModel || isDownloadingLocalWhisperCoreMLEncoder)
 
             SettingsMetricRow(
                 icon: "iphone",
@@ -264,22 +317,65 @@ struct SettingsView: View {
                     )
                 }
                 .buttonStyle(.plain)
-                .disabled(isDownloadingLocalWhisperModel)
+                .disabled(isDownloadingLocalWhisperModel || isDownloadingLocalWhisperCoreMLEncoder)
             }
 
-            if localWhisperModelStatus.isUserInstalled {
-                Button(role: .destructive) {
-                    deleteLocalWhisperModel()
-                } label: {
-                    SettingsCommandRow(
-                        icon: "trash",
-                        titleResource: L10n.LocalWhisper.deleteSelectedModel,
-                        tint: AppTheme.danger
-                    )
+            if localWhisperModelStatus.isAvailable {
+                Toggle(isOn: localWhisperCoreMLEncoderLoadingBinding) {
+                    HStack(alignment: .top, spacing: 10) {
+                        SettingsIcon(systemImage: "bolt.badge.clock", tint: AppTheme.info)
+
+                        VStack(alignment: .leading, spacing: 3) {
+                            Text(L10n.LocalWhisper.coreMLEncoderLoading)
+                                .font(.redditSans(.subheadline, weight: .semibold))
+                                .foregroundStyle(.primary)
+
+                            Text(L10n.LocalWhisper.coreMLEncoderLoadingDescription)
+                                .font(.redditSans(.caption))
+                                .foregroundStyle(.secondary)
+                                .fixedSize(horizontal: false, vertical: true)
+                        }
+                    }
                 }
-                .buttonStyle(.plain)
-                .disabled(isDownloadingLocalWhisperModel)
+                .toggleStyle(.switch)
+                .disabled(transcriber.isRecording || transcriber.isPreparing)
+
+                if isLocalWhisperCoreMLEncoderLoadingEnabled {
+                    SettingsMetricRow(
+                        icon: "cpu",
+                        titleResource: L10n.LocalWhisper.coreMLEncoderStatus,
+                        value: isDownloadingLocalWhisperCoreMLEncoder ? localWhisperCoreMLEncoderDownloadProgressText : localWhisperCoreMLEncoderStatus.statusText,
+                        tint: localWhisperCoreMLEncoderStatus.isAvailable ? AppTheme.success : AppTheme.warning
+                    )
+
+                    SettingsVerbatimStatusRow(
+                        icon: localWhisperCoreMLEncoderStatus.isAvailable ? "checkmark.circle" : "bolt.badge.clock",
+                        text: localWhisperCoreMLEncoderStatus.detailText,
+                        tint: localWhisperCoreMLEncoderStatus.isAvailable ? AppTheme.success : AppTheme.info
+                    )
+
+                    if isDownloadingLocalWhisperCoreMLEncoder {
+                        ProgressView(value: localWhisperCoreMLEncoderDownloadProgress)
+                            .tint(AppTheme.info)
+                            .frame(maxWidth: .infinity)
+                    }
+
+                    if !localWhisperCoreMLEncoderStatus.isAvailable {
+                        Button {
+                            downloadLocalWhisperCoreMLEncoder()
+                        } label: {
+                            SettingsCommandRow(
+                                icon: "bolt.badge.clock",
+                                titleResource: L10n.LocalWhisper.downloadCoreMLEncoder,
+                                tint: AppTheme.info
+                            )
+                        }
+                        .buttonStyle(.plain)
+                        .disabled(isDownloadingLocalWhisperModel || isDownloadingLocalWhisperCoreMLEncoder)
+                    }
+                }
             }
+
         }
     }
 
@@ -303,7 +399,7 @@ struct SettingsView: View {
                         )
                     }
                     .buttonStyle(.plain)
-                    .disabled(isDownloadingLocalWhisperModel)
+                    .disabled(isDownloadingLocalWhisperModel || isDownloadingLocalWhisperCoreMLEncoder)
                 }
             }
             .id("available-\(refreshTick)")
@@ -329,7 +425,7 @@ struct SettingsView: View {
                             )
                         }
                         .buttonStyle(.plain)
-                        .disabled(isDownloadingLocalWhisperModel)
+                        .disabled(isDownloadingLocalWhisperModel || isDownloadingLocalWhisperCoreMLEncoder)
                     }
                 }
             }
@@ -344,10 +440,117 @@ struct SettingsView: View {
         )
     }
 
+    private var localWhisperCoreMLEncoderDownloadProgressText: String {
+        String(
+            format: String(localized: L10n.LocalWhisper.downloadingCoreMLEncoderFormat),
+            localWhisperCoreMLEncoderDownloadProgress * 100
+        )
+    }
+
+    private var liveWhisperDownloadProgressText: String {
+        String(
+            format: String(localized: L10n.LocalWhisper.downloadingModelFormat),
+            liveWhisperDownloadProgress * 100
+        )
+    }
+
+    private var liveWhisperCoreMLEncoderDownloadProgressText: String {
+        String(
+            format: String(localized: L10n.LocalWhisper.downloadingCoreMLEncoderFormat),
+            liveWhisperCoreMLEncoderDownloadProgress * 100
+        )
+    }
+
     private func refreshLocalWhisperModelStatus() {
         selectedLocalWhisperModel = LocalWhisperModelManager.selectedModel
         localWhisperModelStatus = LocalWhisperModelManager.currentStatus()
+        localWhisperCoreMLEncoderStatus = LocalWhisperModelManager.currentCoreMLEncoderStatus()
+        selectedLiveWhisperModel = LocalWhisperModelManager.selectedLiveModel
+        liveWhisperModelStatus = LocalWhisperModelManager.currentLiveStatus()
+        liveWhisperCoreMLEncoderStatus = LocalWhisperModelManager.currentLiveCoreMLEncoderStatus()
         localWhisperModelRefreshTick &+= 1
+    }
+
+    private func sendFeedbackEmail() {
+        guard let url = feedbackMailURL() else {
+            feedbackErrorMessage = String(
+                format: String(localized: L10n.Settings.feedbackOpenFailedFormat),
+                Self.feedbackRecipient
+            )
+            HapticFeedback.play(.failure)
+            return
+        }
+
+        HapticFeedback.play(.menuSelection)
+        UIApplication.shared.open(url) { success in
+            if !success {
+                DispatchQueue.main.async {
+                    feedbackErrorMessage = String(
+                        format: String(localized: L10n.Settings.feedbackOpenFailedFormat),
+                        Self.feedbackRecipient
+                    )
+                    HapticFeedback.play(.failure)
+                }
+            }
+        }
+    }
+
+    private func feedbackMailURL() -> URL? {
+        guard let subject = feedbackEmailSubject().addingPercentEncoding(withAllowedCharacters: Self.mailtoQueryAllowedCharacters),
+              let body = feedbackEmailBody().addingPercentEncoding(withAllowedCharacters: Self.mailtoQueryAllowedCharacters) else {
+            return nil
+        }
+
+        return URL(string: "mailto:\(Self.feedbackRecipient)?subject=\(subject)&body=\(body)")
+    }
+
+    private func feedbackEmailSubject() -> String {
+        let build = DeveloperBuildInfo.current
+        return "LiveTranscriber Feedback - \(build.version)"
+    }
+
+    private func feedbackEmailBody() -> String {
+        let build = DeveloperBuildInfo.current
+        let device = DeveloperDeviceInfo.current
+        let pipeline = transcriber.speechPipelineDiagnostics
+        let localWhisperModel = LocalWhisperModelManager.selectedModel.displayName
+        let liveWhisperModel = LocalWhisperModelManager.selectedLiveModel?.displayName ?? String(localized: L10n.LocalWhisper.liveModelNotSelected)
+        let coreMLEncoderState = LocalWhisperModelManager.isCoreMLEncoderLoadingEnabled ? "On" : "Off"
+
+        return [
+            "Hi,",
+            "",
+            "Please describe your feedback or issue here:",
+            "",
+            "",
+            "Steps to reproduce:",
+            "1.",
+            "2.",
+            "3.",
+            "",
+            "Expected result:",
+            "",
+            "",
+            "Actual result:",
+            "",
+            "",
+            "---",
+            "Diagnostics",
+            "App: LiveTranscriber",
+            "Version: \(build.version)",
+            "Build Time: \(build.buildTime)",
+            "Device: \(device.modelIdentifier)",
+            "System: \(device.systemVersion)",
+            "Current Pipeline: \(pipeline.activePipelineName)",
+            "Configured Pipeline: \(pipeline.configuredPipelineName)",
+            "Selected Language: \(transcriber.selectedLanguage.displayName) (\(transcriber.selectedLanguageID))",
+            "Live Backend: \(transcriber.selectedTranscriptionBackend.title)",
+            "Local Whisper Model: \(localWhisperModel)",
+            "Realtime Whisper Model: \(liveWhisperModel)",
+            "Core ML Encoder Loading: \(coreMLEncoderState)",
+            "Recording Count: \(recordingStore.recordings.count)",
+            "Storage: \(recordingStore.storageDisplayName)"
+        ].joined(separator: "\r\n")
     }
 
     private func selectLocalWhisperModel(_ model: LocalWhisperModel) {
@@ -355,6 +558,21 @@ struct SettingsView: View {
         LocalWhisperModelManager.selectModel(model)
         selectedLocalWhisperModel = model
         localWhisperModelStatus = LocalWhisperModelManager.status(for: model)
+        localWhisperCoreMLEncoderStatus = LocalWhisperModelManager.coreMLEncoderStatus(for: model)
+        Task {
+            await transcriber.refreshSupportedLanguages()
+        }
+    }
+
+    private func selectLiveWhisperModel(_ model: LocalWhisperModel) {
+        HapticFeedback.play(.menuSelection)
+        LocalWhisperModelManager.selectLiveModel(model)
+        selectedLiveWhisperModel = model
+        liveWhisperModelStatus = LocalWhisperModelManager.status(for: model)
+        liveWhisperCoreMLEncoderStatus = LocalWhisperModelManager.coreMLEncoderStatus(for: model)
+        Task {
+            await transcriber.refreshSupportedLanguages()
+        }
     }
 
     private func localWhisperModelSubtitle(
@@ -407,14 +625,137 @@ struct SettingsView: View {
                 await MainActor.run {
                     selectedLocalWhisperModel = status.model
                     localWhisperModelStatus = status
+                    localWhisperCoreMLEncoderStatus = LocalWhisperModelManager.currentCoreMLEncoderStatus()
+                    liveWhisperModelStatus = LocalWhisperModelManager.currentLiveStatus()
+                    liveWhisperCoreMLEncoderStatus = LocalWhisperModelManager.currentLiveCoreMLEncoderStatus()
                     isDownloadingLocalWhisperModel = false
                     localWhisperDownloadProgress = 1
+                    localWhisperModelRefreshTick &+= 1
+                    HapticFeedback.play(.menuSelection)
+                    Task {
+                        await transcriber.refreshSupportedLanguages()
+                    }
+                }
+            } catch {
+                await MainActor.run {
+                    isDownloadingLocalWhisperModel = false
+                    localWhisperDownloadErrorMessage = error.localizedDescription
+                    HapticFeedback.play(.failure)
+                }
+            }
+        }
+    }
+
+    private func downloadLocalWhisperCoreMLEncoder() {
+        guard !isDownloadingLocalWhisperCoreMLEncoder,
+              localWhisperModelStatus.isAvailable else {
+            HapticFeedback.play(.blocked)
+            return
+        }
+
+        isDownloadingLocalWhisperCoreMLEncoder = true
+        localWhisperCoreMLEncoderDownloadProgress = 0
+        HapticFeedback.play(.menuSelection)
+
+        Task {
+            do {
+                let status = try await LocalWhisperModelManager.downloadCoreMLEncoder(for: selectedLocalWhisperModel) { progress in
+                    Task { @MainActor in
+                        localWhisperCoreMLEncoderDownloadProgress = progress
+                    }
+                }
+
+                await MainActor.run {
+                    localWhisperCoreMLEncoderStatus = status
+                    liveWhisperCoreMLEncoderStatus = LocalWhisperModelManager.currentLiveCoreMLEncoderStatus()
+                    isDownloadingLocalWhisperCoreMLEncoder = false
+                    localWhisperCoreMLEncoderDownloadProgress = 1
                     localWhisperModelRefreshTick &+= 1
                     HapticFeedback.play(.menuSelection)
                 }
             } catch {
                 await MainActor.run {
-                    isDownloadingLocalWhisperModel = false
+                    isDownloadingLocalWhisperCoreMLEncoder = false
+                    localWhisperDownloadErrorMessage = error.localizedDescription
+                    HapticFeedback.play(.failure)
+                }
+            }
+        }
+    }
+
+    private func downloadLiveWhisperModel() {
+        guard !isDownloadingLiveWhisperModel,
+              let selectedLiveWhisperModel else {
+            HapticFeedback.play(.blocked)
+            return
+        }
+
+        isDownloadingLiveWhisperModel = true
+        liveWhisperDownloadProgress = 0
+        HapticFeedback.play(.menuSelection)
+
+        Task {
+            do {
+                let status = try await LocalWhisperModelManager.download(model: selectedLiveWhisperModel) { progress in
+                    Task { @MainActor in
+                        liveWhisperDownloadProgress = progress
+                    }
+                }
+
+                await MainActor.run {
+                    liveWhisperModelStatus = status
+                    liveWhisperCoreMLEncoderStatus = LocalWhisperModelManager.currentLiveCoreMLEncoderStatus()
+                    localWhisperModelStatus = LocalWhisperModelManager.currentStatus()
+                    localWhisperCoreMLEncoderStatus = LocalWhisperModelManager.currentCoreMLEncoderStatus()
+                    isDownloadingLiveWhisperModel = false
+                    liveWhisperDownloadProgress = 1
+                    localWhisperModelRefreshTick &+= 1
+                    HapticFeedback.play(.menuSelection)
+                    Task {
+                        await transcriber.refreshSupportedLanguages()
+                    }
+                }
+            } catch {
+                await MainActor.run {
+                    isDownloadingLiveWhisperModel = false
+                    localWhisperDownloadErrorMessage = error.localizedDescription
+                    HapticFeedback.play(.failure)
+                }
+            }
+        }
+    }
+
+    private func downloadLiveWhisperCoreMLEncoder() {
+        guard !isDownloadingLiveWhisperCoreMLEncoder,
+              liveWhisperModelStatus?.isAvailable == true,
+              let selectedLiveWhisperModel else {
+            HapticFeedback.play(.blocked)
+            return
+        }
+
+        isDownloadingLiveWhisperCoreMLEncoder = true
+        liveWhisperCoreMLEncoderDownloadProgress = 0
+        HapticFeedback.play(.menuSelection)
+
+        Task {
+            do {
+                let status = try await LocalWhisperModelManager.downloadCoreMLEncoder(for: selectedLiveWhisperModel) { progress in
+                    Task { @MainActor in
+                        liveWhisperCoreMLEncoderDownloadProgress = progress
+                    }
+                }
+
+                await MainActor.run {
+                    liveWhisperCoreMLEncoderStatus = status
+                    localWhisperCoreMLEncoderStatus = LocalWhisperModelManager.currentCoreMLEncoderStatus()
+                    isDownloadingLiveWhisperCoreMLEncoder = false
+                    liveWhisperCoreMLEncoderDownloadProgress = 1
+                    localWhisperModelRefreshTick &+= 1
+                    HapticFeedback.play(.menuSelection)
+                }
+            } catch {
+                await MainActor.run {
+                    isDownloadingLiveWhisperCoreMLEncoder = false
                     localWhisperDownloadErrorMessage = error.localizedDescription
                     HapticFeedback.play(.failure)
                 }
@@ -430,10 +771,22 @@ struct SettingsView: View {
             if modelToDelete.id == selectedLocalWhisperModel.id {
                 selectedLocalWhisperModel = deletedStatus.model
                 localWhisperModelStatus = deletedStatus
+                localWhisperCoreMLEncoderStatus = LocalWhisperModelManager.currentCoreMLEncoderStatus()
             } else {
                 localWhisperModelStatus = LocalWhisperModelManager.currentStatus()
+                localWhisperCoreMLEncoderStatus = LocalWhisperModelManager.currentCoreMLEncoderStatus()
+            }
+            if modelToDelete.id == selectedLiveWhisperModel?.id {
+                liveWhisperModelStatus = deletedStatus
+                liveWhisperCoreMLEncoderStatus = LocalWhisperModelManager.currentLiveCoreMLEncoderStatus()
+            } else {
+                liveWhisperModelStatus = LocalWhisperModelManager.currentLiveStatus()
+                liveWhisperCoreMLEncoderStatus = LocalWhisperModelManager.currentLiveCoreMLEncoderStatus()
             }
             localWhisperModelRefreshTick &+= 1
+            Task {
+                await transcriber.refreshSupportedLanguages()
+            }
         } catch {
             localWhisperDeleteErrorMessage = error.localizedDescription
             HapticFeedback.play(.failure)
@@ -468,6 +821,196 @@ struct SettingsView: View {
                 .buttonStyle(.plain)
                 .disabled(transcriber.isRecording || transcriber.isPreparing)
             }
+        }
+    }
+
+    private var openAITranscriptionToggleSettings: some View {
+        Toggle(isOn: openAITranscriptionEnabledBinding) {
+            HStack(alignment: .top, spacing: 10) {
+                SettingsIcon(systemImage: "cloud", tint: AppTheme.purple)
+
+                VStack(alignment: .leading, spacing: 3) {
+                    Text(L10n.Settings.onlineOpenAI)
+                        .font(.redditSans(.subheadline, weight: .semibold))
+                        .foregroundStyle(.primary)
+
+                    Text(L10n.Settings.onlineOpenAIDescription)
+                        .font(.redditSans(.caption))
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            }
+        }
+        .toggleStyle(.switch)
+        .disabled(transcriber.isRecording || transcriber.isPreparing)
+    }
+
+    private var openAITranscriptionEnabledBinding: Binding<Bool> {
+        Binding {
+            transcriber.isOpenAITranscriptionEnabled
+        } set: { value in
+            transcriber.isOpenAITranscriptionEnabled = value
+        }
+    }
+
+    private var localWhisperCoreMLEncoderLoadingBinding: Binding<Bool> {
+        Binding {
+            isLocalWhisperCoreMLEncoderLoadingEnabled
+        } set: { value in
+            HapticFeedback.play(.menuSelection)
+            isLocalWhisperCoreMLEncoderLoadingEnabled = value
+            LocalWhisperModelManager.isCoreMLEncoderLoadingEnabled = value
+        }
+    }
+
+    private var localWhisperLiveBetaSettings: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Toggle(isOn: localWhisperLiveBetaBinding) {
+                HStack(alignment: .top, spacing: 10) {
+                    SettingsIcon(systemImage: "waveform.badge.mic", tint: AppTheme.purple)
+
+                    VStack(alignment: .leading, spacing: 3) {
+                        Text(L10n.Settings.localWhisperLiveBeta)
+                            .font(.redditSans(.subheadline, weight: .semibold))
+                            .foregroundStyle(.primary)
+
+                        Text(L10n.Settings.localWhisperLiveBetaDescription)
+                            .font(.redditSans(.caption))
+                            .foregroundStyle(.secondary)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                }
+            }
+            .toggleStyle(.switch)
+            .disabled(transcriber.isRecording || transcriber.isPreparing)
+
+            NavigationLink {
+                liveWhisperModelPage
+            } label: {
+                SettingsNavigationRow(
+                    icon: "dot.radiowaves.left.and.right",
+                    titleResource: L10n.LocalWhisper.liveModelTitle,
+                    value: selectedLiveWhisperModel?.displayName ?? String(localized: L10n.LocalWhisper.liveModelNotSelected),
+                    subtitle: selectedLiveWhisperModel?.detail ?? String(localized: L10n.Settings.localWhisperLiveBetaRequiresSelection),
+                    tint: AppTheme.purple
+                )
+            }
+            .buttonStyle(.plain)
+            .disabled(isDownloadingLiveWhisperModel || isDownloadingLiveWhisperCoreMLEncoder || transcriber.isRecording || transcriber.isPreparing)
+
+            if let liveWhisperModelStatus {
+                SettingsMetricRow(
+                    icon: "iphone",
+                    titleResource: L10n.LocalWhisper.modelStatus,
+                    value: isDownloadingLiveWhisperModel ? liveWhisperDownloadProgressText : liveWhisperModelStatus.statusText,
+                    tint: liveWhisperModelStatus.isAvailable ? AppTheme.success : AppTheme.warning
+                )
+
+                if isDownloadingLiveWhisperModel {
+                    ProgressView(value: liveWhisperDownloadProgress)
+                        .tint(AppTheme.purple)
+                        .frame(maxWidth: .infinity)
+                }
+
+                if !liveWhisperModelStatus.isAvailable {
+                    Button {
+                        downloadLiveWhisperModel()
+                    } label: {
+                        SettingsCommandRow(
+                            icon: "arrow.down.circle",
+                            titleResource: L10n.LocalWhisper.downloadLiveModel,
+                            tint: AppTheme.purple
+                        )
+                    }
+                    .buttonStyle(.plain)
+                    .disabled(isDownloadingLiveWhisperModel || isDownloadingLiveWhisperCoreMLEncoder)
+                }
+
+                if isLocalWhisperCoreMLEncoderLoadingEnabled,
+                   liveWhisperModelStatus.isAvailable,
+                   let liveWhisperCoreMLEncoderStatus {
+                    SettingsMetricRow(
+                        icon: "cpu",
+                        titleResource: L10n.LocalWhisper.coreMLEncoderStatus,
+                        value: isDownloadingLiveWhisperCoreMLEncoder ? liveWhisperCoreMLEncoderDownloadProgressText : liveWhisperCoreMLEncoderStatus.statusText,
+                        tint: liveWhisperCoreMLEncoderStatus.isAvailable ? AppTheme.success : AppTheme.warning
+                    )
+
+                    SettingsVerbatimStatusRow(
+                        icon: liveWhisperCoreMLEncoderStatus.isAvailable ? "checkmark.circle" : "bolt.badge.clock",
+                        text: liveWhisperCoreMLEncoderStatus.detailText,
+                        tint: liveWhisperCoreMLEncoderStatus.isAvailable ? AppTheme.success : AppTheme.info
+                    )
+
+                    if isDownloadingLiveWhisperCoreMLEncoder {
+                        ProgressView(value: liveWhisperCoreMLEncoderDownloadProgress)
+                            .tint(AppTheme.purple)
+                            .frame(maxWidth: .infinity)
+                    }
+
+                    if !liveWhisperCoreMLEncoderStatus.isAvailable {
+                        Button {
+                            downloadLiveWhisperCoreMLEncoder()
+                        } label: {
+                            SettingsCommandRow(
+                                icon: "bolt.badge.clock",
+                                titleResource: L10n.LocalWhisper.downloadCoreMLEncoder,
+                                tint: AppTheme.purple
+                            )
+                        }
+                        .buttonStyle(.plain)
+                        .disabled(isDownloadingLiveWhisperModel || isDownloadingLiveWhisperCoreMLEncoder)
+                    }
+                }
+            }
+
+            if transcriber.selectedTranscriptionBackend.usesLocalWhisper && selectedLiveWhisperModel == nil {
+                SettingsStatusRow(
+                    icon: "exclamationmark.triangle",
+                    textResource: L10n.Settings.localWhisperLiveBetaRequiresSelection,
+                    tint: AppTheme.warning
+                )
+            } else if transcriber.selectedTranscriptionBackend.usesLocalWhisper && liveWhisperModelStatus?.isAvailable != true {
+                SettingsStatusRow(
+                    icon: "arrow.down.circle",
+                    textResource: L10n.Settings.localWhisperLiveBetaRequiresModel,
+                    tint: AppTheme.warning
+                )
+            }
+        }
+    }
+
+    private var localWhisperLiveBetaBinding: Binding<Bool> {
+        Binding {
+            transcriber.selectedTranscriptionBackend.usesLocalWhisper
+        } set: { value in
+            transcriber.selectedTranscriptionBackend = value ? .localWhisperBeta : .appleOnDevice
+        }
+    }
+
+    private var liveWhisperModelPage: some View {
+        let refreshTick = localWhisperModelRefreshTick
+
+        return SettingsDetailPage(titleResource: L10n.LocalWhisper.liveModelTitle) {
+            SettingsSection(titleResource: L10n.LocalWhisper.liveModelTitle, systemImage: "dot.radiowaves.left.and.right", tint: AppTheme.purple) {
+                ForEach(LocalWhisperModelManager.availableModels) { model in
+                    let status = LocalWhisperModelManager.status(for: model)
+                    Button {
+                        selectLiveWhisperModel(model)
+                    } label: {
+                        SettingsSelectionRow(
+                            icon: localWhisperModelIcon(for: model),
+                            title: model.displayName,
+                            subtitle: localWhisperModelSubtitle(for: model, status: status),
+                            isSelected: model.id == selectedLiveWhisperModel?.id,
+                            tint: status.isAvailable ? AppTheme.success : AppTheme.purple
+                        )
+                    }
+                    .buttonStyle(.plain)
+                    .disabled(isDownloadingLiveWhisperModel || isDownloadingLiveWhisperCoreMLEncoder || transcriber.isRecording || transcriber.isPreparing)
+                }
+            }
+            .id("live-\(refreshTick)")
         }
     }
 
@@ -634,11 +1177,13 @@ struct SettingsView: View {
                     tint: AppTheme.info
                 )
 
-                SettingsStatusRow(
-                    icon: "cloud",
-                    textResource: L10n.Settings.openAIManualRetranscriptionUploadsAudio,
-                    tint: AppTheme.warning
-                )
+                if transcriber.isOpenAITranscriptionEnabled {
+                    SettingsStatusRow(
+                        icon: "cloud",
+                        textResource: L10n.Settings.openAIManualRetranscriptionUploadsAudio,
+                        tint: AppTheme.warning
+                    )
+                }
 
                 SettingsStatusRow(
                     icon: "person.crop.circle.badge.xmark",

@@ -137,6 +137,7 @@ typedef struct whisper_full_params (*lt_whisper_full_default_params)(int strateg
 typedef int (*lt_whisper_full)(struct whisper_context * ctx, struct whisper_full_params params, const float * samples, int n_samples);
 typedef int (*lt_whisper_full_n_segments)(struct whisper_context * ctx);
 typedef int64_t (*lt_whisper_full_get_segment_t0)(struct whisper_context * ctx, int i_segment);
+typedef int64_t (*lt_whisper_full_get_segment_t1)(struct whisper_context * ctx, int i_segment);
 typedef const char * (*lt_whisper_full_get_segment_text)(struct whisper_context * ctx, int i_segment);
 
 typedef struct {
@@ -148,15 +149,19 @@ typedef struct {
     lt_whisper_full full;
     lt_whisper_full_n_segments full_n_segments;
     lt_whisper_full_get_segment_t0 full_get_segment_t0;
+    lt_whisper_full_get_segment_t1 full_get_segment_t1;
     lt_whisper_full_get_segment_text full_get_segment_text;
 } LTWhisperRuntime;
 
 @implementation LocalWhisperBridgeSegment
 
-- (instancetype)initWithStartSeconds:(NSTimeInterval)startSeconds text:(NSString *)text {
+- (instancetype)initWithStartSeconds:(NSTimeInterval)startSeconds
+                          endSeconds:(NSTimeInterval)endSeconds
+                                text:(NSString *)text {
     self = [super init];
     if (self) {
         _startSeconds = startSeconds;
+        _endSeconds = endSeconds;
         _text = [text copy];
     }
     return self;
@@ -260,6 +265,7 @@ static BOOL LTWhisperLoadRuntime(LTWhisperRuntime *runtime, NSError **error) {
             !LTWhisperLoadSymbol(handle, "whisper_full", (void **)&loadedRuntime.full, error) ||
             !LTWhisperLoadSymbol(handle, "whisper_full_n_segments", (void **)&loadedRuntime.full_n_segments, error) ||
             !LTWhisperLoadSymbol(handle, "whisper_full_get_segment_t0", (void **)&loadedRuntime.full_get_segment_t0, error) ||
+            !LTWhisperLoadSymbol(handle, "whisper_full_get_segment_t1", (void **)&loadedRuntime.full_get_segment_t1, error) ||
             !LTWhisperLoadSymbol(handle, "whisper_full_get_segment_text", (void **)&loadedRuntime.full_get_segment_text, error)) {
             if (error != NULL && *error != nil) {
                 cachedError = *error;
@@ -274,11 +280,47 @@ static BOOL LTWhisperLoadRuntime(LTWhisperRuntime *runtime, NSError **error) {
     }
 }
 
+static NSString *LTWhisperModelPathForCoreMLEncoderPreference(NSString *modelPath, BOOL useCoreMLEncoder, NSString **temporaryDirectory, NSError **error) {
+    if (useCoreMLEncoder) {
+        return modelPath;
+    }
+
+    NSString *temporaryRoot = [NSTemporaryDirectory() stringByAppendingPathComponent:[NSString stringWithFormat:@"LiveTranscriber-Whisper-NoEncoder-%@", NSUUID.UUID.UUIDString]];
+    NSString *temporaryModelPath = [temporaryRoot stringByAppendingPathComponent:modelPath.lastPathComponent];
+    NSFileManager *fileManager = NSFileManager.defaultManager;
+
+    NSError *directoryError = nil;
+    if (![fileManager createDirectoryAtPath:temporaryRoot withIntermediateDirectories:YES attributes:nil error:&directoryError]) {
+        if (error != NULL) {
+            *error = directoryError ?: LTWhisperMakeError(LocalWhisperBridgeErrorContextCreationFailed, @"Local Whisper could not prepare the selected model.");
+        }
+        return nil;
+    }
+
+    NSError *linkError = nil;
+    if (![fileManager linkItemAtPath:modelPath toPath:temporaryModelPath error:&linkError]) {
+        linkError = nil;
+        if (![fileManager createSymbolicLinkAtPath:temporaryModelPath withDestinationPath:modelPath error:&linkError]) {
+            [fileManager removeItemAtPath:temporaryRoot error:nil];
+            if (error != NULL) {
+                *error = linkError ?: LTWhisperMakeError(LocalWhisperBridgeErrorContextCreationFailed, @"Local Whisper could not prepare the selected model.");
+            }
+            return nil;
+        }
+    }
+
+    if (temporaryDirectory != NULL) {
+        *temporaryDirectory = temporaryRoot;
+    }
+    return temporaryModelPath;
+}
+
 @implementation LocalWhisperBridge
 
 + (NSArray<LocalWhisperBridgeSegment *> *)transcribeSamples:(NSData *)samples
                                                  modelPath:(NSString *)modelPath
                                               languageCode:(NSString *)languageCode
+                                         useCoreMLEncoder:(BOOL)useCoreMLEncoder
                                                      error:(NSError **)error {
     if (samples.length == 0 || samples.length % sizeof(float) != 0) {
         if (error != NULL) {
@@ -303,8 +345,17 @@ static BOOL LTWhisperLoadRuntime(LTWhisperRuntime *runtime, NSError **error) {
     struct whisper_context_params contextParams = runtime.context_default_params();
     contextParams.use_gpu = true;
 
-    struct whisper_context *context = runtime.init_from_file_with_params(modelPath.fileSystemRepresentation, contextParams);
+    NSString *temporaryModelDirectory = nil;
+    NSString *loadModelPath = LTWhisperModelPathForCoreMLEncoderPreference(modelPath, useCoreMLEncoder, &temporaryModelDirectory, error);
+    if (loadModelPath == nil) {
+        return nil;
+    }
+
+    struct whisper_context *context = runtime.init_from_file_with_params(loadModelPath.fileSystemRepresentation, contextParams);
     if (context == NULL) {
+        if (temporaryModelDirectory != nil) {
+            [NSFileManager.defaultManager removeItemAtPath:temporaryModelDirectory error:nil];
+        }
         if (error != NULL) {
             *error = LTWhisperMakeError(LocalWhisperBridgeErrorContextCreationFailed, @"Local Whisper could not load the selected model.");
         }
@@ -320,12 +371,17 @@ static BOOL LTWhisperLoadRuntime(LTWhisperRuntime *runtime, NSError **error) {
     params.print_progress = false;
     params.print_realtime = false;
     params.print_timestamps = false;
+    params.max_len = 80;
+    params.split_on_word = true;
     params.language = languageCode.length > 0 ? languageCode.UTF8String : "auto";
     params.detect_language = languageCode.length == 0 || [languageCode isEqualToString:@"auto"];
 
     int result = runtime.full(context, params, samples.bytes, (int)sampleCount);
     if (result != 0) {
         runtime.free_context(context);
+        if (temporaryModelDirectory != nil) {
+            [NSFileManager.defaultManager removeItemAtPath:temporaryModelDirectory error:nil];
+        }
         if (error != NULL) {
             *error = LTWhisperMakeError(LocalWhisperBridgeErrorTranscriptionFailed, @"Local Whisper transcription failed.");
         }
@@ -347,11 +403,18 @@ static BOOL LTWhisperLoadRuntime(LTWhisperRuntime *runtime, NSError **error) {
         }
 
         int64_t centiseconds = runtime.full_get_segment_t0(context, index);
-        [segments addObject:[[LocalWhisperBridgeSegment alloc] initWithStartSeconds:MAX((NSTimeInterval)centiseconds / 100.0, 0)
+        int64_t endCentiseconds = runtime.full_get_segment_t1(context, index);
+        NSTimeInterval startSeconds = MAX((NSTimeInterval)centiseconds / 100.0, 0);
+        NSTimeInterval endSeconds = MAX((NSTimeInterval)endCentiseconds / 100.0, startSeconds);
+        [segments addObject:[[LocalWhisperBridgeSegment alloc] initWithStartSeconds:startSeconds
+                                                                         endSeconds:endSeconds
                                                                                text:text]];
     }
 
     runtime.free_context(context);
+    if (temporaryModelDirectory != nil) {
+        [NSFileManager.defaultManager removeItemAtPath:temporaryModelDirectory error:nil];
+    }
     return segments;
 }
 

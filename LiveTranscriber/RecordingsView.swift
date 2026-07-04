@@ -16,6 +16,20 @@ private func localizedFormat(_ resource: LocalizedStringResource, _ arguments: C
     String(format: String(localized: resource), arguments: arguments)
 }
 
+private func localWhisperSupportedLanguages() -> [TranscriptionLanguage] {
+    LocalWhisperTranscriptionService.supportedLanguages(for: LocalWhisperModelManager.selectedModel)
+}
+
+private func transcriptionLanguageMatches(_ language: TranscriptionLanguage, languageID: String) -> Bool {
+    if language.id == languageID {
+        return true
+    }
+
+    let firstCode = language.locale.language.languageCode?.identifier
+    let secondCode = Locale(identifier: languageID).language.languageCode?.identifier
+    return firstCode != nil && firstCode == secondCode
+}
+
 struct RecordingsView: View {
     @ObservedObject var store: RecordingStore
     @ObservedObject var transcriber: LiveTranscriptionManager
@@ -32,6 +46,7 @@ struct RecordingsView: View {
     @State private var deleteErrorMessage: String?
     @State private var pendingImport: PendingImport?
     @State private var pendingSpeechLocaleReleaseAction: PendingSpeechLocaleReleaseAction?
+    @State private var appleSpeechTranscriptionLanguages: [TranscriptionLanguage] = TranscriptionLanguage.fallbackOptions
     @State private var searchText = ""
     @State private var isShowingRecordingsMap = false
     @State private var hidesTabBarForRecordingDetail = false
@@ -68,6 +83,7 @@ struct RecordingsView: View {
         )
         .task {
             await transcriber.refreshSupportedLanguages()
+            appleSpeechTranscriptionLanguages = await AppleSpeechTranscriptionSupport.supportedLanguages()
             await store.reload()
             store.refreshIntelligenceAvailability()
         }
@@ -111,7 +127,7 @@ struct RecordingsView: View {
             titleVisibility: .visible
         ) {
             if let pendingImport {
-                ForEach(transcriber.supportedLanguages) { language in
+                ForEach(appleSpeechTranscriptionLanguages) { language in
                     Button {
                         requestImportRecording(from: pendingImport.url, language: language)
                     } label: {
@@ -331,7 +347,7 @@ struct RecordingsView: View {
             }
 
             Menu {
-                ForEach(transcriber.supportedLanguages) { language in
+                ForEach(appleSpeechTranscriptionLanguages) { language in
                     Button {
                         requestRetranscription(item, language: language)
                     } label: {
@@ -346,37 +362,39 @@ struct RecordingsView: View {
             }
             .disabled(item.importStatus?.isFailed == false || transcriber.isRecording || transcriber.isPreparing)
 
-            Menu {
-                Button {
-                    retranscribeWithOpenAI(item, mode: .longForm)
-                } label: {
-                    Label(localized(L10n.Recordings.retranscribeWithOpenAILongForm), systemImage: "text.alignleft")
-                }
+            if transcriber.isOpenAITranscriptionEnabled {
+                Menu {
+                    Button {
+                        retranscribeWithOpenAI(item, mode: .longForm)
+                    } label: {
+                        Label(localized(L10n.Recordings.retranscribeWithOpenAILongForm), systemImage: "text.alignleft")
+                    }
 
-                Button {
-                    retranscribeWithOpenAI(item, mode: .segmented)
-                } label: {
-                    Label(localized(L10n.Recordings.retranscribeWithOpenAISegmented), systemImage: "list.bullet.rectangle")
-                }
+                    Button {
+                        retranscribeWithOpenAI(item, mode: .segmented)
+                    } label: {
+                        Label(localized(L10n.Recordings.retranscribeWithOpenAISegmented), systemImage: "list.bullet.rectangle")
+                    }
 
-                Button {
-                    retranscribeWithOpenAI(item, mode: .refinedSegments)
+                    Button {
+                        retranscribeWithOpenAI(item, mode: .refinedSegments)
+                    } label: {
+                        Label(localized(L10n.Recordings.retranscribeWithOpenAIRefinedSegments), systemImage: "wand.and.sparkles")
+                    }
                 } label: {
-                    Label(localized(L10n.Recordings.retranscribeWithOpenAIRefinedSegments), systemImage: "wand.and.sparkles")
+                    Label(localized(L10n.Recordings.retranscribeWithOpenAI), systemImage: "cloud")
                 }
-            } label: {
-                Label(localized(L10n.Recordings.retranscribeWithOpenAI), systemImage: "cloud")
+                .disabled(item.importStatus?.isFailed == false || transcriber.isRecording || transcriber.isPreparing)
             }
-            .disabled(item.importStatus?.isFailed == false || transcriber.isRecording || transcriber.isPreparing)
 
             Menu {
-                ForEach(transcriber.supportedLanguages) { language in
+                ForEach(localWhisperSupportedLanguages()) { language in
                     Button {
                         retranscribeWithLocalWhisper(item, language: language)
                     } label: {
                         Label(
                             language.displayName,
-                            systemImage: language.id == item.languageID ? "checkmark" : "waveform"
+                            systemImage: transcriptionLanguageMatches(language, languageID: item.languageID) ? "checkmark" : "waveform"
                         )
                     }
                 }
@@ -632,6 +650,10 @@ struct RecordingsView: View {
     }
 
     private func retranscribeWithOpenAI(_ item: RecordingItem, mode: OpenAIFileTranscriptionMode) {
+        guard transcriber.isOpenAITranscriptionEnabled else {
+            HapticFeedback.play(.blocked)
+            return
+        }
         guard item.importStatus?.isFailed != false else {
             HapticFeedback.play(.blocked)
             return
@@ -659,7 +681,7 @@ struct RecordingsView: View {
         }
     }
 
-    private func retranscribeWithLocalWhisper(_ item: RecordingItem, language: TranscriptionLanguage) {
+    private func retranscribeWithLocalWhisper(_ item: RecordingItem, language: TranscriptionLanguage, model: LocalWhisperModel? = nil) {
         guard item.importStatus?.isFailed != false else {
             HapticFeedback.play(.blocked)
             return
@@ -672,7 +694,7 @@ struct RecordingsView: View {
         Task {
             HapticFeedback.play(.retranscribeStart)
             do {
-                try await store.retranscribeWithLocalWhisper(item, language: language)
+                try await store.retranscribeWithLocalWhisper(item, language: language, model: model)
                 HapticFeedback.play(.retranscribeComplete)
             } catch {
                 transcriptionErrorMessage = error.localizedDescription
@@ -1172,7 +1194,7 @@ private struct RecordingMetadataStrip: View {
     var body: some View {
         ScrollView(.horizontal, showsIndicators: false) {
             HStack(spacing: 6) {
-                RecordingMetadataChip(systemImage: "globe", text: item.languageName)
+                RecordingMetadataChip(systemImage: "globe", text: item.localizedLanguageName)
                 RecordingMetadataChip(systemImage: "text.alignleft", text: "\(item.lineCount)")
                 if let location = item.location {
                     RecordingMetadataChip(systemImage: "mappin.and.ellipse") {
@@ -1286,6 +1308,8 @@ struct RecordingDetailView: View {
     @State private var selectedTranslationLanguage: TranscriptionLanguage?
     @State private var translatedTranscriptByLineID: [StoredTranscriptLine.ID: String] = [:]
     @State private var translatedTranscriptCache: [String: [StoredTranscriptLine.ID: String]] = [:]
+    @State private var appleSpeechTranscriptionLanguages: [TranscriptionLanguage] = TranscriptionLanguage.fallbackOptions
+    @State private var appleTranslationLanguages: [TranscriptionLanguage] = []
     @State private var isTranslatingTranscript = false
     @State private var translationErrorMessage: String?
     @State private var pendingSpeechLocaleReleaseAction: PendingSpeechLocaleReleaseAction?
@@ -1417,6 +1441,10 @@ struct RecordingDetailView: View {
         }
         .task(id: transcriptCacheIdentifier) {
             await refreshTranscriptCache()
+        }
+        .task {
+            appleSpeechTranscriptionLanguages = await AppleSpeechTranscriptionSupport.supportedLanguages()
+            appleTranslationLanguages = await AppleTranslationLanguages.supportedLanguages()
         }
         .translationTask(translationConfiguration) { session in
             await translateTranscript(using: session)
@@ -1580,7 +1608,7 @@ struct RecordingDetailView: View {
             }
 
             Menu {
-                ForEach(transcriber.supportedLanguages) { language in
+                ForEach(appleSpeechTranscriptionLanguages) { language in
                     Button {
                         requestCurrentItemRetranscription(language: language)
                     } label: {
@@ -1595,37 +1623,39 @@ struct RecordingDetailView: View {
             }
             .disabled(currentItem.isTranscriptLocked || isTranscriptionRunning || transcriber.isRecording || transcriber.isPreparing)
 
-            Menu {
-                Button {
-                    retranscribeCurrentItemWithOpenAI(mode: .longForm)
-                } label: {
-                    Label(localized(L10n.Recordings.retranscribeWithOpenAILongForm), systemImage: "text.alignleft")
-                }
+            if transcriber.isOpenAITranscriptionEnabled {
+                Menu {
+                    Button {
+                        retranscribeCurrentItemWithOpenAI(mode: .longForm)
+                    } label: {
+                        Label(localized(L10n.Recordings.retranscribeWithOpenAILongForm), systemImage: "text.alignleft")
+                    }
 
-                Button {
-                    retranscribeCurrentItemWithOpenAI(mode: .segmented)
-                } label: {
-                    Label(localized(L10n.Recordings.retranscribeWithOpenAISegmented), systemImage: "list.bullet.rectangle")
-                }
+                    Button {
+                        retranscribeCurrentItemWithOpenAI(mode: .segmented)
+                    } label: {
+                        Label(localized(L10n.Recordings.retranscribeWithOpenAISegmented), systemImage: "list.bullet.rectangle")
+                    }
 
-                Button {
-                    retranscribeCurrentItemWithOpenAI(mode: .refinedSegments)
+                    Button {
+                        retranscribeCurrentItemWithOpenAI(mode: .refinedSegments)
+                    } label: {
+                        Label(localized(L10n.Recordings.retranscribeWithOpenAIRefinedSegments), systemImage: "wand.and.sparkles")
+                    }
                 } label: {
-                    Label(localized(L10n.Recordings.retranscribeWithOpenAIRefinedSegments), systemImage: "wand.and.sparkles")
+                    Label(localized(L10n.Recordings.retranscribeWithOpenAI), systemImage: "cloud")
                 }
-            } label: {
-                Label(localized(L10n.Recordings.retranscribeWithOpenAI), systemImage: "cloud")
+                .disabled(currentItem.isTranscriptLocked || isTranscriptionRunning || transcriber.isRecording || transcriber.isPreparing)
             }
-            .disabled(currentItem.isTranscriptLocked || isTranscriptionRunning || transcriber.isRecording || transcriber.isPreparing)
 
             Menu {
-                ForEach(transcriber.supportedLanguages) { language in
+                ForEach(localWhisperSupportedLanguages()) { language in
                     Button {
                         retranscribeCurrentItemWithLocalWhisper(language: language)
                     } label: {
                         Label(
                             language.displayName,
-                            systemImage: language.id == currentItem.languageID ? "checkmark" : "waveform"
+                            systemImage: transcriptionLanguageMatches(language, languageID: currentItem.languageID) ? "checkmark" : "waveform"
                         )
                     }
                 }
@@ -1677,7 +1707,7 @@ struct RecordingDetailView: View {
                 HStack(spacing: 10) {
                     RecordingInfoPill(icon: "calendar", text: item.createdAt.formatted(date: .abbreviated, time: .shortened))
                     RecordingInfoPill(icon: "clock", text: TranscriptionLine.formatTimestamp(Double(item.durationSeconds)))
-                    RecordingInfoPill(icon: "globe", text: item.languageName)
+                    RecordingInfoPill(icon: "globe", text: item.localizedLanguageName)
                     RecordingInfoPill(icon: iCloudSyncStatus.systemImage, text: iCloudSyncStatus.displayName)
                 }
 
@@ -1688,7 +1718,7 @@ struct RecordingDetailView: View {
                     }
 
                     HStack(spacing: 10) {
-                        RecordingInfoPill(icon: "globe", text: item.languageName)
+                        RecordingInfoPill(icon: "globe", text: item.localizedLanguageName)
                         RecordingInfoPill(icon: iCloudSyncStatus.systemImage, text: iCloudSyncStatus.displayName)
                     }
                 }
@@ -2054,8 +2084,8 @@ struct RecordingDetailView: View {
     }
 
     private var transcriptTranslationLanguages: [TranscriptionLanguage] {
-        transcriber.supportedLanguages.filter { language in
-            !Self.sameBaseLanguage(language.id, currentItem.languageID)
+        appleTranslationLanguages.filter { language in
+            !AppleTranslationLanguages.sameBaseLanguage(language.id, currentItem.languageID)
         }
     }
 
@@ -2196,6 +2226,10 @@ struct RecordingDetailView: View {
     }
 
     private func retranscribeCurrentItemWithOpenAI(mode: OpenAIFileTranscriptionMode) {
+        guard transcriber.isOpenAITranscriptionEnabled else {
+            HapticFeedback.play(.blocked)
+            return
+        }
         guard !isTranscriptionRunning else {
             HapticFeedback.play(.blocked)
             return
@@ -2224,7 +2258,7 @@ struct RecordingDetailView: View {
         }
     }
 
-    private func retranscribeCurrentItemWithLocalWhisper(language: TranscriptionLanguage) {
+    private func retranscribeCurrentItemWithLocalWhisper(language: TranscriptionLanguage, model: LocalWhisperModel? = nil) {
         guard !isTranscriptionRunning else {
             HapticFeedback.play(.blocked)
             return
@@ -2238,7 +2272,7 @@ struct RecordingDetailView: View {
         Task {
             HapticFeedback.play(.retranscribeStart)
             do {
-                try await store.retranscribeWithLocalWhisper(item, language: language)
+                try await store.retranscribeWithLocalWhisper(item, language: language, model: model)
                 HapticFeedback.play(.retranscribeComplete)
             } catch {
                 transcriptionErrorMessage = error.localizedDescription
@@ -2343,7 +2377,7 @@ struct RecordingDetailView: View {
             HapticFeedback.play(.blocked)
             return
         }
-        guard !Self.sameBaseLanguage(language.id, currentItem.languageID) else {
+        guard !AppleTranslationLanguages.sameBaseLanguage(language.id, currentItem.languageID) else {
             clearTranscriptTranslation()
             return
         }
@@ -2362,8 +2396,8 @@ struct RecordingDetailView: View {
         translatedTranscriptByLineID = [:]
         isTranslatingTranscript = true
 
-        let sourceLanguage = Self.localeLanguage(for: currentItem.languageID)
-        let targetLanguage = Self.localeLanguage(for: language.id)
+        let sourceLanguage = AppleTranslationLanguages.localeLanguage(for: currentItem.languageID)
+        let targetLanguage = AppleTranslationLanguages.localeLanguage(for: language.id)
         let nextConfiguration = TranslationSession.Configuration(
             source: sourceLanguage,
             target: targetLanguage
@@ -2458,35 +2492,6 @@ struct RecordingDetailView: View {
 
     private func transcriptTranslationCacheKey(for language: TranscriptionLanguage) -> String {
         "\(transcriptTranslationCachePrefix)|\(language.id)"
-    }
-
-    private static func localeLanguage(for identifier: String) -> Locale.Language? {
-        let language = Locale(identifier: identifier).language
-        guard language.languageCode != nil else {
-            return nil
-        }
-        return language
-    }
-
-    private static func sameBaseLanguage(_ firstIdentifier: String, _ secondIdentifier: String) -> Bool {
-        let firstLanguage = Locale(identifier: firstIdentifier).language
-        let secondLanguage = Locale(identifier: secondIdentifier).language
-        let firstCode = firstLanguage.languageCode?.identifier
-        let secondCode = secondLanguage.languageCode?.identifier
-        guard let firstCode, let secondCode else {
-            return firstIdentifier == secondIdentifier
-        }
-        guard firstCode == secondCode else {
-            return false
-        }
-
-        let firstScript = firstLanguage.script?.identifier
-        let secondScript = secondLanguage.script?.identifier
-        if firstScript != nil || secondScript != nil {
-            return firstScript == secondScript
-        }
-
-        return true
     }
 
     private func prepareRecordingEditSheet() {
@@ -3982,7 +3987,7 @@ final class RecordingPlaybackController: ObservableObject {
         }
 
         let formattedDate = item.createdAt.formatted(date: .abbreviated, time: .shortened)
-        return "\(item.languageName) · \(formattedDate)"
+        return "\(item.localizedLanguageName) · \(formattedDate)"
     }
 }
 

@@ -2941,6 +2941,48 @@
         }
       }
     },
+    "local_whisper.error.missing_live_model" : {
+      "comment" : "Local Whisper error when no live model is selected.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Wähle in den Beta-Funktionen ein Echtzeit-Local-Whisper-Modell, bevor du Local Whisper Live verwendest."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Choose a realtime Local Whisper model in Beta Features before using Local Whisper Live."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Local Whisper Liveを使用する前に、ベータ機能でリアルタイムLocal Whisperモデルを選択してください。"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Kies een realtime Local Whisper-model in Bètafuncties voordat je Local Whisper Live gebruikt."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "使用 Local Whisper Live 前，请先在 Beta 功能中选择实时 Local Whisper 模型。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "使用 Local Whisper Live 前，請先在 Beta 功能中選擇即時 Local Whisper 模型。"
+          }
+        }
+      }
+    },
     "local_whisper.error.missing_symbol.format" : {
       "comment" : "Local Whisper error when a native function cannot be found. Parameter: symbol name.",
       "extractionState" : "stale",
@@ -3445,48 +3487,6 @@
         }
       }
     },
-    "local_whisper.model.delete_selected" : {
-      "comment" : "Settings button title to delete the selected downloaded local Whisper model.",
-      "extractionState" : "stale",
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Ausgewähltes Modell löschen"
-          }
-        },
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Delete Selected Model"
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "選択したモデルを削除"
-          }
-        },
-        "nl" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Geselecteerd model verwijderen"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "删除所选模型"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "刪除所選模型"
-          }
-        }
-      }
-    },
     "local_whisper.model.download_failed" : {
       "comment" : "Alert title when a local Whisper model download fails.",
       "extractionState" : "stale",
@@ -3525,6 +3525,342 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "模型下載失敗"
+          }
+        }
+      }
+    },
+    "local_whisper.coreml_encoder.bundled_detail.format" : {
+      "comment" : "Core ML encoder bundled detail. Parameters: model name, installed size.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ Core ML Encoder ist in dieser App enthalten (%@)."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ Core ML encoder is bundled with this app (%@)."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ Core MLエンコーダーはこのアプリに同梱されています（%@）。"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ Core ML-encoder is meegeleverd met deze app (%@)."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ Core ML Encoder 已随 App 内置（%@）。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ Core ML Encoder 已隨 App 內建（%@）。"
+          }
+        }
+      }
+    },
+    "local_whisper.coreml_encoder.download" : {
+      "comment" : "Settings button title to download the Core ML encoder for a local Whisper model.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Core ML Encoder laden"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Download Core ML Encoder"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Core MLエンコーダーをダウンロード"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Core ML-encoder downloaden"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "下载 Core ML Encoder"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "下載 Core ML Encoder"
+          }
+        }
+      }
+    },
+    "local_whisper.coreml_encoder.downloaded_detail.format" : {
+      "comment" : "Core ML encoder downloaded detail. Parameters: model name, installed size.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ Core ML Encoder wurde auf dieses iPhone geladen (%@)."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ Core ML encoder is downloaded on this iPhone (%@)."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ Core MLエンコーダーはこのiPhoneにダウンロード済みです（%@）。"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ Core ML-encoder is gedownload op deze iPhone (%@)."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ Core ML Encoder 已下载到这台 iPhone（%@）。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ Core ML Encoder 已下載到這台 iPhone（%@）。"
+          }
+        }
+      }
+    },
+    "local_whisper.coreml_encoder.downloading.format" : {
+      "comment" : "Core ML encoder download progress. Parameter: percent complete.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Encoder wird geladen %.0f%%"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Downloading Encoder %.0f%%"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "エンコーダーをダウンロード中 %.0f%%"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Encoder downloaden %.0f%%"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "正在下载 Encoder %.0f%%"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "正在下載 Encoder %.0f%%"
+          }
+        }
+      }
+    },
+    "local_whisper.coreml_encoder.missing_detail.format" : {
+      "comment" : "Core ML encoder missing detail. Parameters: model name, expected download size.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Optionale Apple Neural Engine-Beschleunigung für %@. Downloadgröße etwa %@."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Optional Apple Neural Engine acceleration for %@. Download size is about %@."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ 用の任意のApple Neural Engineアクセラレーションです。ダウンロードサイズは約%@です。"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Optionele Apple Neural Engine-versnelling voor %@. Downloadgrootte is ongeveer %@."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ 可选 Apple Neural Engine 加速。下载大小约 %@。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ 可選 Apple Neural Engine 加速。下載大小約 %@。"
+          }
+        }
+      }
+    },
+    "local_whisper.coreml_encoder.loading" : {
+      "comment" : "Settings toggle title for enabling local Whisper Core ML encoder loading.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Core ML Encoder laden"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Load Core ML Encoder"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Core MLエンコーダーを読み込む"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Core ML-encoder laden"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "加载 Core ML Encoder"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "載入 Core ML Encoder"
+          }
+        }
+      }
+    },
+    "local_whisper.coreml_encoder.loading.description" : {
+      "comment" : "Settings toggle description for enabling local Whisper Core ML encoder loading.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Für die meisten Aufnahmen nicht empfohlen. Kann bei Live-Transkription langsamer oder ungenauer sein. Standardmäßig deaktiviert."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Not recommended for most recordings. It can be slower or less accurate in live transcription. Off by default."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ほとんどの録音では推奨しません。ライブ文字起こしでは遅くなったり精度が下がったりする場合があります。デフォルトではオフです。"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Niet aanbevolen voor de meeste opnamen. Kan bij live transcriptie trager of minder nauwkeurig zijn. Standaard uit."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "大多数录音不推荐开启。实时转录时可能更慢或准确度更低。默认关闭。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "大多數錄音不建議開啟。即時轉錄時可能更慢或準確度更低。預設關閉。"
+          }
+        }
+      }
+    },
+    "local_whisper.coreml_encoder.status" : {
+      "comment" : "Settings metric title for local Whisper Core ML encoder status.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Core ML Encoder"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Core ML Encoder"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Core MLエンコーダー"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Core ML-encoder"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Core ML Encoder"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Core ML Encoder"
           }
         }
       }
@@ -3609,6 +3945,132 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "%@ 已下載到這台 iPhone（%@）。"
+          }
+        }
+      }
+    },
+    "local_whisper.live_model.download" : {
+      "comment" : "Settings button title to download the beta live Local Whisper model.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Echtzeitmodell laden"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Download Realtime Model"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "リアルタイムモデルをダウンロード"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Realtime model downloaden"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "下载实时模型"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "下載即時模型"
+          }
+        }
+      }
+    },
+    "local_whisper.live_model.not_selected" : {
+      "comment" : "Settings value when no beta live Local Whisper model has been selected.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nicht ausgewählt"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Not Selected"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "未選択"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Niet geselecteerd"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "未选择"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "未選擇"
+          }
+        }
+      }
+    },
+    "local_whisper.live_model.title" : {
+      "comment" : "Settings row title for selecting the beta live Local Whisper model.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Echtzeit-Transkriptionsmodell"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Realtime Transcription Model"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "リアルタイム文字起こしモデル"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Realtime transcriptiemodel"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "实时转录模型"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "即時轉錄模型"
           }
         }
       }
@@ -9703,6 +10165,48 @@
         }
       }
     },
+    "settings.beta_features" : {
+      "comment" : "Settings section title for beta features.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Beta-Funktionen"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Beta Features"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ベータ機能"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bètafuncties"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Beta 功能"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Beta 功能"
+          }
+        }
+      }
+    },
     "settings.developer_options" : {
       "comment" : "Developer options settings title.",
       "extractionState" : "stale",
@@ -9825,6 +10329,132 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "檔案"
+          }
+        }
+      }
+    },
+    "settings.feedback" : {
+      "comment" : "Settings row title for sending feedback email.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Feedback"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Feedback"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "フィードバック"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Feedback"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "反馈"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "意見回饋"
+          }
+        }
+      }
+    },
+    "settings.feedback.open_failed.format" : {
+      "comment" : "Alert message when feedback email cannot be opened. Parameter: feedback email address.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Es ist keine Mail-App eingerichtet. Sende Feedback an %@."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No mail app is configured. Send feedback to %@."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "メールアプリが設定されていません。%@ にフィードバックを送信してください。"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Er is geen mail-app geconfigureerd. Stuur feedback naar %@."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "未配置邮件 App。请将反馈发送至 %@。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "未設定郵件 App。請將意見回饋傳送至 %@。"
+          }
+        }
+      }
+    },
+    "settings.feedback.unavailable" : {
+      "comment" : "Alert title when feedback email cannot be opened.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Feedback nicht verfügbar"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Feedback Unavailable"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "フィードバックを利用できません"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Feedback niet beschikbaar"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "无法发送反馈"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "無法傳送意見回饋"
           }
         }
       }
@@ -10039,6 +10669,174 @@
         }
       }
     },
+    "settings.local_whisper_live_beta" : {
+      "comment" : "Settings toggle title for beta live Local Whisper transcription.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Local Whisper Live"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Local Whisper Live"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Local Whisper Live"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Local Whisper Live"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "本地 Whisper 实时转录"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "本機 Whisper 即時轉錄"
+          }
+        }
+      }
+    },
+    "settings.local_whisper_live_beta.description" : {
+      "comment" : "Settings toggle description for beta live Local Whisper transcription.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Verwendet das ausgewählte Echtzeitmodell während der Aufnahme. Offline, experimentell und mit von Whisper unterstützten Sprachen."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Use the selected realtime model while recording. This is offline, experimental, and uses Whisper-supported languages."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "録音中に選択したリアルタイムモデルを使用します。オフラインの実験的機能で、Whisper対応言語を使用します。"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Gebruik het geselecteerde realtime model tijdens het opnemen. Dit is offline, experimenteel en gebruikt door Whisper ondersteunde talen."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "录音时使用所选实时模型。这是离线实验功能，并使用 Whisper 支持的语言列表。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "錄音時使用所選即時模型。這是離線實驗功能，並使用 Whisper 支援的語言列表。"
+          }
+        }
+      }
+    },
+    "settings.local_whisper_live_beta.requires_model" : {
+      "comment" : "Settings warning shown when live Local Whisper beta is enabled without a downloaded model.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Lade das ausgewählte Echtzeitmodell herunter, bevor du Local Whisper Live startest."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Download the selected realtime model before starting Local Whisper Live."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Local Whisper Liveを開始する前に、選択したリアルタイムモデルをダウンロードしてください。"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Download het geselecteerde realtime model voordat je Local Whisper Live start."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "启动 Local Whisper Live 前，请先下载所选实时模型。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "啟動 Local Whisper Live 前，請先下載所選即時模型。"
+          }
+        }
+      }
+    },
+    "settings.local_whisper_live_beta.requires_selection" : {
+      "comment" : "Settings warning shown when live Local Whisper beta is enabled without a selected live model.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Wähle ein Echtzeit-Transkriptionsmodell, bevor du Local Whisper Live verwendest."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Choose a realtime transcription model before using Local Whisper Live."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Local Whisper Liveを使う前に、リアルタイム文字起こしモデルを選択してください。"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Kies een realtime transcriptiemodel voordat je Local Whisper Live gebruikt."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "使用 Local Whisper Live 前，请先选择实时转录模型。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "使用 Local Whisper Live 前，請先選擇即時轉錄模型。"
+          }
+        }
+      }
+    },
     "settings.next_start_uses_language" : {
       "comment" : "Transcription language row subtitle.",
       "extractionState" : "stale",
@@ -10077,6 +10875,90 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "下次開始錄音時會使用所選語言"
+          }
+        }
+      }
+    },
+    "settings.online_openai" : {
+      "comment" : "Settings toggle title for enabling online OpenAI transcription options.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Online OpenAI"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Online OpenAI"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "オンラインOpenAI"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Online OpenAI"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "在线 OpenAI"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "線上 OpenAI"
+          }
+        }
+      }
+    },
+    "settings.online_openai.description" : {
+      "comment" : "Settings toggle description for enabling online OpenAI transcription options.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "OpenAI-Transkriptionsoptionen anzeigen. Wenn aktiviert, kann manuell ausgewähltes Aufnahmeaudio direkt von diesem iPhone an OpenAI gesendet werden."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Show OpenAI transcription options. When enabled, manually selected recording audio can be sent directly from this iPhone to OpenAI."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "OpenAI文字起こしオプションを表示します。有効にすると、手動で選択した録音音声をこのiPhoneからOpenAIへ直接送信できます。"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Toon OpenAI-transcriptieopties. Als dit is ingeschakeld, kan handmatig geselecteerde opname-audio rechtstreeks vanaf deze iPhone naar OpenAI worden verzonden."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "显示 OpenAI 转录选项。启用后，你手动选择的录音音频可由这台 iPhone 直接发送给 OpenAI。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "顯示 OpenAI 轉錄選項。啟用後，你手動選擇的錄音音訊可由這台 iPhone 直接傳送給 OpenAI。"
           }
         }
       }
@@ -10634,37 +11516,37 @@
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Es werden keine vom Entwickler betriebenen Server, keine Drittanbieter-Analysen, keine Werbung und kein Tracking verwendet. Der optionale Download des lokalen Whisper-Modells verbindet sich nur mit Hugging Face, wenn du auf „Ausgewähltes Modell laden“ tippst."
+            "value" : "Es werden keine vom Entwickler betriebenen Server, keine Drittanbieter-Analysen, keine Werbung und kein Tracking verwendet. Optionale Local-Whisper-Modell- und Core-ML-Encoder-Downloads verbinden sich nur mit Hugging Face, wenn du diese Downloads startest."
           }
         },
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "No developer-operated servers, third-party analytics, ads, or tracking are used. The optional Local Whisper model download connects to Hugging Face only when you tap Download Selected Model."
+            "value" : "No developer-operated servers, third-party analytics, ads, or tracking are used. Optional Local Whisper model and Core ML encoder downloads connect to Hugging Face only when you start those downloads."
           }
         },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "開発者が運用するサーバー、サードパーティ分析、広告、トラッキングは使用しません。任意のローカルWhisperモデルのダウンロードは、「選択したモデルをダウンロード」をタップした場合にのみHugging Faceに接続します。"
+            "value" : "開発者が運用するサーバー、サードパーティ分析、広告、トラッキングは使用しません。任意のローカルWhisperモデルとCore MLエンコーダーのダウンロードは、開始した場合にのみHugging Faceに接続します。"
           }
         },
         "nl" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Er worden geen door de ontwikkelaar beheerde servers, analyses van derden, advertenties of tracking gebruikt. De optionele download van het lokale Whisper-model maakt alleen verbinding met Hugging Face wanneer je op Geselecteerd model downloaden tikt."
+            "value" : "Er worden geen door de ontwikkelaar beheerde servers, analyses van derden, advertenties of tracking gebruikt. Optionele Local Whisper-model- en Core ML-encoderdownloads maken alleen verbinding met Hugging Face wanneer je die downloads start."
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "不使用开发者运营的服务器、第三方分析、广告或追踪。可选的本地 Whisper 模型下载只会在你点按“下载所选模型”时连接 Hugging Face。"
+            "value" : "不使用开发者运营的服务器、第三方分析、广告或追踪。可选的本地 Whisper 模型和 Core ML Encoder 下载只会在你开始这些下载时连接 Hugging Face。"
           }
         },
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "不使用開發者營運的伺服器、第三方分析、廣告或追蹤。可選的本機 Whisper 模型下載只會在你點一下「下載所選模型」時連線 Hugging Face。"
+            "value" : "不使用開發者營運的伺服器、第三方分析、廣告或追蹤。可選的本機 Whisper 模型和 Core ML Encoder 下載只會在你開始這些下載時連線 Hugging Face。"
           }
         }
       }
@@ -12601,6 +13483,48 @@
         }
       }
     },
+    "speech.pipeline.active.local_whisper" : {
+      "comment" : "Active Local Whisper pipeline diagnostic value.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Local Whisper Live"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Local Whisper Live"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Local Whisper Live"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Local Whisper Live"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "本地 Whisper 实时转录"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "本機 Whisper 即時轉錄"
+          }
+        }
+      }
+    },
     "speech.pipeline.active.native_compatible_with" : {
       "comment" : "Active speech pipeline diagnostic value.",
       "extractionState" : "stale",
@@ -12723,6 +13647,48 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Analyzer 輸入：16 kHz / mono / Int16 PCM"
+          }
+        }
+      }
+    },
+    "speech.pipeline.local_whisper.input_16k" : {
+      "comment" : "Developer Local Whisper pipeline diagnostic.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Local Whisper-Eingabe: 16 kHz / mono / Float32 PCM"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Local Whisper input: 16 kHz / mono / Float32 PCM"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Local Whisper入力: 16 kHz / モノラル / Float32 PCM"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Local Whisper-invoer: 16 kHz / mono / Float32 PCM"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Local Whisper 输入: 16 kHz / mono / Float32 PCM"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Local Whisper 輸入：16 kHz / mono / Float32 PCM"
           }
         }
       }
@@ -12933,6 +13899,48 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "支援 Pipeline：iOS 26 AVAudioConverter fallback"
+          }
+        }
+      }
+    },
+    "speech.pipeline.supported.local_whisper" : {
+      "comment" : "Developer Local Whisper pipeline diagnostic.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Unterstützte Pipeline: Local Whisper mit festen 8-Sekunden-Blöcken ohne Überlappung"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Supported pipeline: Local Whisper fixed 8 second chunks without overlap"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "サポートされるパイプライン: Local Whisperの重複なし固定8秒チャンク"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ondersteunde pipeline: Local Whisper met vaste chunks van 8 seconden zonder overlap"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "支持 Pipeline: Local Whisper 固定 8 秒分块，无 overlap"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "支援 Pipeline：Local Whisper 固定 8 秒分塊，無 overlap"
           }
         }
       }
@@ -13437,6 +14445,90 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Apple 裝置端"
+          }
+        }
+      }
+    },
+    "transcription.backend.local_whisper_beta.detail" : {
+      "comment" : "Local Whisper live transcription backend detail.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Experimentelle Offline-Live-Transkription mit whisper.cpp."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Experimental offline live transcription using whisper.cpp."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "whisper.cppを使った実験的なオフラインライブ文字起こし。"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Experimentele offline live transcriptie met whisper.cpp."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "使用 whisper.cpp 的实验性离线实时转录。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "使用 whisper.cpp 的實驗性離線即時轉錄。"
+          }
+        }
+      }
+    },
+    "transcription.backend.local_whisper_beta.title" : {
+      "comment" : "Local Whisper live transcription backend title.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Local Whisper Live (Beta)"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Local Whisper Live (Beta)"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Local Whisper Live (ベータ)"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Local Whisper Live (bèta)"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "本地 Whisper 实时转录 (Beta)"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "本機 Whisper 即時轉錄 (Beta)"
           }
         }
       }

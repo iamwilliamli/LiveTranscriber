@@ -4,7 +4,7 @@
 
 LiveTranscriber is an iOS 26+ recording and live transcription app. It records audio, transcribes live speech on device with Apple's Speech APIs, saves audio and transcript files, and keeps recording status visible through Lock Screen Live Activities and Dynamic Island.
 
-The project is designed as a native, local-first iOS utility. Audio, transcripts, and the recording index stay in the local app-private container by default. Users can enable iCloud in Settings to move storage into an app-private iCloud container for cross-device sync. Users can also manually re-transcribe saved recordings with OpenAI file transcription using their own API key.
+The project is designed as a native, local-first iOS utility. Audio, transcripts, and the recording index stay in the local app-private container by default. Users can enable iCloud in Settings to move storage into an app-private iCloud container for cross-device sync. Users can also manually re-transcribe saved recordings with Local Whisper on device, or with OpenAI file transcription using their own API key.
 
 ## Source Availability and Commercial Attribution
 
@@ -21,6 +21,7 @@ Attribution-free, private-label, or white-label commercial use requires separate
 
 ## Community and Reporting
 
+- [TestFlight Beta](https://testflight.apple.com/join/gsu9xa9k)
 - [Contributing Guide](CONTRIBUTING.md)
 - [Code of Conduct](CODE_OF_CONDUCT.md)
 - [Security Policy](SECURITY.md)
@@ -46,6 +47,7 @@ Attribution-free, private-label, or white-label commercial use requires separate
 - Home Screen widget with quick links to recording, saved files, and settings.
 - Local Apple Intelligence summary and topic tag generation for saved transcripts.
 - Selectable speech processing pipelines: a stable iOS 26/27 compatible pipeline and an iOS 27 native `AnalyzerInputConverter` pipeline.
+- Optional Local Whisper re-transcription for saved recordings, with on-device whisper.cpp inference and downloadable or bundled GGML model files.
 - Optional OpenAI re-transcription for saved recordings, with long-form and segmented modes using a user-supplied OpenAI API key stored in Keychain.
 - Recording detail audio parameters, including sample rate, channel count, encoding, duration, frame count, and file size.
 - Shared visual system based on Reddit Sans, grouped backgrounds, compact card surfaces, red recording actions, and system SF Symbols.
@@ -64,6 +66,7 @@ flowchart TB
     fileWriter["Audio File Writer\nWAV / M4A"]
     speechInput["Analyzer Input Pipeline\nmonotonic timestamps"]
     speech["Apple Speech\nSpeechAnalyzer + SpeechTranscriber"]
+    localWhisper["Local Whisper\nmanual saved-recording retranscribe"]
     openai["OpenAI Audio Transcriptions\nmanual saved-recording retranscribe"]
     liveText["Live Transcript Lines"]
     activity["ActivityKit + WidgetKit\nLock Screen, Dynamic Island, Home Widget"]
@@ -93,7 +96,9 @@ flowchart TB
     store -. "when iCloud is enabled" .-> icloudFiles
     swiftData -. "when iCloud is enabled" .-> cloudKit
     store --> detail
+    detail --> localWhisper
     detail --> openai
+    localWhisper --> store
     openai --> store
     detail --> intelligence
     intelligence --> store
@@ -116,6 +121,57 @@ LiveTranscriber exposes the active speech pipeline in Settings > Developer Optio
 
 Both live pipelines use a monotonic audio timeline for `AnalyzerInput.bufferStartTime` so transcript timestamps stay stable across iOS 26 and iOS 27.
 
+## Supported Transcription Languages
+
+The app has different language sources for each transcription path.
+
+Apple live transcription, imported-audio transcription, and `Local Transcribe Again` use the languages returned by `AppleSpeechTranscriptionSupport.supportedLanguages()` on the current device. The initial fallback list, used before the system list is loaded, is:
+
+- English (`en-US`)
+- Simplified Chinese (`zh-Hans`)
+- Traditional Chinese (`zh-Hant`)
+- Japanese (`ja-JP`)
+- Korean (`ko-KR`)
+- French (`fr-FR`)
+- German (`de-DE`)
+- Spanish (`es-ES`)
+
+Local Whisper does not use the Apple Speech language list. Its language menu is based on the selected Whisper model:
+
+- English-only models (`tiny.en`, `base.en`, `small.en`, `medium.en`) expose English (`en`) only.
+- Multilingual models expose the language IDs listed in `LocalWhisperTranscriptionService.whisperMultilingualLanguageIDs`:
+
+```text
+af, am, ar, as, az, ba, be, bg, bn, bo,
+br, bs, ca, cs, cy, da, de, el, en, es,
+et, eu, fa, fi, fo, fr, gl, gu, ha, haw,
+he, hi, hr, ht, hu, hy, id, is, it, ja,
+jw, ka, kk, km, kn, ko, la, lb, ln, lo,
+lt, lv, mg, mi, mk, ml, mn, mr, ms, mt,
+my, ne, nl, nn, no, oc, pa, pl, ps, pt,
+ro, ru, sa, sd, si, sk, sl, sn, so, sq,
+sr, su, sv, sw, ta, te, tg, th, tk, tl,
+tr, tt, uk, ur, uz, vi, yi, yo, yue, zh
+```
+
+OpenAI saved-recording transcription does not show a separate language picker. It uses the saved recording's current `languageID` and sends that language's ISO language code with the OpenAI transcription request when available.
+
+## Optional Local Whisper Saved-Recording Transcription
+
+Live recording still uses Apple on-device Speech for real-time transcription. Local Whisper is a manual re-transcription path for saved recordings: from a recording's detail menu, the user chooses `Transcribe with Local Whisper`, selects a language, and the app replaces the saved transcript with Whisper output.
+
+The local Whisper path runs on the iPhone. The app converts the saved audio file to `16 kHz / mono / Float32 PCM`, loads the selected GGML model, runs whisper.cpp through the local Objective-C bridge, and writes Whisper segment start times back into the same timestamped transcript format used elsewhere in the app.
+
+Models are managed in Settings > Transcription > Local Whisper Model. The selected model is stored in `UserDefaults`; model files can be bundled with the app or downloaded into `Application Support/WhisperModels`. Downloaded model files are excluded from iCloud backup. The currently exposed model choices are:
+
+- Tiny Multilingual / Tiny English: smallest and fastest, lowest accuracy.
+- Base Multilingual / Base English: default balance for local transcription.
+- Small Multilingual / Small English: better quality with a larger download and slower runtime.
+- Medium Multilingual / Medium English: high quality, significantly heavier on storage and runtime.
+- Large v3 Turbo Q5, Large v3 Q5, and Large v3: strongest multilingual options, with much larger storage and memory requirements.
+
+If no selected model is available, Local Whisper transcription fails with a Settings-facing prompt to download a model first. Model downloads use the whisper.cpp GGML model files hosted under `ggerganov/whisper.cpp` on Hugging Face and happen only after the user taps `Download Selected Model`.
+
 ## Optional OpenAI Saved-Recording Transcription
 
 Live recording uses Apple on-device Speech only. For saved recordings, the recording detail menu can manually run OpenAI file transcription when the user needs a higher-accuracy pass for difficult languages, accents, or domain vocabulary.
@@ -128,6 +184,7 @@ OpenAI transcription uses a bring-your-own-key setup in Settings. The user enter
 - iOS 26 or later device or simulator for development.
 - iOS 27 is required for the Native Pipeline mode.
 - Apple Speech and FoundationModels availability on the target device.
+- Local Whisper requires the whisper.cpp runtime to be embedded in the app build and a selected GGML model file to be bundled or downloaded.
 - iCloud capability configured for `iCloud.com.iamwilliamli.LiveTranscriber`, with CloudDocuments for private file sync and CloudKit for private SwiftData index sync.
 
 ## Build
@@ -180,9 +237,10 @@ Reddit Sans is included under the SIL Open Font License, Version 1.1. The font m
 
 ## Privacy Model
 
-LiveTranscriber is built around local processing by default. Live recording, live transcription, summary, and tagging use Apple system frameworks on device.
+LiveTranscriber is built around local processing by default. Live recording, live transcription, summary, and tagging use Apple system frameworks on device. Saved recordings can also be re-transcribed on device with the optional Local Whisper model.
 
 - Live recording does not use developer-operated transcription servers, third-party analytics, ads, tracking, or custom network requests.
+- Local Whisper transcription runs on device. The optional model download connects to Hugging Face only when the user taps `Download Selected Model`.
 - OpenAI is used only when the user manually chooses OpenAI transcription for a saved recording; that recording audio is sent directly from the iPhone to OpenAI.
 - OpenAI transcription stores the user's own OpenAI API key in Keychain and uses it directly from the device.
 - Files are stored in the local app-private container by default. When iCloud storage is enabled in Settings, app-managed recording files sync through an app-private iCloud container instead of a visible iCloud Drive folder.

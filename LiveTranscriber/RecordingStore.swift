@@ -103,6 +103,14 @@ struct RecordingItem: Identifiable, Codable, Hashable {
         Self.mergedTags(manualTags ?? [], intelligence?.tags ?? [])
     }
 
+    var localizedLanguageName: String {
+        let trimmedLanguageID = languageID.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmedLanguageID.isEmpty else {
+            return languageName
+        }
+        return TranscriptionLanguage(id: trimmedLanguageID).displayName
+    }
+
     static func mergedTags(_ primaryTags: [String], _ secondaryTags: [String]) -> [String] {
         var normalizedTags = Set<String>()
         var mergedTags: [String] = []
@@ -854,7 +862,8 @@ final class RecordingStore: ObservableObject {
     @discardableResult
     func importRecording(
         from sourceURL: URL,
-        language: TranscriptionLanguage
+        language: TranscriptionLanguage,
+        localWhisperModel: LocalWhisperModel? = nil
     ) async throws -> RecordingItem {
         try ensureRecordingsDirectory()
 
@@ -900,16 +909,33 @@ final class RecordingStore: ObservableObject {
                 try persist()
             }
             updateImportStatus(for: item.id, progress: 0.08, message: String(localized: L10n.Import.preparingTranscription), shouldPersist: true)
-            let lines = try await importWorker.transcribe(
-                audioURL: targetAudioURL,
-                language: language
-            ) { [weak self] progress in
-                Task { @MainActor in
-                    self?.updateImportStatus(
-                        for: item.id,
-                        progress: 0.1 + progress * 0.78,
-                        message: String(localized: L10n.Import.transcribing)
-                    )
+            let lines: [TranscriptionLine]
+            if let localWhisperModel {
+                lines = try await LocalWhisperTranscriptionService.transcribe(
+                    audioURL: targetAudioURL,
+                    language: language,
+                    model: localWhisperModel
+                ) { [weak self] progress in
+                    Task { @MainActor in
+                        self?.updateImportStatus(
+                            for: item.id,
+                            progress: 0.1 + progress * 0.78,
+                            message: String(localized: L10n.Import.transcribing)
+                        )
+                    }
+                }
+            } else {
+                lines = try await importWorker.transcribe(
+                    audioURL: targetAudioURL,
+                    language: language
+                ) { [weak self] progress in
+                    Task { @MainActor in
+                        self?.updateImportStatus(
+                            for: item.id,
+                            progress: 0.1 + progress * 0.78,
+                            message: String(localized: L10n.Import.transcribing)
+                        )
+                    }
                 }
             }
             guard let index = recordings.firstIndex(where: { $0.id == item.id }) else {
@@ -1049,7 +1075,8 @@ final class RecordingStore: ObservableObject {
 
     func retranscribeWithLocalWhisper(
         _ item: RecordingItem,
-        language: TranscriptionLanguage
+        language: TranscriptionLanguage,
+        model: LocalWhisperModel? = nil
     ) async throws {
         try ensureTranscriptUnlocked(item)
 
@@ -1060,7 +1087,8 @@ final class RecordingStore: ObservableObject {
         do {
             let lines = try await LocalWhisperTranscriptionService.transcribe(
                 audioURL: audioURL,
-                language: language
+                language: language,
+                model: model
             ) { [weak self] progress in
                 Task { @MainActor in
                     self?.updateImportStatus(
@@ -1498,6 +1526,7 @@ final class RecordingStore: ObservableObject {
 
         let searchableFields = [
             item.audioFileName,
+            item.localizedLanguageName,
             item.languageName,
             item.transcriptPreview,
             item.combinedTags.joined(separator: " "),
@@ -1854,6 +1883,7 @@ final class RecordingStore: ObservableObject {
                 signature: signature,
                 metadataText: [
                     item.audioFileName,
+                    item.localizedLanguageName,
                     item.languageName,
                     item.transcriptPreview,
                     item.combinedTags.joined(separator: " "),
@@ -1909,6 +1939,8 @@ final class RecordingStore: ObservableObject {
     private func searchIndexSignature(for item: RecordingItem) -> String {
         [
             item.audioFileName,
+            item.languageID,
+            Locale.current.identifier,
             item.transcriptFileName,
             "\(item.lineCount)",
             "\(item.transcriptPreview.hashValue)",
@@ -2176,10 +2208,6 @@ private enum ImportedRecordingTranscriptionService {
         progressHandler: @escaping (Double) -> Void = { _ in }
     ) async throws -> [TranscriptionLine] {
         try await requestSpeechAuthorization()
-        guard SpeechTranscriber.isAvailable else {
-            throw RecordingImportError.analyzerUnavailable
-        }
-
         let audioFile = try AVAudioFile(forReading: audioURL)
         let inputFormat = audioFile.processingFormat
         let durationSeconds: Double
@@ -2188,8 +2216,11 @@ private enum ImportedRecordingTranscriptionService {
         } else {
             durationSeconds = 1
         }
-        let preferredLocale = Locale(identifier: language.id)
-        let locale = await SpeechTranscriber.supportedLocale(equivalentTo: preferredLocale) ?? preferredLocale
+        guard SpeechTranscriber.isAvailable else {
+            throw RecordingImportError.analyzerUnavailable
+        }
+
+        let locale = await AppleSpeechTranscriptionSupport.resolvedLocale(for: language)
         let transcriber = SpeechTranscriber(locale: locale, preset: .timeIndexedProgressiveTranscription)
         let modules: [any SpeechModule] = [transcriber]
 
@@ -2306,16 +2337,20 @@ private actor ImportedTranscriptionCollector {
     private var interimLine: TranscriptionLine?
 
     func handle(_ result: SpeechTranscriber.Result) -> Double {
-        let resultEndSeconds = CMTimeRangeGetEnd(result.range).seconds
-        let text = String(result.text.characters).trimmingCharacters(in: .whitespacesAndNewlines)
+        handle(text: result.text, range: result.range, isFinal: result.isFinal)
+    }
+
+    private func handle(text resultText: AttributedString, range: CMTimeRange, isFinal: Bool) -> Double {
+        let resultEndSeconds = CMTimeRangeGetEnd(range).seconds
+        let text = String(resultText.characters).trimmingCharacters(in: .whitespacesAndNewlines)
         guard !text.isEmpty else {
             return resultEndSeconds.isFinite ? resultEndSeconds : 0
         }
 
-        let startSeconds = result.range.start.seconds.isFinite ? result.range.start.seconds : 0
-        var line = TranscriptionLine(startSeconds: startSeconds, text: text, isFinal: result.isFinal)
+        let startSeconds = range.start.seconds.isFinite ? range.start.seconds : 0
+        var line = TranscriptionLine(startSeconds: startSeconds, text: text, isFinal: isFinal)
 
-        if result.isFinal {
+        if isFinal {
             if let index = finalizedLines.firstIndex(where: { abs($0.startSeconds - startSeconds) < 0.1 }) {
                 line.id = finalizedLines[index].id
                 finalizedLines[index] = line

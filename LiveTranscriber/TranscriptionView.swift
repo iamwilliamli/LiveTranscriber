@@ -32,6 +32,7 @@ struct TranscriptionView: View {
     @State private var selectedLiveTranslationLanguage: TranscriptionLanguage?
     @State private var translatedLiveTranscriptByLineID: [TranscriptionLine.ID: String] = [:]
     @State private var liveTranslatedLineSignatures: [TranscriptionLine.ID: String] = [:]
+    @State private var appleTranslationLanguages: [TranscriptionLanguage] = []
     @State private var isTranslatingLiveTranscript = false
     @State private var liveTranslationErrorMessage: String?
     @State private var isShowingLiveTranslationLanguagePicker = false
@@ -82,6 +83,9 @@ struct TranscriptionView: View {
         .animation(.snappy(duration: 0.2, extraBounce: 0.02), value: transcriber.isPaused)
         .task {
             await transcriber.refreshSupportedLanguages()
+        }
+        .task {
+            appleTranslationLanguages = await AppleTranslationLanguages.supportedLanguages()
         }
         .translationTask(liveTranslationConfiguration) { session in
             await translateFinalTranscriptLines(using: session)
@@ -727,8 +731,8 @@ struct TranscriptionView: View {
     }
 
     private var liveTranscriptTranslationLanguages: [TranscriptionLanguage] {
-        transcriber.supportedLanguages.filter { language in
-            !Self.sameBaseLanguage(language.id, transcriber.selectedLanguageID)
+        appleTranslationLanguages.filter { language in
+            !AppleTranslationLanguages.sameBaseLanguage(language.id, transcriber.selectedLanguageID)
         }
     }
 
@@ -746,7 +750,7 @@ struct TranscriptionView: View {
     }
 
     private func requestLiveTranscriptTranslation(to language: TranscriptionLanguage) {
-        guard !Self.sameBaseLanguage(language.id, transcriber.selectedLanguageID) else {
+        guard !AppleTranslationLanguages.sameBaseLanguage(language.id, transcriber.selectedLanguageID) else {
             clearLiveTranscriptTranslation()
             return
         }
@@ -783,8 +787,8 @@ struct TranscriptionView: View {
         liveTranslationErrorMessage = nil
 
         let nextConfiguration = TranslationSession.Configuration(
-            source: Self.localeLanguage(for: transcriber.selectedLanguageID),
-            target: Self.localeLanguage(for: language.id)
+            source: AppleTranslationLanguages.localeLanguage(for: transcriber.selectedLanguageID),
+            target: AppleTranslationLanguages.localeLanguage(for: language.id)
         )
 
         if var existingConfiguration = liveTranslationConfiguration,
@@ -870,26 +874,6 @@ struct TranscriptionView: View {
     private func liveTranslationSignature(for line: TranscriptionLine, language: TranscriptionLanguage) -> String {
         "\(language.id)|\(line.id.uuidString)|\(line.text.hashValue)"
     }
-
-    private static func localeLanguage(for identifier: String) -> Locale.Language? {
-        let language = Locale(identifier: identifier).language
-        guard language.languageCode != nil else {
-            return nil
-        }
-        return language
-    }
-
-    private static func sameBaseLanguage(_ firstIdentifier: String, _ secondIdentifier: String) -> Bool {
-        let firstLanguage = Locale(identifier: firstIdentifier).language
-        let secondLanguage = Locale(identifier: secondIdentifier).language
-        let firstCode = firstLanguage.languageCode?.identifier
-        let secondCode = secondLanguage.languageCode?.identifier
-        guard let firstCode, let secondCode else {
-            return firstIdentifier == secondIdentifier
-        }
-        return firstCode == secondCode
-    }
-
 }
 
 private struct PendingRecordingSave: Identifiable {
