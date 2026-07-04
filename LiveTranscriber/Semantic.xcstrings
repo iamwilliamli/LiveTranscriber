@@ -3361,6 +3361,48 @@
         }
       }
     },
+    "local_whisper.model.delete_download" : {
+      "comment" : "Button label to delete one downloaded local Whisper model.",
+      "extractionState" : "stale",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Download löschen"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Delete Download"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ダウンロードを削除"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Download verwijderen"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "删除下载"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "刪除下載"
+          }
+        }
+      }
+    },
     "local_whisper.model.delete_failed" : {
       "comment" : "Alert title when deleting a local Whisper model fails.",
       "extractionState" : "stale",
@@ -3567,6 +3609,48 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "%@ 已下載到這台 iPhone（%@）。"
+          }
+        }
+      }
+    },
+    "local_whisper.model.downloaded.title" : {
+      "comment" : "Settings section title for downloaded local Whisper models.",
+      "extractionState" : "stale",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Geladene Modelle"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Downloaded Models"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ダウンロード済みモデル"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Gedownloade modellen"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已下载模型"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已下載模型"
           }
         }
       }
@@ -4071,6 +4155,48 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "使用本機 Whisper 轉錄前，請先下載 %@（%@）。"
+          }
+        }
+      }
+    },
+    "local_whisper.model.no_downloaded" : {
+      "comment" : "Empty state for downloaded local Whisper model management.",
+      "extractionState" : "stale",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Keine heruntergeladenen lokalen Whisper-Modelle."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No downloaded Local Whisper models."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ダウンロード済みのローカルWhisperモデルはありません。"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Geen gedownloade lokale Whisper-modellen."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "没有已下载的本地 Whisper 模型。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "沒有已下載的本機 Whisper 模型。"
           }
         }
       }
@@ -7137,48 +7263,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "匯入錄音"
-          }
-        }
-      }
-    },
-    "recordings.intelligence_analysis" : {
-      "comment" : "Intelligent analysis action title.",
-      "extractionState" : "stale",
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Intelligente Analyse"
-          }
-        },
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Intelligent Analysis"
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "インテリジェント分析"
-          }
-        },
-        "nl" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Intelligente analyse"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "智能分析"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "智慧分析"
           }
         }
       }

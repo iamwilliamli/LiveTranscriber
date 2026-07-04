@@ -1,0 +1,5 @@
+---
+triple:          'arm64-apple-darwin'
+binary-path:     'Vendor/whisper.xcframework/ios-arm64_x86_64-simulator/whisper.framework/whisper'
+relocations:     []
+...

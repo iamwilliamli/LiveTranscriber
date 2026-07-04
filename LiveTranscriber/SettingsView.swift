@@ -13,6 +13,7 @@ struct SettingsView: View {
     @State private var localWhisperDownloadProgress: Double = 0
     @State private var localWhisperDownloadErrorMessage: String?
     @State private var localWhisperDeleteErrorMessage: String?
+    @State private var localWhisperModelRefreshTick = 0
     private static let repositoryURL = URL(string: "https://github.com/iamwilliamli/LiveTranscriber")!
     private static let designNotesURL = URL(string: "https://chengqili.com/post/livetranscriber")!
     private static let localWhisperSubtitleTrailingCharacters = CharacterSet.punctuationCharacters.union(.whitespacesAndNewlines)
@@ -283,7 +284,10 @@ struct SettingsView: View {
     }
 
     private var localWhisperModelPage: some View {
-        SettingsDetailPage(titleResource: L10n.LocalWhisper.selectedModel) {
+        let refreshTick = localWhisperModelRefreshTick
+        let downloadedStatuses = LocalWhisperModelManager.downloadedStatuses()
+
+        return SettingsDetailPage(titleResource: L10n.LocalWhisper.selectedModel) {
             SettingsSection(titleResource: L10n.LocalWhisper.modelTitle, systemImage: "cube", tint: AppTheme.info) {
                 ForEach(LocalWhisperModelManager.availableModels) { model in
                     let status = LocalWhisperModelManager.status(for: model)
@@ -302,6 +306,34 @@ struct SettingsView: View {
                     .disabled(isDownloadingLocalWhisperModel)
                 }
             }
+            .id("available-\(refreshTick)")
+
+            SettingsSection(titleResource: L10n.LocalWhisper.downloadedModelsTitle, systemImage: "internaldrive", tint: AppTheme.success) {
+                if downloadedStatuses.isEmpty {
+                    SettingsStatusRow(
+                        icon: "tray",
+                        textResource: L10n.LocalWhisper.noDownloadedModels,
+                        tint: AppTheme.info
+                    )
+                } else {
+                    ForEach(downloadedStatuses, id: \.model.id) { status in
+                        Button(role: .destructive) {
+                            deleteLocalWhisperModel(status.model)
+                        } label: {
+                            SettingsModelManagementRow(
+                                icon: "trash",
+                                title: status.model.displayName,
+                                subtitle: status.detailText,
+                                actionResource: L10n.LocalWhisper.deleteModelDownload,
+                                tint: AppTheme.danger
+                            )
+                        }
+                        .buttonStyle(.plain)
+                        .disabled(isDownloadingLocalWhisperModel)
+                    }
+                }
+            }
+            .id("downloaded-\(refreshTick)")
         }
     }
 
@@ -315,6 +347,7 @@ struct SettingsView: View {
     private func refreshLocalWhisperModelStatus() {
         selectedLocalWhisperModel = LocalWhisperModelManager.selectedModel
         localWhisperModelStatus = LocalWhisperModelManager.currentStatus()
+        localWhisperModelRefreshTick &+= 1
     }
 
     private func selectLocalWhisperModel(_ model: LocalWhisperModel) {
@@ -376,6 +409,7 @@ struct SettingsView: View {
                     localWhisperModelStatus = status
                     isDownloadingLocalWhisperModel = false
                     localWhisperDownloadProgress = 1
+                    localWhisperModelRefreshTick &+= 1
                     HapticFeedback.play(.menuSelection)
                 }
             } catch {
@@ -388,10 +422,18 @@ struct SettingsView: View {
         }
     }
 
-    private func deleteLocalWhisperModel() {
+    private func deleteLocalWhisperModel(_ model: LocalWhisperModel? = nil) {
+        let modelToDelete = model ?? selectedLocalWhisperModel
         HapticFeedback.play(.menuSelection)
         do {
-            localWhisperModelStatus = try LocalWhisperModelManager.deleteSelectedModel()
+            let deletedStatus = try LocalWhisperModelManager.deleteDownloadedModel(modelToDelete)
+            if modelToDelete.id == selectedLocalWhisperModel.id {
+                selectedLocalWhisperModel = deletedStatus.model
+                localWhisperModelStatus = deletedStatus
+            } else {
+                localWhisperModelStatus = LocalWhisperModelManager.currentStatus()
+            }
+            localWhisperModelRefreshTick &+= 1
         } catch {
             localWhisperDeleteErrorMessage = error.localizedDescription
             HapticFeedback.play(.failure)
@@ -1121,6 +1163,55 @@ private struct SettingsSelectionRow: View {
                     .font(.system(size: 14, weight: .bold))
                     .foregroundStyle(tint)
             }
+        }
+        .frame(minHeight: 44)
+        .contentShape(Rectangle())
+    }
+}
+
+private struct SettingsModelManagementRow: View {
+    let icon: String
+    let title: String
+    let subtitle: String
+    let action: Text
+    let tint: Color
+
+    init(
+        icon: String,
+        title: String,
+        subtitle: String,
+        actionResource: LocalizedStringResource,
+        tint: Color
+    ) {
+        self.icon = icon
+        self.title = title
+        self.subtitle = subtitle
+        self.action = Text(actionResource)
+        self.tint = tint
+    }
+
+    var body: some View {
+        HStack(spacing: 10) {
+            SettingsIcon(systemImage: icon, tint: tint)
+
+            VStack(alignment: .leading, spacing: 2) {
+                Text(verbatim: title)
+                    .font(.redditSans(.subheadline, weight: .semibold))
+                    .foregroundStyle(.primary)
+
+                Text(verbatim: subtitle)
+                    .font(.redditSans(.caption))
+                    .foregroundStyle(.secondary)
+                    .lineLimit(2)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+
+            Spacer(minLength: 12)
+
+            action
+                .font(.redditSans(.caption, weight: .semibold))
+                .foregroundStyle(tint)
+                .lineLimit(1)
         }
         .frame(minHeight: 44)
         .contentShape(Rectangle())

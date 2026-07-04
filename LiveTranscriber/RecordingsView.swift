@@ -1648,15 +1648,6 @@ struct RecordingDetailView: View {
                 )
             }
 
-            if store.intelligenceAvailability.isAvailable {
-                Button {
-                    analyzeCurrentItem()
-                } label: {
-                    Label(localized(L10n.Recordings.intelligenceAnalysis), systemImage: isAnalyzing ? "hourglass" : "sparkles")
-                }
-                .disabled(isAnalyzing)
-            }
-
             Divider()
 
             Button(role: .destructive) {

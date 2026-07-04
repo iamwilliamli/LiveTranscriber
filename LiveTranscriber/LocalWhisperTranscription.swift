@@ -290,6 +290,12 @@ enum LocalWhisperModelManager {
         status(for: selectedModel)
     }
 
+    static func downloadedStatuses() -> [LocalWhisperModelStatus] {
+        availableModels
+            .map { status(for: $0) }
+            .filter(\.isUserInstalled)
+    }
+
     static func status(for model: LocalWhisperModel) -> LocalWhisperModelStatus {
         let fileManager = FileManager.default
 
@@ -391,10 +397,6 @@ enum LocalWhisperModelManager {
 
         progressHandler(1)
         return status(for: model)
-    }
-
-    static func deleteSelectedModel() throws -> LocalWhisperModelStatus {
-        try deleteDownloadedModel(selectedModel)
     }
 
     static func deleteDownloadedModel(_ model: LocalWhisperModel) throws -> LocalWhisperModelStatus {
