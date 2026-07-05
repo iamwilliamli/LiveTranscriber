@@ -303,7 +303,7 @@ enum L10n {
         static let copyTranscript = L10n.resource("recordings.copy_transcript", defaultValue: "Copy Transcript", comment: "Copy transcript action title.")
         static let generateTagsAndSummary = L10n.resource("recordings.generate_tags_and_summary", defaultValue: "Generate Tags and Summary", comment: "Action title to generate tags and summary.")
         static let analyzeAgain = L10n.resource("recordings.analyze_again", defaultValue: "Analyze Again", comment: "Action title to analyze a recording again.")
-        static let retranscribe = L10n.resource("recordings.retranscribe", defaultValue: "Local Transcribe Again", comment: "Action title to retranscribe a recording with the local speech recognizer.")
+        static let retranscribe = L10n.resource("recordings.retranscribe", defaultValue: "Transcribe with Apple Speech", comment: "Action title to retranscribe a recording using Apple Speech.")
         static let retranscribeWithOpenAI = L10n.resource("recordings.retranscribe_openai", defaultValue: "Transcribe with OpenAI", comment: "Action title to retranscribe a recording with OpenAI.")
         static let retranscribeWithOpenAILongForm = L10n.resource("recordings.retranscribe_openai_long_form", defaultValue: "Long Form", comment: "OpenAI transcription option using a high-accuracy model that returns one transcript block.")
         static let retranscribeWithOpenAISegmented = L10n.resource("recordings.retranscribe_openai_segmented", defaultValue: "Segmented", comment: "OpenAI transcription option using segment timestamps.")

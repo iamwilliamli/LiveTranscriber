@@ -8696,43 +8696,43 @@
       }
     },
     "recordings.retranscribe" : {
-      "comment" : "Action title to retranscribe a recording with the local speech recognizer.",
+      "comment" : "Action title to retranscribe a recording using Apple Speech.",
       "extractionState" : "stale",
       "localizations" : {
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Lokal erneut transkribieren"
+            "value" : "Mit Apple Speech transkribieren"
           }
         },
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Local Transcribe Again"
+            "value" : "Transcribe with Apple Speech"
           }
         },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "ローカルで再文字起こし"
+            "value" : "Apple Speechで文字起こし"
           }
         },
         "nl" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Lokaal opnieuw transcriberen"
+            "value" : "Transcriberen met Apple Speech"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "本地重新转录"
+            "value" : "用 Apple Speech 转录"
           }
         },
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "本機重新轉錄"
+            "value" : "用 Apple Speech 轉錄"
           }
         }
       }

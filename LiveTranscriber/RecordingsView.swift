@@ -16,8 +16,28 @@ private func localizedFormat(_ resource: LocalizedStringResource, _ arguments: C
     String(format: String(localized: resource), arguments: arguments)
 }
 
-private func localWhisperSupportedLanguages() -> [TranscriptionLanguage] {
-    LocalWhisperTranscriptionService.supportedLanguages(for: LocalWhisperModelManager.selectedModel)
+private func localWhisperDownloadedModels() -> [LocalWhisperModel] {
+    LocalWhisperModelManager.downloadedStatuses().map(\.model)
+}
+
+private func localWhisperSupportedLanguages(for model: LocalWhisperModel) -> [TranscriptionLanguage] {
+    LocalWhisperTranscriptionService.supportedLanguages(for: model)
+}
+
+private func localWhisperModelIcon(for model: LocalWhisperModel) -> String {
+    if model.id.contains("large") {
+        return "archivebox.fill"
+    }
+    if model.id.contains("medium") {
+        return "shippingbox.fill"
+    }
+    if model.id.contains("small") {
+        return "cube.fill"
+    }
+    if model.id.contains("tiny") {
+        return "cube"
+    }
+    return "shippingbox"
 }
 
 private func transcriptionLanguageMatches(_ language: TranscriptionLanguage, languageID: String) -> Bool {
@@ -28,6 +48,50 @@ private func transcriptionLanguageMatches(_ language: TranscriptionLanguage, lan
     let firstCode = language.locale.language.languageCode?.identifier
     let secondCode = Locale(identifier: languageID).language.languageCode?.identifier
     return firstCode != nil && firstCode == secondCode
+}
+
+private struct LocalWhisperRetranscriptionMenu: View {
+    let itemLanguageID: String
+    let isDisabled: Bool
+    let onSelect: (TranscriptionLanguage, LocalWhisperModel) -> Void
+
+    private var downloadedModels: [LocalWhisperModel] {
+        localWhisperDownloadedModels()
+    }
+
+    var body: some View {
+        Menu {
+            if downloadedModels.isEmpty {
+                Button {} label: {
+                    Label(localized(L10n.LocalWhisper.noDownloadedModels), systemImage: "arrow.down.circle")
+                }
+                .disabled(true)
+            } else {
+                ForEach(downloadedModels) { model in
+                    Menu {
+                        ForEach(localWhisperSupportedLanguages(for: model)) { language in
+                            Button {
+                                onSelect(language, model)
+                            } label: {
+                                Label(
+                                    language.displayName,
+                                    systemImage: transcriptionLanguageMatches(language, languageID: itemLanguageID) ? "checkmark" : "waveform"
+                                )
+                            }
+                        }
+                    } label: {
+                        Label(
+                            model.displayName,
+                            systemImage: model.id == LocalWhisperModelManager.selectedModel.id ? "checkmark" : localWhisperModelIcon(for: model)
+                        )
+                    }
+                }
+            }
+        } label: {
+            Label(localized(L10n.Recordings.retranscribeWithLocalWhisper), systemImage: "iphone")
+        }
+        .disabled(isDisabled)
+    }
 }
 
 struct RecordingsView: View {
@@ -387,21 +451,12 @@ struct RecordingsView: View {
                 .disabled(item.importStatus?.isFailed == false || transcriber.isRecording || transcriber.isPreparing)
             }
 
-            Menu {
-                ForEach(localWhisperSupportedLanguages()) { language in
-                    Button {
-                        retranscribeWithLocalWhisper(item, language: language)
-                    } label: {
-                        Label(
-                            language.displayName,
-                            systemImage: transcriptionLanguageMatches(language, languageID: item.languageID) ? "checkmark" : "waveform"
-                        )
-                    }
-                }
-            } label: {
-                Label(localized(L10n.Recordings.retranscribeWithLocalWhisper), systemImage: "iphone")
+            LocalWhisperRetranscriptionMenu(
+                itemLanguageID: item.languageID,
+                isDisabled: item.isTranscriptLocked || item.importStatus?.isFailed == false || transcriber.isRecording || transcriber.isPreparing
+            ) { language, model in
+                retranscribeWithLocalWhisper(item, language: language, model: model)
             }
-            .disabled(item.isTranscriptLocked || item.importStatus?.isFailed == false || transcriber.isRecording || transcriber.isPreparing)
 
             Button(role: .destructive) {
                 requestDelete(item)
@@ -1648,21 +1703,12 @@ struct RecordingDetailView: View {
                 .disabled(currentItem.isTranscriptLocked || isTranscriptionRunning || transcriber.isRecording || transcriber.isPreparing)
             }
 
-            Menu {
-                ForEach(localWhisperSupportedLanguages()) { language in
-                    Button {
-                        retranscribeCurrentItemWithLocalWhisper(language: language)
-                    } label: {
-                        Label(
-                            language.displayName,
-                            systemImage: transcriptionLanguageMatches(language, languageID: currentItem.languageID) ? "checkmark" : "waveform"
-                        )
-                    }
-                }
-            } label: {
-                Label(localized(L10n.Recordings.retranscribeWithLocalWhisper), systemImage: "iphone")
+            LocalWhisperRetranscriptionMenu(
+                itemLanguageID: currentItem.languageID,
+                isDisabled: currentItem.isTranscriptLocked || isTranscriptionRunning || transcriber.isRecording || transcriber.isPreparing
+            ) { language, model in
+                retranscribeCurrentItemWithLocalWhisper(language: language, model: model)
             }
-            .disabled(currentItem.isTranscriptLocked || isTranscriptionRunning || transcriber.isRecording || transcriber.isPreparing)
 
             Button {
                 HapticFeedback.play(.copy)

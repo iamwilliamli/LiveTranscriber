@@ -284,12 +284,7 @@ struct TranscriptionView: View {
 
                     Spacer(minLength: 8)
 
-                    Text(transcriber.selectedAudioFormat.badgeText)
-                        .font(.redditSans(.caption2, weight: .bold))
-                        .foregroundStyle(recorderDeckPrimaryColor)
-                        .padding(.horizontal, 8)
-                        .frame(height: 25)
-                        .background(recorderDeckPillColor, in: Capsule())
+                    audioFormatMenu
                 }
 
                 Spacer(minLength: 0)
@@ -326,6 +321,39 @@ struct TranscriptionView: View {
         colorScheme == .dark ? .white.opacity(0.14) : .black.opacity(0.06)
     }
 
+    private var audioFormatMenu: some View {
+        Menu {
+            ForEach(RecordingAudioFormat.allCases) { format in
+                Button {
+                    HapticFeedback.play(.menuSelection)
+                    transcriber.selectedAudioFormat = format
+                } label: {
+                    Label(
+                        format.title,
+                        systemImage: format == transcriber.selectedAudioFormat ? "checkmark" : audioFormatIcon(for: format)
+                    )
+                }
+            }
+        } label: {
+            CompactDropdownBadge(
+                title: transcriber.selectedAudioFormat.badgeText,
+                foreground: recorderDeckPrimaryColor,
+                background: recorderDeckPillColor
+            )
+        }
+        .buttonStyle(.plain)
+        .disabled(transcriber.isRecording || transcriber.isPreparing)
+    }
+
+    private func audioFormatIcon(for format: RecordingAudioFormat) -> String {
+        switch format {
+        case .wav:
+            return "waveform"
+        case .m4a:
+            return "waveform.badge.plus"
+        }
+    }
+
     private var languageMenu: some View {
         Menu {
                 ForEach(transcriber.supportedLanguages) { language in
@@ -339,7 +367,7 @@ struct TranscriptionView: View {
                 }
             }
         } label: {
-            StatusPill(
+            DropdownStatusPill(
                 systemImage: "globe",
                 title: transcriber.selectedLanguage.displayName,
                 tint: AppTheme.info
@@ -1833,6 +1861,70 @@ private struct StatusPill: View {
                 Capsule()
                     .stroke(tint.opacity(0.18), lineWidth: 1)
             }
+    }
+}
+
+private struct DropdownStatusPill: View {
+    @Environment(\.isEnabled) private var isEnabled
+
+    let systemImage: String
+    let title: String
+    let tint: Color
+
+    var body: some View {
+        HStack(spacing: 7) {
+            Image(systemName: systemImage)
+                .font(.system(size: 12, weight: .semibold))
+
+            Text(title)
+                .font(.redditSans(.caption, weight: .semibold))
+                .lineLimit(1)
+                .minimumScaleFactor(0.78)
+                .truncationMode(.tail)
+
+            Image(systemName: "chevron.down")
+                .font(.system(size: 10, weight: .bold))
+                .padding(.leading, 1)
+        }
+        .foregroundStyle(isEnabled ? tint : .secondary)
+        .padding(.leading, 10)
+        .padding(.trailing, 9)
+        .frame(height: 32)
+        .background((isEnabled ? tint.opacity(0.13) : Color.secondary.opacity(0.08)), in: Capsule())
+        .overlay {
+            Capsule()
+                .stroke(isEnabled ? tint.opacity(0.34) : Color.secondary.opacity(0.16), lineWidth: 1)
+        }
+        .contentShape(Capsule())
+    }
+}
+
+private struct CompactDropdownBadge: View {
+    @Environment(\.isEnabled) private var isEnabled
+
+    let title: String
+    let foreground: Color
+    let background: Color
+
+    var body: some View {
+        HStack(spacing: 4) {
+            Text(title)
+                .font(.redditSans(.caption2, weight: .bold))
+                .lineLimit(1)
+
+            Image(systemName: "chevron.down")
+                .font(.system(size: 8, weight: .bold))
+        }
+        .foregroundStyle(isEnabled ? foreground : .secondary)
+        .padding(.leading, 8)
+        .padding(.trailing, 7)
+        .frame(height: 25)
+        .background(background, in: Capsule())
+        .overlay {
+            Capsule()
+                .stroke((isEnabled ? foreground : Color.secondary).opacity(0.16), lineWidth: 1)
+        }
+        .contentShape(Capsule())
     }
 }
 
