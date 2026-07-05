@@ -246,6 +246,51 @@ enum RecordingSummaryProvider: String, CaseIterable, Identifiable {
     }
 }
 
+struct RecordingSummaryProviderAvailability: Equatable {
+    var appleIntelligence: RecordingIntelligenceAvailability
+    var localSummaryStatus: LocalSummaryModelStatus
+
+    var hasAnyAvailableProvider: Bool {
+        isAppleIntelligenceAvailable || isLocalSummaryAvailable
+    }
+
+    var intelligenceAvailability: RecordingIntelligenceAvailability {
+        if isAppleIntelligenceAvailable {
+            return .available
+        }
+        if isLocalSummaryAvailable {
+            return .localSummaryAvailable
+        }
+        return appleIntelligence
+    }
+
+    func isAvailable(_ provider: RecordingSummaryProvider) -> Bool {
+        switch provider {
+        case .automatic:
+            return hasAnyAvailableProvider
+        case .appleIntelligence:
+            return isAppleIntelligenceAvailable
+        case .localQwen:
+            return isLocalSummaryAvailable
+        }
+    }
+
+    static func current() -> RecordingSummaryProviderAvailability {
+        RecordingSummaryProviderAvailability(
+            appleIntelligence: .currentAppleIntelligence(),
+            localSummaryStatus: LocalSummaryModelManager.currentStatus()
+        )
+    }
+
+    private var isAppleIntelligenceAvailable: Bool {
+        appleIntelligence == .available
+    }
+
+    private var isLocalSummaryAvailable: Bool {
+        localSummaryStatus.isAvailable
+    }
+}
+
 enum RecordingIntelligenceAvailability: Equatable {
     case available
     case localSummaryAvailable
@@ -302,18 +347,7 @@ enum RecordingIntelligenceAvailability: Equatable {
     }
 
     static func current() -> RecordingIntelligenceAvailability {
-        let appleAvailability = currentAppleIntelligence()
-        switch appleAvailability {
-        case .available:
-            return .available
-        case .localSummaryAvailable:
-            return .localSummaryAvailable
-        case .unavailable(let reason):
-            if LocalSummaryModelManager.currentStatus().isAvailable {
-                return .localSummaryAvailable
-            }
-            return .unavailable(reason)
-        }
+        RecordingSummaryProviderAvailability.current().intelligenceAvailability
     }
 
     static func currentAppleIntelligence() -> RecordingIntelligenceAvailability {
@@ -652,8 +686,12 @@ private struct MergedRecordingResult {
 
 @MainActor
 final class RecordingStore: ObservableObject {
+    private static let initialSummaryProviderAvailability = RecordingSummaryProviderAvailability.current()
+
     @Published private(set) var recordings: [RecordingItem] = []
-    @Published private(set) var intelligenceAvailability: RecordingIntelligenceAvailability = .current()
+    @Published private(set) var intelligenceAvailability: RecordingIntelligenceAvailability = initialSummaryProviderAvailability.intelligenceAvailability
+    @Published private(set) var summaryProviderAvailability: RecordingSummaryProviderAvailability = initialSummaryProviderAvailability
+    @Published private var iCloudSyncStatusCache: [RecordingItem.ID: RecordingICloudSyncStatus] = [:]
     @Published private(set) var isICloudStorageEnabled: Bool = false
     @Published private(set) var isStorageLocationChanging = false
 
@@ -682,6 +720,7 @@ final class RecordingStore: ObservableObject {
     }()
     private var searchIndexCache: [RecordingItem.ID: RecordingSearchIndexCacheEntry] = [:]
     private var searchIndexWarmupTask: Task<Void, Never>?
+    private var iCloudSyncStatusRefreshTask: Task<Void, Never>?
 
     private var applicationSupportDirectory: URL {
         fileManager.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
@@ -860,6 +899,7 @@ final class RecordingStore: ObservableObject {
             let mergedResult = try mergedRecordings(with: indexedRecordings)
             recordings = mergedResult.items
                 .sorted { $0.createdAt > $1.createdAt }
+            refreshICloudSyncStatusCache()
             pruneSearchIndexCache()
             warmSearchIndexInBackground()
             if modelContainerUsesICloud {
@@ -870,6 +910,9 @@ final class RecordingStore: ObservableObject {
             }
         } catch {
             recordings = []
+            iCloudSyncStatusCache = [:]
+            iCloudSyncStatusRefreshTask?.cancel()
+            iCloudSyncStatusRefreshTask = nil
             searchIndexCache = [:]
             searchIndexWarmupTask?.cancel()
             searchIndexWarmupTask = nil
@@ -877,7 +920,9 @@ final class RecordingStore: ObservableObject {
     }
 
     func refreshIntelligenceAvailability() {
-        intelligenceAvailability = .current()
+        let availability = RecordingSummaryProviderAvailability.current()
+        summaryProviderAvailability = availability
+        intelligenceAvailability = availability.intelligenceAvailability
     }
 
     func setICloudStorageEnabled(_ enabled: Bool) async {
@@ -1578,45 +1623,57 @@ final class RecordingStore: ObservableObject {
             return RecordingICloudSyncStatus(state: .iCloudUnavailable, uploadedFileCount: 0, totalFileCount: 0)
         }
 
-        let fileURLs = [audioURL(for: item), transcriptURL(for: item)].filter { url in
-            fileManager.fileExists(atPath: url.path)
-        }
-        guard !fileURLs.isEmpty else {
-            return RecordingICloudSyncStatus(state: .waiting, uploadedFileCount: 0, totalFileCount: 0)
+        if let cachedStatus = iCloudSyncStatusCache[item.id] {
+            return cachedStatus
         }
 
-        let fileStatuses = fileURLs.map(iCloudFileSyncStatus(for:))
-        if let failedStatus = fileStatuses.first(where: { $0.errorDescription != nil }) {
-            return RecordingICloudSyncStatus(
-                state: .failed,
-                uploadedFileCount: fileStatuses.filter(\.isUploaded).count,
-                totalFileCount: fileStatuses.count,
-                errorDescription: failedStatus.errorDescription
+        return RecordingICloudSyncStatus(state: .waiting, uploadedFileCount: 0, totalFileCount: 0)
+    }
+
+    private func refreshICloudSyncStatusCache() {
+        iCloudSyncStatusRefreshTask?.cancel()
+
+        guard isICloudStorageEnabled else {
+            iCloudSyncStatusCache = Dictionary(
+                uniqueKeysWithValues: recordings.map {
+                    ($0.id, RecordingICloudSyncStatus(state: .localOnly, uploadedFileCount: 0, totalFileCount: 0))
+                }
+            )
+            return
+        }
+
+        guard isICloudStorageAvailable else {
+            iCloudSyncStatusCache = Dictionary(
+                uniqueKeysWithValues: recordings.map {
+                    ($0.id, RecordingICloudSyncStatus(state: .iCloudUnavailable, uploadedFileCount: 0, totalFileCount: 0))
+                }
+            )
+            return
+        }
+
+        let workItems = recordings.map {
+            RecordingICloudSyncStatusWorkItem(
+                id: $0.id,
+                audioURL: audioURL(for: $0),
+                transcriptURL: transcriptURL(for: $0)
             )
         }
 
-        let uploadedFileCount = fileStatuses.filter(\.isUploaded).count
-        if uploadedFileCount == fileStatuses.count {
-            return RecordingICloudSyncStatus(
-                state: .uploaded,
-                uploadedFileCount: uploadedFileCount,
-                totalFileCount: fileStatuses.count
-            )
-        }
+        iCloudSyncStatusRefreshTask = Task { [weak self] in
+            let statuses = await Task.detached(priority: .utility) {
+                Dictionary(
+                    uniqueKeysWithValues: workItems.map { workItem in
+                        (workItem.id, Self.iCloudSyncStatus(for: [workItem.audioURL, workItem.transcriptURL]))
+                    }
+                )
+            }.value
 
-        if fileStatuses.contains(where: \.isUploading) {
-            return RecordingICloudSyncStatus(
-                state: .uploading,
-                uploadedFileCount: uploadedFileCount,
-                totalFileCount: fileStatuses.count
-            )
-        }
+            guard !Task.isCancelled else {
+                return
+            }
 
-        return RecordingICloudSyncStatus(
-            state: .waiting,
-            uploadedFileCount: uploadedFileCount,
-            totalFileCount: fileStatuses.count
-        )
+            self?.iCloudSyncStatusCache = statuses
+        }
     }
 
     func transcriptText(for item: RecordingItem) -> String {
@@ -1828,9 +1885,12 @@ final class RecordingStore: ObservableObject {
 
     private func refreshedItem(_ item: RecordingItem, audioURL: URL) -> RecordingItem {
         var refreshed = item
-        let transcript = transcriptText(for: item)
-        refreshed.transcriptPreview = transcript.plainTranscriptTextForIntelligence
-        refreshed.lineCount = transcript.transcriptLineCount
+        if refreshed.transcriptPreview.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+            || refreshed.lineCount <= 0 {
+            let transcript = transcriptText(for: item)
+            refreshed.transcriptPreview = transcript.plainTranscriptTextForIntelligence
+            refreshed.lineCount = transcript.transcriptLineCount
+        }
         if refreshed.durationSeconds <= 0,
            let duration = try? Self.durationSeconds(for: audioURL) {
             refreshed.durationSeconds = duration
@@ -1953,7 +2013,50 @@ final class RecordingStore: ObservableObject {
         }
     }
 
-    private func iCloudFileSyncStatus(for url: URL) -> RecordingICloudFileSyncStatus {
+    nonisolated private static func iCloudSyncStatus(for urls: [URL]) -> RecordingICloudSyncStatus {
+        let fileManager = FileManager.default
+        let fileURLs = urls.filter { url in
+            fileManager.fileExists(atPath: url.path)
+        }
+        guard !fileURLs.isEmpty else {
+            return RecordingICloudSyncStatus(state: .waiting, uploadedFileCount: 0, totalFileCount: 0)
+        }
+
+        let fileStatuses = fileURLs.map(iCloudFileSyncStatus(for:))
+        if let failedStatus = fileStatuses.first(where: { $0.errorDescription != nil }) {
+            return RecordingICloudSyncStatus(
+                state: .failed,
+                uploadedFileCount: fileStatuses.filter(\.isUploaded).count,
+                totalFileCount: fileStatuses.count,
+                errorDescription: failedStatus.errorDescription
+            )
+        }
+
+        let uploadedFileCount = fileStatuses.filter(\.isUploaded).count
+        if uploadedFileCount == fileStatuses.count {
+            return RecordingICloudSyncStatus(
+                state: .uploaded,
+                uploadedFileCount: uploadedFileCount,
+                totalFileCount: fileStatuses.count
+            )
+        }
+
+        if fileStatuses.contains(where: \.isUploading) {
+            return RecordingICloudSyncStatus(
+                state: .uploading,
+                uploadedFileCount: uploadedFileCount,
+                totalFileCount: fileStatuses.count
+            )
+        }
+
+        return RecordingICloudSyncStatus(
+            state: .waiting,
+            uploadedFileCount: uploadedFileCount,
+            totalFileCount: fileStatuses.count
+        )
+    }
+
+    nonisolated private static func iCloudFileSyncStatus(for url: URL) -> RecordingICloudFileSyncStatus {
         let keys: Set<URLResourceKey> = [
             .isUbiquitousItemKey,
             .ubiquitousItemIsUploadedKey,
@@ -1971,6 +2074,7 @@ final class RecordingStore: ObservableObject {
 
     private func persist() throws {
         try persist(recordings)
+        refreshICloudSyncStatusCache()
     }
 
     private func pruneSearchIndexCache() {
@@ -2214,6 +2318,12 @@ private struct RecordingICloudFileSyncStatus {
     var isUploaded: Bool
     var isUploading: Bool
     var errorDescription: String?
+}
+
+private struct RecordingICloudSyncStatusWorkItem {
+    var id: RecordingItem.ID
+    var audioURL: URL
+    var transcriptURL: URL
 }
 
 private struct RecordingSearchIndexWorkItem {

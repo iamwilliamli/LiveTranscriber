@@ -1,63 +1,91 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024" role="img" aria-label="Live Transcriber app icon">
   <defs>
-    <radialGradient id="canvasGlow" cx="50%" cy="44%" r="70%">
+    <linearGradient id="canvas" x1="0" y1="0" x2="1024" y2="1024" gradientUnits="userSpaceOnUse">
       <stop offset="0%" stop-color="#ffffff"/>
-      <stop offset="66%" stop-color="#f7f8f9"/>
-      <stop offset="100%" stop-color="#eff1f3"/>
+      <stop offset="100%" stop-color="#ecf3ff"/>
+    </linearGradient>
+    <radialGradient id="warmGlow" cx="270" cy="780" r="520" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#ff4054" stop-opacity="0.30"/>
+      <stop offset="100%" stop-color="#ffffff" stop-opacity="0"/>
     </radialGradient>
-    <linearGradient id="graphite" x1="340" y1="250" x2="560" y2="790" gradientUnits="userSpaceOnUse">
-      <stop offset="0%" stop-color="#4a4d4e"/>
-      <stop offset="45%" stop-color="#333637"/>
-      <stop offset="100%" stop-color="#181a1b"/>
+    <radialGradient id="coolGlow" cx="790" cy="720" r="560" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#3976ff" stop-opacity="0.28"/>
+      <stop offset="100%" stop-color="#ffffff" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="violetGlow" cx="760" cy="255" r="390" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#8a73ff" stop-opacity="0.18"/>
+      <stop offset="100%" stop-color="#ffffff" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="glass" x1="280" y1="230" x2="650" y2="880" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#ffffff" stop-opacity="0.72"/>
+      <stop offset="46%" stop-color="#dde6ff" stop-opacity="0.42"/>
+      <stop offset="100%" stop-color="#92b4ff" stop-opacity="0.34"/>
     </linearGradient>
-    <linearGradient id="graphiteEdge" x1="260" y1="430" x2="600" y2="790" gradientUnits="userSpaceOnUse">
-      <stop offset="0%" stop-color="#424546"/>
-      <stop offset="62%" stop-color="#232526"/>
-      <stop offset="100%" stop-color="#111314"/>
+    <linearGradient id="redMic" x1="372" y1="280" x2="548" y2="640" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#ff8e97"/>
+      <stop offset="42%" stop-color="#ff2530"/>
+      <stop offset="100%" stop-color="#e30018"/>
     </linearGradient>
-    <linearGradient id="lineDark" x1="610" y1="360" x2="840" y2="550" gradientUnits="userSpaceOnUse">
-      <stop offset="0%" stop-color="#3f4243"/>
-      <stop offset="100%" stop-color="#17191a"/>
+    <linearGradient id="blueLine" x1="630" y1="440" x2="880" y2="670" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#8db5ff"/>
+      <stop offset="54%" stop-color="#3b61ff"/>
+      <stop offset="100%" stop-color="#1f3be9"/>
     </linearGradient>
-    <linearGradient id="lineMid" x1="610" y1="420" x2="800" y2="580" gradientUnits="userSpaceOnUse">
-      <stop offset="0%" stop-color="#8c8f90"/>
-      <stop offset="100%" stop-color="#4a4d4e"/>
+    <linearGradient id="star" x1="690" y1="220" x2="790" y2="370" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#725cff"/>
+      <stop offset="58%" stop-color="#3b61ff"/>
+      <stop offset="100%" stop-color="#7de8ee"/>
     </linearGradient>
-    <linearGradient id="lineLight" x1="610" y1="500" x2="760" y2="630" gradientUnits="userSpaceOnUse">
-      <stop offset="0%" stop-color="#dbddde"/>
-      <stop offset="100%" stop-color="#a7aaab"/>
-    </linearGradient>
-    <filter id="symbolShadow" x="-25%" y="-25%" width="150%" height="150%" color-interpolation-filters="sRGB">
-      <feDropShadow dx="0" dy="8" stdDeviation="8" flood-color="#050607" flood-opacity="0.34"/>
-      <feDropShadow dx="0" dy="1" stdDeviation="1" flood-color="#ffffff" flood-opacity="0.22"/>
+    <filter id="glassShadow" x="-25%" y="-25%" width="150%" height="150%" color-interpolation-filters="sRGB">
+      <feDropShadow dx="0" dy="18" stdDeviation="24" flood-color="#45506f" flood-opacity="0.20"/>
+      <feDropShadow dx="0" dy="1" stdDeviation="1" flood-color="#ffffff" flood-opacity="0.52"/>
     </filter>
-    <filter id="softNoise" x="0" y="0" width="100%" height="100%" color-interpolation-filters="sRGB">
-      <feTurbulence type="fractalNoise" baseFrequency="0.9" numOctaves="2" seed="19" result="noise"/>
-      <feColorMatrix in="noise" type="saturate" values="0"/>
-      <feComponentTransfer>
-        <feFuncA type="table" tableValues="0 0.018"/>
-      </feComponentTransfer>
-      <feBlend mode="multiply" in2="SourceGraphic"/>
+    <filter id="redShadow" x="-35%" y="-35%" width="170%" height="170%" color-interpolation-filters="sRGB">
+      <feDropShadow dx="0" dy="15" stdDeviation="22" flood-color="#ff2e45" flood-opacity="0.42"/>
+    </filter>
+    <filter id="blueShadow" x="-35%" y="-35%" width="170%" height="170%" color-interpolation-filters="sRGB">
+      <feDropShadow dx="0" dy="8" stdDeviation="15" flood-color="#356cff" flood-opacity="0.34"/>
     </filter>
   </defs>
 
-  <rect width="1024" height="1024" fill="url(#canvasGlow)"/>
+  <rect width="1024" height="1024" fill="url(#canvas)"/>
+  <rect width="1024" height="1024" fill="url(#warmGlow)"/>
+  <rect width="1024" height="1024" fill="url(#coolGlow)"/>
+  <rect width="1024" height="1024" fill="url(#violetGlow)"/>
 
-  <g filter="url(#symbolShadow)">
-    <path d="M284 484 V535 C284 652 346 724 426 724 C506 724 568 652 568 535 V484" fill="none" stroke="url(#graphiteEdge)" stroke-width="39" stroke-linecap="round" stroke-linejoin="round"/>
-    <path d="M426 722 V776" fill="none" stroke="url(#graphiteEdge)" stroke-width="35" stroke-linecap="round"/>
-    <path d="M356 776 H496" fill="none" stroke="url(#graphiteEdge)" stroke-width="35" stroke-linecap="round"/>
-    <rect x="342" y="292" width="168" height="292" rx="84" fill="url(#graphite)" filter="url(#softNoise)"/>
-    <path d="M374 318 C391 301 462 298 488 330" fill="none" stroke="#ffffff" stroke-opacity="0.10" stroke-width="4" stroke-linecap="round"/>
-    <path d="M373 570 C397 594 457 600 488 572" fill="none" stroke="#050607" stroke-opacity="0.18" stroke-width="4" stroke-linecap="round"/>
+  <path d="M10 234 C10 86 86 10 234 10 H790 C938 10 1014 86 1014 234 V790 C1014 938 938 1014 790 1014 H234 C86 1014 10 938 10 790 Z" fill="none" stroke="url(#glass)" stroke-width="7" opacity="0.52"/>
+
+  <g filter="url(#glassShadow)">
+    <path d="M305 486 V560 C305 700 374 790 455 790 C536 790 605 700 605 560 V486" fill="none" stroke="url(#glass)" stroke-width="64" stroke-linecap="round" stroke-linejoin="round" opacity="0.72"/>
+    <path d="M305 486 V560 C305 700 374 790 455 790 C536 790 605 700 605 560 V486" fill="none" stroke="#ffffff" stroke-opacity="0.66" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/>
+    <path d="M455 790 V852" fill="none" stroke="url(#glass)" stroke-width="56" stroke-linecap="round"/>
+    <path d="M370 852 H540" fill="none" stroke="url(#glass)" stroke-width="56" stroke-linecap="round"/>
+    <rect x="330" y="246" width="250" height="430" rx="125" fill="url(#glass)" opacity="0.78"/>
+    <rect x="332" y="248" width="246" height="426" rx="123" fill="none" stroke="#ffffff" stroke-opacity="0.68" stroke-width="4"/>
   </g>
 
-  <g filter="url(#symbolShadow)">
-    <rect x="622" y="383" width="220" height="27" rx="13.5" fill="url(#lineDark)"/>
-    <rect x="622" y="459" width="174" height="27" rx="13.5" fill="url(#lineMid)"/>
-    <rect x="622" y="535" width="119" height="27" rx="13.5" fill="url(#lineLight)"/>
-    <path d="M638 389 H824" stroke="#ffffff" stroke-opacity="0.10" stroke-width="3" stroke-linecap="round"/>
-    <path d="M638 465 H780" stroke="#ffffff" stroke-opacity="0.17" stroke-width="3" stroke-linecap="round"/>
-    <path d="M638 541 H725" stroke="#ffffff" stroke-opacity="0.36" stroke-width="3" stroke-linecap="round"/>
+  <g filter="url(#redShadow)">
+    <rect x="362" y="282" width="186" height="358" rx="93" fill="url(#redMic)"/>
+    <path d="M391 316 C421 292 500 302 524 350" fill="none" stroke="#ffffff" stroke-opacity="0.38" stroke-width="7" stroke-linecap="round"/>
+    <rect x="364" y="284" width="182" height="354" rx="91" fill="none" stroke="#ffffff" stroke-opacity="0.34" stroke-width="4"/>
+  </g>
+
+  <g filter="url(#blueShadow)">
+    <rect x="633" y="443" width="252" height="57" rx="28.5" fill="url(#glass)" opacity="0.46"/>
+    <rect x="642" y="452" width="234" height="41" rx="20.5" fill="url(#blueLine)"/>
+    <path d="M659 460 H859" stroke="#ffffff" stroke-opacity="0.38" stroke-width="3" stroke-linecap="round"/>
+    <rect x="671" y="528" width="160" height="55" rx="27.5" fill="url(#glass)" opacity="0.42"/>
+    <rect x="680" y="536" width="142" height="39" rx="19.5" fill="url(#blueLine)" opacity="0.82"/>
+    <path d="M697 544 H805" stroke="#ffffff" stroke-opacity="0.30" stroke-width="3" stroke-linecap="round"/>
+    <rect x="671" y="610" width="114" height="53" rx="26.5" fill="url(#glass)" opacity="0.38"/>
+    <rect x="680" y="618" width="96" height="37" rx="18.5" fill="url(#blueLine)" opacity="0.62"/>
+    <path d="M697 626 H759" stroke="#ffffff" stroke-opacity="0.24" stroke-width="3" stroke-linecap="round"/>
+  </g>
+
+  <g filter="url(#blueShadow)">
+    <path d="M735 221 C750 270 765 280 809 295 C765 310 750 320 735 369 C720 320 705 310 661 295 C705 280 720 270 735 221 Z" fill="url(#star)"/>
+    <path d="M735 221 C750 270 765 280 809 295 C765 310 750 320 735 369 C720 320 705 310 661 295 C705 280 720 270 735 221 Z" fill="none" stroke="#ffffff" stroke-opacity="0.46" stroke-width="3"/>
+    <path d="M842 344 C851 371 863 377 884 386 C863 395 851 401 842 428 C833 401 821 395 800 386 C821 377 833 371 842 344 Z" fill="url(#star)"/>
+    <path d="M842 344 C851 371 863 377 884 386 C863 395 851 401 842 428 C833 401 821 395 800 386 C821 377 833 371 842 344 Z" fill="none" stroke="#ffffff" stroke-opacity="0.42" stroke-width="2.5"/>
   </g>
 </svg>

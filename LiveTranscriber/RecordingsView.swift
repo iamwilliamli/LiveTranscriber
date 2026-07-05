@@ -24,6 +24,14 @@ private func localWhisperSupportedLanguages(for model: LocalWhisperModel) -> [Tr
     LocalWhisperTranscriptionService.supportedLanguages(for: model)
 }
 
+private func localWhisperMenuLanguageOptions(for models: [LocalWhisperModel]) -> [String: [TranscriptionLanguage]] {
+    Dictionary(
+        uniqueKeysWithValues: models.map { model in
+            (model.id, localWhisperSupportedLanguages(for: model))
+        }
+    )
+}
+
 private func localWhisperModelIcon(for model: LocalWhisperModel) -> String {
     if model.id.contains("large") {
         return "archivebox.fill"
@@ -123,59 +131,324 @@ private func transcriptionLanguagesWithRecordingLanguageFirst(
     return orderedLanguages
 }
 
-private struct LocalWhisperRetranscriptionMenu: View {
-    let itemLanguageID: String
-    let isDisabled: Bool
-    let onSelect: (TranscriptionLanguage, LocalWhisperModel) -> Void
+private struct LocalWhisperRetranscriptionRequest: Identifiable {
+    let item: RecordingItem
 
-    private var downloadedModels: [LocalWhisperModel] {
-        localWhisperDownloadedModels()
+    var id: RecordingItem.ID {
+        item.id
+    }
+}
+
+private struct AppleSpeechRetranscriptionRequest: Identifiable {
+    let item: RecordingItem
+
+    var id: RecordingItem.ID {
+        item.id
+    }
+}
+
+private struct RecordingRetranscriptionLanguagePicker: View {
+    let title: String
+    let recordingLanguageID: String
+    let languages: [TranscriptionLanguage]
+    let onCancel: () -> Void
+    let onSelect: (TranscriptionLanguage) -> Void
+
+    @State private var searchText = ""
+
+    private var orderedLanguages: [TranscriptionLanguage] {
+        transcriptionLanguagesWithRecordingLanguageFirst(
+            languages,
+            recordingLanguageID: recordingLanguageID
+        )
+    }
+
+    private var filteredLanguages: [TranscriptionLanguage] {
+        let query = searchText.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !query.isEmpty else {
+            return orderedLanguages
+        }
+
+        return orderedLanguages.filter { language in
+            language.displayName.localizedCaseInsensitiveContains(query)
+                || language.id.localizedCaseInsensitiveContains(query)
+        }
     }
 
     var body: some View {
-        Menu {
-            if downloadedModels.isEmpty {
-                Button {} label: {
-                    Label(localized(L10n.LocalWhisper.noDownloadedModels), systemImage: "arrow.down.circle")
-                }
-                .disabled(true)
-            } else {
-                ForEach(downloadedModels) { model in
-                    Menu {
-                        let languages = transcriptionLanguagesWithRecordingLanguageFirst(
-                            localWhisperSupportedLanguages(for: model),
-                            recordingLanguageID: itemLanguageID
-                        )
-                        ForEach(languages) { language in
-                            Button {
-                                onSelect(language, model)
-                            } label: {
-                                Label(
-                                    language.displayName,
-                                    systemImage: languages.first?.id == language.id
-                                        && transcriptionLanguageMatches(language, languageID: itemLanguageID)
-                                        ? "checkmark"
-                                        : "waveform"
-                                )
-                            }
+        NavigationStack {
+            List(filteredLanguages) { language in
+                Button {
+                    onSelect(language)
+                } label: {
+                    HStack(spacing: 12) {
+                        Text(language.displayName)
+                            .foregroundStyle(.primary)
+
+                        Spacer(minLength: 8)
+
+                        if transcriptionLanguageMatches(language, languageID: recordingLanguageID) {
+                            Image(systemName: "checkmark")
+                                .font(.redditSans(.caption, weight: .bold))
+                                .foregroundStyle(AppTheme.brand)
                         }
-                    } label: {
-                        Label(
-                            model.displayName,
-                            systemImage: model.id == LocalWhisperModelManager.selectedModel.id ? "checkmark" : localWhisperModelIcon(for: model)
-                        )
                     }
                 }
             }
+            .searchable(text: $searchText, placement: .navigationBarDrawer(displayMode: .always))
+            .navigationTitle(title)
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button(localized(L10n.Common.cancel)) {
+                        onCancel()
+                    }
+                }
+            }
+        }
+    }
+}
+
+private struct LocalWhisperRetranscriptionButton: View {
+    let downloadedModels: [LocalWhisperModel]
+    let isDisabled: Bool
+    let action: () -> Void
+
+    var body: some View {
+        Button {
+            action()
         } label: {
             Label(localized(L10n.Recordings.retranscribeWithLocalWhisper), systemImage: "iphone")
         }
-        .disabled(isDisabled)
+        .disabled(isDisabled || downloadedModels.isEmpty)
+        .accessibilityHint(downloadedModels.isEmpty ? localized(L10n.LocalWhisper.noDownloadedModels) : "")
+    }
+}
+
+private struct LocalWhisperRetranscriptionPicker: View {
+    let recordingLanguageID: String
+    let downloadedModels: [LocalWhisperModel]
+    let languageOptionsByModelID: [String: [TranscriptionLanguage]]
+    let onCancel: () -> Void
+    let onSelect: (TranscriptionLanguage, LocalWhisperModel) -> Void
+
+    @State private var selectedModelID: LocalWhisperModel.ID
+    @State private var searchText = ""
+
+    init(
+        recordingLanguageID: String,
+        downloadedModels: [LocalWhisperModel],
+        languageOptionsByModelID: [String: [TranscriptionLanguage]],
+        onCancel: @escaping () -> Void,
+        onSelect: @escaping (TranscriptionLanguage, LocalWhisperModel) -> Void
+    ) {
+        self.recordingLanguageID = recordingLanguageID
+        self.downloadedModels = downloadedModels
+        self.languageOptionsByModelID = languageOptionsByModelID
+        self.onCancel = onCancel
+        self.onSelect = onSelect
+
+        let preferredModelID = downloadedModels.first { $0.id == LocalWhisperModelManager.selectedModel.id }?.id
+            ?? downloadedModels.first?.id
+            ?? LocalWhisperModelManager.selectedModel.id
+        _selectedModelID = State(initialValue: preferredModelID)
+    }
+
+    private var selectedModel: LocalWhisperModel? {
+        downloadedModels.first { $0.id == selectedModelID } ?? downloadedModels.first
+    }
+
+    private var orderedLanguages: [TranscriptionLanguage] {
+        guard let selectedModel else {
+            return []
+        }
+
+        return transcriptionLanguagesWithRecordingLanguageFirst(
+            languageOptionsByModelID[selectedModel.id] ?? [],
+            recordingLanguageID: recordingLanguageID
+        )
+    }
+
+    private var filteredLanguages: [TranscriptionLanguage] {
+        let query = searchText.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !query.isEmpty else {
+            return orderedLanguages
+        }
+
+        return orderedLanguages.filter { language in
+            language.displayName.localizedCaseInsensitiveContains(query)
+                || language.id.localizedCaseInsensitiveContains(query)
+        }
+    }
+
+    var body: some View {
+        NavigationStack {
+            List {
+                if downloadedModels.isEmpty {
+                    Label(localized(L10n.LocalWhisper.noDownloadedModels), systemImage: "arrow.down.circle")
+                        .foregroundStyle(.secondary)
+                } else {
+                    Section(localized(L10n.LocalWhisper.modelTitle)) {
+                        ForEach(downloadedModels) { model in
+                            Button {
+                                selectedModelID = model.id
+                            } label: {
+                                HStack(spacing: 12) {
+                                    Image(systemName: localWhisperModelIcon(for: model))
+                                        .foregroundStyle(AppTheme.info)
+                                        .frame(width: 22)
+
+                                    Text(model.displayName)
+                                        .foregroundStyle(.primary)
+
+                                    Spacer(minLength: 8)
+
+                                    if selectedModelID == model.id {
+                                        Image(systemName: "checkmark")
+                                            .font(.redditSans(.caption, weight: .bold))
+                                            .foregroundStyle(AppTheme.brand)
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    Section(localized(L10n.Recordings.chooseTranscriptionLanguage)) {
+                        ForEach(filteredLanguages) { language in
+                            Button {
+                                if let selectedModel {
+                                    onSelect(language, selectedModel)
+                                }
+                            } label: {
+                                HStack(spacing: 12) {
+                                    Text(language.displayName)
+                                        .foregroundStyle(.primary)
+
+                                    Spacer(minLength: 8)
+
+                                    if transcriptionLanguageMatches(language, languageID: recordingLanguageID) {
+                                        Image(systemName: "checkmark")
+                                            .font(.redditSans(.caption, weight: .bold))
+                                            .foregroundStyle(AppTheme.brand)
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            .searchable(text: $searchText, placement: .navigationBarDrawer(displayMode: .always))
+            .navigationTitle(localized(L10n.Recordings.retranscribeWithLocalWhisper))
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button(localized(L10n.Common.cancel)) {
+                        onCancel()
+                    }
+                }
+            }
+        }
+    }
+}
+
+private struct TranscriptTranslationLanguagePicker: View {
+    @Environment(\.dismiss) private var dismiss
+    let selectedLanguageID: String?
+    let languages: [TranscriptionLanguage]
+    let onSelectOriginal: () -> Void
+    let onSelectLanguage: (TranscriptionLanguage) -> Void
+
+    var body: some View {
+        NavigationStack {
+            List {
+                Section {
+                    Button {
+                        onSelectOriginal()
+                        dismiss()
+                    } label: {
+                        languageRow(
+                            title: localized(L10n.Recordings.original),
+                            subtitle: localized(L10n.Transcription.stopLiveTranslation),
+                            systemImage: "text.alignleft",
+                            isSelected: selectedLanguageID == nil
+                        )
+                    }
+                    .foregroundStyle(.primary)
+                }
+
+                Section {
+                    if languages.isEmpty {
+                        Text(L10n.Transcription.noTranslationLanguages)
+                            .foregroundStyle(.secondary)
+                    } else {
+                        ForEach(languages) { language in
+                            Button {
+                                onSelectLanguage(language)
+                                dismiss()
+                            } label: {
+                                languageRow(
+                                    title: language.displayName,
+                                    subtitle: language.id,
+                                    systemImage: "translate",
+                                    isSelected: selectedLanguageID == language.id
+                                )
+                            }
+                            .foregroundStyle(.primary)
+                        }
+                    }
+                } header: {
+                    Text(L10n.Transcription.translationLanguage)
+                }
+            }
+            .listStyle(.insetGrouped)
+            .navigationTitle(localized(L10n.Transcription.realTimeTranslation))
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button {
+                        dismiss()
+                    } label: {
+                        Text(L10n.Common.done)
+                    }
+                }
+            }
+        }
+    }
+
+    private func languageRow(
+        title: String,
+        subtitle: String,
+        systemImage: String,
+        isSelected: Bool
+    ) -> some View {
+        HStack(spacing: 12) {
+            Image(systemName: systemImage)
+                .font(.system(size: 16, weight: .semibold))
+                .foregroundStyle(isSelected ? AppTheme.brand : .secondary)
+                .frame(width: 24)
+
+            VStack(alignment: .leading, spacing: 2) {
+                Text(title)
+                    .font(.redditSans(.body, weight: .semibold))
+                Text(subtitle)
+                    .font(.redditSans(.caption))
+                    .foregroundStyle(.secondary)
+            }
+
+            Spacer()
+
+            if isSelected {
+                Image(systemName: "checkmark.circle.fill")
+                    .foregroundStyle(AppTheme.brand)
+            }
+        }
+        .contentShape(Rectangle())
     }
 }
 
 private struct SummaryAnalysisMenu<LabelContent: View>: View {
     let selectedProvider: RecordingSummaryProvider
+    let providerAvailability: RecordingSummaryProviderAvailability
     let isDisabled: Bool
     let primaryAction: (() -> Void)?
     let onSelect: (RecordingSummaryProvider) -> Void
@@ -183,12 +456,14 @@ private struct SummaryAnalysisMenu<LabelContent: View>: View {
 
     init(
         selectedProvider: RecordingSummaryProvider,
+        providerAvailability: RecordingSummaryProviderAvailability,
         isDisabled: Bool,
         primaryAction: (() -> Void)? = nil,
         onSelect: @escaping (RecordingSummaryProvider) -> Void,
         @ViewBuilder label: @escaping () -> LabelContent
     ) {
         self.selectedProvider = selectedProvider
+        self.providerAvailability = providerAvailability
         self.isDisabled = isDisabled
         self.primaryAction = primaryAction
         self.onSelect = onSelect
@@ -213,7 +488,7 @@ private struct SummaryAnalysisMenu<LabelContent: View>: View {
                 }
             }
         }
-        .disabled(isDisabled || !RecordingSummaryProvider.hasAnyAvailableProvider)
+        .disabled(isDisabled || !providerAvailability.hasAnyAvailableProvider)
     }
 
     @ViewBuilder
@@ -227,7 +502,7 @@ private struct SummaryAnalysisMenu<LabelContent: View>: View {
                     systemImage: provider == selectedProvider ? "checkmark" : provider.systemImage
                 )
             }
-            .disabled(!provider.isCurrentlyAvailable)
+            .disabled(!providerAvailability.isAvailable(provider))
         }
     }
 }
@@ -248,7 +523,11 @@ struct RecordingsView: View {
     @State private var deleteErrorMessage: String?
     @State private var pendingImport: PendingImport?
     @State private var pendingSpeechLocaleReleaseAction: PendingSpeechLocaleReleaseAction?
+    @State private var appleSpeechRetranscriptionRequest: AppleSpeechRetranscriptionRequest?
     @State private var appleSpeechTranscriptionLanguages: [TranscriptionLanguage] = TranscriptionLanguage.fallbackOptions
+    @State private var downloadedLocalWhisperModels: [LocalWhisperModel] = []
+    @State private var localWhisperLanguageOptionsByModelID: [String: [TranscriptionLanguage]] = [:]
+    @State private var localWhisperRetranscriptionRequest: LocalWhisperRetranscriptionRequest?
     @State private var searchText = ""
     @State private var isShowingRecordingsMap = false
     @State private var hidesTabBarForRecordingDetail = false
@@ -279,7 +558,14 @@ struct RecordingsView: View {
                     recordingsToolbar
                 }
                 .navigationDestination(item: $selectedRecording) { item in
-                    RecordingDetailView(item: item, store: store, transcriber: transcriber, player: player)
+                    RecordingDetailView(
+                        item: item,
+                        store: store,
+                        transcriber: transcriber,
+                        player: player,
+                        downloadedLocalWhisperModels: downloadedLocalWhisperModels,
+                        localWhisperLanguageOptionsByModelID: localWhisperLanguageOptionsByModelID
+                    )
                 }
         }
         .toolbar(hidesTabBarForRecordingDetail ? .hidden : .visible, for: .tabBar)
@@ -291,6 +577,7 @@ struct RecordingsView: View {
         .task {
             await transcriber.refreshSupportedLanguages()
             appleSpeechTranscriptionLanguages = await AppleSpeechTranscriptionSupport.supportedLanguages()
+            await refreshLocalWhisperMenuOptions()
             await store.reload()
             store.refreshIntelligenceAvailability()
         }
@@ -321,6 +608,34 @@ struct RecordingsView: View {
         }
         .sheet(isPresented: $isShowingRecordingsMap) {
             RecordingMapView(store: store, transcriber: transcriber, player: player)
+        }
+        .sheet(item: $localWhisperRetranscriptionRequest) { request in
+            LocalWhisperRetranscriptionPicker(
+                recordingLanguageID: request.item.languageID,
+                downloadedModels: downloadedLocalWhisperModels,
+                languageOptionsByModelID: localWhisperLanguageOptionsByModelID,
+                onCancel: {
+                    localWhisperRetranscriptionRequest = nil
+                },
+                onSelect: { language, model in
+                    localWhisperRetranscriptionRequest = nil
+                    retranscribeWithLocalWhisper(request.item, language: language, model: model)
+                }
+            )
+        }
+        .sheet(item: $appleSpeechRetranscriptionRequest) { request in
+            RecordingRetranscriptionLanguagePicker(
+                title: localized(L10n.Recordings.retranscribe),
+                recordingLanguageID: request.item.languageID,
+                languages: appleSpeechTranscriptionLanguages,
+                onCancel: {
+                    appleSpeechRetranscriptionRequest = nil
+                },
+                onSelect: { language in
+                    appleSpeechRetranscriptionRequest = nil
+                    requestRetranscription(request.item, language: language)
+                }
+            )
         }
         .confirmationDialog(
             localized(L10n.Recordings.chooseTranscriptionLanguage),
@@ -540,9 +855,10 @@ struct RecordingsView: View {
                 Label(localized(L10n.Recordings.copyTranscript), systemImage: "doc.on.doc")
             }
 
-            if RecordingSummaryProvider.hasAnyAvailableProvider {
+            if store.summaryProviderAvailability.hasAnyAvailableProvider {
                 SummaryAnalysisMenu(
                     selectedProvider: selectedSummaryProvider,
+                    providerAvailability: store.summaryProviderAvailability,
                     isDisabled: analyzingRecordingID != nil
                 ) { provider in
                     analyze(item, summaryProvider: provider)
@@ -556,24 +872,8 @@ struct RecordingsView: View {
                 }
             }
 
-            Menu {
-                let languages = transcriptionLanguagesWithRecordingLanguageFirst(
-                    appleSpeechTranscriptionLanguages,
-                    recordingLanguageID: item.languageID
-                )
-                ForEach(languages) { language in
-                    Button {
-                        requestRetranscription(item, language: language)
-                    } label: {
-                        Label(
-                            language.displayName,
-                            systemImage: languages.first?.id == language.id
-                                && transcriptionLanguageMatches(language, languageID: item.languageID)
-                                ? "checkmark"
-                                : "globe"
-                        )
-                    }
-                }
+            Button {
+                appleSpeechRetranscriptionRequest = AppleSpeechRetranscriptionRequest(item: item)
             } label: {
                 Label(localized(L10n.Recordings.retranscribe), systemImage: "arrow.triangle.2.circlepath")
             }
@@ -604,11 +904,11 @@ struct RecordingsView: View {
                 .disabled(item.importStatus?.isFailed == false || transcriber.isRecording || transcriber.isPreparing)
             }
 
-            LocalWhisperRetranscriptionMenu(
-                itemLanguageID: item.languageID,
+            LocalWhisperRetranscriptionButton(
+                downloadedModels: downloadedLocalWhisperModels,
                 isDisabled: item.isTranscriptLocked || item.importStatus?.isFailed == false || transcriber.isRecording || transcriber.isPreparing
-            ) { language, model in
-                retranscribeWithLocalWhisper(item, language: language, model: model)
+            ) {
+                localWhisperRetranscriptionRequest = LocalWhisperRetranscriptionRequest(item: item)
             }
 
             Button(role: .destructive) {
@@ -665,6 +965,19 @@ struct RecordingsView: View {
     private func consumeIncomingImportURL(_ url: URL) {
         queueImport(from: url)
         incomingImportURL = nil
+    }
+
+    private func refreshLocalWhisperMenuOptions() async {
+        let menuOptions = await Task.detached(priority: .utility) {
+            let models = localWhisperDownloadedModels()
+            return (
+                models,
+                localWhisperMenuLanguageOptions(for: models)
+            )
+        }.value
+
+        downloadedLocalWhisperModels = menuOptions.0
+        localWhisperLanguageOptionsByModelID = menuOptions.1
     }
 
     private func queueImport(from url: URL) {
@@ -784,8 +1097,9 @@ struct RecordingsView: View {
     }
 
     private func analyze(_ item: RecordingItem, summaryProvider: RecordingSummaryProvider) {
-        guard summaryProvider.isCurrentlyAvailable else {
+        guard store.summaryProviderAvailability.isAvailable(summaryProvider) else {
             HapticFeedback.play(.blocked)
+            store.refreshIntelligenceAvailability()
             return
         }
         guard analyzingRecordingID == nil else {
@@ -999,6 +1313,8 @@ struct RecordingMapView: View {
     @Environment(\.dismiss) private var dismiss
     @State private var selectedPoint: RecordingMapPoint?
     @State private var selectedRecording: RecordingItem?
+    @State private var downloadedLocalWhisperModels: [LocalWhisperModel] = []
+    @State private var localWhisperLanguageOptionsByModelID: [String: [TranscriptionLanguage]] = [:]
 
     private var points: [RecordingMapPoint] {
         store.recordings.compactMap { item in
@@ -1055,8 +1371,26 @@ struct RecordingMapView: View {
                     }
                 }
             }
+            .task {
+                let menuOptions = await Task.detached(priority: .utility) {
+                    let models = localWhisperDownloadedModels()
+                    return (
+                        models,
+                        localWhisperMenuLanguageOptions(for: models)
+                    )
+                }.value
+                downloadedLocalWhisperModels = menuOptions.0
+                localWhisperLanguageOptionsByModelID = menuOptions.1
+            }
             .navigationDestination(item: $selectedRecording) { item in
-                RecordingDetailView(item: item, store: store, transcriber: transcriber, player: player)
+                RecordingDetailView(
+                    item: item,
+                    store: store,
+                    transcriber: transcriber,
+                    player: player,
+                    downloadedLocalWhisperModels: downloadedLocalWhisperModels,
+                    localWhisperLanguageOptionsByModelID: localWhisperLanguageOptionsByModelID
+                )
             }
         }
     }
@@ -1456,6 +1790,8 @@ struct RecordingDetailView: View {
     @ObservedObject var store: RecordingStore
     @ObservedObject var transcriber: LiveTranscriptionManager
     @ObservedObject var player: RecordingPlaybackController
+    var downloadedLocalWhisperModels: [LocalWhisperModel] = []
+    var localWhisperLanguageOptionsByModelID: [String: [TranscriptionLanguage]] = [:]
     var onClose: (() -> Void)? = nil
     @Environment(\.dismiss) private var dismiss
     @Environment(\.scenePhase) private var scenePhase
@@ -1489,7 +1825,10 @@ struct RecordingDetailView: View {
     @State private var appleTranslationLanguages: [TranscriptionLanguage] = []
     @State private var isTranslatingTranscript = false
     @State private var translationErrorMessage: String?
+    @State private var isShowingTranscriptTranslationLanguagePicker = false
     @State private var pendingSpeechLocaleReleaseAction: PendingSpeechLocaleReleaseAction?
+    @State private var isShowingAppleSpeechRetranscriptionPicker = false
+    @State private var isShowingLocalWhisperRetranscriptionPicker = false
     @AppStorage(RecordingSummaryProvider.selectedDefaultsKey) private var selectedSummaryProviderRawValue = RecordingSummaryProvider.automatic.rawValue
 
     private var currentItem: RecordingItem {
@@ -1611,6 +1950,50 @@ struct RecordingDetailView: View {
                 }
             )
             .interactiveDismissDisabled(isSavingTranscriptLineEdit)
+            .presentationDetents([.medium, .large])
+            .presentationDragIndicator(.visible)
+        }
+        .sheet(isPresented: $isShowingLocalWhisperRetranscriptionPicker) {
+            LocalWhisperRetranscriptionPicker(
+                recordingLanguageID: currentItem.languageID,
+                downloadedModels: downloadedLocalWhisperModels,
+                languageOptionsByModelID: localWhisperLanguageOptionsByModelID,
+                onCancel: {
+                    isShowingLocalWhisperRetranscriptionPicker = false
+                },
+                onSelect: { language, model in
+                    isShowingLocalWhisperRetranscriptionPicker = false
+                    retranscribeCurrentItemWithLocalWhisper(language: language, model: model)
+                }
+            )
+        }
+        .sheet(isPresented: $isShowingAppleSpeechRetranscriptionPicker) {
+            RecordingRetranscriptionLanguagePicker(
+                title: localized(L10n.Recordings.retranscribe),
+                recordingLanguageID: currentItem.languageID,
+                languages: appleSpeechTranscriptionLanguages,
+                onCancel: {
+                    isShowingAppleSpeechRetranscriptionPicker = false
+                },
+                onSelect: { language in
+                    isShowingAppleSpeechRetranscriptionPicker = false
+                    requestCurrentItemRetranscription(language: language)
+                }
+            )
+        }
+        .sheet(isPresented: $isShowingTranscriptTranslationLanguagePicker) {
+            TranscriptTranslationLanguagePicker(
+                selectedLanguageID: selectedTranslationLanguage?.id,
+                languages: transcriptTranslationLanguages,
+                onSelectOriginal: {
+                    clearTranscriptTranslation()
+                    isShowingTranscriptTranslationLanguagePicker = false
+                },
+                onSelectLanguage: { language in
+                    requestTranscriptTranslation(to: language)
+                    isShowingTranscriptTranslationLanguagePicker = false
+                }
+            )
             .presentationDetents([.medium, .large])
             .presentationDragIndicator(.visible)
         }
@@ -1789,24 +2172,8 @@ struct RecordingDetailView: View {
                 Label(localized(L10n.Recordings.share), systemImage: "square.and.arrow.up")
             }
 
-            Menu {
-                let languages = transcriptionLanguagesWithRecordingLanguageFirst(
-                    appleSpeechTranscriptionLanguages,
-                    recordingLanguageID: currentItem.languageID
-                )
-                ForEach(languages) { language in
-                    Button {
-                        requestCurrentItemRetranscription(language: language)
-                    } label: {
-                        Label(
-                            language.displayName,
-                            systemImage: languages.first?.id == language.id
-                                && transcriptionLanguageMatches(language, languageID: currentItem.languageID)
-                                ? "checkmark"
-                                : "globe"
-                        )
-                    }
-                }
+            Button {
+                requestCurrentItemRetranscription()
             } label: {
                 Label(localized(L10n.Recordings.retranscribe), systemImage: isTranscriptionRunning ? "hourglass" : "arrow.triangle.2.circlepath")
             }
@@ -1837,11 +2204,11 @@ struct RecordingDetailView: View {
                 .disabled(currentItem.isTranscriptLocked || isTranscriptionRunning || transcriber.isRecording || transcriber.isPreparing)
             }
 
-            LocalWhisperRetranscriptionMenu(
-                itemLanguageID: currentItem.languageID,
+            LocalWhisperRetranscriptionButton(
+                downloadedModels: downloadedLocalWhisperModels,
                 isDisabled: currentItem.isTranscriptLocked || isTranscriptionRunning || transcriber.isRecording || transcriber.isPreparing
-            ) { language, model in
-                retranscribeCurrentItemWithLocalWhisper(language: language, model: model)
+            ) {
+                isShowingLocalWhisperRetranscriptionPicker = true
             }
 
             Button {
@@ -1939,9 +2306,10 @@ struct RecordingDetailView: View {
 
                 Spacer(minLength: 8)
 
-                if RecordingSummaryProvider.hasAnyAvailableProvider {
+                if store.summaryProviderAvailability.hasAnyAvailableProvider {
                     SummaryAnalysisMenu(
                         selectedProvider: selectedSummaryProvider,
+                        providerAvailability: store.summaryProviderAvailability,
                         isDisabled: isAnalyzing,
                         primaryAction: {
                             analyzeCurrentItem(summaryProvider: selectedSummaryProvider)
@@ -1987,12 +2355,14 @@ struct RecordingDetailView: View {
         }
         .padding(14)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(AppTheme.cardBackground)
-        .overlay {
-            RoundedRectangle(cornerRadius: AppTheme.cornerRadius, style: .continuous)
-                .stroke(AppTheme.cardBorder, lineWidth: 1)
+        .background {
+            ZStack {
+                RoundedRectangle(cornerRadius: AppTheme.cornerRadius, style: .continuous)
+                    .fill(AppTheme.cardBackground)
+                RoundedRectangle(cornerRadius: AppTheme.cornerRadius, style: .continuous)
+                    .stroke(AppTheme.cardBorder, lineWidth: 1)
+            }
         }
-        .clipShape(RoundedRectangle(cornerRadius: AppTheme.cornerRadius, style: .continuous))
     }
 
     private var audioParametersCard: some View {
@@ -2214,25 +2584,9 @@ struct RecordingDetailView: View {
     }
 
     private var transcriptTranslationMenu: some View {
-        Menu {
-            Button {
-                clearTranscriptTranslation()
-            } label: {
-                Label(localized(L10n.Recordings.original), systemImage: selectedTranslationLanguage == nil ? "checkmark" : "text.alignleft")
-            }
-
-            Divider()
-
-            ForEach(transcriptTranslationLanguages) { language in
-                Button {
-                    requestTranscriptTranslation(to: language)
-                } label: {
-                    Label(
-                        language.displayName,
-                        systemImage: selectedTranslationLanguage?.id == language.id ? "checkmark" : "translate"
-                    )
-                }
-            }
+        Button {
+            HapticFeedback.play(.navigation)
+            isShowingTranscriptTranslationLanguagePicker = true
         } label: {
             HStack(spacing: 5) {
                 Image(systemName: "translate")
@@ -2277,8 +2631,9 @@ struct RecordingDetailView: View {
     }
 
     private func analyzeCurrentItem(summaryProvider: RecordingSummaryProvider) {
-        guard summaryProvider.isCurrentlyAvailable else {
+        guard store.summaryProviderAvailability.isAvailable(summaryProvider) else {
             HapticFeedback.play(.blocked)
+            store.refreshIntelligenceAvailability()
             return
         }
         guard !isAnalyzing else {
@@ -2340,6 +2695,19 @@ struct RecordingDetailView: View {
         }
 
         return (translatedLines.joined(separator: "\n"), selectedTranslationLanguage.displayName)
+    }
+
+    private func requestCurrentItemRetranscription() {
+        guard !isTranscriptionRunning else {
+            HapticFeedback.play(.blocked)
+            return
+        }
+        guard !transcriber.isRecording, !transcriber.isPreparing else {
+            HapticFeedback.play(.blocked)
+            return
+        }
+
+        isShowingAppleSpeechRetranscriptionPicker = true
     }
 
     private func requestCurrentItemRetranscription(language: TranscriptionLanguage) {
