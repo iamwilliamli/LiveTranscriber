@@ -7,6 +7,7 @@ struct ContentView: View {
     @StateObject private var recordingPlayer = RecordingPlaybackController()
     @State private var selectedTab: AppTab = .transcribe
     @State private var incomingRecordingImportURL: URL?
+    @State private var pendingOpenRecordingID: RecordingItem.ID?
     @State private var pendingRecordingDraftFromLiveActivity: RecordingDraft?
     @State private var pendingDeepLinkSpeechLocaleReleaseRequest: SpeechLocaleReleaseRequest?
     @State private var speechLocaleErrorMessage: String?
@@ -82,6 +83,7 @@ struct ContentView: View {
                     store: recordingStore,
                     transcriber: transcriber,
                     incomingImportURL: $incomingRecordingImportURL,
+                    pendingOpenRecordingID: $pendingOpenRecordingID,
                     player: recordingPlayer
                 )
             }
@@ -140,6 +142,13 @@ struct ContentView: View {
         }
 
         switch host {
+        case "recording":
+            guard let idString = url.pathComponents.dropFirst().first,
+                  let id = UUID(uuidString: idString) else {
+                return false
+            }
+            selectedTab = .recordings
+            pendingOpenRecordingID = id
         case "record", "transcribe":
             selectedTab = .transcribe
             if shouldStartRecording(from: url) {

@@ -1,5 +1,6 @@
 import AVFoundation
 import CoreMedia
+import CoreSpotlight
 import Darwin
 import Foundation
 import FoundationModels
@@ -721,6 +722,7 @@ final class RecordingStore: ObservableObject {
     private var searchIndexCache: [RecordingItem.ID: RecordingSearchIndexCacheEntry] = [:]
     private var searchIndexWarmupTask: Task<Void, Never>?
     private var iCloudSyncStatusRefreshTask: Task<Void, Never>?
+    private var spotlightIndexTask: Task<Void, Never>?
 
     private var applicationSupportDirectory: URL {
         fileManager.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
@@ -1450,6 +1452,7 @@ final class RecordingStore: ObservableObject {
         recordings.removeAll { $0.id == item.id }
         searchIndexCache[item.id] = nil
         try persist()
+        deleteSpotlightIndex(for: [item.id])
     }
 
     @discardableResult
@@ -1771,6 +1774,39 @@ final class RecordingStore: ObservableObject {
 
     func recording(withID id: RecordingItem.ID) -> RecordingItem? {
         recordings.first { $0.id == id }
+    }
+
+    func recordingEntities() -> [RecordingEntity] {
+        recordings
+            .filter { $0.importStatus == nil }
+            .map(recordingEntity(for:))
+    }
+
+    func recordingEntities(matching query: String) -> [RecordingEntity] {
+        let normalizedQuery = query.normalizedForRecordingSearch
+        guard !normalizedQuery.isEmpty else {
+            return recordingEntities()
+        }
+
+        return recordings
+            .filter { $0.importStatus == nil }
+            .filter { normalizedSearchText(for: $0).contains(normalizedQuery) }
+            .map(recordingEntity(for:))
+    }
+
+    func recordingEntity(for item: RecordingItem) -> RecordingEntity {
+        RecordingEntity(
+            id: item.id,
+            title: Self.recordingTitle(for: item),
+            createdAt: item.createdAt,
+            durationSeconds: item.durationSeconds,
+            languageName: item.localizedLanguageName,
+            summary: item.intelligence?.summary,
+            transcript: transcriptText(for: item),
+            transcriptPreview: item.transcriptPreview,
+            tags: item.combinedTags,
+            isTranscriptLocked: item.isTranscriptLocked
+        )
     }
 
     @discardableResult
@@ -2134,6 +2170,7 @@ final class RecordingStore: ObservableObject {
     private func persist() throws {
         try persist(recordings)
         refreshICloudSyncStatusCache()
+        scheduleSpotlightIndexUpdate()
     }
 
     private func pruneSearchIndexCache() {
@@ -2225,6 +2262,79 @@ final class RecordingStore: ObservableObject {
     private func transcriptModificationTime(for item: RecordingItem) -> TimeInterval {
         let url = transcriptURL(for: item)
         return ((try? url.resourceValues(forKeys: [.contentModificationDateKey]).contentModificationDate) ?? .distantPast).timeIntervalSinceReferenceDate
+    }
+
+    private static func recordingTitle(for item: RecordingItem) -> String {
+        let baseName = (item.audioFileName as NSString).deletingPathExtension
+        let trimmedBaseName = baseName.trimmingCharacters(in: .whitespacesAndNewlines)
+        if !trimmedBaseName.isEmpty {
+            return trimmedBaseName
+        }
+
+        return item.createdAt.formatted(date: .abbreviated, time: .shortened)
+    }
+
+    private func scheduleSpotlightIndexUpdate() {
+        spotlightIndexTask?.cancel()
+
+        let workItems = recordings
+            .filter { $0.importStatus == nil }
+            .map { item in
+                RecordingSpotlightIndexWorkItem(
+                    id: item.id,
+                    title: Self.recordingTitle(for: item),
+                    createdAt: item.createdAt,
+                    durationSeconds: item.durationSeconds,
+                    languageName: item.localizedLanguageName,
+                    summary: item.intelligence?.summary,
+                    transcriptPreview: item.transcriptPreview,
+                    tags: item.combinedTags,
+                    isTranscriptLocked: item.isTranscriptLocked,
+                    transcriptURL: transcriptURL(for: item)
+                )
+            }
+
+        spotlightIndexTask = Task(priority: .utility) {
+            do {
+                try await Task.sleep(nanoseconds: 750_000_000)
+                guard !Task.isCancelled else {
+                    return
+                }
+
+                let entities = workItems.map { workItem in
+                    RecordingEntity(
+                        id: workItem.id,
+                        title: workItem.title,
+                        createdAt: workItem.createdAt,
+                        durationSeconds: workItem.durationSeconds,
+                        languageName: workItem.languageName,
+                        summary: workItem.summary,
+                        transcript: (try? String(contentsOf: workItem.transcriptURL, encoding: .utf8)) ?? "",
+                        transcriptPreview: workItem.transcriptPreview,
+                        tags: workItem.tags,
+                        isTranscriptLocked: workItem.isTranscriptLocked
+                    )
+                }
+
+                try await CSSearchableIndex.default().indexAppEntities(entities)
+            } catch is CancellationError {
+            } catch {
+                Self.logger.error("Failed to index recordings for Siri and Search: \(error.localizedDescription, privacy: .public)")
+            }
+        }
+    }
+
+    private func deleteSpotlightIndex(for ids: [RecordingItem.ID]) {
+        Task(priority: .utility) {
+            do {
+                try await CSSearchableIndex.default().deleteAppEntities(
+                    identifiedBy: ids,
+                    ofType: RecordingEntity.self
+                )
+            } catch {
+                Self.logger.error("Failed to delete recording Siri/Search index entries: \(error.localizedDescription, privacy: .public)")
+            }
+        }
     }
 
     private func persist(_ items: [RecordingItem]) throws {
@@ -2396,6 +2506,19 @@ private struct RecordingSearchIndexWarmupEntry {
     var id: RecordingItem.ID
     var signature: String
     var normalizedText: String
+}
+
+private struct RecordingSpotlightIndexWorkItem: Sendable {
+    var id: RecordingItem.ID
+    var title: String
+    var createdAt: Date
+    var durationSeconds: Int
+    var languageName: String
+    var summary: String?
+    var transcriptPreview: String
+    var tags: [String]
+    var isTranscriptLocked: Bool
+    var transcriptURL: URL
 }
 
 extension String {

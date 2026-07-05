@@ -511,6 +511,7 @@ struct RecordingsView: View {
     @ObservedObject var store: RecordingStore
     @ObservedObject var transcriber: LiveTranscriptionManager
     @Binding var incomingImportURL: URL?
+    @Binding var pendingOpenRecordingID: RecordingItem.ID?
     @ObservedObject var player: RecordingPlaybackController
     @State private var deleteRequest: RecordingDeleteRequest?
     @State private var selectedRecording: RecordingItem?
@@ -579,9 +580,11 @@ struct RecordingsView: View {
             await refreshLocalWhisperMenuOptions()
             await store.reload()
             store.refreshIntelligenceAvailability()
+            consumePendingOpenRecordingIDIfNeeded()
         }
         .onAppear {
             consumeIncomingImportURLIfNeeded()
+            consumePendingOpenRecordingIDIfNeeded()
         }
         .onChange(of: incomingImportURL) { _, newURL in
             guard let newURL else {
@@ -589,6 +592,12 @@ struct RecordingsView: View {
             }
 
             consumeIncomingImportURL(newURL)
+        }
+        .onChange(of: pendingOpenRecordingID) { _, _ in
+            consumePendingOpenRecordingIDIfNeeded()
+        }
+        .onChange(of: store.recordings) { _, _ in
+            consumePendingOpenRecordingIDIfNeeded()
         }
         .onChange(of: selectedRecording?.id) { _, newValue in
             if newValue == nil {
@@ -1056,6 +1065,16 @@ struct RecordingsView: View {
         HapticFeedback.play(.navigation)
         hideTabBarForDetail()
         selectedRecording = item
+    }
+
+    private func consumePendingOpenRecordingIDIfNeeded() {
+        guard let id = pendingOpenRecordingID,
+              let item = store.recording(withID: id) else {
+            return
+        }
+
+        pendingOpenRecordingID = nil
+        openRecording(item)
     }
 
     private func hideTabBarForDetail() {
@@ -2404,7 +2423,7 @@ struct RecordingDetailView: View {
             }
 
             ZStack {
-                HStack(spacing: 8) {
+                HStack(spacing: 20) {
                     PlaybackRoundButton(systemImage: "gobackward.5", title: "-5s") {
                         HapticFeedback.play(.timelineSeek)
                         scrubbedPlaybackTime = nil
@@ -2429,7 +2448,7 @@ struct RecordingDetailView: View {
                     }
                     .disabled(!player.isLoaded)
                 }
-                .frame(width: 168)
+                .frame(width: 196)
 
                 HStack {
                     Spacer(minLength: 0)
@@ -2448,8 +2467,7 @@ struct RecordingDetailView: View {
         .padding(.horizontal, 12)
         .padding(.vertical, 10)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .glassEffect(.regular.tint(AppTheme.brand.opacity(0.08)).interactive(), in: shape)
-        .shadow(color: Color.black.opacity(0.14), radius: 18, y: 8)
+        .glassEffect(.regular.tint(AppTheme.playbackGlassTint), in: shape)
     }
 
     private var playbackSpeedMenu: some View {
@@ -3832,6 +3850,8 @@ private struct RecordingAudioFileInfo: Equatable, Sendable {
 }
 
 private struct PlaybackRoundButton: View {
+    @Environment(\.colorScheme) private var colorScheme
+
     let systemImage: String
     let title: Text
     var isPrimary = false
@@ -3857,22 +3877,69 @@ private struct PlaybackRoundButton: View {
                 .font(.system(size: isPrimary ? 22 : 18, weight: .semibold))
                 .frame(width: isPrimary ? 58 : 46, height: isPrimary ? 58 : 46)
                 .foregroundStyle(isPrimary ? .white : AppTheme.brand)
-                .background(
-                    isPrimary ? AppTheme.brand : AppTheme.brand.opacity(0.11),
-                    in: Circle()
-                )
+                .background {
+                    if isPrimary {
+                        Circle()
+                            .fill(
+                                LinearGradient(
+                                    colors: [
+                                        AppTheme.brandSoft,
+                                        AppTheme.brand
+                                    ],
+                                    startPoint: .topLeading,
+                                    endPoint: .bottomTrailing
+                                )
+                            )
+                            .opacity(colorScheme == .dark ? 0.72 : 1)
+                    } else {
+                        Circle()
+                            .fill(AppTheme.raisedControlBackground)
+                            .opacity(colorScheme == .dark ? 0.58 : 1)
+                    }
+                }
+                .overlay {
+                    Circle()
+                        .stroke(
+                            isPrimary
+                                ? Color.white.opacity(colorScheme == .dark ? 0.10 : 0.16)
+                                : Color.white.opacity(colorScheme == .dark ? 0.12 : 0.18),
+                            lineWidth: 1
+                        )
+                }
         }
-        .buttonStyle(PlaybackRoundButtonStyle())
+        .buttonStyle(PlaybackRoundButtonStyle(isPrimary: isPrimary, colorScheme: colorScheme))
         .accessibilityLabel(title)
     }
 }
 
 private struct PlaybackRoundButtonStyle: ButtonStyle {
+    let isPrimary: Bool
+    let colorScheme: ColorScheme
+
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
-            .scaleEffect(configuration.isPressed ? 0.94 : 1)
-            .opacity(configuration.isPressed ? 0.82 : 1)
-            .animation(.snappy(duration: 0.12, extraBounce: 0), value: configuration.isPressed)
+            .compositingGroup()
+            .scaleEffect(configuration.isPressed ? 0.91 : 1)
+            .offset(y: configuration.isPressed ? 3 : 0)
+            .shadow(
+                color: shadowColor(isPressed: configuration.isPressed),
+                radius: configuration.isPressed ? (isPrimary ? 7 : 5) : (isPrimary ? 18 : 10),
+                y: configuration.isPressed ? (isPrimary ? 3 : 2) : (isPrimary ? 11 : 6)
+            )
+            .animation(.snappy(duration: 0.11, extraBounce: 0), value: configuration.isPressed)
+    }
+
+    private func shadowColor(isPressed: Bool) -> Color {
+        if isPrimary {
+            if colorScheme == .dark {
+                return AppTheme.brand.opacity(isPressed ? 0.14 : 0.24)
+            }
+            return AppTheme.brand.opacity(isPressed ? 0.24 : 0.46)
+        }
+        if colorScheme == .dark {
+            return Color.black.opacity(isPressed ? 0.05 : 0.09)
+        }
+        return Color.black.opacity(isPressed ? 0.08 : 0.16)
     }
 }
 
@@ -4638,6 +4705,7 @@ private struct RecordingInfoPill: View {
         store: RecordingStore(),
         transcriber: LiveTranscriptionManager(),
         incomingImportURL: .constant(nil),
+        pendingOpenRecordingID: .constant(nil),
         player: RecordingPlaybackController()
     )
         .font(.redditSans(.body))

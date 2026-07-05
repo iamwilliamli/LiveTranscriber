@@ -120,6 +120,7 @@ enum L10n {
         static let storageLocationAndCount = L10n.resource("settings.subtitle.storage_location_count", defaultValue: "Storage location and recording count", comment: "Settings row subtitle.")
         static let dataBoundariesAndPermissions = L10n.resource("settings.subtitle.data_boundaries_permissions", defaultValue: "Data boundaries and permission usage", comment: "Settings row subtitle.")
         static let deviceAndPipelineDiagnostics = L10n.resource("settings.subtitle.device_pipeline_diagnostics", defaultValue: "Device and pipeline diagnostics", comment: "Settings row subtitle.")
+        static let publicBetaFeedback = L10n.resource("settings.public_beta_feedback", defaultValue: "Public Beta Feedback", comment: "Settings row title for opening the public beta Telegram feedback group.")
         static let feedback = L10n.resource("settings.feedback", defaultValue: "Feedback", comment: "Settings row title for sending feedback email.")
         static let feedbackUnavailable = L10n.resource("settings.feedback.unavailable", defaultValue: "Feedback Unavailable", comment: "Alert title when feedback email cannot be opened.")
         static let feedbackOpenFailedFormat = L10n.resource("settings.feedback.open_failed.format", defaultValue: "No mail app is configured. Send feedback to %@.", comment: "Alert message when feedback email cannot be opened. Parameter: feedback email address.")
@@ -172,6 +173,16 @@ enum L10n {
         static let intelligence = L10n.resource("settings.intelligence", defaultValue: "Intelligence", comment: "Settings section title for summaries and local intelligence models.")
         static let summariesAndLocalModels = L10n.resource("settings.subtitle.summaries_local_models", defaultValue: "Summaries and local model downloads", comment: "Settings row subtitle for summary intelligence settings.")
         static let showIntroduction = L10n.resource("settings.show_introduction", defaultValue: "Show Introduction", comment: "Settings action title to show onboarding again.")
+    }
+
+    enum Appearance {
+        static let title = L10n.resource("appearance.title", defaultValue: "Appearance", comment: "Settings section title for appearance options.")
+        static let subtitle = L10n.resource("appearance.subtitle", defaultValue: "Colors and interface style", comment: "Settings row subtitle for appearance options.")
+        static let playbackGlass = L10n.resource("appearance.playback_glass", defaultValue: "Player Glass", comment: "Setting title for playback glass color.")
+        static let playbackGlassRed = L10n.resource("appearance.playback_glass.red", defaultValue: "Red", comment: "Playback glass color option.")
+        static let playbackGlassBlue = L10n.resource("appearance.playback_glass.blue", defaultValue: "Blue", comment: "Playback glass color option.")
+        static let playbackGlassWhite = L10n.resource("appearance.playback_glass.white", defaultValue: "White", comment: "Playback glass color option.")
+        static let playbackGlassGraphite = L10n.resource("appearance.playback_glass.graphite", defaultValue: "Graphite", comment: "Playback glass color option.")
     }
 
     enum Transcription {

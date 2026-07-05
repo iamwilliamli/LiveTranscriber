@@ -12,10 +12,28 @@ enum AppTheme {
     static let danger = Color(red: 0.86, green: 0.18, blue: 0.18)
     static let purple = Color(red: 0.47, green: 0.34, blue: 0.86)
 
-    static let groupedBackground = Color(.systemGroupedBackground)
-    static let cardBackground = Color(.secondarySystemGroupedBackground)
-    static let elevatedBackground = Color(.tertiarySystemGroupedBackground)
-    static let subtleBorder = Color(.separator).opacity(0.24)
-    static let cardBorder = Color(.separator).opacity(0.52)
+    static let groupedBackground = Color(UIColor { traits in
+        traits.userInterfaceStyle == .dark
+            ? .systemGroupedBackground
+            : UIColor(red: 0.976, green: 0.978, blue: 0.984, alpha: 1)
+    })
+    static let cardBackground = Color(UIColor { traits in
+        traits.userInterfaceStyle == .dark
+            ? .secondarySystemGroupedBackground
+            : UIColor(red: 1, green: 1, blue: 1, alpha: 1)
+    })
+    static let elevatedBackground = Color(UIColor { traits in
+        traits.userInterfaceStyle == .dark
+            ? .tertiarySystemGroupedBackground
+            : UIColor(red: 0.988, green: 0.989, blue: 0.993, alpha: 1)
+    })
+    static let raisedControlBackground = Color(UIColor { traits in
+        traits.userInterfaceStyle == .dark
+            ? UIColor(red: 0.26, green: 0.27, blue: 0.30, alpha: 1)
+            : UIColor(red: 1, green: 1, blue: 1, alpha: 1)
+    })
+    static let playbackGlassTint = Color.black.opacity(0.08)
+    static let subtleBorder = Color(.separator).opacity(0.18)
+    static let cardBorder = Color(.separator).opacity(0.36)
     static let cardShadow = Color.black.opacity(0.06)
 }

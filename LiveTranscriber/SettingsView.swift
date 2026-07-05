@@ -8,7 +8,6 @@ struct SettingsView: View {
         case intelligence
         case files
         case privacy
-        case source
         case developer
         case transcriptionLanguage
         case localWhisperModel
@@ -50,8 +49,7 @@ struct SettingsView: View {
     @State private var localSummaryDeleteErrorMessage: String?
     @AppStorage(OnboardingState.completedDefaultsKey) private var hasCompletedOnboarding = true
     @AppStorage(RecordingSummaryProvider.selectedDefaultsKey) private var selectedSummaryProviderRawValue = RecordingSummaryProvider.automatic.rawValue
-    private static let repositoryURL = URL(string: "https://github.com/iamwilliamli/LiveTranscriber")!
-    private static let designNotesURL = URL(string: "https://chengqili.com/post/livetranscriber")!
+    private static let publicBetaFeedbackURL = URL(string: "https://t.me/livetranscriber")!
     private static let feedbackRecipient = "lichengqi0805@gmail.com"
     private static let mailtoQueryAllowedCharacters: CharacterSet = {
         var allowed = CharacterSet.urlQueryAllowed
@@ -77,8 +75,6 @@ struct SettingsView: View {
             fileSettingsPage
         case .privacy:
             privacySettingsPage
-        case .source:
-            sourceSettingsPage
         case .developer:
             developerSettingsPage
         case .transcriptionLanguage:
@@ -163,19 +159,6 @@ struct SettingsView: View {
                     .settingsNavigationHaptic()
                     .settingsSurface()
 
-                    NavigationLink(value: SettingsRoute.source) {
-                        SettingsNavigationRow(
-                            icon: "chevron.left.forwardslash.chevron.right",
-                            titleResource: L10n.Source.title,
-                            value: String(localized: L10n.Source.sourceAvailable),
-                            subtitleResource: L10n.Source.subtitle,
-                            tint: AppTheme.info
-                        )
-                    }
-                    .buttonStyle(.plain)
-                    .settingsNavigationHaptic()
-                    .settingsSurface()
-
                     NavigationLink(value: SettingsRoute.developer) {
                         SettingsNavigationRow(
                             icon: "wrench.and.screwdriver",
@@ -187,6 +170,18 @@ struct SettingsView: View {
                     }
                     .buttonStyle(.plain)
                     .settingsNavigationHaptic()
+                    .settingsSurface()
+
+                    Button {
+                        openPublicBetaFeedback()
+                    } label: {
+                        SettingsCommandRow(
+                            icon: "paperplane.fill",
+                            titleResource: L10n.Settings.publicBetaFeedback,
+                            tint: AppTheme.info
+                        )
+                    }
+                    .buttonStyle(.plain)
                     .settingsSurface()
 
                     Button {
@@ -749,6 +744,11 @@ struct SettingsView: View {
                 }
             }
         }
+    }
+
+    private func openPublicBetaFeedback() {
+        HapticFeedback.play(.menuSelection)
+        UIApplication.shared.open(Self.publicBetaFeedbackURL)
     }
 
     private func feedbackMailURL() -> URL? {
@@ -1580,50 +1580,6 @@ struct SettingsView: View {
         }
     }
 
-    private var sourceSettingsPage: some View {
-        SettingsDetailPage(titleResource: L10n.Source.title) {
-            SettingsSection(titleResource: L10n.Source.title, systemImage: "chevron.left.forwardslash.chevron.right", tint: AppTheme.info) {
-                SettingsStatusRow(
-                    icon: "doc.text",
-                    textResource: L10n.Source.description,
-                    tint: AppTheme.info
-                )
-
-                SettingsStatusRow(
-                    icon: "exclamationmark.shield",
-                    textResource: L10n.Source.licenseNote,
-                    tint: AppTheme.warning
-                )
-
-                SettingsStatusRow(
-                    icon: "person.text.rectangle",
-                    textResource: L10n.Source.requiredAttribution,
-                    tint: AppTheme.info
-                )
-
-                Link(destination: Self.repositoryURL) {
-                    SettingsExternalLinkRow(
-                        icon: "link",
-                        titleResource: L10n.Source.repositoryTitle,
-                        value: Self.repositoryURL.absoluteString,
-                        tint: AppTheme.brand
-                    )
-                }
-                .buttonStyle(.plain)
-
-                Link(destination: Self.designNotesURL) {
-                    SettingsExternalLinkRow(
-                        icon: "doc.text.magnifyingglass",
-                        titleResource: L10n.Source.designNotesTitle,
-                        value: Self.designNotesURL.absoluteString,
-                        tint: AppTheme.info
-                    )
-                }
-                .buttonStyle(.plain)
-            }
-        }
-    }
-
     private var speechPipelineModePage: some View {
         SettingsDetailPage(titleResource: L10n.Settings.speechPipelineMode) {
             SettingsSection(titleResource: L10n.Settings.speechPipelineMode, systemImage: "waveform.path.ecg", tint: AppTheme.brand) {
@@ -2261,6 +2217,12 @@ private struct SettingsCommandRow: View {
         self.tint = tint
     }
 
+    init(icon: String, title: String, tint: Color) {
+        self.icon = icon
+        self.title = Text(verbatim: title)
+        self.tint = tint
+    }
+
     var body: some View {
         HStack(spacing: 10) {
             SettingsIcon(systemImage: icon, tint: tint)
@@ -2272,46 +2234,6 @@ private struct SettingsCommandRow: View {
             Spacer(minLength: 12)
         }
         .frame(minHeight: 42)
-        .contentShape(Rectangle())
-    }
-}
-
-private struct SettingsExternalLinkRow: View {
-    let icon: String
-    let title: Text
-    let value: String
-    let tint: Color
-
-    init(icon: String, titleResource: LocalizedStringResource, value: String, tint: Color) {
-        self.icon = icon
-        self.title = Text(titleResource)
-        self.value = value
-        self.tint = tint
-    }
-
-    var body: some View {
-        HStack(spacing: 10) {
-            SettingsIcon(systemImage: icon, tint: tint)
-
-            VStack(alignment: .leading, spacing: 2) {
-                title
-                    .font(.redditSans(.subheadline, weight: .semibold))
-                    .foregroundStyle(.primary)
-
-                Text(value)
-                    .font(.redditSans(.caption))
-                    .foregroundStyle(.secondary)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.72)
-            }
-
-            Spacer(minLength: 12)
-
-            Image(systemName: "arrow.up.forward")
-                .font(.system(size: 12, weight: .bold))
-                .foregroundStyle(tint)
-        }
-        .frame(minHeight: 44)
         .contentShape(Rectangle())
     }
 }

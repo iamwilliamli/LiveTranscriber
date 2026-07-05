@@ -41,6 +41,7 @@ struct TranscriptionView: View {
     @State private var liveTranscriptLineEditRequest: LiveTranscriptLineEditRequest?
     @State private var editedLiveTranscriptLineText = ""
     @State private var isSavingLiveTranscriptLineEdit = false
+    @State private var assistantStatusPulse = false
 
     private var isCompletingRecording: Bool {
         pendingRecordingSave != nil || isSavingPendingRecording
@@ -58,13 +59,15 @@ struct TranscriptionView: View {
                 .ignoresSafeArea()
 
             VStack(alignment: .leading, spacing: 14) {
+                assistantGreetingHeader
+
                 recorderCard
 
                 transcriptCard
             }
             .padding(.horizontal, 16)
             .padding(.top, 12)
-            .padding(.bottom, transcriber.isRecording ? 126 : 112)
+            .padding(.bottom, 112)
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
 
             floatingRecorderDock
@@ -222,6 +225,65 @@ struct TranscriptionView: View {
             .shadow(color: Color.black.opacity(0.12), radius: 14, y: 6)
             .offset(y: savedRecordingBannerIsVisible ? 0 : -74)
             .opacity(savedRecordingBannerIsVisible ? 1 : 0)
+        }
+    }
+
+    private var assistantGreetingHeader: some View {
+        HStack(alignment: .center, spacing: 10) {
+            Image("AssistantRobot")
+                .resizable()
+                .scaledToFit()
+                .frame(width: 52, height: 52)
+                .accessibilityHidden(true)
+
+            HStack(alignment: .center, spacing: 7) {
+                Text(assistantGreetingTitle)
+                    .font(.redditSans(.title3, weight: .bold))
+                    .foregroundStyle(.primary)
+                    .lineLimit(1)
+
+                assistantStatusPulseIndicator
+            }
+            .frame(height: 52, alignment: .center)
+
+            Spacer(minLength: 0)
+        }
+        .padding(.horizontal, 1)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .accessibilityElement(children: .combine)
+    }
+
+    private var assistantStatusPulseIndicator: some View {
+        ZStack {
+            Circle()
+                .fill(AppTheme.info.opacity(0.18))
+                .frame(width: 16, height: 16)
+                .scaleEffect(assistantStatusPulse ? 1 : 0.45)
+                .opacity(assistantStatusPulse ? 0 : 1)
+
+            Circle()
+                .fill(AppTheme.info)
+                .frame(width: 7, height: 7)
+                .shadow(color: AppTheme.info.opacity(0.45), radius: 4, y: 1)
+        }
+        .frame(width: 16, height: 16)
+        .accessibilityHidden(true)
+        .onAppear {
+            withAnimation(.easeOut(duration: 1.25).repeatForever(autoreverses: false)) {
+                assistantStatusPulse = true
+            }
+        }
+    }
+
+    private var assistantGreetingTitle: String {
+        let hour = Calendar.current.component(.hour, from: Date())
+        switch hour {
+        case 5..<12:
+            return "Good Morning!"
+        case 12..<18:
+            return "Good Afternoon!"
+        default:
+            return "Good Evening!"
         }
     }
 

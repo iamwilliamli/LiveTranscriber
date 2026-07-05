@@ -2,6 +2,7 @@ import SwiftUI
 
 @main
 struct LiveTranscriberApp: App {
+
     init() {
         AppTypography.configureUIKitAppearances()
     }
