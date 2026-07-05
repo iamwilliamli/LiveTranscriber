@@ -2350,34 +2350,52 @@ struct RecordingDetailView: View {
     private var audioParametersCard: some View {
         let iCloudSyncStatus = store.iCloudSyncStatus(for: currentItem)
 
-        return VStack(alignment: .leading, spacing: 12) {
+        return VStack(alignment: .leading, spacing: 16) {
             Label(localized(L10n.Recordings.audioParameters), systemImage: "info.circle")
-                .font(.redditSans(.headline))
+                .font(.redditSans(.headline, weight: .bold))
 
             if let audioFileInfo {
-                VStack(spacing: 0) {
-                    RecordingAudioParameterRow(icon: "waveform", titleResource: L10n.Recordings.sampleRate, value: audioFileInfo.fileSampleRateText)
-                    RecordingAudioParameterRow(icon: "speaker.wave.2", titleResource: L10n.Recordings.channels, value: audioFileInfo.channelLayoutText)
-                    RecordingAudioParameterRow(icon: "cpu", titleResource: L10n.Recordings.encoding, value: audioFileInfo.fileFormatText)
-                    RecordingAudioParameterRow(icon: "slider.horizontal.3", titleResource: L10n.Recordings.processingFormat, value: audioFileInfo.processingFormatText)
-                    RecordingAudioParameterRow(icon: "number", titleResource: L10n.Recordings.pcmBitDepth, value: audioFileInfo.bitDepthText)
-                    RecordingAudioParameterRow(icon: "timer", titleResource: L10n.Recordings.audioDuration, value: audioFileInfo.durationText)
-                    RecordingAudioParameterRow(icon: "square.stack.3d.up", titleResource: L10n.Recordings.audioFrames, value: audioFileInfo.frameCountText)
-                    RecordingAudioParameterRow(icon: "doc", titleResource: L10n.Recordings.fileSize, value: audioFileInfo.fileSizeText)
-                    RecordingAudioParameterRow(icon: iCloudSyncStatus.systemImage, titleResource: L10n.Recordings.iCloudSync, value: iCloudSyncStatus.displayName, showsDivider: false)
+                VStack(alignment: .leading, spacing: 16) {
+                    LazyVGrid(
+                        columns: [
+                            GridItem(.flexible(), spacing: 12),
+                            GridItem(.flexible(), spacing: 12)
+                        ],
+                        spacing: 12
+                    ) {
+                        RecordingAudioMetricTile(icon: "speedometer", titleResource: L10n.Recordings.bitRate, value: audioFileInfo.bitRateText, tint: AppTheme.brand)
+                        RecordingAudioMetricTile(icon: "waveform", titleResource: L10n.Recordings.sampleRate, value: audioFileInfo.fileSampleRateText, tint: AppTheme.info)
+                        RecordingAudioMetricTile(icon: "speaker.wave.2", titleResource: L10n.Recordings.channels, value: audioFileInfo.channelLayoutText, tint: AppTheme.success)
+                        RecordingAudioMetricTile(icon: "timer", titleResource: L10n.Recordings.audioDuration, value: audioFileInfo.durationText, tint: AppTheme.warning)
+                    }
+
+                    RecordingAudioParameterGroup(titleResource: L10n.Recordings.technicalDetails) {
+                        RecordingAudioParameterRow(icon: "doc.badge.gearshape", titleResource: L10n.Recordings.fileFormat, value: audioFileInfo.containerFormatText)
+                        RecordingAudioParameterRow(icon: "cpu", titleResource: L10n.Recordings.encoding, value: audioFileInfo.fileFormatText)
+                        RecordingAudioParameterRow(icon: "speedometer", titleResource: L10n.Recordings.averageBitRate, value: audioFileInfo.averageBitRateText)
+                        RecordingAudioParameterRow(icon: "slider.horizontal.3", titleResource: L10n.Recordings.processingFormat, value: audioFileInfo.processingFormatText)
+                        RecordingAudioParameterRow(icon: "number", titleResource: L10n.Recordings.pcmBitDepth, value: audioFileInfo.bitDepthText)
+                        RecordingAudioParameterRow(icon: "square.stack.3d.up", titleResource: L10n.Recordings.audioFrames, value: audioFileInfo.frameCountText, showsDivider: false)
+                    }
+
+                    RecordingAudioParameterGroup(titleResource: L10n.Recordings.storage) {
+                        RecordingAudioParameterRow(icon: "doc.text", titleResource: L10n.Recordings.fileName, value: audioFileInfo.fileName)
+                        RecordingAudioParameterRow(icon: "doc", titleResource: L10n.Recordings.fileSize, value: audioFileInfo.fileSizeText)
+                        RecordingAudioParameterRow(icon: iCloudSyncStatus.systemImage, titleResource: L10n.Recordings.iCloudSync, value: iCloudSyncStatus.displayName, showsDivider: false)
+                    }
                 }
             } else if let audioFileInfoError {
                 Label(audioFileInfoError, systemImage: "exclamationmark.triangle")
-                    .font(.redditSans(.caption))
+                    .font(.redditSans(.subheadline, weight: .semibold))
                     .foregroundStyle(AppTheme.warning)
                     .fixedSize(horizontal: false, vertical: true)
             } else {
                 Label(localized(L10n.Recordings.readingAudioParameters), systemImage: "waveform")
-                    .font(.redditSans(.caption, weight: .semibold))
+                    .font(.redditSans(.subheadline, weight: .semibold))
                     .foregroundStyle(AppTheme.info)
             }
         }
-        .padding(14)
+        .padding(16)
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(AppTheme.cardBackground)
         .overlay {
@@ -3647,13 +3665,16 @@ private struct RecordingAudioFileInfo: Equatable, Sendable {
     var processingSampleRate: Double
     var channelCount: UInt32
     var processingChannelCount: UInt32
+    var fileExtension: String
     var fileFormatName: String
     var fileCommonFormatName: String
     var processingCommonFormatName: String
     var bitDepth: Int?
+    var encoderBitRate: Int?
     var isInterleaved: Bool
     var frameCount: AVAudioFramePosition
     var durationSeconds: TimeInterval
+    var fileName: String
     var fileSize: Int64?
 
     init(url: URL) throws {
@@ -3666,13 +3687,16 @@ private struct RecordingAudioFileInfo: Equatable, Sendable {
         self.processingSampleRate = processingFormat.sampleRate
         self.channelCount = fileFormat.channelCount
         self.processingChannelCount = processingFormat.channelCount
+        self.fileExtension = url.pathExtension.uppercased()
         self.fileFormatName = Self.formatName(from: fileFormat.settings[AVFormatIDKey])
         self.fileCommonFormatName = Self.commonFormatName(fileFormat.commonFormat)
         self.processingCommonFormatName = Self.commonFormatName(processingFormat.commonFormat)
         self.bitDepth = Self.bitDepth(settings: fileFormat.settings, format: fileFormat)
+        self.encoderBitRate = Self.intValue(from: fileFormat.settings[AVEncoderBitRateKey])
         self.isInterleaved = fileFormat.isInterleaved
         self.frameCount = file.length
         self.durationSeconds = processingFormat.sampleRate > 0 ? Double(file.length) / processingFormat.sampleRate : 0
+        self.fileName = url.lastPathComponent
         self.fileSize = resourceValues?.fileSize.map { Int64($0) }
     }
 
@@ -3696,6 +3720,31 @@ private struct RecordingAudioFileInfo: Equatable, Sendable {
             return fileFormatName
         }
         return "\(fileFormatName) / \(fileCommonFormatName)"
+    }
+
+    var containerFormatText: String {
+        let trimmedExtension = fileExtension.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmedExtension.isEmpty else {
+            return fileFormatName
+        }
+        return "\(trimmedExtension) / \(fileFormatName)"
+    }
+
+    var bitRateText: String {
+        if let encoderBitRate, encoderBitRate > 0 {
+            return Self.bitRateText(Double(encoderBitRate))
+        }
+        return averageBitRateText
+    }
+
+    var averageBitRateText: String {
+        guard let fileSize,
+              durationSeconds.isFinite,
+              durationSeconds > 0 else {
+            return localized(L10n.Common.unknown)
+        }
+
+        return Self.bitRateText(Double(fileSize) * 8 / durationSeconds)
     }
 
     var processingFormatText: String {
@@ -3750,6 +3799,21 @@ private struct RecordingAudioFileInfo: Equatable, Sendable {
             return "\(Int(kilohertz)) kHz"
         }
         return String(format: "%.1f kHz", kilohertz)
+    }
+
+    private static func bitRateText(_ bitsPerSecond: Double) -> String {
+        guard bitsPerSecond.isFinite, bitsPerSecond > 0 else {
+            return localized(L10n.Common.unknown)
+        }
+
+        let kilobitsPerSecond = bitsPerSecond / 1_000
+        if kilobitsPerSecond >= 1_000 {
+            return String(format: "%.2f Mbps", kilobitsPerSecond / 1_000)
+        }
+        if kilobitsPerSecond.rounded() == kilobitsPerSecond {
+            return "\(Int(kilobitsPerSecond)) kbps"
+        }
+        return String(format: "%.1f kbps", kilobitsPerSecond)
     }
 
     private static func commonFormatName(_ commonFormat: AVAudioCommonFormat) -> String {
@@ -3958,30 +4022,107 @@ private struct RecordingAudioParameterRow: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            HStack(alignment: .firstTextBaseline, spacing: 10) {
+            HStack(alignment: .top, spacing: 12) {
                 Image(systemName: icon)
-                    .font(.system(size: 13, weight: .semibold))
+                    .font(.system(size: 14, weight: .bold))
                     .foregroundStyle(AppTheme.info)
-                    .frame(width: 18)
+                    .frame(width: 28, height: 28)
+                    .background(AppTheme.info.opacity(0.11), in: RoundedRectangle(cornerRadius: 7, style: .continuous))
 
-                title
-                    .font(.redditSans(.caption, weight: .semibold))
-                    .foregroundStyle(.secondary)
+                VStack(alignment: .leading, spacing: 4) {
+                    title
+                        .font(.redditSans(.caption, weight: .semibold))
+                        .foregroundStyle(.secondary)
 
-                Spacer(minLength: 12)
-
-                Text(value)
-                    .font(.redditSans(.caption, weight: .semibold).monospacedDigit())
-                    .foregroundStyle(.primary)
-                    .multilineTextAlignment(.trailing)
-                    .lineLimit(2)
-                    .minimumScaleFactor(0.8)
+                    Text(value)
+                        .font(.redditSans(.subheadline, weight: .semibold).monospacedDigit())
+                        .foregroundStyle(.primary)
+                        .lineLimit(3)
+                        .minimumScaleFactor(0.82)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
             }
-            .padding(.vertical, 8)
+            .padding(.vertical, 12)
 
             if showsDivider {
                 Divider()
-                    .padding(.leading, 28)
+                    .padding(.leading, 40)
+            }
+        }
+    }
+}
+
+private struct RecordingAudioMetricTile: View {
+    let icon: String
+    let title: Text
+    let value: String
+    let tint: Color
+
+    init(icon: String, titleResource: LocalizedStringResource, value: String, tint: Color) {
+        self.icon = icon
+        self.title = Text(titleResource)
+        self.value = value
+        self.tint = tint
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack(spacing: 8) {
+                Image(systemName: icon)
+                    .font(.system(size: 14, weight: .bold))
+                    .foregroundStyle(tint)
+                    .frame(width: 30, height: 30)
+                    .background(tint.opacity(0.12), in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+
+                title
+                    .font(.redditSans(.caption, weight: .bold))
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.75)
+            }
+
+            Text(value)
+                .font(.redditSans(.headline, weight: .bold).monospacedDigit())
+                .foregroundStyle(.primary)
+                .lineLimit(2)
+                .minimumScaleFactor(0.68)
+                .frame(maxWidth: .infinity, alignment: .leading)
+        }
+        .padding(12)
+        .frame(maxWidth: .infinity, minHeight: 104, alignment: .topLeading)
+        .background(AppTheme.elevatedBackground, in: RoundedRectangle(cornerRadius: AppTheme.cornerRadius, style: .continuous))
+        .overlay {
+            RoundedRectangle(cornerRadius: AppTheme.cornerRadius, style: .continuous)
+                .stroke(AppTheme.cardBorder.opacity(0.72), lineWidth: 1)
+        }
+    }
+}
+
+private struct RecordingAudioParameterGroup<Content: View>: View {
+    let title: Text
+    let content: Content
+
+    init(titleResource: LocalizedStringResource, @ViewBuilder content: () -> Content) {
+        self.title = Text(titleResource)
+        self.content = content()
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 9) {
+            title
+                .font(.redditSans(.caption, weight: .bold))
+                .foregroundStyle(.secondary)
+                .textCase(.uppercase)
+
+            VStack(spacing: 0) {
+                content
+            }
+            .padding(.horizontal, 12)
+            .background(AppTheme.elevatedBackground, in: RoundedRectangle(cornerRadius: AppTheme.cornerRadius, style: .continuous))
+            .overlay {
+                RoundedRectangle(cornerRadius: AppTheme.cornerRadius, style: .continuous)
+                    .stroke(AppTheme.cardBorder.opacity(0.72), lineWidth: 1)
             }
         }
     }

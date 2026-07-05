@@ -256,22 +256,26 @@ struct TranscriptionView: View {
     private var assistantStatusPulseIndicator: some View {
         ZStack {
             Circle()
-                .fill(AppTheme.info.opacity(0.18))
-                .frame(width: 16, height: 16)
+                .fill(AppTheme.info.opacity(colorScheme == .dark ? 0.34 : 0.18))
+                .frame(width: 22, height: 22)
                 .scaleEffect(assistantStatusPulse ? 1 : 0.45)
                 .opacity(assistantStatusPulse ? 0 : 1)
 
             Circle()
                 .fill(AppTheme.info)
                 .frame(width: 7, height: 7)
-                .shadow(color: AppTheme.info.opacity(0.45), radius: 4, y: 1)
+                .shadow(color: AppTheme.info.opacity(colorScheme == .dark ? 0.72 : 0.45), radius: 4, y: 1)
         }
-        .frame(width: 16, height: 16)
+        .frame(width: 22, height: 22)
         .accessibilityHidden(true)
         .onAppear {
+            assistantStatusPulse = false
             withAnimation(.easeOut(duration: 1.25).repeatForever(autoreverses: false)) {
                 assistantStatusPulse = true
             }
+        }
+        .onDisappear {
+            assistantStatusPulse = false
         }
     }
 
