@@ -153,6 +153,24 @@ typedef struct {
     lt_whisper_full_get_segment_text full_get_segment_text;
 } LTWhisperRuntime;
 
+static void LTWhisperProgressCallback(struct whisper_context *ctx, struct whisper_state *state, int progress, void *user_data) {
+    (void)ctx;
+    (void)state;
+
+    LocalWhisperBridgeProgressHandler progressHandler = (__bridge LocalWhisperBridgeProgressHandler)user_data;
+    if (progressHandler == nil) {
+        return;
+    }
+
+    double normalizedProgress = (double)progress / 100.0;
+    if (normalizedProgress < 0.0) {
+        normalizedProgress = 0.0;
+    } else if (normalizedProgress > 1.0) {
+        normalizedProgress = 1.0;
+    }
+    progressHandler(normalizedProgress);
+}
+
 @implementation LocalWhisperBridgeSegment
 
 - (instancetype)initWithStartSeconds:(NSTimeInterval)startSeconds
@@ -321,6 +339,7 @@ static NSString *LTWhisperModelPathForCoreMLEncoderPreference(NSString *modelPat
                                                  modelPath:(NSString *)modelPath
                                               languageCode:(NSString *)languageCode
                                          useCoreMLEncoder:(BOOL)useCoreMLEncoder
+                                           progressHandler:(LocalWhisperBridgeProgressHandler)progressHandler
                                                      error:(NSError **)error {
     if (samples.length == 0 || samples.length % sizeof(float) != 0) {
         if (error != NULL) {
@@ -375,6 +394,11 @@ static NSString *LTWhisperModelPathForCoreMLEncoderPreference(NSString *modelPat
     params.split_on_word = true;
     params.language = languageCode.length > 0 ? languageCode.UTF8String : "auto";
     params.detect_language = languageCode.length == 0 || [languageCode isEqualToString:@"auto"];
+    LocalWhisperBridgeProgressHandler progressHandlerCopy = [progressHandler copy];
+    if (progressHandlerCopy != nil) {
+        params.progress_callback = LTWhisperProgressCallback;
+        params.progress_callback_user_data = (__bridge void *)progressHandlerCopy;
+    }
 
     int result = runtime.full(context, params, samples.bytes, (int)sampleCount);
     if (result != 0) {

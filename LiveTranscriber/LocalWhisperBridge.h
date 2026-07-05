@@ -15,14 +15,17 @@ NS_ASSUME_NONNULL_BEGIN
 
 @end
 
+typedef void (^LocalWhisperBridgeProgressHandler)(double progress);
+
 @interface LocalWhisperBridge : NSObject
 
 + (nullable NSArray<LocalWhisperBridgeSegment *> *)transcribeSamples:(NSData *)samples
                                                            modelPath:(NSString *)modelPath
                                                         languageCode:(NSString *)languageCode
                                                     useCoreMLEncoder:(BOOL)useCoreMLEncoder
+                                                     progressHandler:(nullable LocalWhisperBridgeProgressHandler)progressHandler
                                                                error:(NSError **)error
-    NS_SWIFT_NAME(transcribeSamples(_:modelPath:languageCode:useCoreMLEncoder:));
+    NS_SWIFT_NAME(transcribeSamples(_:modelPath:languageCode:useCoreMLEncoder:progressHandler:));
 
 @end
 

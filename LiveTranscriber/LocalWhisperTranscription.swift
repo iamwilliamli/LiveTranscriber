@@ -120,7 +120,9 @@ enum LocalWhisperTranscriptionService {
                 samples: samples,
                 modelURL: modelURL,
                 languageCode: languageCode
-            )
+            ) { progress in
+                progressHandler(0.25 + progress * 0.65)
+            }
         }.value
 
         progressHandler(0.95)
@@ -1205,7 +1207,8 @@ private enum LocalWhisperAudioConverter {
 private func transcribeWithWhisperBridge(
     samples: [Float],
     modelURL: URL,
-    languageCode: String
+    languageCode: String,
+    progressHandler: @escaping @Sendable (Double) -> Void = { _ in }
 ) throws -> [TranscriptionLine] {
     let sampleData = samples.withUnsafeBufferPointer { buffer -> Data in
         guard let baseAddress = buffer.baseAddress else {
@@ -1218,7 +1221,8 @@ private func transcribeWithWhisperBridge(
         sampleData,
         modelPath: modelURL.path,
         languageCode: languageCode.isEmpty ? "auto" : languageCode,
-        useCoreMLEncoder: LocalWhisperModelManager.isCoreMLEncoderLoadingEnabled
+        useCoreMLEncoder: LocalWhisperModelManager.isCoreMLEncoderLoadingEnabled,
+        progressHandler: progressHandler
     )
 
     return segments.compactMap { segment in
