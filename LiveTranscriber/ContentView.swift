@@ -10,42 +10,22 @@ struct ContentView: View {
     @State private var pendingRecordingDraftFromLiveActivity: RecordingDraft?
     @State private var pendingDeepLinkSpeechLocaleReleaseRequest: SpeechLocaleReleaseRequest?
     @State private var speechLocaleErrorMessage: String?
+    @AppStorage(OnboardingState.completedDefaultsKey) private var hasCompletedOnboarding = false
 
     var body: some View {
-        TabView(selection: tabSelection) {
-            Tab(String(localized: L10n.App.transcribeTab), systemImage: "waveform.and.mic", value: AppTab.transcribe) {
-                TranscriptionView(
-                    transcriber: transcriber,
-                    recordingStore: recordingStore,
-                    externalPendingRecordingDraft: $pendingRecordingDraftFromLiveActivity
-                )
-            }
-
-            Tab(String(localized: L10n.App.recordingsTab), systemImage: "folder", value: AppTab.recordings) {
-                RecordingsView(
-                    store: recordingStore,
-                    transcriber: transcriber,
-                    incomingImportURL: $incomingRecordingImportURL,
-                    player: recordingPlayer
-                )
-            }
-
-            Tab(String(localized: L10n.App.settingsTab), systemImage: "gearshape", value: AppTab.settings) {
-                SettingsView(transcriber: transcriber, recordingStore: recordingStore)
+        Group {
+            if hasCompletedOnboarding {
+                mainTabs
+            } else {
+                OnboardingIntroView(transcriber: transcriber) {
+                    withAnimation(.easeInOut(duration: 0.32)) {
+                        hasCompletedOnboarding = true
+                    }
+                }
             }
         }
-        .tabBarMinimizeBehavior(.onScrollDown)
         .font(.redditSans(.body))
         .tint(AppTheme.brand)
-        .task {
-            await recordingStore.reload()
-            await transcriber.refreshSupportedLanguages()
-        }
-        .onReceive(NotificationCenter.default.publisher(for: UIApplication.didBecomeActiveNotification)) { _ in
-            Task {
-                await recordingStore.reload()
-            }
-        }
         .onOpenURL { url in
             handleOpenedURL(url)
         }
@@ -84,6 +64,41 @@ struct ContentView: View {
             Button(String(localized: L10n.Common.ok), role: .cancel) {}
         } message: {
             Text(speechLocaleErrorMessage ?? "")
+        }
+    }
+
+    private var mainTabs: some View {
+        TabView(selection: tabSelection) {
+            Tab(String(localized: L10n.App.transcribeTab), systemImage: "waveform.and.mic", value: AppTab.transcribe) {
+                TranscriptionView(
+                    transcriber: transcriber,
+                    recordingStore: recordingStore,
+                    externalPendingRecordingDraft: $pendingRecordingDraftFromLiveActivity
+                )
+            }
+
+            Tab(String(localized: L10n.App.recordingsTab), systemImage: "folder", value: AppTab.recordings) {
+                RecordingsView(
+                    store: recordingStore,
+                    transcriber: transcriber,
+                    incomingImportURL: $incomingRecordingImportURL,
+                    player: recordingPlayer
+                )
+            }
+
+            Tab(String(localized: L10n.App.settingsTab), systemImage: "gearshape", value: AppTab.settings) {
+                SettingsView(transcriber: transcriber, recordingStore: recordingStore)
+            }
+        }
+        .tabBarMinimizeBehavior(.onScrollDown)
+        .task {
+            await recordingStore.reload()
+            await transcriber.refreshSupportedLanguages()
+        }
+        .onReceive(NotificationCenter.default.publisher(for: UIApplication.didBecomeActiveNotification)) { _ in
+            Task {
+                await recordingStore.reload()
+            }
         }
     }
 

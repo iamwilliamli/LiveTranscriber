@@ -41,13 +41,86 @@ private func localWhisperModelIcon(for model: LocalWhisperModel) -> String {
 }
 
 private func transcriptionLanguageMatches(_ language: TranscriptionLanguage, languageID: String) -> Bool {
-    if language.id == languageID {
-        return true
+    transcriptionLanguageMatchRank(language, languageID: languageID) != nil
+}
+
+private func transcriptionLanguageMatchRank(_ language: TranscriptionLanguage, languageID: String) -> Int? {
+    let normalizedLanguageID = languageID.trimmingCharacters(in: .whitespacesAndNewlines)
+        .replacingOccurrences(of: "_", with: "-")
+    guard !normalizedLanguageID.isEmpty else {
+        return nil
     }
 
-    let firstCode = language.locale.language.languageCode?.identifier
-    let secondCode = Locale(identifier: languageID).language.languageCode?.identifier
-    return firstCode != nil && firstCode == secondCode
+    let normalizedCandidateID = language.id.replacingOccurrences(of: "_", with: "-")
+    if normalizedCandidateID == normalizedLanguageID {
+        return 0
+    }
+
+    let candidateLanguage = language.locale.language
+    let recordingLanguage = Locale(identifier: normalizedLanguageID).language
+    guard let candidateCode = candidateLanguage.languageCode?.identifier,
+          let recordingCode = recordingLanguage.languageCode?.identifier,
+          candidateCode == recordingCode else {
+        return nil
+    }
+
+    if let recordingRegion = recordingLanguage.region?.identifier,
+       candidateLanguage.region?.identifier == recordingRegion {
+        return 1
+    }
+
+    if let recordingScript = recordingLanguage.script?.identifier,
+       candidateLanguage.script?.identifier == recordingScript {
+        return 2
+    }
+
+    if recordingLanguage.region == nil && recordingLanguage.script == nil {
+        if let preferredRegion = preferredRegionForBaseLanguage(recordingCode),
+           candidateLanguage.region?.identifier == preferredRegion {
+            return 3
+        }
+        return 4
+    }
+
+    return 5
+}
+
+private func preferredRegionForBaseLanguage(_ languageCode: String) -> String? {
+    switch languageCode {
+    case "en":
+        return "US"
+    default:
+        return nil
+    }
+}
+
+private func transcriptionLanguagesWithRecordingLanguageFirst(
+    _ languages: [TranscriptionLanguage],
+    recordingLanguageID: String
+) -> [TranscriptionLanguage] {
+    guard let bestMatch = languages.indices.compactMap({ index -> (index: Int, rank: Int)? in
+        guard let rank = transcriptionLanguageMatchRank(languages[index], languageID: recordingLanguageID) else {
+            return nil
+        }
+        return (index, rank)
+    })
+    .min(by: { first, second in
+        if first.rank != second.rank {
+            return first.rank < second.rank
+        }
+        return first.index < second.index
+    }) else {
+        return languages
+    }
+
+    guard bestMatch.index != languages.startIndex else {
+        return languages
+    }
+
+    var orderedLanguages = languages
+    let recordingLanguage = orderedLanguages.remove(at: bestMatch.index)
+    orderedLanguages.insert(recordingLanguage, at: orderedLanguages.startIndex)
+    return orderedLanguages
 }
 
 private struct LocalWhisperRetranscriptionMenu: View {
@@ -69,13 +142,20 @@ private struct LocalWhisperRetranscriptionMenu: View {
             } else {
                 ForEach(downloadedModels) { model in
                     Menu {
-                        ForEach(localWhisperSupportedLanguages(for: model)) { language in
+                        let languages = transcriptionLanguagesWithRecordingLanguageFirst(
+                            localWhisperSupportedLanguages(for: model),
+                            recordingLanguageID: itemLanguageID
+                        )
+                        ForEach(languages) { language in
                             Button {
                                 onSelect(language, model)
                             } label: {
                                 Label(
                                     language.displayName,
-                                    systemImage: transcriptionLanguageMatches(language, languageID: itemLanguageID) ? "checkmark" : "waveform"
+                                    systemImage: languages.first?.id == language.id
+                                        && transcriptionLanguageMatches(language, languageID: itemLanguageID)
+                                        ? "checkmark"
+                                        : "waveform"
                                 )
                             }
                         }
@@ -91,6 +171,64 @@ private struct LocalWhisperRetranscriptionMenu: View {
             Label(localized(L10n.Recordings.retranscribeWithLocalWhisper), systemImage: "iphone")
         }
         .disabled(isDisabled)
+    }
+}
+
+private struct SummaryAnalysisMenu<LabelContent: View>: View {
+    let selectedProvider: RecordingSummaryProvider
+    let isDisabled: Bool
+    let primaryAction: (() -> Void)?
+    let onSelect: (RecordingSummaryProvider) -> Void
+    @ViewBuilder var label: () -> LabelContent
+
+    init(
+        selectedProvider: RecordingSummaryProvider,
+        isDisabled: Bool,
+        primaryAction: (() -> Void)? = nil,
+        onSelect: @escaping (RecordingSummaryProvider) -> Void,
+        @ViewBuilder label: @escaping () -> LabelContent
+    ) {
+        self.selectedProvider = selectedProvider
+        self.isDisabled = isDisabled
+        self.primaryAction = primaryAction
+        self.onSelect = onSelect
+        self.label = label
+    }
+
+    var body: some View {
+        Group {
+            if let primaryAction {
+                Menu {
+                    menuItems
+                } label: {
+                    label()
+                } primaryAction: {
+                    primaryAction()
+                }
+            } else {
+                Menu {
+                    menuItems
+                } label: {
+                    label()
+                }
+            }
+        }
+        .disabled(isDisabled || !RecordingSummaryProvider.hasAnyAvailableProvider)
+    }
+
+    @ViewBuilder
+    private var menuItems: some View {
+        ForEach(RecordingSummaryProvider.menuProviders) { provider in
+            Button {
+                onSelect(provider)
+            } label: {
+                Label(
+                    provider.displayName,
+                    systemImage: provider == selectedProvider ? "checkmark" : provider.systemImage
+                )
+            }
+            .disabled(!provider.isCurrentlyAvailable)
+        }
     }
 }
 
@@ -115,6 +253,11 @@ struct RecordingsView: View {
     @State private var isShowingRecordingsMap = false
     @State private var hidesTabBarForRecordingDetail = false
     @State private var tabBarRestoreTask: Task<Void, Never>?
+    @AppStorage(RecordingSummaryProvider.selectedDefaultsKey) private var selectedSummaryProviderRawValue = RecordingSummaryProvider.automatic.rawValue
+
+    private var selectedSummaryProvider: RecordingSummaryProvider {
+        RecordingSummaryProvider(rawValue: selectedSummaryProviderRawValue) ?? .automatic
+    }
 
     private var filteredRecordings: [RecordingItem] {
         let query = normalizedSearchText(searchText)
@@ -163,6 +306,7 @@ struct RecordingsView: View {
         }
         .onChange(of: selectedRecording?.id) { _, newValue in
             if newValue == nil {
+                HapticFeedback.play(.navigation)
                 scheduleTabBarRestoreAfterPop()
             } else {
                 hideTabBarForDetail()
@@ -396,9 +540,12 @@ struct RecordingsView: View {
                 Label(localized(L10n.Recordings.copyTranscript), systemImage: "doc.on.doc")
             }
 
-            if store.intelligenceAvailability.isAvailable {
-                Button {
-                    analyze(item)
+            if RecordingSummaryProvider.hasAnyAvailableProvider {
+                SummaryAnalysisMenu(
+                    selectedProvider: selectedSummaryProvider,
+                    isDisabled: analyzingRecordingID != nil
+                ) { provider in
+                    analyze(item, summaryProvider: provider)
                 } label: {
                     Label(
                         item.intelligence == nil
@@ -407,17 +554,23 @@ struct RecordingsView: View {
                         systemImage: "sparkles"
                     )
                 }
-                .disabled(analyzingRecordingID != nil)
             }
 
             Menu {
-                ForEach(appleSpeechTranscriptionLanguages) { language in
+                let languages = transcriptionLanguagesWithRecordingLanguageFirst(
+                    appleSpeechTranscriptionLanguages,
+                    recordingLanguageID: item.languageID
+                )
+                ForEach(languages) { language in
                     Button {
                         requestRetranscription(item, language: language)
                     } label: {
                         Label(
                             language.displayName,
-                            systemImage: language.id == item.languageID ? "checkmark" : "globe"
+                            systemImage: languages.first?.id == language.id
+                                && transcriptionLanguageMatches(language, languageID: item.languageID)
+                                ? "checkmark"
+                                : "globe"
                         )
                     }
                 }
@@ -468,7 +621,7 @@ struct RecordingsView: View {
         .swipeActions(edge: .leading, allowsFullSwipe: false) {
             if store.intelligenceAvailability.isAvailable {
                 Button {
-                    analyze(item)
+                    analyze(item, summaryProvider: selectedSummaryProvider)
                 } label: {
                     Label(localized(L10n.Recordings.analyze), systemImage: "sparkles")
                 }
@@ -630,8 +783,8 @@ struct RecordingsView: View {
         }
     }
 
-    private func analyze(_ item: RecordingItem) {
-        guard store.intelligenceAvailability.isAvailable else {
+    private func analyze(_ item: RecordingItem, summaryProvider: RecordingSummaryProvider) {
+        guard summaryProvider.isCurrentlyAvailable else {
             HapticFeedback.play(.blocked)
             return
         }
@@ -641,10 +794,10 @@ struct RecordingsView: View {
         }
 
         analyzingRecordingID = item.id
+        HapticFeedback.play(.analysisStart)
         Task {
-            HapticFeedback.play(.analysisStart)
             do {
-                _ = try await store.analyzeIntelligence(for: item)
+                _ = try await store.analyzeIntelligence(for: item, summaryProvider: summaryProvider)
                 HapticFeedback.play(.analysisComplete)
             } catch {
                 analysisErrorMessage = error.localizedDescription
@@ -655,6 +808,7 @@ struct RecordingsView: View {
     }
 
     private func openRecording(_ item: RecordingItem) {
+        HapticFeedback.play(.navigation)
         hideTabBarForDetail()
         selectedRecording = item
     }
@@ -692,8 +846,8 @@ struct RecordingsView: View {
             return
         }
 
+        HapticFeedback.play(.retranscribeStart)
         Task {
-            HapticFeedback.play(.retranscribeStart)
             do {
                 try await store.retranscribe(item, language: language)
                 HapticFeedback.play(.retranscribeComplete)
@@ -719,8 +873,8 @@ struct RecordingsView: View {
         }
 
         let language = TranscriptionLanguage(id: item.languageID)
+        HapticFeedback.play(.retranscribeStart)
         Task {
-            HapticFeedback.play(.retranscribeStart)
             do {
                 try await store.retranscribeWithOpenAI(
                     item,
@@ -746,8 +900,8 @@ struct RecordingsView: View {
             return
         }
 
+        HapticFeedback.play(.retranscribeStart)
         Task {
-            HapticFeedback.play(.retranscribeStart)
             do {
                 try await store.retranscribeWithLocalWhisper(item, language: language, model: model)
                 HapticFeedback.play(.retranscribeComplete)
@@ -1136,26 +1290,11 @@ private struct RecordingRow: View {
 
                 trailingStatus
             }
-            .contentShape(Rectangle())
-            .onTapGesture {
-                HapticFeedback.play(.navigation)
-                onOpen()
-            }
 
             RecordingMetadataStrip(item: item)
-                .contentShape(Rectangle())
-                .onTapGesture {
-                    HapticFeedback.play(.navigation)
-                    onOpen()
-                }
 
             if !item.combinedTags.isEmpty {
                 FlowTags(tags: Array(item.combinedTags.prefix(4)))
-                    .contentShape(Rectangle())
-                    .onTapGesture {
-                        HapticFeedback.play(.navigation)
-                        onOpen()
-                    }
             }
 
             if let importStatus = item.importStatus {
@@ -1174,43 +1313,26 @@ private struct RecordingRow: View {
                             .lineLimit(1)
                     }
                 }
-                .contentShape(Rectangle())
-                .onTapGesture {
-                    HapticFeedback.play(.navigation)
-                    onOpen()
-                }
             } else if canGenerateIntelligence && isAnalyzing {
                 Label(localized(L10n.Recordings.analyzing), systemImage: "sparkles")
                     .font(.redditSans(.caption, weight: .semibold))
                     .foregroundStyle(AppTheme.info)
-                    .contentShape(Rectangle())
-                    .onTapGesture {
-                        HapticFeedback.play(.navigation)
-                        onOpen()
-                    }
             } else if let intelligence = item.intelligence {
                 RecordingIntelligencePreview(intelligence: intelligence)
-                    .contentShape(Rectangle())
-                    .onTapGesture {
-                        HapticFeedback.play(.navigation)
-                        onOpen()
-                    }
             } else if !item.transcriptPreview.isEmpty {
                 Text(item.transcriptPreview)
                     .font(.redditSans(.subheadline))
                     .foregroundStyle(.primary)
                     .lineLimit(2)
                     .fixedSize(horizontal: false, vertical: true)
-                    .contentShape(Rectangle())
-                    .onTapGesture {
-                        HapticFeedback.play(.navigation)
-                        onOpen()
-                    }
             }
         }
         .padding(14)
         .frame(maxWidth: .infinity, alignment: .leading)
         .contentShape(Rectangle())
+        .onTapGesture {
+            onOpen()
+        }
         .contentShape(.contextMenuPreview, RoundedRectangle(cornerRadius: AppTheme.cornerRadius, style: .continuous))
         .background(AppTheme.cardBackground)
         .overlay {
@@ -1368,9 +1490,14 @@ struct RecordingDetailView: View {
     @State private var isTranslatingTranscript = false
     @State private var translationErrorMessage: String?
     @State private var pendingSpeechLocaleReleaseAction: PendingSpeechLocaleReleaseAction?
+    @AppStorage(RecordingSummaryProvider.selectedDefaultsKey) private var selectedSummaryProviderRawValue = RecordingSummaryProvider.automatic.rawValue
 
     private var currentItem: RecordingItem {
         store.recording(withID: item.id) ?? item
+    }
+
+    private var selectedSummaryProvider: RecordingSummaryProvider {
+        RecordingSummaryProvider(rawValue: selectedSummaryProviderRawValue) ?? .automatic
     }
 
     private var transcriptCacheIdentifier: String {
@@ -1663,13 +1790,20 @@ struct RecordingDetailView: View {
             }
 
             Menu {
-                ForEach(appleSpeechTranscriptionLanguages) { language in
+                let languages = transcriptionLanguagesWithRecordingLanguageFirst(
+                    appleSpeechTranscriptionLanguages,
+                    recordingLanguageID: currentItem.languageID
+                )
+                ForEach(languages) { language in
                     Button {
                         requestCurrentItemRetranscription(language: language)
                     } label: {
                         Label(
                             language.displayName,
-                            systemImage: language.id == currentItem.languageID ? "checkmark" : "globe"
+                            systemImage: languages.first?.id == language.id
+                                && transcriptionLanguageMatches(language, languageID: currentItem.languageID)
+                                ? "checkmark"
+                                : "globe"
                         )
                     }
                 }
@@ -1805,19 +1939,26 @@ struct RecordingDetailView: View {
 
                 Spacer(minLength: 8)
 
-                if store.intelligenceAvailability.isAvailable {
-                    Button {
-                        analyzeCurrentItem()
+                if RecordingSummaryProvider.hasAnyAvailableProvider {
+                    SummaryAnalysisMenu(
+                        selectedProvider: selectedSummaryProvider,
+                        isDisabled: isAnalyzing,
+                        primaryAction: {
+                            analyzeCurrentItem(summaryProvider: selectedSummaryProvider)
+                        }
+                    ) { provider in
+                        analyzeCurrentItem(summaryProvider: provider)
                     } label: {
-                        if isAnalyzing {
-                            ProgressView()
-                                .controlSize(.small)
-                        } else {
-                            Text(item.intelligence == nil ? localized(L10n.Recordings.analyze) : localized(L10n.Recordings.analyzeAgain))
-                                .font(.redditSans(.caption, weight: .semibold))
+                        HStack(spacing: 6) {
+                            if isAnalyzing {
+                                ProgressView()
+                                    .controlSize(.small)
+                            } else {
+                                Text(item.intelligence == nil ? localized(L10n.Recordings.analyze) : localized(L10n.Recordings.analyzeAgain))
+                                    .font(.redditSans(.caption, weight: .semibold))
+                            }
                         }
                     }
-                    .disabled(isAnalyzing)
                     .buttonStyle(.bordered)
                 }
             }
@@ -2135,8 +2276,8 @@ struct RecordingDetailView: View {
         }
     }
 
-    private func analyzeCurrentItem() {
-        guard store.intelligenceAvailability.isAvailable else {
+    private func analyzeCurrentItem(summaryProvider: RecordingSummaryProvider) {
+        guard summaryProvider.isCurrentlyAvailable else {
             HapticFeedback.play(.blocked)
             return
         }
@@ -2165,7 +2306,8 @@ struct RecordingDetailView: View {
                 _ = try await store.analyzeIntelligence(
                     for: item,
                     transcriptOverride: translatedAnalysisInput?.transcript,
-                    languageNameOverride: translatedAnalysisInput?.languageName
+                    languageNameOverride: translatedAnalysisInput?.languageName,
+                    summaryProvider: summaryProvider
                 )
                 HapticFeedback.play(.analysisComplete)
             } catch {
@@ -2259,8 +2401,8 @@ struct RecordingDetailView: View {
         }
 
         let item = currentItem
+        HapticFeedback.play(.retranscribeStart)
         Task {
-            HapticFeedback.play(.retranscribeStart)
             do {
                 try await store.retranscribe(item, language: language)
                 HapticFeedback.play(.retranscribeComplete)
@@ -2287,8 +2429,8 @@ struct RecordingDetailView: View {
 
         let item = currentItem
         let language = TranscriptionLanguage(id: item.languageID)
+        HapticFeedback.play(.retranscribeStart)
         Task {
-            HapticFeedback.play(.retranscribeStart)
             do {
                 try await store.retranscribeWithOpenAI(
                     item,
@@ -2315,8 +2457,8 @@ struct RecordingDetailView: View {
         }
 
         let item = currentItem
+        HapticFeedback.play(.retranscribeStart)
         Task {
-            HapticFeedback.play(.retranscribeStart)
             do {
                 try await store.retranscribeWithLocalWhisper(item, language: language, model: model)
                 HapticFeedback.play(.retranscribeComplete)

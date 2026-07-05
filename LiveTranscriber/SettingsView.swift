@@ -26,6 +26,14 @@ struct SettingsView: View {
     @State private var localWhisperDownloadErrorMessage: String?
     @State private var localWhisperDeleteErrorMessage: String?
     @State private var localWhisperModelRefreshTick = 0
+    @State private var selectedLocalSummaryModel = LocalSummaryModelManager.selectedModel
+    @State private var localSummaryModelStatus = LocalSummaryModelManager.currentStatus()
+    @State private var isDownloadingLocalSummaryModel = false
+    @State private var localSummaryDownloadProgress: Double = 0
+    @State private var localSummaryDownloadErrorMessage: String?
+    @State private var localSummaryDeleteErrorMessage: String?
+    @AppStorage(OnboardingState.completedDefaultsKey) private var hasCompletedOnboarding = true
+    @AppStorage(RecordingSummaryProvider.selectedDefaultsKey) private var selectedSummaryProviderRawValue = RecordingSummaryProvider.automatic.rawValue
     private static let repositoryURL = URL(string: "https://github.com/iamwilliamli/LiveTranscriber")!
     private static let designNotesURL = URL(string: "https://chengqili.com/post/livetranscriber")!
     private static let feedbackRecipient = "lichengqi0805@gmail.com"
@@ -35,6 +43,10 @@ struct SettingsView: View {
         return allowed
     }()
     private static let localWhisperSubtitleTrailingCharacters = CharacterSet.punctuationCharacters.union(.whitespacesAndNewlines)
+
+    private var selectedSummaryProvider: RecordingSummaryProvider {
+        RecordingSummaryProvider(rawValue: selectedSummaryProviderRawValue) ?? .automatic
+    }
 
     var body: some View {
         NavigationStack {
@@ -63,6 +75,20 @@ struct SettingsView: View {
                             value: transcriber.selectedAudioFormat.title,
                             subtitleResource: L10n.Settings.audioFormatAndBehavior,
                             tint: AppTheme.brand
+                        )
+                    }
+                    .buttonStyle(.plain)
+                    .settingsSurface()
+
+                    NavigationLink {
+                        intelligenceSettingsPage
+                    } label: {
+                        SettingsNavigationRow(
+                            icon: "sparkles",
+                            titleResource: L10n.Settings.intelligence,
+                            value: recordingStore.intelligenceAvailability.statusText,
+                            subtitleResource: L10n.Settings.summariesAndLocalModels,
+                            tint: AppTheme.purple
                         )
                     }
                     .buttonStyle(.plain)
@@ -148,6 +174,7 @@ struct SettingsView: View {
             await recordingStore.reload()
             recordingStore.refreshIntelligenceAvailability()
             refreshLocalWhisperModelStatus()
+            refreshLocalSummaryModelStatus()
         }
         .task {
             await refreshICloudSyncStatusPeriodically()
@@ -219,6 +246,36 @@ struct SettingsView: View {
             Text(localWhisperDeleteErrorMessage ?? "")
         }
         .alert(
+            String(localized: L10n.LocalSummary.downloadFailed),
+            isPresented: Binding(
+                get: { localSummaryDownloadErrorMessage != nil },
+                set: { isPresented in
+                    if !isPresented {
+                        localSummaryDownloadErrorMessage = nil
+                    }
+                }
+            )
+        ) {
+            Button(String(localized: L10n.Common.ok), role: .cancel) {}
+        } message: {
+            Text(localSummaryDownloadErrorMessage ?? "")
+        }
+        .alert(
+            String(localized: L10n.LocalSummary.deleteFailed),
+            isPresented: Binding(
+                get: { localSummaryDeleteErrorMessage != nil },
+                set: { isPresented in
+                    if !isPresented {
+                        localSummaryDeleteErrorMessage = nil
+                    }
+                }
+            )
+        ) {
+            Button(String(localized: L10n.Common.ok), role: .cancel) {}
+        } message: {
+            Text(localSummaryDeleteErrorMessage ?? "")
+        }
+        .alert(
             String(localized: L10n.Settings.feedbackUnavailable),
             isPresented: Binding(
                 get: { feedbackErrorMessage != nil },
@@ -268,6 +325,148 @@ struct SettingsView: View {
             SettingsSection(titleResource: L10n.Settings.betaFeatures, systemImage: "testtube.2", tint: AppTheme.purple) {
                 localWhisperLiveBetaSettings
             }
+        }
+    }
+
+    private var intelligenceSettingsPage: some View {
+        let appleAvailability = RecordingIntelligenceAvailability.currentAppleIntelligence()
+        let appleAvailabilityTint = appleAvailability.isAvailable ? AppTheme.success : AppTheme.warning
+
+        return SettingsDetailPage(titleResource: L10n.Settings.intelligence) {
+            SettingsSection(titleResource: L10n.LocalSummary.providerTitle, systemImage: "sparkles", tint: AppTheme.purple) {
+                Menu {
+                    ForEach(RecordingSummaryProvider.menuProviders) { provider in
+                        Button {
+                            selectSummaryProvider(provider)
+                        } label: {
+                            Label(
+                                provider.displayName,
+                                systemImage: provider == selectedSummaryProvider ? "checkmark" : provider.systemImage
+                            )
+                        }
+                    }
+                } label: {
+                    SettingsPickerRow(
+                        icon: selectedSummaryProvider.systemImage,
+                        titleResource: L10n.LocalSummary.selectedProvider,
+                        value: selectedSummaryProvider.displayName,
+                        tint: AppTheme.purple
+                    )
+                }
+                .buttonStyle(.plain)
+
+                SettingsVerbatimStatusRow(
+                    icon: selectedSummaryProvider.systemImage,
+                    text: selectedSummaryProvider.detailText,
+                    tint: AppTheme.info
+                )
+            }
+
+            SettingsSection(titleResource: L10n.Intelligence.appleModelTitle, systemImage: "sparkles", tint: appleAvailabilityTint) {
+                SettingsMetricRow(
+                    icon: "iphone",
+                    titleResource: L10n.Settings.advancedModel,
+                    value: appleAvailability.statusText,
+                    tint: appleAvailabilityTint
+                )
+
+                SettingsVerbatimStatusRow(
+                    icon: appleAvailability.isAvailable ? "checkmark.seal.fill" : "exclamationmark.triangle.fill",
+                    text: appleAvailability.detailText,
+                    tint: appleAvailabilityTint
+                )
+            }
+
+            SettingsSection(titleResource: L10n.LocalSummary.modelTitle, systemImage: "cpu", tint: AppTheme.purple) {
+                localSummaryModelSettings
+            }
+        }
+    }
+
+    private var localSummaryModelSettings: some View {
+        let model = selectedLocalSummaryModel
+
+        return VStack(alignment: .leading, spacing: 12) {
+            Menu {
+                ForEach(LocalSummaryModelManager.availableModels) { model in
+                    Button {
+                        selectLocalSummaryModel(model)
+                    } label: {
+                        Label(
+                            model.displayName,
+                            systemImage: model.id == selectedLocalSummaryModel.id ? "checkmark" : "cpu"
+                        )
+                    }
+                }
+            } label: {
+                SettingsPickerRow(
+                    icon: "cpu",
+                    titleResource: L10n.LocalSummary.selectedModel,
+                    value: model.displayName,
+                    tint: AppTheme.purple
+                )
+            }
+            .buttonStyle(.plain)
+            .disabled(isDownloadingLocalSummaryModel)
+
+            SettingsVerbatimStatusRow(
+                icon: "text.alignleft",
+                text: model.detail,
+                tint: AppTheme.purple
+            )
+
+            SettingsMetricRow(
+                icon: "internaldrive",
+                titleResource: L10n.LocalSummary.modelStatus,
+                value: isDownloadingLocalSummaryModel ? localSummaryDownloadProgressText : localSummaryModelStatus.statusText,
+                tint: localSummaryModelStatus.isAvailable ? AppTheme.success : AppTheme.warning
+            )
+
+            SettingsVerbatimStatusRow(
+                icon: localSummaryModelStatus.isAvailable ? "checkmark.circle" : "arrow.down.circle",
+                text: localSummaryModelStatus.detailText,
+                tint: localSummaryModelStatus.isAvailable ? AppTheme.success : AppTheme.info
+            )
+
+            if isDownloadingLocalSummaryModel {
+                ProgressView(value: localSummaryDownloadProgress)
+                    .tint(AppTheme.purple)
+                    .frame(maxWidth: .infinity)
+            }
+
+            if !localSummaryModelStatus.isAvailable {
+                Button {
+                    downloadLocalSummaryModel()
+                } label: {
+                    SettingsCommandRow(
+                        icon: "arrow.down.circle",
+                        titleResource: L10n.LocalSummary.downloadSelectedModel,
+                        tint: AppTheme.purple
+                    )
+                }
+                .buttonStyle(.plain)
+                .disabled(isDownloadingLocalSummaryModel)
+            }
+
+            if localSummaryModelStatus.isUserInstalled {
+                Button(role: .destructive) {
+                    deleteLocalSummaryModel()
+                } label: {
+                    SettingsCommandRow(
+                        icon: "trash",
+                        titleResource: L10n.LocalSummary.deleteModelDownload,
+                        tint: AppTheme.danger
+                    )
+                }
+                .buttonStyle(.plain)
+                .disabled(isDownloadingLocalSummaryModel)
+            }
+
+            SettingsStatusRow(
+                icon: "cpu",
+                textResource: L10n.LocalSummary.runtimePending,
+                tint: AppTheme.info
+            )
         }
     }
 
@@ -461,6 +660,13 @@ struct SettingsView: View {
         )
     }
 
+    private var localSummaryDownloadProgressText: String {
+        String(
+            format: String(localized: L10n.LocalSummary.downloadingModelFormat),
+            localSummaryDownloadProgress * 100
+        )
+    }
+
     private func refreshLocalWhisperModelStatus() {
         selectedLocalWhisperModel = LocalWhisperModelManager.selectedModel
         localWhisperModelStatus = LocalWhisperModelManager.currentStatus()
@@ -469,6 +675,11 @@ struct SettingsView: View {
         liveWhisperModelStatus = LocalWhisperModelManager.currentLiveStatus()
         liveWhisperCoreMLEncoderStatus = LocalWhisperModelManager.currentLiveCoreMLEncoderStatus()
         localWhisperModelRefreshTick &+= 1
+    }
+
+    private func refreshLocalSummaryModelStatus() {
+        selectedLocalSummaryModel = LocalSummaryModelManager.selectedModel
+        localSummaryModelStatus = LocalSummaryModelManager.currentStatus()
     }
 
     private func sendFeedbackEmail() {
@@ -515,6 +726,8 @@ struct SettingsView: View {
         let pipeline = transcriber.speechPipelineDiagnostics
         let localWhisperModel = LocalWhisperModelManager.selectedModel.displayName
         let liveWhisperModel = LocalWhisperModelManager.selectedLiveModel?.displayName ?? String(localized: L10n.LocalWhisper.liveModelNotSelected)
+        let localSummaryModel = LocalSummaryModelManager.defaultModel.displayName
+        let localSummaryStatus = LocalSummaryModelManager.currentStatus().statusText
         let coreMLEncoderState = LocalWhisperModelManager.isCoreMLEncoderLoadingEnabled ? "On" : "Off"
 
         return [
@@ -547,6 +760,9 @@ struct SettingsView: View {
             "Live Backend: \(transcriber.selectedTranscriptionBackend.title)",
             "Local Whisper Model: \(localWhisperModel)",
             "Realtime Whisper Model: \(liveWhisperModel)",
+            "Summary Engine: \(selectedSummaryProvider.displayName)",
+            "Local Summary Model: \(localSummaryModel)",
+            "Local Summary Status: \(localSummaryStatus)",
             "Core ML Encoder Loading: \(coreMLEncoderState)",
             "Recording Count: \(recordingStore.recordings.count)",
             "Storage: \(recordingStore.storageDisplayName)"
@@ -573,6 +789,21 @@ struct SettingsView: View {
         Task {
             await transcriber.refreshSupportedLanguages()
         }
+    }
+
+    private func selectSummaryProvider(_ provider: RecordingSummaryProvider) {
+        HapticFeedback.play(.menuSelection)
+        selectedSummaryProviderRawValue = provider.rawValue
+        RecordingSummaryProvider.select(provider)
+        recordingStore.refreshIntelligenceAvailability()
+    }
+
+    private func selectLocalSummaryModel(_ model: LocalSummaryModel) {
+        HapticFeedback.play(.menuSelection)
+        LocalSummaryModelManager.selectModel(model)
+        selectedLocalSummaryModel = model
+        localSummaryModelStatus = LocalSummaryModelManager.status(for: model)
+        recordingStore.refreshIntelligenceAvailability()
     }
 
     private func localWhisperModelSubtitle(
@@ -789,6 +1020,59 @@ struct SettingsView: View {
             }
         } catch {
             localWhisperDeleteErrorMessage = error.localizedDescription
+            HapticFeedback.play(.failure)
+        }
+    }
+
+    private func downloadLocalSummaryModel() {
+        guard !isDownloadingLocalSummaryModel else {
+            return
+        }
+
+        isDownloadingLocalSummaryModel = true
+        localSummaryDownloadProgress = 0
+        HapticFeedback.play(.menuSelection)
+
+        Task {
+            do {
+                let status = try await LocalSummaryModelManager.downloadDefaultModel { progress in
+                    Task { @MainActor in
+                        localSummaryDownloadProgress = progress
+                    }
+                }
+
+                await MainActor.run {
+                    selectedLocalSummaryModel = status.model
+                    localSummaryModelStatus = status
+                    recordingStore.refreshIntelligenceAvailability()
+                    isDownloadingLocalSummaryModel = false
+                    localSummaryDownloadProgress = 1
+                    HapticFeedback.play(.menuSelection)
+                }
+            } catch {
+                await MainActor.run {
+                    isDownloadingLocalSummaryModel = false
+                    localSummaryDownloadErrorMessage = error.localizedDescription
+                    HapticFeedback.play(.failure)
+                }
+            }
+        }
+    }
+
+    private func deleteLocalSummaryModel() {
+        guard !isDownloadingLocalSummaryModel else {
+            HapticFeedback.play(.blocked)
+            return
+        }
+
+        HapticFeedback.play(.menuSelection)
+        do {
+            let status = try LocalSummaryModelManager.deleteDownloadedModel()
+            selectedLocalSummaryModel = status.model
+            localSummaryModelStatus = status
+            recordingStore.refreshIntelligenceAvailability()
+        } catch {
+            localSummaryDeleteErrorMessage = error.localizedDescription
             HapticFeedback.play(.failure)
         }
     }
@@ -1496,6 +1780,20 @@ struct SettingsView: View {
                 text: availability.detailText,
                 tint: tint
             )
+
+            Button {
+                HapticFeedback.play(.navigation)
+                withAnimation(.easeInOut(duration: 0.28)) {
+                    hasCompletedOnboarding = false
+                }
+            } label: {
+                SettingsCommandRow(
+                    icon: "sparkles.rectangle.stack",
+                    titleResource: L10n.Settings.showIntroduction,
+                    tint: AppTheme.purple
+                )
+            }
+            .buttonStyle(.plain)
         }
     }
 }
@@ -1824,6 +2122,46 @@ private struct SettingsMetricRow: View {
                 .minimumScaleFactor(0.75)
         }
         .frame(minHeight: 42)
+    }
+}
+
+private struct SettingsPickerRow: View {
+    let icon: String
+    let title: Text
+    let value: String
+    let tint: Color
+
+    init(icon: String, titleResource: LocalizedStringResource, value: String, tint: Color) {
+        self.icon = icon
+        self.title = Text(titleResource)
+        self.value = value
+        self.tint = tint
+    }
+
+    var body: some View {
+        HStack(spacing: 10) {
+            SettingsIcon(systemImage: icon, tint: tint)
+
+            title
+                .font(.redditSans(.subheadline, weight: .semibold))
+                .foregroundStyle(.primary)
+
+            Spacer(minLength: 12)
+
+            HStack(spacing: 6) {
+                Text(value)
+                    .font(.redditSans(.subheadline))
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.75)
+
+                Image(systemName: "chevron.up.chevron.down")
+                    .font(.system(size: 10, weight: .bold))
+                    .foregroundStyle(.tertiary)
+            }
+        }
+        .frame(minHeight: 42)
+        .contentShape(Rectangle())
     }
 }
 

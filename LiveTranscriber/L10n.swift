@@ -75,6 +75,38 @@ enum L10n {
         static let settingsTab = L10n.resource("app.tab.settings", defaultValue: "Settings", comment: "Main tab title for settings.")
     }
 
+    enum Onboarding {
+        static let title = L10n.resource("onboarding.title", defaultValue: "Live Transcriber", comment: "Onboarding hero title.")
+        static let caption = L10n.resource("onboarding.caption", defaultValue: "Capture speech, keep searchable recordings, and choose the transcription path that fits the moment.", comment: "Onboarding hero caption.")
+        static let liveTitle = L10n.resource("onboarding.feature.live.title", defaultValue: "Live captions that stay with the audio", comment: "Onboarding feature title for live transcription.")
+        static let liveDetail = L10n.resource("onboarding.feature.live.detail", defaultValue: "Record meetings, lectures, calls, or field notes with timed transcript lines ready as soon as you stop.", comment: "Onboarding feature description for live transcription.")
+        static let recordingsTitle = L10n.resource("onboarding.feature.recordings.title", defaultValue: "A focused library for every recording", comment: "Onboarding feature title for saved recordings.")
+        static let recordingsDetail = L10n.resource("onboarding.feature.recordings.detail", defaultValue: "Import audio, retranscribe with Apple Speech or Local Whisper, translate transcripts, and add tags or summaries.", comment: "Onboarding feature description for recordings.")
+        static let privacyTitle = L10n.resource("onboarding.feature.privacy.title", defaultValue: "Local-first by default", comment: "Onboarding feature title for privacy.")
+        static let privacyDetail = L10n.resource("onboarding.feature.privacy.detail", defaultValue: "Speech, files, and summaries stay on this iPhone unless you explicitly enable an online option for a saved recording.", comment: "Onboarding feature description for privacy.")
+        static let setupTitle = L10n.resource("onboarding.setup.title", defaultValue: "Quick setup", comment: "Onboarding setup section title.")
+        static let languageTitle = L10n.resource("onboarding.setup.language", defaultValue: "Transcription Language", comment: "Onboarding language setting title.")
+        static let formatTitle = L10n.resource("onboarding.setup.format", defaultValue: "Recording Format", comment: "Onboarding recording format setting title.")
+        static let whisperModelTitle = L10n.resource("onboarding.setup.whisper_model", defaultValue: "Local Whisper Model", comment: "Onboarding Local Whisper model picker title.")
+        static let downloadWhisperFormat = L10n.resource("onboarding.setup.download_whisper.format", defaultValue: "Download Whisper Model (%@)", comment: "Onboarding Local Whisper download button. Parameter: model download size.")
+        static let footer = L10n.resource("onboarding.footer", defaultValue: "You can change these choices later in Settings. Microphone and Speech permissions are requested only when the related feature needs them.", comment: "Onboarding footer privacy and settings note.")
+        static let heroSplashTitle = L10n.resource("onboarding.hero_splash.title", defaultValue: "Capture now. Revisit everything.", comment: "Onboarding splash hero title.")
+        static let heroSplashCaption = L10n.resource("onboarding.hero_splash.caption", defaultValue: "Live captions, saved audio, offline Whisper, and private transcript tools in one place.", comment: "Onboarding splash hero caption.")
+        static let heroChipLive = L10n.resource("onboarding.hero_chip.live", defaultValue: "Live transcript", comment: "Onboarding hero status chip for live transcription.")
+        static let heroChipWhisper = L10n.resource("onboarding.hero_chip.whisper", defaultValue: "Whisper ready", comment: "Onboarding hero status chip for Local Whisper.")
+        static let heroChipPrivate = L10n.resource("onboarding.hero_chip.private", defaultValue: "On device", comment: "Onboarding hero status chip for privacy.")
+        static let carouselCaptureTitle = L10n.resource("onboarding.carousel.capture.title", defaultValue: "Live Capture", comment: "Onboarding splash carousel card title for live capture.")
+        static let carouselCaptureDetail = L10n.resource("onboarding.carousel.capture.detail", defaultValue: "Turn speech into timed lines", comment: "Onboarding splash carousel card detail for live capture.")
+        static let carouselLibraryTitle = L10n.resource("onboarding.carousel.library.title", defaultValue: "Audio Library", comment: "Onboarding splash carousel card title for library.")
+        static let carouselLibraryDetail = L10n.resource("onboarding.carousel.library.detail", defaultValue: "Import, search, and replay", comment: "Onboarding splash carousel card detail for library.")
+        static let carouselWhisperTitle = L10n.resource("onboarding.carousel.whisper.title", defaultValue: "Local Whisper", comment: "Onboarding splash carousel card title for Local Whisper.")
+        static let carouselWhisperDetail = L10n.resource("onboarding.carousel.whisper.detail", defaultValue: "Download offline models", comment: "Onboarding splash carousel card detail for Local Whisper.")
+        static let carouselPrivateTitle = L10n.resource("onboarding.carousel.private.title", defaultValue: "Private Notes", comment: "Onboarding splash carousel card title for privacy.")
+        static let carouselPrivateDetail = L10n.resource("onboarding.carousel.private.detail", defaultValue: "Keep work on this iPhone", comment: "Onboarding splash carousel card detail for privacy.")
+        static let cta = L10n.resource("onboarding.cta", defaultValue: "Start Transcribing", comment: "Onboarding primary call to action.")
+        static let useDefaults = L10n.resource("onboarding.use_defaults", defaultValue: "Use Defaults", comment: "Onboarding secondary action to continue with default settings.")
+    }
+
     enum Settings {
         static let title = L10n.resource("settings.title", defaultValue: "Settings", comment: "Settings screen title.")
         static let transcription = L10n.resource("settings.transcription", defaultValue: "Transcription", comment: "Settings section title for transcription.")
@@ -137,6 +169,9 @@ enum L10n {
         static let currentSpeechPipeline = L10n.resource("settings.current_speech_pipeline", defaultValue: "Current Speech Pipeline", comment: "Developer settings metric title.")
         static let switchPipelineSubtitle = L10n.resource("settings.switch_pipeline_subtitle", defaultValue: "Switch compatible mode or iOS 27 Native mode", comment: "Developer settings row subtitle.")
         static let advancedModel = L10n.resource("settings.advanced_model", defaultValue: "Advanced Model", comment: "Developer settings metric title.")
+        static let intelligence = L10n.resource("settings.intelligence", defaultValue: "Intelligence", comment: "Settings section title for summaries and local intelligence models.")
+        static let summariesAndLocalModels = L10n.resource("settings.subtitle.summaries_local_models", defaultValue: "Summaries and local model downloads", comment: "Settings row subtitle for summary intelligence settings.")
+        static let showIntroduction = L10n.resource("settings.show_introduction", defaultValue: "Show Introduction", comment: "Settings action title to show onboarding again.")
     }
 
     enum Transcription {
@@ -487,6 +522,11 @@ enum L10n {
     }
 
     enum Intelligence {
+        static let appleModelTitle = L10n.resource(
+            "intelligence.apple_model.title",
+            defaultValue: "Apple Intelligence",
+            comment: "Settings section title for Apple Intelligence summary availability."
+        )
         static let available = L10n.resource(
             "intelligence.available",
             defaultValue: "Available",
@@ -576,6 +616,154 @@ enum L10n {
             "intelligence.parse.topic_tags_label",
             defaultValue: "topic tags",
             comment: "Localized label used when recovering plain model output."
+        )
+    }
+
+    enum LocalSummary {
+        static let providerTitle = L10n.resource(
+            "local_summary.provider.title",
+            defaultValue: "Summary Engine",
+            comment: "Settings section title for selecting the default summary engine."
+        )
+        static let selectedProvider = L10n.resource(
+            "local_summary.provider.selected",
+            defaultValue: "Default Engine",
+            comment: "Settings row title for the selected default summary engine."
+        )
+        static let providerAutomaticTitle = L10n.resource(
+            "local_summary.provider.automatic.title",
+            defaultValue: "Automatic",
+            comment: "Summary engine option that automatically chooses an available local summary provider."
+        )
+        static let providerAutomaticDetail = L10n.resource(
+            "local_summary.provider.automatic.detail",
+            defaultValue: "Use Apple Intelligence when available, otherwise use the downloaded Local Qwen model.",
+            comment: "Summary engine automatic option detail."
+        )
+        static let providerAppleTitle = L10n.resource(
+            "local_summary.provider.apple.title",
+            defaultValue: "Apple Intelligence",
+            comment: "Summary engine option for Apple's on-device language model."
+        )
+        static let providerAppleDetail = L10n.resource(
+            "local_summary.provider.apple.detail",
+            defaultValue: "Use Apple's on-device language model for summaries and tags.",
+            comment: "Summary engine Apple option detail."
+        )
+        static let providerLocalQwenTitle = L10n.resource(
+            "local_summary.provider.local_qwen.title",
+            defaultValue: "Local Qwen3",
+            comment: "Summary engine option for the local Qwen model."
+        )
+        static let providerLocalQwenDetail = L10n.resource(
+            "local_summary.provider.local_qwen.detail",
+            defaultValue: "Use the selected downloaded Qwen GGUF model with embedded llama.cpp.",
+            comment: "Summary engine Local Qwen option detail."
+        )
+        static let available = L10n.resource(
+            "local_summary.available",
+            defaultValue: "Local Qwen Ready",
+            comment: "Overall intelligence status when local Qwen summaries are available."
+        )
+        static let availableDetail = L10n.resource(
+            "local_summary.available.detail",
+            defaultValue: "Apple Intelligence is unavailable, but Qwen3 summaries can run on this iPhone with embedded llama.cpp.",
+            comment: "Overall intelligence detail when local Qwen summaries are available."
+        )
+        static let modelTitle = L10n.resource(
+            "local_summary.model.title",
+            defaultValue: "Local Summary Model",
+            comment: "Settings section title for local summary model management."
+        )
+        static let selectedModel = L10n.resource(
+            "local_summary.model.selected",
+            defaultValue: "Summary Model",
+            comment: "Settings metric title for the selected local summary model."
+        )
+        static let modelStatus = L10n.resource(
+            "local_summary.model.status",
+            defaultValue: "Model Status",
+            comment: "Settings metric title for local summary model status."
+        )
+        static let modelReady = L10n.resource(
+            "local_summary.model.ready",
+            defaultValue: "Ready",
+            comment: "Local summary model status when a model is available."
+        )
+        static let modelNotInstalled = L10n.resource(
+            "local_summary.model.not_installed",
+            defaultValue: "Not Installed",
+            comment: "Local summary model status when a model is not installed."
+        )
+        static let modelDownloadedDetailFormat = L10n.resource(
+            "local_summary.model.downloaded_detail.format",
+            defaultValue: "%@ is downloaded on this iPhone (%@).",
+            comment: "Local summary model downloaded detail. Parameters: model name, file size."
+        )
+        static let modelBundledDetailFormat = L10n.resource(
+            "local_summary.model.bundled_detail.format",
+            defaultValue: "%@ is bundled with this app (%@).",
+            comment: "Local summary model bundled detail. Parameters: model name, file size."
+        )
+        static let modelMissingDetailFormat = L10n.resource(
+            "local_summary.model.missing_detail.format",
+            defaultValue: "Download %@ (%@) before using local summaries.",
+            comment: "Local summary model missing detail. Parameters: model name, expected size."
+        )
+        static let downloadSelectedModel = L10n.resource(
+            "local_summary.model.download_selected",
+            defaultValue: "Download Qwen Model",
+            comment: "Settings button title to download the selected local summary model."
+        )
+        static let deleteModelDownload = L10n.resource(
+            "local_summary.model.delete_download",
+            defaultValue: "Delete Qwen Download",
+            comment: "Settings button title to delete the downloaded local summary model."
+        )
+        static let downloadingModelFormat = L10n.resource(
+            "local_summary.model.downloading.format",
+            defaultValue: "Downloading %.0f%%",
+            comment: "Local summary model download progress. Parameter: percent complete."
+        )
+        static let downloadFailed = L10n.resource(
+            "local_summary.model.download_failed",
+            defaultValue: "Summary Model Download Failed",
+            comment: "Alert title when a local summary model download fails."
+        )
+        static let deleteFailed = L10n.resource(
+            "local_summary.model.delete_failed",
+            defaultValue: "Summary Model Delete Failed",
+            comment: "Alert title when deleting a local summary model fails."
+        )
+        static let runtimePending = L10n.resource(
+            "local_summary.runtime.pending",
+            defaultValue: "Qwen3 summaries run on this iPhone with embedded llama.cpp after the model is downloaded.",
+            comment: "Settings status explaining that local summary inference runs on device."
+        )
+        static let runtimeUnavailable = L10n.resource(
+            "local_summary.error.runtime_unavailable",
+            defaultValue: "llama.cpp is not embedded in this build.",
+            comment: "Local summary error when the native runtime cannot be loaded."
+        )
+        static let missingModel = L10n.resource(
+            "local_summary.error.missing_model",
+            defaultValue: "Download the Qwen local summary model in Settings before running local summaries.",
+            comment: "Local summary error when no model file can be found."
+        )
+        static let modelDownloadFailed = L10n.resource(
+            "local_summary.error.model_download_failed",
+            defaultValue: "The Qwen local summary model download did not produce a valid GGUF model file.",
+            comment: "Local summary invalid downloaded model error."
+        )
+        static let modelQwen3Title = L10n.resource(
+            "local_summary.model.qwen3_1_7b_q4.title",
+            defaultValue: "Qwen3 1.7B Q4_K_M",
+            comment: "Local summary Qwen3 model name."
+        )
+        static let modelQwen3Detail = L10n.resource(
+            "local_summary.model.qwen3_1_7b_q4.detail",
+            defaultValue: "Multilingual offline summary model in GGUF Q4_K_M format.",
+            comment: "Local summary Qwen3 model detail."
         )
     }
 

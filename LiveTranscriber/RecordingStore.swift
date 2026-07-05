@@ -165,8 +165,90 @@ struct RecordingTitleSuggestion: Hashable {
     var tags: [String]
 }
 
+enum RecordingSummaryProvider: String, CaseIterable, Identifiable {
+    case automatic
+    case appleIntelligence
+    case localQwen
+
+    static let selectedDefaultsKey = "recording.summary.provider"
+    static let menuProviders: [RecordingSummaryProvider] = [.automatic, .appleIntelligence, .localQwen]
+
+    var id: String {
+        rawValue
+    }
+
+    var displayName: String {
+        switch self {
+        case .automatic:
+            return String(localized: L10n.LocalSummary.providerAutomaticTitle)
+        case .appleIntelligence:
+            return String(localized: L10n.LocalSummary.providerAppleTitle)
+        case .localQwen:
+            return String(localized: L10n.LocalSummary.providerLocalQwenTitle)
+        }
+    }
+
+    var detailText: String {
+        switch self {
+        case .automatic:
+            return String(localized: L10n.LocalSummary.providerAutomaticDetail)
+        case .appleIntelligence:
+            return String(localized: L10n.LocalSummary.providerAppleDetail)
+        case .localQwen:
+            return String(localized: L10n.LocalSummary.providerLocalQwenDetail)
+        }
+    }
+
+    var systemImage: String {
+        switch self {
+        case .automatic:
+            return "sparkles"
+        case .appleIntelligence:
+            return "apple.logo"
+        case .localQwen:
+            return "cpu"
+        }
+    }
+
+    var isCurrentlyAvailable: Bool {
+        switch self {
+        case .automatic:
+            return Self.isAppleIntelligenceAvailable || LocalSummaryModelManager.currentStatus().isAvailable
+        case .appleIntelligence:
+            return Self.isAppleIntelligenceAvailable
+        case .localQwen:
+            return LocalSummaryModelManager.currentStatus().isAvailable
+        }
+    }
+
+    static var selected: RecordingSummaryProvider {
+        let storedRawValue = UserDefaults.standard.string(forKey: selectedDefaultsKey)
+        return storedRawValue.flatMap(RecordingSummaryProvider.init(rawValue:)) ?? .automatic
+    }
+
+    static func select(_ provider: RecordingSummaryProvider) {
+        UserDefaults.standard.set(provider.rawValue, forKey: selectedDefaultsKey)
+    }
+
+    static var hasAnyAvailableProvider: Bool {
+        menuProviders.contains { $0.isCurrentlyAvailable }
+    }
+
+    private static var isAppleIntelligenceAvailable: Bool {
+        let model = SystemLanguageModel(
+            useCase: .general,
+            guardrails: .permissiveContentTransformations
+        )
+        if case .available = model.availability {
+            return true
+        }
+        return false
+    }
+}
+
 enum RecordingIntelligenceAvailability: Equatable {
     case available
+    case localSummaryAvailable
     case unavailable(UnavailableReason)
 
     enum UnavailableReason: Equatable {
@@ -177,13 +259,20 @@ enum RecordingIntelligenceAvailability: Equatable {
     }
 
     var isAvailable: Bool {
-        self == .available
+        switch self {
+        case .available, .localSummaryAvailable:
+            return true
+        case .unavailable:
+            return false
+        }
     }
 
     var statusText: String {
         switch self {
         case .available:
             return String(localized: L10n.Intelligence.available)
+        case .localSummaryAvailable:
+            return String(localized: L10n.LocalSummary.available)
         case .unavailable(.deviceNotEligible):
             return String(localized: L10n.Intelligence.unsupportedDevice)
         case .unavailable(.appleIntelligenceNotEnabled):
@@ -199,6 +288,8 @@ enum RecordingIntelligenceAvailability: Equatable {
         switch self {
         case .available:
             return String(localized: L10n.Intelligence.detailAvailable)
+        case .localSummaryAvailable:
+            return String(localized: L10n.LocalSummary.availableDetail)
         case .unavailable(.deviceNotEligible):
             return String(localized: L10n.Intelligence.detailUnsupportedDevice)
         case .unavailable(.appleIntelligenceNotEnabled):
@@ -211,6 +302,21 @@ enum RecordingIntelligenceAvailability: Equatable {
     }
 
     static func current() -> RecordingIntelligenceAvailability {
+        let appleAvailability = currentAppleIntelligence()
+        switch appleAvailability {
+        case .available:
+            return .available
+        case .localSummaryAvailable:
+            return .localSummaryAvailable
+        case .unavailable(let reason):
+            if LocalSummaryModelManager.currentStatus().isAvailable {
+                return .localSummaryAvailable
+            }
+            return .unavailable(reason)
+        }
+    }
+
+    static func currentAppleIntelligence() -> RecordingIntelligenceAvailability {
         let model = SystemLanguageModel(
             useCase: .general,
             guardrails: .permissiveContentTransformations
@@ -1555,12 +1661,14 @@ final class RecordingStore: ObservableObject {
     func analyzeIntelligence(
         for item: RecordingItem,
         transcriptOverride: String? = nil,
-        languageNameOverride: String? = nil
+        languageNameOverride: String? = nil,
+        summaryProvider: RecordingSummaryProvider = .selected
     ) async throws -> RecordingIntelligence {
         let transcript = (transcriptOverride ?? transcriptText(for: item)).plainTranscriptTextForIntelligence
         let intelligence = try await RecordingIntelligenceService.generate(
             transcript: transcript,
-            languageName: languageNameOverride ?? item.languageName
+            languageName: languageNameOverride ?? item.languageName,
+            summaryProvider: summaryProvider
         )
 
         guard let index = recordings.firstIndex(where: { $0.id == item.id }) else {
@@ -2572,7 +2680,11 @@ private enum StructuredFoundationModelsRuntime {
 
 private enum RecordingIntelligenceService {
     private static let logger = Logger(subsystem: "com.reddownloader.LiveTranscriber", category: "RecordingIntelligence")
-    static func generate(transcript: String, languageName: String) async throws -> RecordingIntelligence {
+    static func generate(
+        transcript: String,
+        languageName: String,
+        summaryProvider: RecordingSummaryProvider = .selected
+    ) async throws -> RecordingIntelligence {
         let cleanedTranscript = transcript.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !cleanedTranscript.isEmpty else {
             throw RecordingIntelligenceError.emptyTranscript
@@ -2582,12 +2694,28 @@ private enum RecordingIntelligenceService {
             useCase: .general,
             guardrails: .permissiveContentTransformations
         )
-        debugLog("Starting analysis. language=\(languageName), characters=\(cleanedTranscript.count), availability=\(availabilityDescription(model.availability)), transcriptPreview=\(debugSnippet(cleanedTranscript, limit: 900))")
+        debugLog("Starting analysis. provider=\(summaryProvider.rawValue), language=\(languageName), characters=\(cleanedTranscript.count), availability=\(availabilityDescription(model.availability)), transcriptPreview=\(debugSnippet(cleanedTranscript, limit: 900))")
+        if summaryProvider == .localQwen {
+            return try await generateLocalSummary(
+                transcript: cleanedTranscript,
+                languageName: languageName
+            )
+        }
+
+        let shouldFallbackToLocalSummary = summaryProvider == .automatic
         switch model.availability {
         case .available:
             break
         case .unavailable(let reason):
-            debugLog("Model unavailable. reason=\(reason)")
+            debugLog("Model unavailable. reason=\(reason). localFallback=\(shouldFallbackToLocalSummary)")
+            if shouldFallbackToLocalSummary {
+                if let localSummary = try await generateLocalSummaryIfAvailable(
+                    transcript: cleanedTranscript,
+                    languageName: languageName
+                ) {
+                    return localSummary
+                }
+            }
             throw RecordingIntelligenceError.unavailable(reason)
         }
 
@@ -2624,9 +2752,45 @@ private enum RecordingIntelligenceService {
             debugLog("Text iOS 26 analysis completed. summaryCharacters=\(summary.count), summary=\(debugSnippet(summary, limit: 700)), tagCount=0")
             return RecordingIntelligence(summary: summary, tags: [], generatedAt: Date())
         } catch {
-            debugLog("Analysis failed. \(debugDescription(for: error))")
+            debugLog("Analysis failed. \(debugDescription(for: error)). localFallback=\(shouldFallbackToLocalSummary)")
+            if shouldFallbackToLocalSummary {
+                if let localSummary = try await generateLocalSummaryIfAvailable(
+                    transcript: cleanedTranscript,
+                    languageName: languageName
+                ) {
+                    return localSummary
+                }
+            }
             throw error
         }
+    }
+
+    private static func generateLocalSummary(
+        transcript: String,
+        languageName: String
+    ) async throws -> RecordingIntelligence {
+        debugLog("Starting local Qwen summary. language=\(languageName), characters=\(transcript.count), transcriptPreview=\(debugSnippet(transcript, limit: 900))")
+        let intelligence = try await LocalSummaryIntelligenceService.generate(
+            transcript: transcript,
+            languageName: languageName
+        )
+        debugLog("Local Qwen summary completed. summaryCharacters=\(intelligence.summary.count), summary=\(debugSnippet(intelligence.summary, limit: 700)), tagCount=\(intelligence.tags.count), tags=\(intelligence.tags)")
+        return intelligence
+    }
+
+    private static func generateLocalSummaryIfAvailable(
+        transcript: String,
+        languageName: String
+    ) async throws -> RecordingIntelligence? {
+        guard LocalSummaryModelManager.currentStatus().isAvailable else {
+            debugLog("Local Qwen summary fallback skipped because no local summary model is installed.")
+            return nil
+        }
+
+        return try await generateLocalSummary(
+            transcript: transcript,
+            languageName: languageName
+        )
     }
 
     static func generateTitleSuggestion(transcript: String, languageName: String) async throws -> RecordingTitleSuggestion {

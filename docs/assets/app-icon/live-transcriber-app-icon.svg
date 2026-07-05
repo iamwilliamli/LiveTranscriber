@@ -1,0 +1,63 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024" role="img" aria-label="Live Transcriber app icon">
+  <defs>
+    <radialGradient id="canvasGlow" cx="50%" cy="44%" r="70%">
+      <stop offset="0%" stop-color="#ffffff"/>
+      <stop offset="66%" stop-color="#f7f8f9"/>
+      <stop offset="100%" stop-color="#eff1f3"/>
+    </radialGradient>
+    <linearGradient id="graphite" x1="340" y1="250" x2="560" y2="790" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#4a4d4e"/>
+      <stop offset="45%" stop-color="#333637"/>
+      <stop offset="100%" stop-color="#181a1b"/>
+    </linearGradient>
+    <linearGradient id="graphiteEdge" x1="260" y1="430" x2="600" y2="790" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#424546"/>
+      <stop offset="62%" stop-color="#232526"/>
+      <stop offset="100%" stop-color="#111314"/>
+    </linearGradient>
+    <linearGradient id="lineDark" x1="610" y1="360" x2="840" y2="550" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#3f4243"/>
+      <stop offset="100%" stop-color="#17191a"/>
+    </linearGradient>
+    <linearGradient id="lineMid" x1="610" y1="420" x2="800" y2="580" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#8c8f90"/>
+      <stop offset="100%" stop-color="#4a4d4e"/>
+    </linearGradient>
+    <linearGradient id="lineLight" x1="610" y1="500" x2="760" y2="630" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#dbddde"/>
+      <stop offset="100%" stop-color="#a7aaab"/>
+    </linearGradient>
+    <filter id="symbolShadow" x="-25%" y="-25%" width="150%" height="150%" color-interpolation-filters="sRGB">
+      <feDropShadow dx="0" dy="8" stdDeviation="8" flood-color="#050607" flood-opacity="0.34"/>
+      <feDropShadow dx="0" dy="1" stdDeviation="1" flood-color="#ffffff" flood-opacity="0.22"/>
+    </filter>
+    <filter id="softNoise" x="0" y="0" width="100%" height="100%" color-interpolation-filters="sRGB">
+      <feTurbulence type="fractalNoise" baseFrequency="0.9" numOctaves="2" seed="19" result="noise"/>
+      <feColorMatrix in="noise" type="saturate" values="0"/>
+      <feComponentTransfer>
+        <feFuncA type="table" tableValues="0 0.018"/>
+      </feComponentTransfer>
+      <feBlend mode="multiply" in2="SourceGraphic"/>
+    </filter>
+  </defs>
+
+  <rect width="1024" height="1024" fill="url(#canvasGlow)"/>
+
+  <g filter="url(#symbolShadow)">
+    <path d="M284 484 V535 C284 652 346 724 426 724 C506 724 568 652 568 535 V484" fill="none" stroke="url(#graphiteEdge)" stroke-width="39" stroke-linecap="round" stroke-linejoin="round"/>
+    <path d="M426 722 V776" fill="none" stroke="url(#graphiteEdge)" stroke-width="35" stroke-linecap="round"/>
+    <path d="M356 776 H496" fill="none" stroke="url(#graphiteEdge)" stroke-width="35" stroke-linecap="round"/>
+    <rect x="342" y="292" width="168" height="292" rx="84" fill="url(#graphite)" filter="url(#softNoise)"/>
+    <path d="M374 318 C391 301 462 298 488 330" fill="none" stroke="#ffffff" stroke-opacity="0.10" stroke-width="4" stroke-linecap="round"/>
+    <path d="M373 570 C397 594 457 600 488 572" fill="none" stroke="#050607" stroke-opacity="0.18" stroke-width="4" stroke-linecap="round"/>
+  </g>
+
+  <g filter="url(#symbolShadow)">
+    <rect x="622" y="383" width="220" height="27" rx="13.5" fill="url(#lineDark)"/>
+    <rect x="622" y="459" width="174" height="27" rx="13.5" fill="url(#lineMid)"/>
+    <rect x="622" y="535" width="119" height="27" rx="13.5" fill="url(#lineLight)"/>
+    <path d="M638 389 H824" stroke="#ffffff" stroke-opacity="0.10" stroke-width="3" stroke-linecap="round"/>
+    <path d="M638 465 H780" stroke="#ffffff" stroke-opacity="0.17" stroke-width="3" stroke-linecap="round"/>
+    <path d="M638 541 H725" stroke="#ffffff" stroke-opacity="0.36" stroke-width="3" stroke-linecap="round"/>
+  </g>
+</svg>
