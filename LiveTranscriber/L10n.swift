@@ -392,6 +392,7 @@ enum L10n {
         static let editRecordingTitle = L10n.resource("recordings.edit.title", defaultValue: "Edit Recording", comment: "Edit recording screen title.")
         static let recordingName = L10n.resource("recordings.edit.recording_name", defaultValue: "Recording Name", comment: "Recording name field title.")
         static let summary = L10n.resource("recordings.edit.summary", defaultValue: "Summary", comment: "Summary field title.")
+        static let editSummary = L10n.resource("recordings.edit.summary_action", defaultValue: "Edit Summary", comment: "Action title for editing a recording summary.")
         static let summaryPlaceholder = L10n.resource("recordings.edit.summary_placeholder", defaultValue: "Add a summary", comment: "Placeholder for the editable recording summary field.")
         static let tags = L10n.resource("recordings.edit.tags", defaultValue: "Tags", comment: "Tags field title.")
         static let notAdded = L10n.resource("recordings.edit.not_added", defaultValue: "Not Added", comment: "Status shown when no optional metadata has been added.")

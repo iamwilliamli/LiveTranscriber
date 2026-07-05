@@ -1741,6 +1741,9 @@ struct RecordingDetailView: View {
     @State private var editRecordingSummary = ""
     @State private var editRecordingIncludesLocation = false
     @State private var isSavingRecordingEdit = false
+    @State private var isShowingSummaryEditSheet = false
+    @State private var editedSummaryText = ""
+    @State private var isSavingSummaryEdit = false
     @State private var editErrorMessage: String?
     @State private var transcriptLineEditRequest: TranscriptLineEditRequest?
     @State private var editedTranscriptLineText = ""
@@ -1869,6 +1872,19 @@ struct RecordingDetailView: View {
                     editLocationProvider.reset()
                 }
             }
+        }
+        .sheet(isPresented: $isShowingSummaryEditSheet) {
+            RecordingSummaryEditSheet(
+                summary: $editedSummaryText,
+                isSaving: isSavingSummaryEdit,
+                onSave: saveSummaryEdit,
+                onCancel: {
+                    isShowingSummaryEditSheet = false
+                }
+            )
+            .interactiveDismissDisabled(isSavingSummaryEdit)
+            .presentationDetents([.medium, .large])
+            .presentationDragIndicator(.visible)
         }
         .sheet(item: $transcriptLineEditRequest) { request in
             TranscriptLineEditSheet(
@@ -2273,6 +2289,22 @@ struct RecordingDetailView: View {
                         .foregroundStyle(.primary)
                         .lineSpacing(4)
                         .fixedSize(horizontal: false, vertical: true)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .contentShape(Rectangle())
+                        .contextMenu {
+                            Button {
+                                HapticFeedback.play(.copy)
+                                UIPasteboard.general.string = intelligence.summary
+                            } label: {
+                                Label(localized(L10n.Common.copy), systemImage: "doc.on.doc")
+                            }
+
+                            Button {
+                                beginSummaryEdit()
+                            } label: {
+                                Label(localized(L10n.Recordings.editSummary), systemImage: "pencil")
+                            }
+                        }
                 }
 
                 Text(intelligence.generatedAt, format: .dateTime.year().month().day().hour().minute())
@@ -2992,6 +3024,12 @@ struct RecordingDetailView: View {
         HapticFeedback.play(.menuSelection)
     }
 
+    private func beginSummaryEdit() {
+        editedSummaryText = currentItem.intelligence?.summary ?? ""
+        isShowingSummaryEditSheet = true
+        HapticFeedback.play(.menuSelection)
+    }
+
     private func saveRecordingEdit() {
         guard !isTranscriptionRunning else {
             HapticFeedback.play(.blocked)
@@ -3025,6 +3063,34 @@ struct RecordingDetailView: View {
             HapticFeedback.play(.failure)
         }
         isSavingRecordingEdit = false
+    }
+
+    private func saveSummaryEdit() {
+        guard !isTranscriptionRunning else {
+            HapticFeedback.play(.blocked)
+            return
+        }
+        guard !isSavingSummaryEdit else {
+            return
+        }
+
+        isSavingSummaryEdit = true
+        do {
+            let updatedItem = try store.updateDetails(
+                for: currentItem,
+                proposedName: (currentItem.audioFileName as NSString).deletingPathExtension,
+                manualTags: currentItem.manualTags ?? [],
+                summary: editedSummaryText,
+                location: currentItem.location
+            )
+            HapticFeedback.play(.primaryAction)
+            isShowingSummaryEditSheet = false
+            player.load(item: updatedItem, url: store.audioURL(for: updatedItem))
+        } catch {
+            editErrorMessage = error.localizedDescription
+            HapticFeedback.play(.failure)
+        }
+        isSavingSummaryEdit = false
     }
 
     private func deleteCurrentItem(_ item: RecordingItem) {
@@ -3195,6 +3261,73 @@ private struct RecordingEditSheet: View {
             }
         }
         .recordingEditSectionSurface()
+    }
+}
+
+private struct RecordingSummaryEditSheet: View {
+    @Binding var summary: String
+    let isSaving: Bool
+    let onSave: () -> Void
+    let onCancel: () -> Void
+
+    var body: some View {
+        NavigationStack {
+            VStack(alignment: .leading, spacing: 12) {
+                Label(localized(L10n.Recordings.summary), systemImage: "text.alignleft")
+                    .font(.redditSans(.caption, weight: .semibold))
+                    .foregroundStyle(.secondary)
+
+                ZStack(alignment: .topLeading) {
+                    if summary.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                        Text(L10n.Recordings.summaryPlaceholder)
+                            .font(.redditSans(.body))
+                            .foregroundStyle(.tertiary)
+                            .padding(.horizontal, 5)
+                            .padding(.vertical, 8)
+                            .allowsHitTesting(false)
+                    }
+
+                    TextEditor(text: $summary)
+                        .font(.redditSans(.body))
+                        .scrollContentBackground(.hidden)
+                        .padding(.horizontal, -4)
+                        .background(Color.clear)
+                }
+                .padding(.horizontal, 12)
+                .padding(.vertical, 8)
+                .frame(maxWidth: .infinity, minHeight: 220, alignment: .topLeading)
+                .background(AppTheme.elevatedBackground, in: RoundedRectangle(cornerRadius: AppTheme.compactCornerRadius, style: .continuous))
+
+                Spacer(minLength: 0)
+            }
+            .padding(16)
+            .background(AppTheme.groupedBackground.ignoresSafeArea())
+            .navigationTitle(localized(L10n.Recordings.editSummary))
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .topBarLeading) {
+                    Button(localized(L10n.Common.cancel)) {
+                        onCancel()
+                    }
+                    .disabled(isSaving)
+                }
+
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button {
+                        onSave()
+                    } label: {
+                        if isSaving {
+                            ProgressView()
+                                .controlSize(.small)
+                        } else {
+                            Text(L10n.Common.save)
+                                .font(.redditSans(.subheadline, weight: .semibold))
+                        }
+                    }
+                    .disabled(isSaving)
+                }
+            }
+        }
     }
 }
 
