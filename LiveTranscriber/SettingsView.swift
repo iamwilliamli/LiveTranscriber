@@ -2,8 +2,24 @@ import SwiftUI
 import UIKit
 
 struct SettingsView: View {
+    private enum SettingsRoute: Hashable {
+        case transcription
+        case recording
+        case intelligence
+        case files
+        case privacy
+        case source
+        case developer
+        case transcriptionLanguage
+        case localWhisperModel
+        case liveWhisperModel
+        case recordingFormat
+        case speechPipelineMode
+    }
+
     @ObservedObject var transcriber: LiveTranscriptionManager
     @ObservedObject var recordingStore: RecordingStore
+    @State private var navigationPath: [SettingsRoute] = []
     @State private var iCloudSyncRefreshTick = 0
     @State private var pendingSpeechLocaleReleaseRequest: SpeechLocaleReleaseRequest?
     @State private var speechLocaleErrorMessage: String?
@@ -48,13 +64,41 @@ struct SettingsView: View {
         RecordingSummaryProvider(rawValue: selectedSummaryProviderRawValue) ?? .automatic
     }
 
+    @ViewBuilder
+    private func settingsDestination(for route: SettingsRoute) -> some View {
+        switch route {
+        case .transcription:
+            transcriptionSettingsPage
+        case .recording:
+            recordingSettingsPage
+        case .intelligence:
+            intelligenceSettingsPage
+        case .files:
+            fileSettingsPage
+        case .privacy:
+            privacySettingsPage
+        case .source:
+            sourceSettingsPage
+        case .developer:
+            developerSettingsPage
+        case .transcriptionLanguage:
+            transcriptionLanguagePage
+        case .localWhisperModel:
+            localWhisperModelPage
+        case .liveWhisperModel:
+            liveWhisperModelPage
+        case .recordingFormat:
+            recordingFormatPage
+        case .speechPipelineMode:
+            speechPipelineModePage
+        }
+    }
+
     var body: some View {
-        NavigationStack {
+        NavigationStack(path: $navigationPath) {
             ScrollView {
                 VStack(alignment: .leading, spacing: 14) {
-                    NavigationLink {
-                        transcriptionSettingsPage
-                    } label: {
+                    NavigationLink(value: SettingsRoute.transcription) {
                         SettingsNavigationRow(
                             icon: "captions.bubble",
                             titleResource: L10n.Settings.transcription,
@@ -64,11 +108,10 @@ struct SettingsView: View {
                         )
                     }
                     .buttonStyle(.plain)
+                    .settingsNavigationHaptic()
                     .settingsSurface()
 
-                    NavigationLink {
-                        recordingSettingsPage
-                    } label: {
+                    NavigationLink(value: SettingsRoute.recording) {
                         SettingsNavigationRow(
                             icon: "waveform.badge.mic",
                             titleResource: L10n.Settings.recording,
@@ -78,11 +121,10 @@ struct SettingsView: View {
                         )
                     }
                     .buttonStyle(.plain)
+                    .settingsNavigationHaptic()
                     .settingsSurface()
 
-                    NavigationLink {
-                        intelligenceSettingsPage
-                    } label: {
+                    NavigationLink(value: SettingsRoute.intelligence) {
                         SettingsNavigationRow(
                             icon: "sparkles",
                             titleResource: L10n.Settings.intelligence,
@@ -92,11 +134,10 @@ struct SettingsView: View {
                         )
                     }
                     .buttonStyle(.plain)
+                    .settingsNavigationHaptic()
                     .settingsSurface()
 
-                    NavigationLink {
-                        fileSettingsPage
-                    } label: {
+                    NavigationLink(value: SettingsRoute.files) {
                         SettingsNavigationRow(
                             icon: "folder",
                             titleResource: L10n.Settings.files,
@@ -106,11 +147,10 @@ struct SettingsView: View {
                         )
                     }
                     .buttonStyle(.plain)
+                    .settingsNavigationHaptic()
                     .settingsSurface()
 
-                    NavigationLink {
-                        privacySettingsPage
-                    } label: {
+                    NavigationLink(value: SettingsRoute.privacy) {
                         SettingsNavigationRow(
                             icon: "lock.shield",
                             titleResource: L10n.Settings.privacy,
@@ -120,11 +160,10 @@ struct SettingsView: View {
                         )
                     }
                     .buttonStyle(.plain)
+                    .settingsNavigationHaptic()
                     .settingsSurface()
 
-                    NavigationLink {
-                        sourceSettingsPage
-                    } label: {
+                    NavigationLink(value: SettingsRoute.source) {
                         SettingsNavigationRow(
                             icon: "chevron.left.forwardslash.chevron.right",
                             titleResource: L10n.Source.title,
@@ -134,11 +173,10 @@ struct SettingsView: View {
                         )
                     }
                     .buttonStyle(.plain)
+                    .settingsNavigationHaptic()
                     .settingsSurface()
 
-                    NavigationLink {
-                        developerSettingsPage
-                    } label: {
+                    NavigationLink(value: SettingsRoute.developer) {
                         SettingsNavigationRow(
                             icon: "wrench.and.screwdriver",
                             titleResource: L10n.Settings.developerOptions,
@@ -148,6 +186,7 @@ struct SettingsView: View {
                         )
                     }
                     .buttonStyle(.plain)
+                    .settingsNavigationHaptic()
                     .settingsSurface()
 
                     Button {
@@ -168,6 +207,14 @@ struct SettingsView: View {
             .toolbar(.visible, for: .navigationBar)
             .navigationTitle(String(localized: L10n.Settings.title))
             .navigationBarTitleDisplayMode(.inline)
+            .navigationDestination(for: SettingsRoute.self) { route in
+                settingsDestination(for: route)
+            }
+            .onChange(of: navigationPath) { oldValue, newValue in
+                if newValue.count < oldValue.count {
+                    HapticFeedback.play(.navigation)
+                }
+            }
         }
         .task {
             await transcriber.refreshSupportedLanguages()
@@ -295,18 +342,17 @@ struct SettingsView: View {
     private var transcriptionSettingsPage: some View {
         SettingsDetailPage(titleResource: L10n.Settings.transcription) {
             SettingsSection(titleResource: L10n.Settings.transcription, systemImage: "captions.bubble", tint: AppTheme.info) {
-                NavigationLink {
-                    transcriptionLanguagePage
-                } label: {
-                        SettingsNavigationRow(
-                            icon: "globe",
-                            titleResource: L10n.Settings.transcriptionLanguage,
-                            value: transcriber.selectedLanguage.displayName,
-                            subtitleResource: L10n.Settings.nextStartUsesLanguage,
-                            tint: AppTheme.info
-                        )
+                NavigationLink(value: SettingsRoute.transcriptionLanguage) {
+                    SettingsNavigationRow(
+                        icon: "globe",
+                        titleResource: L10n.Settings.transcriptionLanguage,
+                        value: transcriber.selectedLanguage.displayName,
+                        subtitleResource: L10n.Settings.nextStartUsesLanguage,
+                        tint: AppTheme.info
+                    )
                 }
                 .buttonStyle(.plain)
+                .settingsNavigationHaptic()
                 .disabled(transcriber.isRecording || transcriber.isPreparing)
 
                 openAITranscriptionToggleSettings
@@ -472,9 +518,7 @@ struct SettingsView: View {
 
     private var localWhisperModelSettings: some View {
         VStack(alignment: .leading, spacing: 12) {
-            NavigationLink {
-                localWhisperModelPage
-            } label: {
+            NavigationLink(value: SettingsRoute.localWhisperModel) {
                 SettingsNavigationRow(
                     icon: "cube",
                     titleResource: L10n.LocalWhisper.selectedModel,
@@ -484,6 +528,7 @@ struct SettingsView: View {
                 )
             }
             .buttonStyle(.plain)
+            .settingsNavigationHaptic()
             .disabled(isDownloadingLocalWhisperModel || isDownloadingLocalWhisperCoreMLEncoder)
 
             SettingsMetricRow(
@@ -1168,9 +1213,7 @@ struct SettingsView: View {
             .toggleStyle(.switch)
             .disabled(transcriber.isRecording || transcriber.isPreparing)
 
-            NavigationLink {
-                liveWhisperModelPage
-            } label: {
+            NavigationLink(value: SettingsRoute.liveWhisperModel) {
                 SettingsNavigationRow(
                     icon: "dot.radiowaves.left.and.right",
                     titleResource: L10n.LocalWhisper.liveModelTitle,
@@ -1180,6 +1223,7 @@ struct SettingsView: View {
                 )
             }
             .buttonStyle(.plain)
+            .settingsNavigationHaptic()
             .disabled(isDownloadingLiveWhisperModel || isDownloadingLiveWhisperCoreMLEncoder || transcriber.isRecording || transcriber.isPreparing)
 
             if let liveWhisperModelStatus {
@@ -1375,9 +1419,7 @@ struct SettingsView: View {
     private var recordingSettingsPage: some View {
         SettingsDetailPage(titleResource: L10n.Settings.recording) {
             SettingsSection(titleResource: L10n.Settings.recording, systemImage: "waveform.badge.mic", tint: AppTheme.brand) {
-                NavigationLink {
-                    recordingFormatPage
-                } label: {
+                NavigationLink(value: SettingsRoute.recordingFormat) {
                     SettingsNavigationRow(
                         icon: "waveform.badge.mic",
                         titleResource: L10n.Settings.recordingFormat,
@@ -1387,6 +1429,7 @@ struct SettingsView: View {
                     )
                 }
                 .buttonStyle(.plain)
+                .settingsNavigationHaptic()
                 .disabled(transcriber.isRecording || transcriber.isPreparing)
 
                 if transcriber.isRecording || transcriber.isPreparing {
@@ -1735,9 +1778,7 @@ struct SettingsView: View {
             )
 
             if transcriber.selectedTranscriptionBackend.requiresAppleSpeech {
-                NavigationLink {
-                    speechPipelineModePage
-                } label: {
+                NavigationLink(value: SettingsRoute.speechPipelineMode) {
                     SettingsNavigationRow(
                         icon: "slider.horizontal.3",
                         titleResource: L10n.Settings.speechPipelineMode,
@@ -1747,6 +1788,7 @@ struct SettingsView: View {
                     )
                 }
                 .buttonStyle(.plain)
+                .settingsNavigationHaptic()
                 .disabled(transcriber.isRecording || transcriber.isPreparing)
             }
 
@@ -2334,6 +2376,14 @@ private struct SettingsIcon: View {
 }
 
 private extension View {
+    func settingsNavigationHaptic() -> some View {
+        simultaneousGesture(
+            TapGesture().onEnded {
+                HapticFeedback.play(.navigation)
+            }
+        )
+    }
+
     func settingsSurface() -> some View {
         padding(14)
             .frame(maxWidth: .infinity, alignment: .leading)

@@ -1011,6 +1011,65 @@ final class RecordingStore: ObservableObject {
     }
 
     @discardableResult
+    func importRecording(from sourceURL: URL) async throws -> RecordingItem {
+        let language = TranscriptionLanguage(id: TranscriptionLanguage.defaultLanguageID)
+        try ensureRecordingsDirectory()
+
+        let createdAt = Date()
+        let baseName = uniqueBaseName(for: createdAt)
+        let audioExtension = sourceURL.pathExtension.isEmpty ? "m4a" : sourceURL.pathExtension.lowercased()
+        let audioFileName = "\(baseName).\(audioExtension)"
+        let transcriptFileName = "\(baseName).txt"
+        let targetAudioURL = recordingsDirectory.appendingPathComponent(audioFileName)
+        let targetTranscriptURL = recordingsDirectory.appendingPathComponent(transcriptFileName)
+
+        let item = RecordingItem(
+            id: UUID(),
+            createdAt: createdAt,
+            durationSeconds: 0,
+            languageID: language.id,
+            languageName: language.displayName,
+            audioFileName: audioFileName,
+            transcriptFileName: transcriptFileName,
+            transcriptPreview: "",
+            lineCount: 0,
+            intelligence: nil,
+            importStatus: RecordingImportStatus(
+                progress: 0.02,
+                message: String(localized: L10n.Import.importingRecording),
+                isFailed: false
+            ),
+            manualTags: nil,
+            location: nil
+        )
+        recordings.insert(item, at: 0)
+        recordings.sort { $0.createdAt > $1.createdAt }
+        try persist()
+
+        do {
+            let durationSeconds = try await importWorker.prepareImportedAudio(
+                from: sourceURL,
+                to: targetAudioURL,
+                transcriptURL: targetTranscriptURL
+            )
+            guard let index = recordings.firstIndex(where: { $0.id == item.id }) else {
+                throw RecordingImportError.saveFailed
+            }
+            recordings[index].durationSeconds = durationSeconds
+            recordings[index].importStatus = nil
+            try persist()
+        } catch {
+            markImportFailed(for: item.id, message: error.localizedDescription)
+            throw error
+        }
+
+        guard let importedItem = recordings.first(where: { $0.id == item.id }) else {
+            throw RecordingImportError.saveFailed
+        }
+        return importedItem
+    }
+
+    @discardableResult
     func importRecording(
         from sourceURL: URL,
         language: TranscriptionLanguage,

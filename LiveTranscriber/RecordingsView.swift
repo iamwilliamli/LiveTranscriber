@@ -521,7 +521,6 @@ struct RecordingsView: View {
     @State private var importErrorMessage: String?
     @State private var transcriptionErrorMessage: String?
     @State private var deleteErrorMessage: String?
-    @State private var pendingImport: PendingImport?
     @State private var pendingSpeechLocaleReleaseAction: PendingSpeechLocaleReleaseAction?
     @State private var appleSpeechRetranscriptionRequest: AppleSpeechRetranscriptionRequest?
     @State private var appleSpeechTranscriptionLanguages: [TranscriptionLanguage] = TranscriptionLanguage.fallbackOptions
@@ -636,35 +635,6 @@ struct RecordingsView: View {
                     requestRetranscription(request.item, language: language)
                 }
             )
-        }
-        .confirmationDialog(
-            localized(L10n.Recordings.chooseTranscriptionLanguage),
-            isPresented: Binding(
-                get: { pendingImport != nil },
-                set: { isPresented in
-                    if !isPresented {
-                        pendingImport = nil
-                    }
-                }
-            ),
-            titleVisibility: .visible
-        ) {
-            if let pendingImport {
-                ForEach(appleSpeechTranscriptionLanguages) { language in
-                    Button {
-                        requestImportRecording(from: pendingImport.url, language: language)
-                    } label: {
-                        Label(
-                            language.displayName,
-                            systemImage: language.id == transcriber.selectedLanguageID ? "checkmark" : "globe"
-                        )
-                    }
-                }
-            }
-
-            Button(localized(L10n.Common.cancel), role: .cancel) {}
-        } message: {
-            Text(L10n.Recordings.importRecording)
         }
         .alert(
             localized(L10n.SpeechText.releaseOldLanguagesTitle),
@@ -828,7 +798,7 @@ struct RecordingsView: View {
                         Image(systemName: "square.and.arrow.down")
                             .frame(width: 32, height: 28)
                     }
-                    .disabled(isImporting || pendingImport != nil || transcriber.isRecording || transcriber.isPreparing)
+                    .disabled(isImporting || transcriber.isRecording || transcriber.isPreparing)
                     .accessibilityLabel(Text(L10n.Recordings.importRecording))
                 }
                 .fixedSize()
@@ -987,55 +957,20 @@ struct RecordingsView: View {
         }
 
         selectedRecording = nil
-        pendingImport = PendingImport(url: url)
-        HapticFeedback.play(.importQueued)
+        importRecording(from: url)
     }
 
-    private func requestImportRecording(from url: URL, language: TranscriptionLanguage) {
+    private func importRecording(from url: URL) {
         guard !isImporting else {
             HapticFeedback.play(.blocked)
             return
         }
 
-        pendingImport = nil
-        Task {
-            do {
-                let preparation = try await transcriber.prepareSpeechLocaleForUse(
-                    language,
-                    preservingLanguageIDs: [transcriber.selectedLanguageID]
-                )
-                switch preparation {
-                case .ready:
-                    importRecording(from: url, language: language)
-                case .needsRelease(let request):
-                    pendingSpeechLocaleReleaseAction = PendingSpeechLocaleReleaseAction(
-                        request: request,
-                        operation: .importRecording(url)
-                    )
-                    HapticFeedback.play(.warning)
-                }
-            } catch {
-                importErrorMessage = error.localizedDescription
-                HapticFeedback.play(.failure)
-            }
-        }
-    }
-
-    private func importRecording(from url: URL, language: TranscriptionLanguage) {
-        guard !isImporting else {
-            HapticFeedback.play(.blocked)
-            return
-        }
-
-        pendingImport = nil
         isImporting = true
         HapticFeedback.play(.importStart)
         Task {
             do {
-                _ = try await store.importRecording(
-                    from: url,
-                    language: language
-                )
+                _ = try await store.importRecording(from: url)
                 HapticFeedback.play(.importComplete)
             } catch {
                 importErrorMessage = error.localizedDescription
@@ -1079,15 +1014,11 @@ struct RecordingsView: View {
             do {
                 try await transcriber.releaseSpeechLocalesAndReserveTarget(pendingAction.request)
                 switch pendingAction.operation {
-                case .importRecording(let url):
-                    importRecording(from: url, language: pendingAction.request.targetLanguage)
                 case .retranscribe(let item):
                     retranscribe(item, language: pendingAction.request.targetLanguage)
                 }
             } catch {
                 switch pendingAction.operation {
-                case .importRecording:
-                    importErrorMessage = error.localizedDescription
                 case .retranscribe:
                     transcriptionErrorMessage = error.localizedDescription
                 }
@@ -1260,11 +1191,6 @@ struct RecordingsView: View {
     }
 }
 
-private struct PendingImport: Identifiable {
-    let id = UUID()
-    let url: URL
-}
-
 private struct PendingSpeechLocaleReleaseAction: Identifiable {
     let request: SpeechLocaleReleaseRequest
     let operation: SpeechLocaleReleaseOperation
@@ -1275,7 +1201,6 @@ private struct PendingSpeechLocaleReleaseAction: Identifiable {
 }
 
 private enum SpeechLocaleReleaseOperation {
-    case importRecording(URL)
     case retranscribe(RecordingItem)
 }
 
@@ -1391,6 +1316,11 @@ struct RecordingMapView: View {
                     downloadedLocalWhisperModels: downloadedLocalWhisperModels,
                     localWhisperLanguageOptionsByModelID: localWhisperLanguageOptionsByModelID
                 )
+            }
+            .onChange(of: selectedRecording?.id) { _, newValue in
+                if newValue == nil {
+                    HapticFeedback.play(.navigation)
+                }
             }
         }
     }
@@ -1884,6 +1814,7 @@ struct RecordingDetailView: View {
             if let onClose {
                 ToolbarItem(placement: .topBarLeading) {
                     Button {
+                        HapticFeedback.play(.navigation)
                         onClose()
                     } label: {
                         Image(systemName: "chevron.left")

@@ -66,7 +66,7 @@ enum HapticFeedback {
 
         switch event {
         case .navigation:
-            softImpact(intensity: 0.35)
+            mediumImpact(intensity: 0.62)
         case .tabSelection:
             selection()
             delayedImpact(.light, intensity: 0.42, afterMilliseconds: 24)
