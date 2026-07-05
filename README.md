@@ -1,223 +1,191 @@
 # LiveTranscriber
 
-![LiveTranscriber README poster](docs/assets/readme-poster.png)
+<p align="center">
+  <img src="docs/assets/readme-poster.png" alt="LiveTranscriber README poster" />
+</p>
 
-LiveTranscriber is an iOS 26+ recording and live transcription app. It records audio, transcribes live speech on device with Apple's Speech APIs or the optional Local Whisper Live beta, saves audio and transcript files, and keeps recording status visible through Lock Screen Live Activities and Dynamic Island.
+<p align="center">
+  <a href="README.zh-CN.md">简体中文</a> · <strong>English</strong> ·
+  <a href="https://testflight.apple.com/join/gsu9xa9k">TestFlight Beta</a>
+</p>
 
-The project is designed as a native, local-first iOS utility. Audio, transcripts, and the recording index stay in the local app-private container by default. Users can enable iCloud in Settings to move storage into an app-private iCloud container for cross-device sync. Users can manually re-transcribe saved recordings with Apple Speech, Local Whisper, or OpenAI file transcription using their own API key, and can summarize recordings with Apple Intelligence or a downloaded local Qwen3 GGUF model through embedded llama.cpp.
+<p align="center">
+  <img alt="Platform" src="https://img.shields.io/badge/platform-iOS%2026%2B-black">
+  <img alt="SwiftUI" src="https://img.shields.io/badge/SwiftUI-native-blue">
+  <img alt="Local first" src="https://img.shields.io/badge/privacy-local--first-green">
+  <img alt="License" src="https://img.shields.io/badge/license-source--available-orange">
+</p>
 
-## Source Availability and Commercial Attribution
+LiveTranscriber is a local-first iOS recording app built around one workflow: record on your iPhone, read the transcript as it appears, translate the text while recording, then turn saved audio into searchable notes with local transcription, summaries, and tags.
 
-LiveTranscriber is source-available under the [LiveTranscriber Source Available License 1.0](LICENSE). The code is public so people can learn from it, fork it, and continue development.
+It uses Apple Speech for the default live transcription path, supports optional Local Whisper for offline high-accuracy re-transcription, and can generate summaries and topic tags with Apple Intelligence or a downloaded Qwen3 1.7B Q4 GGUF model through embedded llama.cpp. This makes it useful on devices where Apple Intelligence is unavailable, including China-region iPhones and other unsupported configurations.
 
-This is not an OSI-approved open-source license because commercial forks have an attribution requirement. Commercial apps, services, forks, or derivative products based on this project must include visible in-app attribution:
+## Highlights
 
-```text
-Based on LiveTranscriber by William Li
-Original project: https://github.com/iamwilliamli/LiveTranscriber
-```
+| Moment | What LiveTranscriber does |
+| --- | --- |
+| While recording | Saves audio and shows live transcript lines immediately. |
+| While listening | Translates confirmed transcript text with Apple's Translation framework. |
+| After recording | Re-transcribes saved audio with Apple Speech, Local Whisper, or optional OpenAI. |
+| For notes | Generates summaries and tags with Apple Intelligence or local Qwen3. |
+| For recall | Searches names, languages, transcript text, summaries, and tags. |
+| For privacy | Keeps recordings local by default, with optional private iCloud sync. |
 
-Attribution-free, private-label, or white-label commercial use requires separate written permission from William Li. See [LICENSE](LICENSE), [NOTICE](NOTICE), and [CONTRIBUTING.md](CONTRIBUTING.md) for the full terms.
+## Core Workflow
 
-## Community and Reporting
-
-- [TestFlight Beta](https://testflight.apple.com/join/gsu9xa9k)
-- [Contributing Guide](CONTRIBUTING.md)
-- [Code of Conduct](CODE_OF_CONDUCT.md)
-- [Security Policy](SECURITY.md)
-- [Bug Reports](https://github.com/iamwilliamli/LiveTranscriber/issues/new?template=bug_report.md)
-- [Feature Requests](https://github.com/iamwilliamli/LiveTranscriber/issues/new?template=feature_request.md)
+1. **Record and transcribe live.** Start recording, choose language and WAV/M4A format from the recorder, and watch transcript lines appear as the audio is captured.
+2. **Translate during recording.** Use live transcript translation for confirmed lines while the recording is still running.
+3. **Save a structured recording.** Add a title, manual tags, generated title/tags, and optional location metadata.
+4. **Improve the transcript locally.** After recording, choose Local Whisper and select any downloaded model for higher-accuracy offline re-transcription.
+5. **Summarize on device.** Use Apple Intelligence when available, or use local Qwen3 summaries and tags when Apple Intelligence is not available.
+6. **Search later.** Find recordings by file name, language, transcript body, summary, or tags.
 
 ## Current Features
 
-- Tab-based SwiftUI app with recording, file library, and settings areas.
-- First-run onboarding for core permissions, local model setup, and app feature orientation.
-- Live recording with real-time transcript updates, pause/resume, elapsed timer, and consistent haptic feedback for primary actions, menus, and navigation.
-- Home recording controls for transcription language and recording format, including visible dropdown affordances for changing language and WAV/M4A output before recording.
-- Save sheet after stopping a recording, with editable name, manual tags, AI title/tag generation, duration, and optional location attachment.
-- WAV and M4A recording output, configurable from the recorder card and Settings.
-- Stereo Capture recording with `AVCaptureSession` and `AVCaptureDeviceInput.multichannelAudioMode = .stereo`.
-- Offline transcription for imported audio files, with language selection and progress/failure state.
-- Import from Files or the iOS share/Open In menu for audio recordings such as Voice Memos exports.
-- Re-transcription of saved recordings with any supported Speech locale.
-- Local app-private storage by default, with an optional Settings-controlled app-private iCloud container for audio, transcript, and recording-index sync.
-- Recording map view for recordings that were saved with location metadata.
-- Search across file names, languages, transcript previews, full transcript text, summaries, and topic tags.
-- Timestamped transcript lines for playback seeking.
-- Saved recording detail view with audio playback, transcript seek, transcript translation, copy, share, edit, lock/unlock, and delete actions.
-- Lock Screen and Dynamic Island Live Activity with elapsed time, latest final transcript, language, line count, and stop action.
-- Home Screen widget with quick links to recording, saved files, and settings.
-- Selectable summary engine for saved transcripts: Automatic, Apple Intelligence, or Local Qwen3. The recording detail analyze button uses the Settings default on tap and exposes provider choice on long press.
-- Local Qwen3 1.7B Q4_K_M GGUF summary and topic tag generation through embedded llama.cpp, with model download/delete controls in Settings.
-- Selectable speech processing pipelines: a stable iOS 26/27 compatible pipeline and an iOS 27 native `AnalyzerInputConverter` pipeline.
-- Optional Local Whisper Live beta for realtime offline transcription with a separately selected realtime model.
-- Optional Local Whisper re-transcription for saved recordings, with on-device whisper.cpp inference, downloadable or bundled GGML model files, per-run model selection, language selection, and optional Core ML encoder downloads.
-- Optional OpenAI re-transcription for saved recordings, with long-form, segmented, and local-segment refinement modes using a user-supplied OpenAI API key stored in Keychain.
-- Recording detail audio parameters, including sample rate, channel count, encoding, duration, frame count, and file size.
-- Shared visual system based on Reddit Sans, grouped backgrounds, compact card surfaces, red recording actions, and system SF Symbols.
-- English, Simplified Chinese, Traditional Chinese, German, Dutch, and Japanese localization.
+### Recording
+
+- Native SwiftUI app with Recording, Recordings, and Settings tabs.
+- Stereo Capture using `AVCaptureSession` and `AVCaptureDeviceInput.multichannelAudioMode = .stereo`.
+- WAV and M4A output, configurable from the recorder card and Settings.
+- Pause/resume, elapsed timer, input status, Live Activity, Dynamic Island, and Home Screen widget support.
+- Consistent haptic feedback for primary actions, menus, navigation, analysis, playback, and blocked states.
+
+### Transcription and Translation
+
+- Default Apple Speech live transcription through `SpeechAnalyzer` and `SpeechTranscriber`.
+- Optional Local Whisper Live beta for offline realtime transcription with a selected downloaded model.
+- Import audio from Files or the iOS share/Open In menu.
+- Offline imported-audio transcription with progress and failure states.
+- Saved-recording re-transcription with Apple Speech, Local Whisper, or OpenAI.
+- Live and saved transcript translation using Apple's Translation framework.
+
+### Saved Recordings
+
+- Timestamped transcript lines that can seek playback.
+- Recording detail view with playback controls, transcript seek, translation, copy, share, edit, lock/unlock, delete, and audio parameter inspection.
+- Recording map for recordings saved with location metadata.
+- Search across file names, languages, transcript previews, full transcript text, summaries, and tags.
+- Local app-private storage by default, with optional app-private iCloud file sync and private CloudKit index sync.
+
+### Intelligence
+
+- Selectable summary engine: Automatic, Apple Intelligence, or Local Qwen3.
+- Tap Analyze to use the Settings default; long-press Analyze to choose a provider for that run.
+- Local Qwen3 1.7B Q4_K_M GGUF summaries and tags through embedded llama.cpp.
+- Summary model download/delete controls in Settings.
+- Save-sheet title/tag generation for new recordings.
+
+### Model Options
+
+- Local Whisper saved-recording re-transcription can choose from downloaded models per run.
+- Local Whisper model families: Tiny, Base, Small, Medium, Large v3 Turbo Q5, Large v3 Q5, and Large v3.
+- Optional Core ML encoder downloads for Local Whisper model acceleration.
+- Local Qwen summary model: `Qwen_Qwen3-1.7B-Q4_K_M.gguf`.
+
+## Why Local Qwen Matters
+
+Apple Intelligence is not available on every iPhone, region, language, or OS configuration. LiveTranscriber keeps summaries usable by adding a local Qwen3 path:
+
+- The transcript stays on the phone.
+- The model runs through embedded llama.cpp.
+- Summary and tags work without Apple Intelligence after the GGUF model is downloaded.
+- This is especially helpful for China-region iPhones and other devices where Apple Intelligence is unavailable.
 
 ## How It Works
-
-LiveTranscriber is a local-first iOS app. The default recording path captures stereo audio once, writes that audio to a file, and downmixes the same live sample buffers into the local Apple Speech pipeline for real-time transcripts. If Local Whisper Live beta is enabled, the app records through the same capture path and runs the selected Whisper model locally in chunked realtime inference. Saved recordings, transcript text, search metadata, summaries, and tags stay in the app-private container by default. If the user enables iCloud, app-managed files move to the app-private iCloud container and the SwiftData index syncs through the user's private CloudKit database.
 
 ```mermaid
 flowchart TB
     user["User"]
-    ui["SwiftUI App\nRecordings, Transcription, Settings"]
-    manager["LiveTranscriptionManager\nrecording session state"]
+    ui["SwiftUI App\nRecording, Library, Settings"]
     capture["AVCaptureSession\nStereo microphone capture"]
     fileWriter["Audio File Writer\nWAV / M4A"]
-    speechInput["Analyzer Input Pipeline\nmonotonic timestamps"]
-    speech["Apple Speech\nSpeechAnalyzer + SpeechTranscriber"]
-    localWhisperLive["Local Whisper Live Beta\nrealtime whisper.cpp chunks"]
-    localWhisper["Local Whisper\nmanual saved-recording retranscribe"]
-    openai["OpenAI Audio Transcriptions\nmanual saved-recording retranscribe"]
-    translation["Apple Translation\nlive and saved transcript translation"]
+    appleSpeech["Apple Speech\nSpeechAnalyzer + SpeechTranscriber"]
+    whisperLive["Local Whisper Live Beta\nrealtime whisper.cpp chunks"]
     liveText["Live Transcript Lines"]
-    activity["ActivityKit + WidgetKit\nLock Screen, Dynamic Island, Home Widget"]
-    store["RecordingStore\nmetadata, files, search, import"]
-    localFiles["Local App-Private Container\naudio + transcript files"]
-    swiftData["SwiftData Index\nrecording metadata"]
-    icloudFiles["App-Private iCloud Container\noptional file sync"]
-    cloudKit["Private CloudKit Database\noptional index sync"]
-    detail["Recording Detail\nplayback, seek, share, re-transcribe"]
-    intelligence["Apple Intelligence\nFoundationModels summary + tags"]
-    localQwen["Local Qwen3 GGUF\nsummary through embedded llama.cpp"]
-    importAudio["Files / Share Sheet\nimported audio"]
+    translation["Apple Translation\nlive and saved transcript translation"]
+    store["RecordingStore\nmetadata, files, search"]
+    localFiles["Local App-Private Container"]
+    icloud["Private iCloud Container\noptional"]
+    cloudKit["Private CloudKit Database\noptional"]
+    detail["Recording Detail\nplayback, seek, edit, analyze"]
+    localWhisper["Local Whisper\nsaved-recording re-transcription"]
+    appleIntel["Apple Intelligence\nFoundationModels summary + tags"]
+    localQwen["Local Qwen3 GGUF\nsummary through llama.cpp"]
+    openai["OpenAI Audio\noptional saved-recording re-transcription"]
+    activity["ActivityKit + WidgetKit\nLock Screen, Dynamic Island, Widget"]
 
     user --> ui
-    ui --> manager
-    manager --> capture
+    ui --> capture
     capture --> fileWriter
-    capture --> speechInput
-    speechInput --> speech
-    speech --> liveText
-    capture --> localWhisperLive
-    localWhisperLive --> liveText
+    capture --> appleSpeech
+    capture --> whisperLive
+    appleSpeech --> liveText
+    whisperLive --> liveText
     liveText --> ui
-    liveText --> activity
     liveText --> translation
-    translation --> ui
+    liveText --> activity
     fileWriter --> store
     liveText --> store
-    importAudio --> store
     store --> localFiles
-    store --> swiftData
-    store -. "when iCloud is enabled" .-> icloudFiles
-    swiftData -. "when iCloud is enabled" .-> cloudKit
+    store -. "if enabled" .-> icloud
+    store -. "if enabled" .-> cloudKit
     store --> detail
     detail --> localWhisper
+    detail --> appleIntel
+    detail --> localQwen
     detail --> openai
     localWhisper --> store
-    openai --> store
-    detail --> translation
-    detail --> intelligence
-    detail --> localQwen
-    intelligence --> store
+    appleIntel --> store
     localQwen --> store
+    openai --> store
 ```
 
-## Recording Capture Mode
+## Transcription Paths
 
-LiveTranscriber uses Stereo Capture as its only live microphone capture path.
+| Path | Use case | Network behavior |
+| --- | --- | --- |
+| Apple Speech | Default live transcription, import transcription, Apple re-transcription | On-device Apple system framework |
+| Local Whisper Live beta | Offline realtime transcription with a selected Whisper model | On-device after model download |
+| Local Whisper saved-recording | Higher-accuracy offline pass after recording | On-device after model download |
+| OpenAI saved-recording | Optional cloud transcription with the user's own API key | Uploads only when explicitly selected |
 
-The recorder uses `AVCaptureSession`, sets `AVCaptureDeviceInput.multichannelAudioMode = .stereo`, writes a stereo file, and downmixes the same captured sample buffers to mono before feeding SpeechAnalyzer.
+## Summary Paths
 
-Stereo Capture only works when the active capture input supports AVCapture stereo mode. On current Apple APIs this mode is intended for the built-in microphone; external microphones may not honor it.
+| Engine | Use case | Notes |
+| --- | --- | --- |
+| Automatic | Best available local option | Apple Intelligence first, then Local Qwen if installed |
+| Apple Intelligence | System FoundationModels summary and tags | Requires device and region availability |
+| Local Qwen3 | Local summaries on unsupported devices | Uses `Qwen_Qwen3-1.7B-Q4_K_M.gguf` with embedded llama.cpp |
 
-## Live Transcription Backends and Speech Pipeline Modes
+## Supported Languages
 
-LiveTranscriber uses Apple on-device Speech by default. Settings also expose an experimental Local Whisper Live beta backend. Local Whisper Live requires a separately selected realtime Whisper model, runs offline through whisper.cpp, and uses fixed 8 second chunks without overlap.
+Apple live transcription, imported-audio transcription, and Apple Speech re-transcription use the languages returned by `AppleSpeechTranscriptionSupport.supportedLanguages()` on the current device. The fallback list shown before the system list loads includes English, Simplified Chinese, Traditional Chinese, Japanese, Korean, French, German, and Spanish.
 
-When the Apple on-device backend is selected, LiveTranscriber exposes the active Speech pipeline in Settings > Developer Options.
+Local Whisper uses model-specific language support:
 
-- Compatible Pipeline: available on iOS 26 and iOS 27. Uses `SpeechTranscriber` with `preset: .timeIndexedProgressiveTranscription`, `SpeechAnalyzer.Options(priority: .userInitiated, modelRetention: .whileInUse)`, `ignoresResourceLimits: true` on iOS 27, `AVAudioConverter`, and fixed analyzer input `16 kHz / mono / Int16 PCM`.
-- iOS 27 Native Pipeline: available on iOS 27. Uses `SpeechTranscriber` with `preset: .timeIndexedProgressiveTranscription`, `SpeechAnalyzer.Options(priority: .userInitiated, modelRetention: .whileInUse, ignoresResourceLimits: true)`, `AnalyzerInputConverter.converter(compatibleWith: modules)`, and `SpeechAnalyzer.prepareToAnalyze(in: nil)` so the system chooses the compatible input format.
+- English-only models expose English only.
+- Multilingual models expose Whisper's multilingual language list.
 
-Both live pipelines use a monotonic audio timeline for `AnalyzerInput.bufferStartTime` so transcript timestamps stay stable across iOS 26 and iOS 27.
+OpenAI saved-recording transcription uses the saved recording's current language ID when sending the request.
 
-## Supported Transcription Languages
+## Storage and Sync
 
-The app has different language sources for each transcription path.
-
-Apple live transcription, imported-audio transcription, and Apple Speech re-transcription use the languages returned by `AppleSpeechTranscriptionSupport.supportedLanguages()` on the current device. The initial fallback list, used before the system list is loaded, is:
-
-- English (`en-US`)
-- Simplified Chinese (`zh-Hans`)
-- Traditional Chinese (`zh-Hant`)
-- Japanese (`ja-JP`)
-- Korean (`ko-KR`)
-- French (`fr-FR`)
-- German (`de-DE`)
-- Spanish (`es-ES`)
-
-Local Whisper does not use the Apple Speech language list. Its language menu is based on the selected Whisper model. The saved-recording Local Whisper menu first lets the user choose one of the downloaded models, then choose a language supported by that model:
-
-- English-only models (`tiny.en`, `base.en`, `small.en`, `medium.en`) expose English (`en`) only.
-- Multilingual models expose the language IDs listed in `LocalWhisperTranscriptionService.whisperMultilingualLanguageIDs`:
-
-```text
-af, am, ar, as, az, ba, be, bg, bn, bo,
-br, bs, ca, cs, cy, da, de, el, en, es,
-et, eu, fa, fi, fo, fr, gl, gu, ha, haw,
-he, hi, hr, ht, hu, hy, id, is, it, ja,
-jw, ka, kk, km, kn, ko, la, lb, ln, lo,
-lt, lv, mg, mi, mk, ml, mn, mr, ms, mt,
-my, ne, nl, nn, no, oc, pa, pl, ps, pt,
-ro, ru, sa, sd, si, sk, sl, sn, so, sq,
-sr, su, sv, sw, ta, te, tg, th, tk, tl,
-tr, tt, uk, ur, uz, vi, yi, yo, yue, zh
-```
-
-OpenAI saved-recording transcription does not show a separate language picker. It uses the saved recording's current `languageID` and sends that language's ISO language code with the OpenAI transcription request when available.
-
-Live and saved transcript translation use Apple's Translation framework and expose target languages supported by the current system.
-
-## Optional Local Whisper Transcription
-
-Local Whisper is available in two places:
-
-- Local Whisper Live beta: an optional realtime backend for new recordings. The user enables it in Settings, selects a realtime model, and downloads that model before recording.
-- Saved-recording Local Whisper: a manual re-transcription path. From a recording's detail menu, the user chooses `Transcribe with Local Whisper`, selects a downloaded model and language, and the app replaces the saved transcript with Whisper output.
-
-Both Local Whisper paths run on the iPhone. Saved-recording transcription converts the audio file to `16 kHz / mono / Float32 PCM`, loads the selected GGML model, runs whisper.cpp through the local Objective-C bridge, and writes Whisper segment start times back into the same timestamped transcript format used elsewhere in the app. Local Whisper Live uses the selected realtime model and emits live final/interim transcript lines from local chunks.
-
-Models are managed in Settings. Saved-recording transcription and realtime Local Whisper keep separate selected model IDs in `UserDefaults`; model files can be bundled with the app or downloaded into `Application Support/WhisperModels`. Downloaded model files and optional Core ML encoder bundles are excluded from iCloud backup. The currently exposed model choices are:
-
-- Tiny Multilingual / Tiny English: smallest and fastest, lowest accuracy.
-- Base Multilingual / Base English: default balance for local transcription.
-- Small Multilingual / Small English: better quality with a larger download and slower runtime.
-- Medium Multilingual / Medium English: high quality, significantly heavier on storage and runtime.
-- Large v3 Turbo Q5, Large v3 Q5, and Large v3: strongest multilingual options, with much larger storage and memory requirements.
-
-If no selected model is available, Local Whisper transcription fails with a Settings-facing prompt to download a model first. Model downloads use the whisper.cpp GGML model files hosted under `ggerganov/whisper.cpp` on Hugging Face and happen only after the user taps a download action.
-
-## Local and Apple Summary Engines
-
-Saved recordings can generate summaries and topic tags with a selectable summary engine:
-
-- Automatic: use Apple Intelligence when available, otherwise use the downloaded Local Qwen model.
-- Apple Intelligence: use the system FoundationModels path only.
-- Local Qwen3: use a downloaded or bundled `Qwen_Qwen3-1.7B-Q4_K_M.gguf` file through the embedded llama.cpp bridge.
-
-The default summary engine is stored in Settings. On the recording detail screen, tapping Analyze uses that default; long-pressing the button opens the provider menu for a one-off choice. The local Qwen model is managed under Settings > Intelligence, stored in `Application Support/SummaryModels`, and excluded from iCloud backup.
-
-## Optional OpenAI Saved-Recording Transcription
-
-Live recording does not use OpenAI. For saved recordings, the recording detail menu can manually run OpenAI file transcription when the user needs a higher-accuracy pass for difficult languages, accents, or domain vocabulary.
-
-OpenAI transcription uses a bring-your-own-key setup in Settings. The user enters their own OpenAI API key, the key is stored in iOS Keychain, and the iPhone uploads the selected saved recording directly to OpenAI only when the user chooses an OpenAI re-transcription action. Long-form mode uses `gpt-4o-transcribe`; segmented mode uses `whisper-1` with segment timestamps; refine-local-segments mode keeps local timestamps and retranscribes each local audio segment.
+- Local app-private storage is the default.
+- Optional iCloud storage moves app-managed audio and transcript files into an app-private iCloud container.
+- Recording metadata uses SwiftData locally by default.
+- When iCloud storage is enabled, metadata syncs through the user's private CloudKit database.
+- Downloaded Whisper, Core ML encoder, and Qwen model files are excluded from iCloud backup.
 
 ## Requirements
 
 - Xcode beta with the iOS 27 SDK.
 - iOS 26 or later device or simulator for development.
-- iOS 27 is required for the Native Pipeline mode.
-- Apple Speech and FoundationModels availability on the target device.
-- Local Whisper requires the whisper.cpp runtime to be embedded in the app build and a selected GGML model file to be bundled or downloaded.
-- Local Qwen summaries require the llama.cpp runtime to be embedded in the app build and the Qwen3 GGUF model to be bundled or downloaded.
-- iCloud capability configured for `iCloud.com.iamwilliamli.LiveTranscriber`, with CloudDocuments for private file sync and CloudKit for private SwiftData index sync.
+- iOS 27 is required for the Native Speech Pipeline mode.
+- Apple Speech availability on the target device.
+- FoundationModels availability for Apple Intelligence summaries.
+- Embedded whisper.cpp runtime for Local Whisper.
+- Embedded llama.cpp runtime for Local Qwen summaries.
+- iCloud capability configured for `iCloud.com.iamwilliamli.LiveTranscriber` when testing sync.
 
 ## Build
 
@@ -238,7 +206,7 @@ For device testing, open `LiveTranscriber.xcodeproj` in Xcode and use a signing 
 
 - `LiveTranscriber/`: Main iOS app target.
 - `LiveTranscriberWidget/`: ActivityKit widget extension for Lock Screen and Dynamic Island.
-- `LiveTranscriber.xcodeproj/`: Xcode project and shared scheme.
+- `Vendor/`: Embedded whisper.cpp and llama.cpp XCFrameworks.
 - `docs/`: Focused engineering documents.
 - `DEVELOPMENT_NOTES.md`: Long-form development log and implementation notes.
 
@@ -250,6 +218,28 @@ For device testing, open `LiveTranscriber.xcodeproj` in Xcode and use a signing 
 - [Live Activity Design](docs/LIVE_ACTIVITY.md)
 - [Localization](docs/LOCALIZATION.md)
 - [Development Notes](DEVELOPMENT_NOTES.md)
+
+## Community
+
+- [TestFlight Beta](https://testflight.apple.com/join/gsu9xa9k)
+- [Contributing Guide](CONTRIBUTING.md)
+- [Code of Conduct](CODE_OF_CONDUCT.md)
+- [Security Policy](SECURITY.md)
+- [Bug Reports](https://github.com/iamwilliamli/LiveTranscriber/issues/new?template=bug_report.md)
+- [Feature Requests](https://github.com/iamwilliamli/LiveTranscriber/issues/new?template=feature_request.md)
+
+## Source Availability and Commercial Attribution
+
+LiveTranscriber is source-available under the [LiveTranscriber Source Available License 1.0](LICENSE). The code is public so people can learn from it, fork it, and continue development.
+
+This is not an OSI-approved open-source license because commercial forks have an attribution requirement. Commercial apps, services, forks, or derivative products based on this project must include visible in-app attribution:
+
+```text
+Based on LiveTranscriber by William Li
+Original project: https://github.com/iamwilliamli/LiveTranscriber
+```
+
+Attribution-free, private-label, or white-label commercial use requires separate written permission from William Li. See [LICENSE](LICENSE), [NOTICE](NOTICE), and [CONTRIBUTING.md](CONTRIBUTING.md) for the full terms.
 
 ## Third-Party Licenses
 
@@ -263,20 +253,19 @@ Reddit Sans is included under the SIL Open Font License, Version 1.1. whisper.cp
 - [AnalyzerInputConverter](https://developer.apple.com/documentation/speech/analyzerinputconverter)
 - [AVCaptureSession](https://developer.apple.com/documentation/avfoundation/avcapturesession)
 - [AVCaptureDeviceInput](https://developer.apple.com/documentation/avfoundation/avcapturedeviceinput)
-- [AVAudioConverter](https://developer.apple.com/documentation/avfaudio/avaudioconverter)
 - [ActivityKit](https://developer.apple.com/documentation/activitykit)
 - [Foundation Models](https://developer.apple.com/documentation/foundationmodels)
 - [Translation](https://developer.apple.com/documentation/translation)
 
 ## Privacy Model
 
-LiveTranscriber is built around local processing by default. Live recording and live transcription use Apple system frameworks on device unless the user enables Local Whisper Live beta. Summary and tagging use Apple Intelligence or the downloaded Local Qwen model, depending on the selected summary engine. Saved recordings can also be re-transcribed on device with Local Whisper.
+LiveTranscriber is built around local processing by default.
 
 - Live recording does not use developer-operated transcription servers, third-party analytics, ads, tracking, or custom network requests.
-- Local Whisper transcription runs on device. Optional Whisper model and Core ML encoder downloads connect to Hugging Face only when the user starts those downloads.
-- Local Qwen summaries run on device through embedded llama.cpp. The optional Qwen GGUF download connects to Hugging Face only when the user starts the download.
-- OpenAI is used only when the user manually chooses OpenAI transcription for a saved recording; that recording audio is sent directly from the iPhone to OpenAI.
-- OpenAI transcription stores the user's own OpenAI API key in Keychain and uses it directly from the device.
-- Files are stored in the local app-private container by default. When iCloud storage is enabled in Settings, app-managed recording files sync through an app-private iCloud container instead of a visible iCloud Drive folder.
-- Recording metadata is stored with SwiftData locally by default. When iCloud storage is enabled, it syncs through the user's CloudKit private database.
+- Apple Speech, Apple Translation, and Apple Intelligence use Apple system frameworks.
+- Local Whisper transcription runs on device after the user downloads or bundles a model.
+- Local Qwen summaries run on device through embedded llama.cpp after the user downloads or bundles the GGUF model.
+- OpenAI is used only when the user manually chooses OpenAI transcription for a saved recording; that audio is sent directly from the iPhone to OpenAI with the user's own API key.
+- Files are stored in the local app-private container by default.
+- Optional iCloud sync uses the user's app-private iCloud container and CloudKit private database.
 - The camera is not used for photos or video. `NSCameraUsageDescription` is present because Apple static review requires it when the app uses `AVCaptureSession` / `AVCaptureDeviceInput` for microphone recording.
