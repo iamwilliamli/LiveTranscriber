@@ -1840,6 +1840,13 @@ final class RecordingStore: ObservableObject {
         )
     }
 
+    func generateSuggestedTitle(for item: RecordingItem) async throws -> RecordingTitleSuggestion {
+        try await RecordingIntelligenceService.generateTitleSuggestion(
+            transcript: transcriptText(for: item),
+            languageName: item.localizedLanguageName
+        )
+    }
+
     private func ensureRecordingsDirectory() throws {
         try fileManager.createDirectory(at: recordingsDirectory, withIntermediateDirectories: true)
         try migrateLegacyRecordingFilesIfNeeded()
@@ -3085,7 +3092,39 @@ private enum RecordingIntelligenceService {
         )
     }
 
-    static func generateTitleSuggestion(transcript: String, languageName: String) async throws -> RecordingTitleSuggestion {
+    private static func generateLocalTitleSuggestion(
+        transcript: String,
+        languageName: String
+    ) async throws -> RecordingTitleSuggestion {
+        debugLog("Starting local Qwen title generation. language=\(languageName), characters=\(transcript.count), transcriptPreview=\(debugSnippet(transcript, limit: 900))")
+        let suggestion = try await LocalSummaryIntelligenceService.generateTitleSuggestion(
+            transcript: transcript,
+            languageName: languageName
+        )
+        debugLog("Local Qwen title generation completed. titleCharacters=\(suggestion.title.count), title=\(debugSnippet(suggestion.title, limit: 300)), summaryCharacters=\(suggestion.summary?.count ?? 0), summary=\(debugSnippet(suggestion.summary, limit: 700)), tagCount=\(suggestion.tags.count), tags=\(suggestion.tags)")
+        return suggestion
+    }
+
+    private static func generateLocalTitleSuggestionIfAvailable(
+        transcript: String,
+        languageName: String
+    ) async throws -> RecordingTitleSuggestion? {
+        guard LocalSummaryModelManager.currentStatus().isAvailable else {
+            debugLog("Local Qwen title fallback skipped because no local summary model is installed.")
+            return nil
+        }
+
+        return try await generateLocalTitleSuggestion(
+            transcript: transcript,
+            languageName: languageName
+        )
+    }
+
+    static func generateTitleSuggestion(
+        transcript: String,
+        languageName: String,
+        summaryProvider: RecordingSummaryProvider = .selected
+    ) async throws -> RecordingTitleSuggestion {
         let cleanedTranscript = transcript.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !cleanedTranscript.isEmpty else {
             throw RecordingIntelligenceError.emptyTranscript
@@ -3095,12 +3134,28 @@ private enum RecordingIntelligenceService {
             useCase: .general,
             guardrails: .permissiveContentTransformations
         )
-        debugLog("Starting title generation. language=\(languageName), characters=\(cleanedTranscript.count), availability=\(availabilityDescription(model.availability)), transcriptPreview=\(debugSnippet(cleanedTranscript, limit: 900))")
+        debugLog("Starting title generation. provider=\(summaryProvider.rawValue), language=\(languageName), characters=\(cleanedTranscript.count), availability=\(availabilityDescription(model.availability)), transcriptPreview=\(debugSnippet(cleanedTranscript, limit: 900))")
+        if summaryProvider == .localQwen {
+            return try await generateLocalTitleSuggestion(
+                transcript: cleanedTranscript,
+                languageName: languageName
+            )
+        }
+
+        let shouldFallbackToLocalTitle = summaryProvider == .automatic
         switch model.availability {
         case .available:
             break
         case .unavailable(let reason):
-            debugLog("Title model unavailable. reason=\(reason)")
+            debugLog("Title model unavailable. reason=\(reason). localFallback=\(shouldFallbackToLocalTitle)")
+            if shouldFallbackToLocalTitle {
+                if let localSuggestion = try await generateLocalTitleSuggestionIfAvailable(
+                    transcript: cleanedTranscript,
+                    languageName: languageName
+                ) {
+                    return localSuggestion
+                }
+            }
             throw RecordingIntelligenceError.unavailable(reason)
         }
 
@@ -3149,7 +3204,15 @@ private enum RecordingIntelligenceService {
             debugLog("Text iOS 26 title generation completed. titleCharacters=\(title.count), title=\(debugSnippet(title, limit: 300)), summaryCharacters=\(summary?.count ?? 0), summary=\(debugSnippet(summary, limit: 700)), tagCount=0")
             return RecordingTitleSuggestion(title: title, summary: summary, tags: [])
         } catch {
-            debugLog("Title generation failed. \(debugDescription(for: error))")
+            debugLog("Title generation failed. \(debugDescription(for: error)). localFallback=\(shouldFallbackToLocalTitle)")
+            if shouldFallbackToLocalTitle {
+                if let localSuggestion = try await generateLocalTitleSuggestionIfAvailable(
+                    transcript: cleanedTranscript,
+                    languageName: languageName
+                ) {
+                    return localSuggestion
+                }
+            }
             throw error
         }
     }

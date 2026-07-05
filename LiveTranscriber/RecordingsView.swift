@@ -1782,6 +1782,8 @@ struct RecordingDetailView: View {
     @State private var isShowingAppleSpeechRetranscriptionPicker = false
     @State private var isShowingLocalWhisperRetranscriptionPicker = false
     @AppStorage(RecordingSummaryProvider.selectedDefaultsKey) private var selectedSummaryProviderRawValue = RecordingSummaryProvider.automatic.rawValue
+    @State private var selectedDetailPage: RecordingDetailPage = .transcript
+    @StateObject private var chatEngine = RecordingChatEngine()
 
     private var currentItem: RecordingItem {
         store.recording(withID: item.id) ?? item
@@ -1810,23 +1812,27 @@ struct RecordingDetailView: View {
     }
 
     var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 16) {
-                header
-                if store.intelligenceAvailability.isAvailable || currentItem.intelligence != nil {
-                    intelligenceCard
-                }
-                transcript
+        VStack(spacing: 0) {
+            Picker(localized(L10n.Recordings.detailPages), selection: $selectedDetailPage) {
+                Text(L10n.Recordings.transcript).tag(RecordingDetailPage.transcript)
+                Text(L10n.Recordings.aiAnalysis).tag(RecordingDetailPage.aiAnalysis)
             }
-            .padding()
+            .pickerStyle(.segmented)
+            .padding(.horizontal)
+            .padding(.top, 8)
+            .padding(.bottom, 4)
+
+            TabView(selection: $selectedDetailPage) {
+                transcriptPage
+                    .tag(RecordingDetailPage.transcript)
+
+                aiAnalysisPage
+                    .tag(RecordingDetailPage.aiAnalysis)
+            }
+            .tabViewStyle(.page(indexDisplayMode: .never))
         }
-        .safeAreaInset(edge: .bottom) {
-            playerCard
-                .frame(maxWidth: 390)
-                .frame(maxWidth: .infinity)
-                .padding(.horizontal, 18)
-                .padding(.top, 6)
-                .padding(.bottom, 6)
+        .onChange(of: selectedDetailPage) {
+            HapticFeedback.play(.navigation)
         }
         .background(AppTheme.groupedBackground)
         .toolbar(.visible, for: .navigationBar)
@@ -1876,6 +1882,10 @@ struct RecordingDetailView: View {
                 includesLocation: $editRecordingIncludesLocation,
                 locationProvider: editLocationProvider,
                 isSaving: isSavingRecordingEdit,
+                showsTitleGeneration: store.summaryProviderAvailability.hasAnyAvailableProvider,
+                onGenerateTitle: {
+                    try await store.generateSuggestedTitle(for: currentItem)
+                },
                 onSave: saveRecordingEdit,
                 onCancel: {
                     isShowingRecordingEditSheet = false
@@ -1964,6 +1974,7 @@ struct RecordingDetailView: View {
             .presentationDragIndicator(.visible)
         }
         .onAppear {
+            chatEngine.configure(recordingID: currentItem.id)
             Task {
                 store.refreshIntelligenceAvailability()
                 await refreshAudioFileInfo()
@@ -2204,6 +2215,42 @@ struct RecordingDetailView: View {
             Image(systemName: "ellipsis.circle")
         }
         .accessibilityLabel(Text(L10n.Common.more))
+    }
+
+    private var transcriptPage: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 16) {
+                header
+                transcript
+            }
+            .padding()
+        }
+        .safeAreaInset(edge: .bottom) {
+            playerCard
+                .frame(maxWidth: 390)
+                .frame(maxWidth: .infinity)
+                .padding(.horizontal, 18)
+                .padding(.top, 6)
+                .padding(.bottom, 6)
+        }
+    }
+
+    private var aiAnalysisPage: some View {
+        RecordingAIAnalysisPage(
+            engine: chatEngine,
+            isAvailable: store.summaryProviderAvailability.hasAnyAvailableProvider,
+            makeContext: {
+                RecordingChatContext(
+                    transcript: store.transcriptText(for: currentItem),
+                    summary: currentItem.intelligence?.summary,
+                    languageName: currentItem.localizedLanguageName
+                )
+            }
+        ) {
+            if store.intelligenceAvailability.isAvailable || currentItem.intelligence != nil {
+                intelligenceCard
+            }
+        }
     }
 
     private var header: some View {
@@ -3154,8 +3201,12 @@ private struct RecordingEditSheet: View {
     @Binding var includesLocation: Bool
     @ObservedObject var locationProvider: RecordingEditLocationProvider
     let isSaving: Bool
+    var showsTitleGeneration = false
+    var onGenerateTitle: (() async throws -> RecordingTitleSuggestion)? = nil
     let onSave: () -> Void
     let onCancel: () -> Void
+    @State private var isGeneratingTitle = false
+    @State private var titleGenerationErrorMessage: String?
 
     var body: some View {
         NavigationStack {
@@ -3196,6 +3247,21 @@ private struct RecordingEditSheet: View {
                 }
             }
         }
+        .alert(
+            localized(L10n.Transcription.titleGenerationFailed),
+            isPresented: Binding(
+                get: { titleGenerationErrorMessage != nil },
+                set: { isPresented in
+                    if !isPresented {
+                        titleGenerationErrorMessage = nil
+                    }
+                }
+            )
+        ) {
+            Button(localized(L10n.Common.ok), role: .cancel) {}
+        } message: {
+            Text(titleGenerationErrorMessage ?? "")
+        }
     }
 
     private var nameSection: some View {
@@ -3204,15 +3270,75 @@ private struct RecordingEditSheet: View {
                 .font(.redditSans(.caption, weight: .semibold))
                 .foregroundStyle(.secondary)
 
-            TextField(localized(L10n.Recordings.recordingName), text: $recordingName)
-                .font(.redditSans(.headline, weight: .semibold))
-                .textInputAutocapitalization(.never)
-                .autocorrectionDisabled()
-                .padding(.horizontal, 12)
-                .frame(height: 48)
-                .background(AppTheme.elevatedBackground, in: RoundedRectangle(cornerRadius: AppTheme.compactCornerRadius, style: .continuous))
+            HStack(spacing: 8) {
+                TextField(localized(L10n.Recordings.recordingName), text: $recordingName)
+                    .font(.redditSans(.headline, weight: .semibold))
+                    .textInputAutocapitalization(.never)
+                    .autocorrectionDisabled()
+
+                if showsTitleGeneration, onGenerateTitle != nil {
+                    Button {
+                        generateTitle()
+                    } label: {
+                        Group {
+                            if isGeneratingTitle {
+                                ProgressView()
+                                    .controlSize(.small)
+                            } else {
+                                Image(systemName: "sparkles")
+                                    .font(.system(size: 15, weight: .semibold))
+                            }
+                        }
+                        .frame(width: 34, height: 34)
+                        .foregroundStyle(AppTheme.brand)
+                        .background(AppTheme.brand.opacity(0.11), in: Circle())
+                    }
+                    .buttonStyle(.plain)
+                    .disabled(isSaving || isGeneratingTitle)
+                    .accessibilityLabel(localized(L10n.Transcription.generateTitleAndTagsAccessibility))
+                }
+            }
+            .padding(.leading, 12)
+            .padding(.trailing, showsTitleGeneration && onGenerateTitle != nil ? 7 : 12)
+            .frame(height: 48)
+            .background(AppTheme.elevatedBackground, in: RoundedRectangle(cornerRadius: AppTheme.compactCornerRadius, style: .continuous))
         }
         .recordingEditSectionSurface()
+    }
+
+    private func generateTitle() {
+        guard let onGenerateTitle, !isGeneratingTitle, !isSaving else {
+            HapticFeedback.play(.blocked)
+            return
+        }
+
+        isGeneratingTitle = true
+        titleGenerationErrorMessage = nil
+        HapticFeedback.play(.analysisStart)
+        Task {
+            do {
+                let suggestion = try await onGenerateTitle()
+                let cleanedTitle = suggestion.title.trimmingCharacters(in: .whitespacesAndNewlines)
+                guard !cleanedTitle.isEmpty else {
+                    titleGenerationErrorMessage = localized(L10n.Intelligence.emptyTitle)
+                    HapticFeedback.play(.failure)
+                    isGeneratingTitle = false
+                    return
+                }
+                recordingName = cleanedTitle
+                tags = RecordingItem.mergedTags(tags, suggestion.tags)
+                if summary.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
+                   let suggestedSummary = suggestion.summary?.trimmingCharacters(in: .whitespacesAndNewlines),
+                   !suggestedSummary.isEmpty {
+                    summary = suggestedSummary
+                }
+                HapticFeedback.play(.analysisComplete)
+            } catch {
+                titleGenerationErrorMessage = error.localizedDescription
+                HapticFeedback.play(.failure)
+            }
+            isGeneratingTitle = false
+        }
     }
 
     private var summarySection: some View {

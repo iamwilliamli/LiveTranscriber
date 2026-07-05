@@ -15,7 +15,7 @@ enum AppTheme {
     static let groupedBackground = Color(UIColor { traits in
         traits.userInterfaceStyle == .dark
             ? .systemGroupedBackground
-            : UIColor(red: 0.976, green: 0.978, blue: 0.984, alpha: 1)
+            : UIColor(red: 0.949, green: 0.953, blue: 0.965, alpha: 1)
     })
     static let cardBackground = Color(UIColor { traits in
         traits.userInterfaceStyle == .dark
@@ -25,12 +25,17 @@ enum AppTheme {
     static let elevatedBackground = Color(UIColor { traits in
         traits.userInterfaceStyle == .dark
             ? .tertiarySystemGroupedBackground
-            : UIColor(red: 0.988, green: 0.989, blue: 0.993, alpha: 1)
+            : UIColor(red: 0.929, green: 0.935, blue: 0.950, alpha: 1)
     })
     static let raisedControlBackground = Color(UIColor { traits in
         traits.userInterfaceStyle == .dark
             ? UIColor(red: 0.26, green: 0.27, blue: 0.30, alpha: 1)
             : UIColor(red: 1, green: 1, blue: 1, alpha: 1)
+    })
+    static let assistantBubbleBackground = Color(UIColor { traits in
+        traits.userInterfaceStyle == .dark
+            ? UIColor(red: 0.24, green: 0.25, blue: 0.28, alpha: 1)
+            : UIColor(red: 0.918, green: 0.924, blue: 0.940, alpha: 1)
     })
     static let playbackGlassTint = Color.black.opacity(0.08)
     static let subtleBorder = Color(.separator).opacity(0.18)

@@ -369,6 +369,16 @@ enum L10n {
         static let share = L10n.resource("recordings.share", defaultValue: "Share", comment: "Share menu title.")
         static let copied = L10n.resource("recordings.copied", defaultValue: "Copied", comment: "Status shown after copying.")
         static let intelligenceSummary = L10n.resource("recordings.intelligence_summary", defaultValue: "Summary", comment: "Intelligent summary section title.")
+        static let detailPages = L10n.resource("recordings.detail_pages", defaultValue: "View", comment: "Accessibility label for the detail page switcher.")
+        static let aiAnalysis = L10n.resource("recordings.ai_analysis", defaultValue: "AI Analysis", comment: "Detail page title for the AI analysis page.")
+        static let chatSection = L10n.resource("recordings.chat_section", defaultValue: "Ask AI", comment: "Chat card title on the AI analysis page.")
+        static let chatPlaceholder = L10n.resource("recordings.chat_placeholder", defaultValue: "Ask about this recording…", comment: "Chat input placeholder on the AI analysis page.")
+        static let chatEmpty = L10n.resource("recordings.chat_empty", defaultValue: "Ask anything about this recording. Answers are based on the transcript.", comment: "Empty state shown before the first chat message.")
+        static let chatThinking = L10n.resource("recordings.chat_thinking", defaultValue: "Thinking…", comment: "Status shown while the AI answer is being generated.")
+        static let chatFailed = L10n.resource("recordings.chat_failed", defaultValue: "Couldn't get an answer.", comment: "Error shown when the AI answer fails.")
+        static let chatUnavailable = L10n.resource("recordings.chat_unavailable", defaultValue: "AI chat is unavailable. Enable Apple Intelligence or download the local model in Settings.", comment: "Message shown when no AI provider is available for chat.")
+        static let chatClear = L10n.resource("recordings.chat_clear", defaultValue: "Clear Conversation", comment: "Action that clears the recording chat conversation.")
+        static let chatSend = L10n.resource("recordings.chat_send", defaultValue: "Send", comment: "Accessibility label for the chat send button.")
         static let noSummary = L10n.resource("recordings.no_summary", defaultValue: "No Summary", comment: "Empty state title when no summary exists.")
         static let sampleRate = L10n.resource("recordings.audio.sample_rate", defaultValue: "Sample Rate", comment: "Audio parameter row title.")
         static let bitRate = L10n.resource("recordings.audio.bit_rate", defaultValue: "Bit Rate", comment: "Audio parameter row title.")
@@ -640,8 +650,8 @@ enum L10n {
     enum LocalSummary {
         static let providerTitle = L10n.resource(
             "local_summary.provider.title",
-            defaultValue: "Summary Engine",
-            comment: "Settings section title for selecting the default summary engine."
+            defaultValue: "AI Engine",
+            comment: "Settings section title for selecting the default AI engine."
         )
         static let selectedProvider = L10n.resource(
             "local_summary.provider.selected",
