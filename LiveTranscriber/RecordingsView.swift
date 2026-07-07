@@ -1785,6 +1785,8 @@ struct RecordingDetailView: View {
     @State private var selectedDetailPage: RecordingDetailPage = .transcript
     @StateObject private var chatEngine = RecordingChatEngine()
 
+    private static let playerOverlayReadablePadding: CGFloat = 156
+
     private var currentItem: RecordingItem {
         store.recording(withID: item.id) ?? item
     }
@@ -1812,7 +1814,26 @@ struct RecordingDetailView: View {
     }
 
     var body: some View {
-        VStack(spacing: 0) {
+        // A page-style TabView clips its pages at the bottom safe area,
+        // which letterboxes the content above the home indicator. Plain
+        // views in a ZStack extend edge-to-edge like the old single page,
+        // and keeping both alive preserves scroll and draft state.
+        ZStack {
+            transcriptPage
+                .opacity(selectedDetailPage == .transcript ? 1 : 0)
+                .offset(x: selectedDetailPage == .transcript ? 0 : -44)
+                .allowsHitTesting(selectedDetailPage == .transcript)
+                .accessibilityHidden(selectedDetailPage != .transcript)
+
+            aiAnalysisPage
+                .opacity(selectedDetailPage == .aiAnalysis ? 1 : 0)
+                .offset(x: selectedDetailPage == .aiAnalysis ? 0 : 44)
+                .allowsHitTesting(selectedDetailPage == .aiAnalysis)
+                .accessibilityHidden(selectedDetailPage != .aiAnalysis)
+        }
+        .animation(.easeInOut(duration: 0.22), value: selectedDetailPage)
+        .gesture(detailPageSwipeGesture)
+        .safeAreaInset(edge: .top, spacing: 0) {
             Picker(localized(L10n.Recordings.detailPages), selection: $selectedDetailPage) {
                 Text(L10n.Recordings.transcript).tag(RecordingDetailPage.transcript)
                 Text(L10n.Recordings.aiAnalysis).tag(RecordingDetailPage.aiAnalysis)
@@ -1820,22 +1841,26 @@ struct RecordingDetailView: View {
             .pickerStyle(.segmented)
             .padding(.horizontal)
             .padding(.top, 8)
-            .padding(.bottom, 4)
-
-            TabView(selection: $selectedDetailPage) {
-                transcriptPage
-                    .tag(RecordingDetailPage.transcript)
-
-                aiAnalysisPage
-                    .tag(RecordingDetailPage.aiAnalysis)
+            .padding(.bottom, 8)
+            .background {
+                // One continuous surface from the status bar down to the
+                // rounded bottom edge, so the navigation bar area and this
+                // strip cannot render with different tints.
+                UnevenRoundedRectangle(
+                    bottomLeadingRadius: 20,
+                    bottomTrailingRadius: 20,
+                    style: .continuous
+                )
+                .fill(.ultraThinMaterial)
+                .ignoresSafeArea(edges: .top)
             }
-            .tabViewStyle(.page(indexDisplayMode: .never))
         }
         .onChange(of: selectedDetailPage) {
             HapticFeedback.play(.navigation)
         }
-        .background(AppTheme.groupedBackground)
+        .background(AppTheme.groupedBackground.ignoresSafeArea())
         .toolbar(.visible, for: .navigationBar)
+        .toolbarBackground(.hidden, for: .navigationBar)
         .navigationTitle(currentItem.audioFileName)
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
@@ -2217,21 +2242,44 @@ struct RecordingDetailView: View {
         .accessibilityLabel(Text(L10n.Common.more))
     }
 
-    private var transcriptPage: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 16) {
-                header
-                transcript
+    private var detailPageSwipeGesture: some Gesture {
+        DragGesture(minimumDistance: 25)
+            .onEnded { value in
+                let horizontal = value.translation.width
+                let vertical = value.translation.height
+                guard abs(horizontal) > abs(vertical) * 1.5, abs(horizontal) > 50 else {
+                    return
+                }
+                if horizontal < 0, selectedDetailPage == .transcript {
+                    selectedDetailPage = .aiAnalysis
+                } else if horizontal > 0, selectedDetailPage == .aiAnalysis {
+                    selectedDetailPage = .transcript
+                }
             }
-            .padding()
-        }
-        .safeAreaInset(edge: .bottom) {
-            playerCard
-                .frame(maxWidth: 390)
-                .frame(maxWidth: .infinity)
-                .padding(.horizontal, 18)
-                .padding(.top, 6)
-                .padding(.bottom, 6)
+    }
+
+    private var transcriptPage: some View {
+        ZStack {
+            AppTheme.groupedBackground
+                .ignoresSafeArea()
+
+            ScrollView {
+                VStack(alignment: .leading, spacing: 16) {
+                    header
+                    transcript
+                }
+                .padding(.horizontal)
+                .padding(.top)
+                .padding(.bottom)
+            }
+            .safeAreaInset(edge: .bottom) {
+                playerCard
+                    .frame(maxWidth: 390)
+                    .frame(maxWidth: .infinity)
+                    .padding(.horizontal, 18)
+                    .padding(.top, 6)
+                    .padding(.bottom, 6)
+            }
         }
     }
 
@@ -2618,6 +2666,10 @@ struct RecordingDetailView: View {
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
             }
+
+            Color.clear
+                .frame(height: Self.playerOverlayReadablePadding)
+                .accessibilityHidden(true)
         }
         .padding(14)
         .frame(maxWidth: .infinity, alignment: .leading)

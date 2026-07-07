@@ -3045,6 +3045,15 @@ private enum RecordingIntelligenceService {
         #if HAS_IOS27_SDK
         if #available(iOS 27.0, *) {
             do {
+                let chunks = TranscriptContextBuilder.chunks(from: cleanedTranscript, profile: .appleSummary)
+                if chunks.count > 1 {
+                    return try await generateChunkedStructuredIntelligence(
+                        chunks: chunks,
+                        languageName: languageName,
+                        model: model
+                    )
+                }
+
                 if let responseText = try await StructuredFoundationModelsRuntime.generateIntelligence(
                     transcript: cleanedTranscript,
                     languageName: languageName
@@ -3115,6 +3124,61 @@ private enum RecordingIntelligenceService {
             languageName: languageName
         )
     }
+
+    #if HAS_IOS27_SDK
+    @available(iOS 27.0, *)
+    private static func generateChunkedStructuredIntelligence(
+        chunks: [TranscriptChunk],
+        languageName: String,
+        model: SystemLanguageModel
+    ) async throws -> RecordingIntelligence {
+        debugLog("Structured framework analysis using chunked context. chunkCount=\(chunks.count)")
+        var noteEntries: [String] = []
+        var allTags: [String] = []
+
+        for chunk in chunks {
+            do {
+                guard let responseText = try await StructuredFoundationModelsRuntime.generateIntelligence(
+                    transcript: chunk.text,
+                    languageName: languageName
+                ) else {
+                    continue
+                }
+
+                let payload = try parseIntelligencePayload(from: responseText)
+                let summary = normalizedSummary(payload.summary) ?? ""
+                let tags = normalizedTags(payload.tags)
+                if !summary.isEmpty {
+                    noteEntries.append("Part \(chunk.index): \(summary)")
+                }
+                allTags.append(contentsOf: tags)
+                debugLog("Structured chunk analysis completed. chunk=\(chunk.index), summaryCharacters=\(summary.count), tagCount=\(tags.count), tags=\(tags)")
+            } catch {
+                debugLog("Structured chunk analysis failed. chunk=\(chunk.index), \(debugDescription(for: error))")
+            }
+        }
+
+        guard !noteEntries.isEmpty else {
+            throw RecordingIntelligenceError.emptyResponse
+        }
+
+        let notes = compactedContextEntries(
+            noteEntries,
+            characterLimit: TranscriptContextProfile.appleSummary.mergeCharacterLimit,
+            minimumEntryCharacters: 120
+        )
+        let summary = try await generateFinalSummary(
+            notes: notes,
+            languageName: languageName,
+            model: model
+        )
+        return RecordingIntelligence(
+            summary: summary,
+            tags: normalizedTags(allTags),
+            generatedAt: Date()
+        )
+    }
+    #endif
 
     private static func generateLocalTitleSuggestion(
         transcript: String,
@@ -3246,11 +3310,33 @@ private enum RecordingIntelligenceService {
         languageName: String,
         model: SystemLanguageModel
     ) async throws -> String {
-        let notes = try await generateSemanticNotes(
-            transcript: transcript,
-            languageName: languageName,
-            model: model
-        )
+        let chunks = TranscriptContextBuilder.chunks(from: transcript, profile: .appleSummary)
+        let notes: String
+
+        if chunks.count <= 1 {
+            notes = try await generateSemanticNotes(
+                transcript: transcript,
+                languageName: languageName,
+                model: model
+            )
+        } else {
+            debugLog("Text iOS 26 summary using chunked semantic notes. chunkCount=\(chunks.count), transcriptCharacters=\(transcript.count)")
+            var chunkNotes: [String] = []
+            for chunk in chunks {
+                let notes = try await generateSemanticNotes(
+                    transcript: chunk.text,
+                    languageName: languageName,
+                    model: model
+                )
+                chunkNotes.append("Part \(chunk.index): \(notes)")
+            }
+            notes = compactedContextEntries(
+                chunkNotes,
+                characterLimit: TranscriptContextProfile.appleSummary.mergeCharacterLimit,
+                minimumEntryCharacters: 120
+            )
+        }
+
         return try await generateFinalSummary(
             notes: notes,
             languageName: languageName,
@@ -3422,7 +3508,10 @@ private enum RecordingIntelligenceService {
         languageName: String,
         model: SystemLanguageModel
     ) async throws -> String {
-        let outputLanguage = inferredOutputLanguageName(from: transcript, languageName: languageName)
+        let titleTranscript = transcript.count > TranscriptContextProfile.appleSummary.directCharacterLimit
+            ? TranscriptContextBuilder.boundaryDigest(from: transcript, profile: .appleSummary)
+            : transcript
+        let outputLanguage = inferredOutputLanguageName(from: titleTranscript, languageName: languageName)
         let session = LanguageModelSession(
             model: model,
             instructions: """
@@ -3445,11 +3534,11 @@ private enum RecordingIntelligenceService {
         - Do not mention these requirements.
 
         Transcript:
-        \(delimitedTranscript(transcript))
+        \(delimitedTranscript(titleTranscript))
         """
 
         do {
-            debugLog("Text iOS 26 title request. language=\(languageName), expectedOutputLanguage=\(outputLanguage), transcriptCharacters=\(transcript.count), promptCharacters=\(prompt.count), transcriptPreview=\(debugSnippet(transcript, limit: 1_200))")
+            debugLog("Text iOS 26 title request. language=\(languageName), expectedOutputLanguage=\(outputLanguage), transcriptCharacters=\(transcript.count), promptCharacters=\(prompt.count), transcriptPreview=\(debugSnippet(titleTranscript, limit: 1_200))")
             let response = try await session.respond(
                 to: prompt,
                 options: GenerationOptions(
@@ -3818,20 +3907,39 @@ private enum RecordingIntelligenceService {
             .trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
-    private static func clipped(_ transcript: String) -> String {
-        let limit = 8_000
-        guard transcript.count > limit else {
-            return transcript
-        }
-        return String(transcript.prefix(limit))
-    }
-
     private static func delimitedTranscript(_ transcript: String) -> String {
         """
         <transcript>
-        \(clipped(transcript))
+        \(transcript)
         </transcript>
         """
+    }
+
+    private static func compactedContextEntries(
+        _ entries: [String],
+        characterLimit: Int,
+        minimumEntryCharacters: Int
+    ) -> String {
+        let cleanedEntries = entries
+            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .filter { !$0.isEmpty }
+        let joined = cleanedEntries.joined(separator: "\n\n")
+        guard joined.count > characterLimit, !cleanedEntries.isEmpty else {
+            return joined
+        }
+
+        let perEntryLimit = max(
+            minimumEntryCharacters,
+            (characterLimit / cleanedEntries.count) - 12
+        )
+        return cleanedEntries
+            .map { entry in
+                guard entry.count > perEntryLimit else {
+                    return entry
+                }
+                return String(entry.prefix(perEntryLimit)).trimmingCharacters(in: .whitespacesAndNewlines)
+            }
+            .joined(separator: "\n\n")
     }
 
     private static func normalizedTags(_ tags: [String]) -> [String] {

@@ -26,38 +26,20 @@ enum LocalSummaryIntelligenceService {
             throw LocalSummaryIntelligenceError.missingModel
         }
 
-        let prompts = summaryPrompts(
-            transcript: clippedTranscriptForLocalSummary(cleanedTranscript),
-            languageName: languageName
-        )
-        let rawOutput = try await generateRawText(
-            modelPath: locatedModel.url.path,
-            prompts: prompts,
-            maxTokens: 420,
-            temperature: 0.2,
-            topP: 0.9
-        )
-        debugLog("Local Qwen rawResponse=\(debugSnippet(rawOutput, limit: 1_500))")
-
-        do {
-            return try intelligence(from: rawOutput)
-        } catch {
-            debugLog("Local Qwen parse failed. \(debugDescription(for: error)) cleanedResponse=\(debugSnippet(cleanedModelOutput(rawOutput), limit: 1_200)). Retrying with compact prompt.")
+        let chunks = TranscriptContextBuilder.chunks(from: cleanedTranscript, profile: .localQwenSummary)
+        if chunks.count > 1 {
+            return try await generateChunkedSummary(
+                chunks: chunks,
+                languageName: languageName,
+                modelPath: locatedModel.url.path
+            )
         }
 
-        let retryPrompts = compactSummaryPrompts(
-            transcript: clippedTranscriptForLocalSummary(cleanedTranscript),
-            languageName: languageName
+        return try await generateSingleSummary(
+            transcript: cleanedTranscript,
+            languageName: languageName,
+            modelPath: locatedModel.url.path
         )
-        let retryOutput = try await generateRawText(
-            modelPath: locatedModel.url.path,
-            prompts: retryPrompts,
-            maxTokens: 260,
-            temperature: 0.1,
-            topP: 0.8
-        )
-        debugLog("Local Qwen retry rawResponse=\(debugSnippet(retryOutput, limit: 1_500))")
-        return try intelligence(from: retryOutput)
     }
 
     static func generateTitleSuggestion(
@@ -75,12 +57,72 @@ enum LocalSummaryIntelligenceService {
             throw LocalSummaryIntelligenceError.missingModel
         }
 
-        let prompts = titlePrompts(
-            transcript: clippedTranscriptForLocalSummary(cleanedTranscript),
+        let chunks = TranscriptContextBuilder.chunks(from: cleanedTranscript, profile: .localQwenSummary)
+        if chunks.count > 1 {
+            return try await generateChunkedTitleSuggestion(
+                chunks: chunks,
+                languageName: languageName,
+                modelPath: locatedModel.url.path
+            )
+        }
+
+        return try await generateSingleTitleSuggestion(
+            transcript: cleanedTranscript,
+            languageName: languageName,
+            modelPath: locatedModel.url.path
+        )
+    }
+
+    private static func generateSingleSummary(
+        transcript: String,
+        languageName: String,
+        modelPath: String
+    ) async throws -> RecordingIntelligence {
+        let prompts = summaryPrompts(
+            transcript: transcript,
             languageName: languageName
         )
         let rawOutput = try await generateRawText(
-            modelPath: locatedModel.url.path,
+            modelPath: modelPath,
+            prompts: prompts,
+            maxTokens: 420,
+            temperature: 0.2,
+            topP: 0.9
+        )
+        debugLog("Local Qwen rawResponse=\(debugSnippet(rawOutput, limit: 1_500))")
+
+        do {
+            return try intelligence(from: rawOutput)
+        } catch {
+            debugLog("Local Qwen parse failed. \(debugDescription(for: error)) cleanedResponse=\(debugSnippet(cleanedModelOutput(rawOutput), limit: 1_200)). Retrying with compact prompt.")
+        }
+
+        let retryPrompts = compactSummaryPrompts(
+            transcript: transcript,
+            languageName: languageName
+        )
+        let retryOutput = try await generateRawText(
+            modelPath: modelPath,
+            prompts: retryPrompts,
+            maxTokens: 260,
+            temperature: 0.1,
+            topP: 0.8
+        )
+        debugLog("Local Qwen retry rawResponse=\(debugSnippet(retryOutput, limit: 1_500))")
+        return try intelligence(from: retryOutput)
+    }
+
+    private static func generateSingleTitleSuggestion(
+        transcript: String,
+        languageName: String,
+        modelPath: String
+    ) async throws -> RecordingTitleSuggestion {
+        let prompts = titlePrompts(
+            transcript: transcript,
+            languageName: languageName
+        )
+        let rawOutput = try await generateRawText(
+            modelPath: modelPath,
             prompts: prompts,
             maxTokens: 360,
             temperature: 0.2,
@@ -95,11 +137,11 @@ enum LocalSummaryIntelligenceService {
         }
 
         let retryPrompts = compactTitlePrompts(
-            transcript: clippedTranscriptForLocalSummary(cleanedTranscript),
+            transcript: transcript,
             languageName: languageName
         )
         let retryOutput = try await generateRawText(
-            modelPath: locatedModel.url.path,
+            modelPath: modelPath,
             prompts: retryPrompts,
             maxTokens: 220,
             temperature: 0.1,
@@ -107,6 +149,153 @@ enum LocalSummaryIntelligenceService {
         )
         debugLog("Local Qwen title retry rawResponse=\(debugSnippet(retryOutput, limit: 1_500))")
         return try titleSuggestion(from: retryOutput)
+    }
+
+    private static func generateChunkedSummary(
+        chunks: [TranscriptChunk],
+        languageName: String,
+        modelPath: String
+    ) async throws -> RecordingIntelligence {
+        debugLog("Local Qwen summary using chunked context. chunkCount=\(chunks.count)")
+        let intelligences = try await generateChunkIntelligences(
+            chunks: chunks,
+            languageName: languageName,
+            modelPath: modelPath
+        )
+        return try await mergeChunkIntelligences(
+            intelligences,
+            languageName: languageName,
+            modelPath: modelPath
+        )
+    }
+
+    private static func generateChunkedTitleSuggestion(
+        chunks: [TranscriptChunk],
+        languageName: String,
+        modelPath: String
+    ) async throws -> RecordingTitleSuggestion {
+        debugLog("Local Qwen title using chunked context. chunkCount=\(chunks.count)")
+        let intelligences = try await generateChunkIntelligences(
+            chunks: chunks,
+            languageName: languageName,
+            modelPath: modelPath
+        )
+        return try await mergeChunkTitleSuggestion(
+            intelligences,
+            languageName: languageName,
+            modelPath: modelPath
+        )
+    }
+
+    private static func generateChunkIntelligences(
+        chunks: [TranscriptChunk],
+        languageName: String,
+        modelPath: String
+    ) async throws -> [RecordingIntelligence] {
+        var intelligences: [RecordingIntelligence] = []
+
+        for chunk in chunks {
+            do {
+                let intelligence = try await generateSingleSummary(
+                    transcript: chunk.text,
+                    languageName: languageName,
+                    modelPath: modelPath
+                )
+                debugLog("Local Qwen chunk summary completed. chunk=\(chunk.index), summaryCharacters=\(intelligence.summary.count), tagCount=\(intelligence.tags.count), tags=\(intelligence.tags)")
+                intelligences.append(intelligence)
+            } catch {
+                debugLog("Local Qwen chunk summary failed. chunk=\(chunk.index), \(debugDescription(for: error))")
+            }
+        }
+
+        guard !intelligences.isEmpty else {
+            throw LocalSummaryIntelligenceError.emptyResponse
+        }
+        return intelligences
+    }
+
+    private static func mergeChunkIntelligences(
+        _ intelligences: [RecordingIntelligence],
+        languageName: String,
+        modelPath: String
+    ) async throws -> RecordingIntelligence {
+        let notes = chunkNotesText(from: intelligences)
+        let prompts = mergeSummaryPrompts(chunkNotes: notes, languageName: languageName)
+        let rawOutput = try await generateRawText(
+            modelPath: modelPath,
+            prompts: prompts,
+            maxTokens: 320,
+            temperature: 0.15,
+            topP: 0.85
+        )
+        debugLog("Local Qwen merge summary rawResponse=\(debugSnippet(rawOutput, limit: 1_500))")
+        let merged = try intelligence(from: rawOutput)
+        let tags = normalizedTags(intelligences.flatMap(\.tags) + merged.tags)
+        return RecordingIntelligence(summary: merged.summary, tags: tags, generatedAt: Date())
+    }
+
+    private static func mergeChunkTitleSuggestion(
+        _ intelligences: [RecordingIntelligence],
+        languageName: String,
+        modelPath: String
+    ) async throws -> RecordingTitleSuggestion {
+        let notes = chunkNotesText(from: intelligences)
+        let prompts = mergeTitlePrompts(chunkNotes: notes, languageName: languageName)
+        let rawOutput = try await generateRawText(
+            modelPath: modelPath,
+            prompts: prompts,
+            maxTokens: 300,
+            temperature: 0.15,
+            topP: 0.85
+        )
+        debugLog("Local Qwen merge title rawResponse=\(debugSnippet(rawOutput, limit: 1_500))")
+        let suggestion = try titleSuggestion(from: rawOutput)
+        let tags = normalizedTags(intelligences.flatMap(\.tags) + suggestion.tags)
+        let summary: String?
+        if let suggestionSummary = suggestion.summary {
+            summary = suggestionSummary
+        } else {
+            let fallbackIntelligence = try? await mergeChunkIntelligences(
+                intelligences,
+                languageName: languageName,
+                modelPath: modelPath
+            )
+            summary = fallbackIntelligence?.summary
+        }
+        return RecordingTitleSuggestion(
+            title: suggestion.title,
+            summary: summary,
+            tags: tags
+        )
+    }
+
+    private static func chunkNotesText(from intelligences: [RecordingIntelligence]) -> String {
+        let profile = TranscriptContextProfile.localQwenSummary
+        let perEntryLimit = max(40, min(180, (profile.mergeCharacterLimit / max(intelligences.count, 1)) - 32))
+        let entries = intelligences.enumerated().map { offset, intelligence in
+            let summary = intelligence.summary.count > perEntryLimit
+                ? String(intelligence.summary.prefix(perEntryLimit)).trimmingCharacters(in: .whitespacesAndNewlines)
+                : intelligence.summary
+            let tags = intelligence.tags.prefix(5).joined(separator: ", ")
+            if tags.isEmpty {
+                return "Part \(offset + 1): \(summary)"
+            }
+            return "Part \(offset + 1): \(summary)\nTags: \(tags)"
+        }
+        let joined = entries.joined(separator: "\n\n")
+        guard joined.count > profile.mergeCharacterLimit else {
+            return joined
+        }
+
+        let headCount = profile.mergeCharacterLimit * 2 / 3
+        let tailCount = profile.mergeCharacterLimit - headCount - 80
+        return """
+        \(joined.prefix(headCount))
+
+        [Middle partial notes compacted to fit local context.]
+
+        \(joined.suffix(max(tailCount, 0)))
+        """
     }
 
     private static func summaryPrompts(transcript: String, languageName: String) -> LocalSummaryPrompts {
@@ -160,6 +349,35 @@ enum LocalSummaryIntelligenceService {
             \(transcript)
 
             Start with Summary. Return the note content directly in that field. /no_think
+            """
+        )
+    }
+
+    private static func mergeSummaryPrompts(chunkNotes: String, languageName: String) -> LocalSummaryPrompts {
+        LocalSummaryPrompts(
+            system: """
+            You merge partial notes from one long recording into final saved-recording metadata.
+            Return only compact JSON with this exact shape: {"summary":"...","tags":["..."]}.
+            The parts are chronological. Preserve distinct topics, decisions, names, tools, dates, and numbers.
+            Write in the recording's language, using the language hint only when ambiguous.
+            Tags are short topic labels. Return JSON only. /no_think
+            """,
+            user: """
+            Merge these partial notes into one saved-recording note.
+
+            Recording language hint: \(languageName)
+
+            Requirements:
+            - Summary: one natural sentence that covers the full recording.
+            - Tags: two to six short topic labels from across all parts.
+            - Do not focus only on the first or last part.
+
+            Partial notes:
+            <notes>
+            \(chunkNotes)
+            </notes>
+
+            /no_think
             """
         )
     }
@@ -220,6 +438,36 @@ enum LocalSummaryIntelligenceService {
         )
     }
 
+    private static func mergeTitlePrompts(chunkNotes: String, languageName: String) -> LocalSummaryPrompts {
+        LocalSummaryPrompts(
+            system: """
+            You create final saved-recording metadata from partial notes of one long recording.
+            Return only compact JSON with this exact shape: {"title":"...","summary":"...","tags":["..."]}.
+            The title is 2 to 8 words and names the concrete topic, request, decision, event, or result.
+            Write in the recording's language, using the language hint only when ambiguous.
+            Return JSON only. /no_think
+            """,
+            user: """
+            Recording language hint: \(languageName)
+
+            Create final metadata from these chronological partial notes.
+
+            Requirements:
+            - Title: 2 to 8 words, concrete and file-safe.
+            - Summary: one natural sentence covering the full recording.
+            - Tags: two to six short topic labels from across all parts.
+            - Do not include quotes, emojis, hash signs, file extensions, labels, or punctuation at the end.
+
+            Partial notes:
+            <notes>
+            \(chunkNotes)
+            </notes>
+
+            /no_think
+            """
+        )
+    }
+
     private static func generateRawText(
         modelPath: String,
         prompts: LocalSummaryPrompts,
@@ -238,23 +486,6 @@ enum LocalSummaryIntelligenceService {
                 topP: topP
             )
         }.value
-    }
-
-    private static func clippedTranscriptForLocalSummary(_ transcript: String) -> String {
-        let maximumCharacterCount = 8_000
-        guard transcript.count > maximumCharacterCount else {
-            return transcript
-        }
-
-        let prefix = transcript.prefix(5_200)
-        let suffix = transcript.suffix(2_400)
-        return """
-        \(prefix)
-
-        [Middle of transcript omitted to fit the local Qwen context.]
-
-        \(suffix)
-        """
     }
 
     private static func intelligence(from rawOutput: String) throws -> RecordingIntelligence {

@@ -28,6 +28,11 @@ struct RecordingChatContext {
     var languageName: String
 }
 
+private struct RecordingChatTranscriptContext {
+    var text: String
+    var statusText: String
+}
+
 enum RecordingChatArchive {
     private static func chatsDirectory() throws -> URL {
         let supportDirectory = try FileManager.default.url(
@@ -82,6 +87,7 @@ enum RecordingChatArchive {
 final class RecordingChatEngine: ObservableObject {
     @Published private(set) var messages: [RecordingChatMessage] = []
     @Published private(set) var isResponding = false
+    @Published private(set) var analysisStatusText: String?
 
     private var recordingID: UUID?
     private var appleSession: LanguageModelSession?
@@ -120,6 +126,7 @@ final class RecordingChatEngine: ObservableObject {
 
         messages.append(RecordingChatMessage(role: .user, text: trimmedQuestion))
         isResponding = true
+        analysisStatusText = "Searching transcript excerpts"
 
         Task {
             do {
@@ -135,6 +142,7 @@ final class RecordingChatEngine: ObservableObject {
                     )
                 )
             }
+            analysisStatusText = nil
             isResponding = false
             persist()
         }
@@ -163,12 +171,14 @@ final class RecordingChatEngine: ObservableObject {
     private func streamAnswer(question: String, context: RecordingChatContext) async throws {
         switch RecordingSummaryProvider.selected {
         case .appleIntelligence:
+            analysisStatusText = "Preparing transcript context"
             try await appleStreamAnswer(question: question, context: context)
         case .localQwen:
             try await localStreamAnswer(question: question, context: context)
         case .automatic:
             if RecordingSummaryProvider.appleIntelligence.isCurrentlyAvailable {
                 do {
+                    analysisStatusText = "Preparing transcript context"
                     try await appleStreamAnswer(question: question, context: context)
                     return
                 } catch {
@@ -176,6 +186,7 @@ final class RecordingChatEngine: ObservableObject {
                         throw error
                     }
                     removeUnfinishedAssistantMessage()
+                    analysisStatusText = "Switching to local Qwen"
                 }
             }
             try await localStreamAnswer(question: question, context: context)
@@ -183,7 +194,14 @@ final class RecordingChatEngine: ObservableObject {
     }
 
     private func appleStreamAnswer(question: String, context: RecordingChatContext) async throws {
-        let transcript = Self.clippedTranscript(context.transcript)
+        let transcriptContext = Self.transcriptContext(
+            for: question,
+            transcript: context.transcript,
+            profile: .appleSummary,
+            maximumChunkCount: 8
+        )
+        analysisStatusText = transcriptContext.statusText
+        let transcript = transcriptContext.text
         let session: LanguageModelSession
         if let appleSession, appleSessionTranscript == transcript {
             session = appleSession
@@ -205,6 +223,7 @@ final class RecordingChatEngine: ObservableObject {
         let revealTask = Task { await revealLoop(messageID: messageID) }
 
         do {
+            analysisStatusText = "Generating answer"
             let stream = session.streamResponse(
                 to: question,
                 options: GenerationOptions(temperature: 0.3, maximumResponseTokens: 700)
@@ -259,24 +278,47 @@ final class RecordingChatEngine: ObservableObject {
             throw RecordingChatError.unavailable
         }
 
-        let systemPrompt = Self.chatInstructions(
-            transcript: Self.clippedTranscript(context.transcript),
-            context: context
-        ) + "\nAnswer directly without JSON or thinking text. /no_think"
-        let userPrompt = Self.localUserPrompt(question: question, history: messages)
         let modelPath = locatedModel.url.path
+        let rawAnswer: String
 
-        let rawAnswer = try await Task.detached(priority: .userInitiated) { () throws -> String in
-            try LocalLlamaBridge.generateText(
-                withModelAtPath: modelPath,
-                systemPrompt: systemPrompt,
-                userPrompt: userPrompt,
-                maxTokens: 600,
-                contextTokens: 4096,
-                temperature: 0.3,
-                topP: 0.9
+        do {
+            analysisStatusText = "Searching transcript excerpts"
+            let transcriptContext = Self.transcriptContext(
+                for: question,
+                transcript: context.transcript,
+                profile: .localQwenChat,
+                maximumChunkCount: 2
             )
-        }.value
+            analysisStatusText = "\(transcriptContext.statusText). Generating answer"
+            rawAnswer = try await Self.generateLocalAnswer(
+                modelPath: modelPath,
+                question: question,
+                context: context,
+                history: messages,
+                transcript: transcriptContext.text,
+                maxTokens: 420
+            )
+        } catch {
+            guard Self.isLocalContextExceeded(error) else {
+                throw error
+            }
+            analysisStatusText = "Context was too long. Retrying with a smaller excerpt"
+            let retryTranscriptContext = Self.transcriptContext(
+                for: question,
+                transcript: context.transcript,
+                profile: .localQwenChat,
+                maximumChunkCount: 1
+            )
+            analysisStatusText = "\(retryTranscriptContext.statusText). Generating answer"
+            rawAnswer = try await Self.generateLocalAnswer(
+                modelPath: modelPath,
+                question: question,
+                context: context,
+                history: [],
+                transcript: retryTranscriptContext.text,
+                maxTokens: 320
+            )
+        }
 
         let answer = Self.cleanedLocalOutput(rawAnswer)
         guard !answer.isEmpty else {
@@ -288,7 +330,43 @@ final class RecordingChatEngine: ObservableObject {
         await revealLoop(messageID: UUID())
     }
 
-    private static func chatInstructions(transcript: String, context: RecordingChatContext) -> String {
+    private static func generateLocalAnswer(
+        modelPath: String,
+        question: String,
+        context: RecordingChatContext,
+        history: [RecordingChatMessage],
+        transcript: String,
+        maxTokens: Int
+    ) async throws -> String {
+        let systemPrompt = chatInstructions(
+            transcript: transcript,
+            context: context,
+            summaryCharacterLimit: 500
+        ) + "\nAnswer directly without JSON or thinking text. /no_think"
+        let userPrompt = localUserPrompt(
+            question: question,
+            history: history,
+            maximumHistoryCharacters: 700
+        )
+
+        return try await Task.detached(priority: .userInitiated) { () throws -> String in
+            try LocalLlamaBridge.generateText(
+                withModelAtPath: modelPath,
+                systemPrompt: systemPrompt,
+                userPrompt: userPrompt,
+                maxTokens: maxTokens,
+                contextTokens: 4096,
+                temperature: 0.3,
+                topP: 0.9
+            )
+        }.value
+    }
+
+    private static func chatInstructions(
+        transcript: String,
+        context: RecordingChatContext,
+        summaryCharacterLimit: Int? = nil
+    ) -> String {
         var instructions = """
         You answer questions about one saved audio recording using its automatic speech recognition transcript.
         Ground every answer in the transcript; when the transcript does not contain the answer, say so instead of guessing.
@@ -299,16 +377,20 @@ final class RecordingChatEngine: ObservableObject {
         """
 
         if let summary = context.summary?.trimmingCharacters(in: .whitespacesAndNewlines), !summary.isEmpty {
-            instructions += "\n\nRecording summary:\n\(summary)"
+            instructions += "\n\nRecording summary:\n\(limited(summary, to: summaryCharacterLimit))"
         }
 
         instructions += "\n\nTranscript:\n<transcript>\n\(transcript)\n</transcript>"
         return instructions
     }
 
-    private static func localUserPrompt(question: String, history: [RecordingChatMessage]) -> String {
+    private static func localUserPrompt(
+        question: String,
+        history: [RecordingChatMessage],
+        maximumHistoryCharacters: Int
+    ) -> String {
         let recentTurns = history
-            .suffix(7)
+            .suffix(4)
             .dropLast()
             .filter { !$0.isError }
         guard !recentTurns.isEmpty else {
@@ -318,34 +400,68 @@ final class RecordingChatEngine: ObservableObject {
         let historyText = recentTurns
             .map { message in
                 let label = message.role == .user ? "User" : "Assistant"
-                return "\(label): \(message.text)"
+                return "\(label): \(limited(message.text, to: 220))"
             }
             .joined(separator: "\n")
+        let limitedHistoryText = limited(historyText, to: maximumHistoryCharacters)
         return """
         Previous conversation:
-        \(historyText)
+        \(limitedHistoryText)
 
         User question:
         \(question)
         """
     }
 
-    private static func clippedTranscript(_ transcript: String) -> String {
+    private static func transcriptContext(
+        for question: String,
+        transcript: String,
+        profile: TranscriptContextProfile,
+        maximumChunkCount: Int
+    ) -> RecordingChatTranscriptContext {
         let cleaned = transcript.trimmingCharacters(in: .whitespacesAndNewlines)
-        let maximumCharacterCount = 8_000
-        guard cleaned.count > maximumCharacterCount else {
-            return cleaned
+        guard cleaned.count > profile.directCharacterLimit else {
+            return RecordingChatTranscriptContext(
+                text: cleaned,
+                statusText: "Using the full transcript"
+            )
         }
 
-        let prefix = cleaned.prefix(5_200)
-        let suffix = cleaned.suffix(2_400)
-        return """
-        \(prefix)
+        let chunks = TranscriptContextBuilder.relevantChunks(
+            question: question,
+            transcript: cleaned,
+            profile: profile,
+            maximumCount: maximumChunkCount
+        )
+        guard !chunks.isEmpty else {
+            return RecordingChatTranscriptContext(
+                text: TranscriptContextBuilder.boundaryDigest(from: cleaned, profile: profile),
+                statusText: "Compressing transcript context"
+            )
+        }
 
-        [Middle of transcript omitted to fit the model context.]
+        let text = chunks
+            .map { chunk in
+                "Excerpt \(chunk.index):\n\(limited(chunk.text, to: profile.chunkCharacterLimit))"
+            }
+            .joined(separator: "\n\n")
+        return RecordingChatTranscriptContext(
+            text: text,
+            statusText: "Found \(chunks.count) relevant transcript excerpt\(chunks.count == 1 ? "" : "s")"
+        )
+    }
 
-        \(suffix)
-        """
+    private static func limited(_ text: String, to limit: Int?) -> String {
+        guard let limit, text.count > limit else {
+            return text
+        }
+        return String(text.prefix(limit)).trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    private static func isLocalContextExceeded(_ error: Error) -> Bool {
+        let nsError = error as NSError
+        return nsError.localizedDescription.localizedCaseInsensitiveContains("context")
+            && nsError.localizedDescription.localizedCaseInsensitiveContains("too long")
     }
 
     private static func cleanedLocalOutput(_ text: String) -> String {
@@ -467,14 +583,9 @@ struct RecordingAIAnalysisPage<SummaryCard: View>: View {
                     }
 
                     if engine.isResponding, engine.messages.last?.role != .assistant {
-                        HStack(spacing: 8) {
-                            ProgressView()
-                                .controlSize(.small)
-                            Text(localized(L10n.Recordings.chatThinking))
-                                .font(.redditSans(.caption, weight: .semibold))
-                                .foregroundStyle(.secondary)
-                        }
-                        .padding(.leading, 4)
+                        RecordingChatAnalysisStatus(
+                            text: engine.analysisStatusText ?? localized(L10n.Recordings.chatThinking)
+                        )
                     }
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
@@ -575,6 +686,26 @@ private struct RecordingChatBubble: View {
             return AppTheme.warning.opacity(0.12)
         }
         return message.role == .user ? AppTheme.brand.opacity(0.14) : AppTheme.assistantBubbleBackground
+    }
+}
+
+private struct RecordingChatAnalysisStatus: View {
+    let text: String
+
+    var body: some View {
+        HStack(spacing: 8) {
+            ProgressView()
+                .controlSize(.small)
+
+            Text(text)
+                .font(.redditSans(.caption, weight: .semibold))
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+        .padding(.horizontal, 10)
+        .padding(.vertical, 8)
+        .background(AppTheme.info.opacity(0.1), in: RoundedRectangle(cornerRadius: AppTheme.compactCornerRadius, style: .continuous))
+        .padding(.leading, 4)
     }
 }
 
