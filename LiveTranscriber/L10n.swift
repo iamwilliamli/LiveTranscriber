@@ -327,6 +327,7 @@ enum L10n {
         static let duplicateRecordingName = L10n.resource("import.error.duplicate_recording_name", defaultValue: "A recording file with this name already exists", comment: "Recording detail validation error.")
         static let recordingFileNotFound = L10n.resource("import.error.recording_file_not_found", defaultValue: "Recording file could not be found", comment: "Recording detail validation error.")
         static let noRecognizedText = L10n.resource("import.error.no_recognized_text", defaultValue: "No text was recognized in the imported recording", comment: "Import transcription error.")
+        static let transcriptionInterrupted = L10n.resource("import.error.transcription_interrupted", defaultValue: "Transcription was interrupted. Try again.", comment: "Import transcription error shown after the app restarts and finds an unfinished transcription status.")
         static let saveFailed = L10n.resource("import.error.save_failed", defaultValue: "Imported recording could not be saved", comment: "Import save error.")
         static let uploadingToOpenAI = L10n.resource("import.status.uploading_to_openai", defaultValue: "Uploading to OpenAI", comment: "Import status shown while uploading an audio file to OpenAI for transcription.")
         static let refiningWithOpenAI = L10n.resource("import.status.refining_with_openai", defaultValue: "Refining with OpenAI", comment: "Import status shown while OpenAI refines local timed transcript segments.")

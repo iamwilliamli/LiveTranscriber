@@ -901,6 +901,7 @@ final class RecordingStore: ObservableObject {
             let mergedResult = try mergedRecordings(with: indexedRecordings)
             recordings = mergedResult.items
                 .sorted { $0.createdAt > $1.createdAt }
+            markInterruptedImportStatuses()
             refreshICloudSyncStatusCache()
             pruneSearchIndexCache()
             warmSearchIndexInBackground()
@@ -1445,6 +1446,29 @@ final class RecordingStore: ObservableObject {
         }
         recordings[index].importStatus = RecordingImportStatus(progress: 1, message: message, isFailed: true)
         try? persist()
+    }
+
+    private func markInterruptedImportStatuses() {
+        let interruptedMessage = String(localized: L10n.Import.transcriptionInterrupted)
+        var didUpdate = false
+
+        for index in recordings.indices {
+            guard let status = recordings[index].importStatus,
+                  !status.isFailed else {
+                continue
+            }
+
+            recordings[index].importStatus = RecordingImportStatus(
+                progress: 1,
+                message: interruptedMessage,
+                isFailed: true
+            )
+            didUpdate = true
+        }
+
+        if didUpdate {
+            Self.logger.info("Marked interrupted recording import/transcription statuses as failed.")
+        }
     }
 
     func delete(_ item: RecordingItem) throws {
