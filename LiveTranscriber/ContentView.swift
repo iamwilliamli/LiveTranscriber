@@ -30,6 +30,14 @@ struct ContentView: View {
         .onOpenURL { url in
             handleOpenedURL(url)
         }
+        .onReceive(NotificationCenter.default.publisher(for: HomeScreenQuickActionRouter.didRequestRoute)) { _ in
+            consumePendingHomeScreenQuickAction()
+        }
+        .onChange(of: hasCompletedOnboarding) { _, completed in
+            if completed {
+                consumePendingHomeScreenQuickAction()
+            }
+        }
         .alert(
             String(localized: L10n.SpeechText.releaseOldLanguagesTitle),
             isPresented: Binding(
@@ -96,6 +104,7 @@ struct ContentView: View {
         .task {
             await recordingStore.reload()
             await transcriber.refreshSupportedLanguages()
+            consumePendingHomeScreenQuickAction()
         }
         .onReceive(NotificationCenter.default.publisher(for: UIApplication.didBecomeActiveNotification)) { _ in
             Task {
@@ -115,6 +124,15 @@ struct ContentView: View {
             selectedTab = newTab
             HapticFeedback.play(.tabSelection)
         }
+    }
+
+    private func consumePendingHomeScreenQuickAction() {
+        guard hasCompletedOnboarding,
+              let url = HomeScreenQuickActionRouter.shared.consumePendingURL() else {
+            return
+        }
+
+        handleOpenedURL(url)
     }
 
     private func handleOpenedURL(_ url: URL) {

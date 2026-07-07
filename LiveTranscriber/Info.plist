@@ -81,6 +81,17 @@
 	<true/>
 	<key>UIApplicationSupportsIndirectInputEvents</key>
 	<true/>
+	<key>UIApplicationShortcutItems</key>
+	<array>
+		<dict>
+			<key>UIApplicationShortcutItemType</key>
+			<string>com.iamwilliamli.LiveTranscriber.startRecording</string>
+			<key>UIApplicationShortcutItemTitle</key>
+			<string>Start Recording</string>
+			<key>UIApplicationShortcutItemIconSymbolName</key>
+			<string>record.circle</string>
+		</dict>
+	</array>
 	<key>UIAppFonts</key>
 	<array>
 		<string>RedditSans-Regular.ttf</string>
