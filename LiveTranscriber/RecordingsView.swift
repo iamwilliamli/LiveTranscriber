@@ -1785,7 +1785,6 @@ struct RecordingDetailView: View {
     @State private var selectedDetailPage: RecordingDetailPage = .transcript
     @StateObject private var chatEngine = RecordingChatEngine()
 
-    private static let playerOverlayReadablePadding: CGFloat = 156
 
     private var currentItem: RecordingItem {
         store.recording(withID: item.id) ?? item
@@ -2666,10 +2665,6 @@ struct RecordingDetailView: View {
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
             }
-
-            Color.clear
-                .frame(height: Self.playerOverlayReadablePadding)
-                .accessibilityHidden(true)
         }
         .padding(14)
         .frame(maxWidth: .infinity, alignment: .leading)
