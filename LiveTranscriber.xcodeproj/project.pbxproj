@@ -38,6 +38,11 @@
 		7B000000000000000000001E /* RedditSans-Italic.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 7B0000000000000000001014 /* RedditSans-Italic.ttf */; };
 		7B0000000000000000000020 /* HapticFeedback.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7B0000000000000000001020 /* HapticFeedback.swift */; };
 		7B0000000000000000000021 /* L10n.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7B0000000000000000001021 /* L10n.swift */; };
+		7B00000000000000000000C1 /* LaunchSplashView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7B00000000000000000010C1 /* LaunchSplashView.swift */; };
+		7B00000000000000000000C2 /* QuickRecordingControlIntent.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7B00000000000000000010C2 /* QuickRecordingControlIntent.swift */; };
+		7B00000000000000000000C3 /* QuickRecordingControlIntent.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7B00000000000000000010C2 /* QuickRecordingControlIntent.swift */; };
+		7B00000000000000000000C4 /* ControlCenter.xcstrings in Resources */ = {isa = PBXBuildFile; fileRef = 7B00000000000000000010C3 /* ControlCenter.xcstrings */; };
+		7B00000000000000000000C5 /* ControlCenter.xcstrings in Resources */ = {isa = PBXBuildFile; fileRef = 7B00000000000000000010C3 /* ControlCenter.xcstrings */; };
 		7B0000000000000000000022 /* Semantic.xcstrings in Resources */ = {isa = PBXBuildFile; fileRef = 7B0000000000000000001022 /* Semantic.xcstrings */; };
 		7B0000000000000000000023 /* StructuredFoundationModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7B0000000000000000001027 /* StructuredFoundationModels.swift */; };
 		7B0000000000000000000024 /* LiveTranscriberStructuredFoundationModels.framework in Embed Frameworks */ = {isa = PBXBuildFile; fileRef = 7B0000000000000000001028 /* LiveTranscriberStructuredFoundationModels.framework */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
@@ -142,6 +147,9 @@
 		7B000000000000000000101E /* LiveTranscriber.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = LiveTranscriber.entitlements; sourceTree = "<group>"; };
 		7B0000000000000000001020 /* HapticFeedback.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HapticFeedback.swift; sourceTree = "<group>"; };
 		7B0000000000000000001021 /* L10n.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = L10n.swift; sourceTree = "<group>"; };
+		7B00000000000000000010C1 /* LaunchSplashView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LaunchSplashView.swift; sourceTree = "<group>"; };
+		7B00000000000000000010C2 /* QuickRecordingControlIntent.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QuickRecordingControlIntent.swift; sourceTree = "<group>"; };
+		7B00000000000000000010C3 /* ControlCenter.xcstrings */ = {isa = PBXFileReference; lastKnownFileType = text.json.xcstrings; path = ControlCenter.xcstrings; sourceTree = "<group>"; };
 		7B0000000000000000001022 /* Semantic.xcstrings */ = {isa = PBXFileReference; lastKnownFileType = text.json.xcstrings; path = Semantic.xcstrings; sourceTree = "<group>"; };
 		7B0000000000000000001027 /* StructuredFoundationModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StructuredFoundationModels.swift; sourceTree = "<group>"; };
 		7B0000000000000000001028 /* LiveTranscriberStructuredFoundationModels.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; includeInIndex = 0; path = LiveTranscriberStructuredFoundationModels.framework; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -229,6 +237,8 @@
 				7B0000000000000000001015 /* TranscriptionLanguage.swift */,
 				7B0000000000000000001020 /* HapticFeedback.swift */,
 				7B0000000000000000001021 /* L10n.swift */,
+				7B00000000000000000010C1 /* LaunchSplashView.swift */,
+				7B00000000000000000010C2 /* QuickRecordingControlIntent.swift */,
 				7B0000000000000000001016 /* RecordingStore.swift */,
 				7B0000000000000000001037 /* RecordingSiriIntegration.swift */,
 				7B0000000000000000001017 /* RecordingsView.swift */,
@@ -246,6 +256,7 @@
 				7B0000000000000000001008 /* Assets.xcassets */,
 				7B0000000000000000003010 /* Fonts */,
 				7B0000000000000000001022 /* Semantic.xcstrings */,
+				7B00000000000000000010C3 /* ControlCenter.xcstrings */,
 				7B0000000000000000003006 /* InfoPlist.strings */,
 				7B000000000000000000100A /* Info.plist */,
 				7B000000000000000000101E /* LiveTranscriber.entitlements */,
@@ -413,6 +424,7 @@
 				7B0000000000000000000008 /* Assets.xcassets in Resources */,
 				7B0000000000000000000009 /* PrivacyInfo.xcprivacy in Resources */,
 				7B0000000000000000000022 /* Semantic.xcstrings in Resources */,
+				7B00000000000000000000C4 /* ControlCenter.xcstrings in Resources */,
 				7B000000000000000000000B /* InfoPlist.strings in Resources */,
 				7B000000000000000000000C /* RedditSans-Regular.ttf in Resources */,
 				7B000000000000000000000D /* RedditSans-Medium.ttf in Resources */,
@@ -426,6 +438,7 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				7B00000000000000000000C5 /* ControlCenter.xcstrings in Resources */,
 				7B000000000000000000001A /* RedditSans-Regular.ttf in Resources */,
 				7B000000000000000000001B /* RedditSans-Medium.ttf in Resources */,
 				7B000000000000000000001C /* RedditSans-SemiBold.ttf in Resources */,
@@ -459,6 +472,8 @@
 				7B0000000000000000000032 /* RecordingSiriIntegration.swift in Sources */,
 				7B0000000000000000000020 /* HapticFeedback.swift in Sources */,
 				7B0000000000000000000021 /* L10n.swift in Sources */,
+				7B00000000000000000000C1 /* LaunchSplashView.swift in Sources */,
+				7B00000000000000000000C2 /* QuickRecordingControlIntent.swift in Sources */,
 				7B000000000000000000002E /* OnboardingIntroView.swift in Sources */,
 				7B0000000000000000000013 /* RecordingsView.swift in Sources */,
 				7B0000000000000000000033 /* RecordingChatView.swift in Sources */,
@@ -481,6 +496,7 @@
 			files = (
 				7B0000000000000000000017 /* TranscriptionActivityAttributes.swift in Sources */,
 				7B0000000000000000000018 /* LiveTranscriberWidgetBundle.swift in Sources */,
+				7B00000000000000000000C3 /* QuickRecordingControlIntent.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

@@ -270,7 +270,8 @@ struct RecordingAudioEvent: Codable, Hashable, Identifiable {
 
 extension RecordingAudioEventAnalysis {
     var searchableText: String {
-        events.map { [$0.label, $0.sourceIdentifier].joined(separator: " ") }
+        Set(events.flatMap { [$0.label, $0.sourceIdentifier] })
+            .sorted { $0.localizedCaseInsensitiveCompare($1) == .orderedAscending }
             .joined(separator: "\n")
     }
 }
@@ -1161,12 +1162,38 @@ final class RecordingStore: ObservableObject {
 
     @discardableResult
     func importRecording(from sourceURL: URL) async throws -> RecordingItem {
+        try await importRecording(
+            from: sourceURL,
+            extractsVideoAudio: false,
+            videoProgressHandler: nil
+        )
+    }
+
+    @discardableResult
+    func importVideoRecording(
+        from sourceURL: URL,
+        progressHandler: @escaping @MainActor @Sendable (Double) -> Void = { _ in }
+    ) async throws -> RecordingItem {
+        try await importRecording(
+            from: sourceURL,
+            extractsVideoAudio: true,
+            videoProgressHandler: progressHandler
+        )
+    }
+
+    private func importRecording(
+        from sourceURL: URL,
+        extractsVideoAudio: Bool,
+        videoProgressHandler: (@MainActor @Sendable (Double) -> Void)?
+    ) async throws -> RecordingItem {
         let language = TranscriptionLanguage(id: TranscriptionLanguage.defaultLanguageID)
         try ensureRecordingsDirectory()
 
         let createdAt = Date()
         let baseName = uniqueBaseName(for: createdAt)
-        let audioExtension = sourceURL.pathExtension.isEmpty ? "m4a" : sourceURL.pathExtension.lowercased()
+        let audioExtension = extractsVideoAudio
+            ? "m4a"
+            : (sourceURL.pathExtension.isEmpty ? "m4a" : sourceURL.pathExtension.lowercased())
         let audioFileName = "\(baseName).\(audioExtension)"
         let transcriptFileName = "\(baseName).txt"
         let targetAudioURL = recordingsDirectory.appendingPathComponent(audioFileName)
@@ -1185,7 +1212,11 @@ final class RecordingStore: ObservableObject {
             intelligence: nil,
             importStatus: RecordingImportStatus(
                 progress: 0.02,
-                message: String(localized: L10n.Import.importingRecording),
+                message: String(
+                    localized: extractsVideoAudio
+                        ? L10n.Import.extractingAudio
+                        : L10n.Import.importingRecording
+                ),
                 isFailed: false
             ),
             manualTags: nil,
@@ -1196,11 +1227,27 @@ final class RecordingStore: ObservableObject {
         try persist()
 
         do {
-            let durationSeconds = try await importWorker.prepareImportedAudio(
-                from: sourceURL,
-                to: targetAudioURL,
-                transcriptURL: targetTranscriptURL
-            )
+            let durationSeconds: Int
+            if extractsVideoAudio {
+                durationSeconds = try await importWorker.prepareImportedVideoAudio(
+                    from: sourceURL,
+                    to: targetAudioURL,
+                    transcriptURL: targetTranscriptURL
+                ) { [weak self] progress in
+                    self?.updateImportStatus(
+                        for: item.id,
+                        progress: 0.02 + progress * 0.96,
+                        message: String(localized: L10n.Import.extractingAudio)
+                    )
+                    videoProgressHandler?(progress)
+                }
+            } else {
+                durationSeconds = try await importWorker.prepareImportedAudio(
+                    from: sourceURL,
+                    to: targetAudioURL,
+                    transcriptURL: targetTranscriptURL
+                )
+            }
             guard let index = recordings.firstIndex(where: { $0.id == item.id }) else {
                 throw RecordingImportError.saveFailed
             }
@@ -2852,6 +2899,70 @@ private actor RecordingStoreImportWorker {
         }.value
     }
 
+    func prepareImportedVideoAudio(
+        from sourceURL: URL,
+        to destinationURL: URL,
+        transcriptURL: URL,
+        progressHandler: @escaping @MainActor @Sendable (Double) -> Void
+    ) async throws -> Int {
+        let fileManager = FileManager.default
+        let accessed = sourceURL.startAccessingSecurityScopedResource()
+        defer {
+            if accessed {
+                sourceURL.stopAccessingSecurityScopedResource()
+            }
+        }
+
+        let asset = AVURLAsset(url: sourceURL)
+        let audioTracks: [AVAssetTrack]
+        do {
+            audioTracks = try await asset.loadTracks(withMediaType: .audio)
+        } catch {
+            throw RecordingImportError.audioExtractionFailed
+        }
+        guard !audioTracks.isEmpty else {
+            throw RecordingImportError.videoHasNoAudio
+        }
+        guard let exportSession = AVAssetExportSession(
+            asset: asset,
+            presetName: AVAssetExportPresetAppleM4A
+        ) else {
+            throw RecordingImportError.audioExtractionFailed
+        }
+
+        if fileManager.fileExists(atPath: destinationURL.path) {
+            try fileManager.removeItem(at: destinationURL)
+        }
+
+        await progressHandler(0)
+        let monitoringTask = Task {
+            for await state in exportSession.states(updateInterval: 0.1) {
+                guard !Task.isCancelled else {
+                    break
+                }
+                if case .exporting(let progress) = state {
+                    await progressHandler(progress.fractionCompleted)
+                }
+            }
+        }
+        defer {
+            monitoringTask.cancel()
+        }
+
+        do {
+            try await exportSession.export(to: destinationURL, as: .m4a)
+            await progressHandler(1)
+            try "".write(to: transcriptURL, atomically: true, encoding: .utf8)
+            return (try? RecordingStore.durationSeconds(for: destinationURL)) ?? 0
+        } catch {
+            try? fileManager.removeItem(at: destinationURL)
+            if Task.isCancelled {
+                throw CancellationError()
+            }
+            throw RecordingImportError.audioExtractionFailed
+        }
+    }
+
     func transcribe(
         audioURL: URL,
         language: TranscriptionLanguage,
@@ -2884,6 +2995,8 @@ private enum RecordingImportError: LocalizedError {
     case unsupportedLanguage
     case noTranscript
     case saveFailed
+    case videoHasNoAudio
+    case audioExtractionFailed
 
     var errorDescription: String? {
         switch self {
@@ -2897,6 +3010,10 @@ private enum RecordingImportError: LocalizedError {
             return String(localized: L10n.Import.noRecognizedText)
         case .saveFailed:
             return String(localized: L10n.Import.saveFailed)
+        case .videoHasNoAudio:
+            return String(localized: L10n.Import.videoHasNoAudio)
+        case .audioExtractionFailed:
+            return String(localized: L10n.Import.audioExtractionFailed)
         }
     }
 }

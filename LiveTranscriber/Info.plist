@@ -105,7 +105,10 @@
 		<string>RedditSans-Italic.ttf</string>
 	</array>
 	<key>UILaunchScreen</key>
-	<dict/>
+	<dict>
+		<key>UIColorName</key>
+		<string>LaunchBackground</string>
+	</dict>
 	<key>UIBackgroundModes</key>
 	<array>
 		<string>audio</string>

@@ -50,6 +50,7 @@ struct SettingsView: View {
     @AppStorage(OnboardingState.completedDefaultsKey) private var hasCompletedOnboarding = true
     @AppStorage(RecordingSummaryProvider.selectedDefaultsKey) private var selectedSummaryProviderRawValue = RecordingSummaryProvider.automatic.rawValue
     private static let publicBetaFeedbackURL = URL(string: "https://t.me/livetranscriber")!
+    private static let privacyPolicyURL = URL(string: "https://iamwilliamli.github.io/LiveTranscriber/privacy/")!
     private static let feedbackRecipient = "lichengqi0805@gmail.com"
     private static let mailtoQueryAllowedCharacters: CharacterSet = {
         var allowed = CharacterSet.urlQueryAllowed
@@ -1517,6 +1518,16 @@ struct SettingsView: View {
                     textResource: L10n.Settings.developerCannotAccessContent,
                     tint: AppTheme.success
                 )
+
+                Link(destination: Self.privacyPolicyURL) {
+                    SettingsExternalLinkRow(
+                        icon: "doc.text",
+                        titleResource: L10n.Settings.privacyPolicy,
+                        tint: AppTheme.success
+                    )
+                }
+                .buttonStyle(.plain)
+                .settingsNavigationHaptic()
             }
 
             SettingsSection(titleResource: L10n.Settings.storage, systemImage: "internaldrive", tint: AppTheme.info) {
@@ -2232,6 +2243,37 @@ private struct SettingsCommandRow: View {
                 .foregroundStyle(tint)
 
             Spacer(minLength: 12)
+        }
+        .frame(minHeight: 42)
+        .contentShape(Rectangle())
+    }
+}
+
+private struct SettingsExternalLinkRow: View {
+    let icon: String
+    let title: Text
+    let tint: Color
+
+    init(icon: String, titleResource: LocalizedStringResource, tint: Color) {
+        self.icon = icon
+        self.title = Text(titleResource)
+        self.tint = tint
+    }
+
+    var body: some View {
+        HStack(spacing: 10) {
+            SettingsIcon(systemImage: icon, tint: tint)
+
+            title
+                .font(.redditSans(.subheadline, weight: .semibold))
+                .foregroundStyle(.primary)
+
+            Spacer(minLength: 12)
+
+            Image(systemName: "arrow.up.right")
+                .font(.system(size: 12, weight: .semibold))
+                .foregroundStyle(tint)
+                .accessibilityHidden(true)
         }
         .frame(minHeight: 42)
         .contentShape(Rectangle())

@@ -11,6 +11,7 @@ struct InputLevelHistorySample: Identifiable, Equatable, Sendable {
     let id: Int
     let level: Float
     let isCaptured: Bool
+    let elapsedTime: TimeInterval
 }
 
 private func liveAudioFormatSummary(_ format: AVAudioFormat) -> String {
@@ -82,12 +83,64 @@ final class LiveInterimTranscriptStore: ObservableObject {
 @MainActor
 final class RecordingElapsedClock: ObservableObject {
     @Published private(set) var elapsedSeconds = 0
+    @Published private(set) var timelineAnchor = RecordingElapsedTimelineAnchor.initial
 
     func updateElapsedSeconds(_ seconds: Int) {
         guard elapsedSeconds != seconds else {
             return
         }
         elapsedSeconds = seconds
+    }
+
+    func beginTimeline(at date: Date) {
+        timelineAnchor = RecordingElapsedTimelineAnchor(
+            elapsedAtAnchor: 0,
+            anchorDate: date,
+            isRunning: true
+        )
+    }
+
+    func pauseTimeline(at elapsed: TimeInterval, date: Date) {
+        timelineAnchor = RecordingElapsedTimelineAnchor(
+            elapsedAtAnchor: elapsed,
+            anchorDate: date,
+            isRunning: false
+        )
+    }
+
+    func resumeTimeline(from elapsed: TimeInterval, at date: Date) {
+        timelineAnchor = RecordingElapsedTimelineAnchor(
+            elapsedAtAnchor: elapsed,
+            anchorDate: date,
+            isRunning: true
+        )
+    }
+
+    func resetTimeline(at date: Date = Date()) {
+        timelineAnchor = RecordingElapsedTimelineAnchor(
+            elapsedAtAnchor: 0,
+            anchorDate: date,
+            isRunning: false
+        )
+    }
+}
+
+struct RecordingElapsedTimelineAnchor: Equatable, Sendable {
+    static let initial = RecordingElapsedTimelineAnchor(
+        elapsedAtAnchor: 0,
+        anchorDate: Date(),
+        isRunning: false
+    )
+
+    let elapsedAtAnchor: TimeInterval
+    let anchorDate: Date
+    let isRunning: Bool
+
+    func elapsed(at currentDate: Date) -> TimeInterval {
+        guard isRunning else {
+            return elapsedAtAnchor
+        }
+        return elapsedAtAnchor + max(0, currentDate.timeIntervalSince(anchorDate))
     }
 }
 
@@ -104,7 +157,7 @@ final class LiveTranscriptionManager: ObservableObject {
     private(set) var elapsedSeconds: Int = 0
     @Published private(set) var inputLevel: Float = 0
     @Published private(set) var inputLevelHistory: [InputLevelHistorySample] = (0..<72).map {
-        InputLevelHistorySample(id: $0, level: 0, isCaptured: false)
+        InputLevelHistorySample(id: $0, level: 0, isCaptured: false, elapsedTime: 0)
     }
     @Published private(set) var supportedLanguages: [TranscriptionLanguage] = TranscriptionLanguage.fallbackOptions
     @Published private(set) var speechPipelineRuntimeFormatText = String(localized: L10n.SpeechText.runtimeInputWaitingRecording)
@@ -680,6 +733,7 @@ final class LiveTranscriptionManager: ObservableObject {
         if !isRecording {
             statusText = String(localized: L10n.RecordingStatus.ready)
             setElapsedSeconds(0)
+            elapsedClock.resetTimeline()
             resetInputLevel(clearHistory: true)
             accumulatedRecordingSeconds = 0
             recordingStartedAt = nil
@@ -805,7 +859,12 @@ final class LiveTranscriptionManager: ObservableObject {
         if clearHistory {
             let firstSampleID = nextInputLevelHistorySampleID
             inputLevelHistory = (0..<Self.inputLevelHistoryCount).map { offset in
-                InputLevelHistorySample(id: firstSampleID + offset, level: 0, isCaptured: false)
+                InputLevelHistorySample(
+                    id: firstSampleID + offset,
+                    level: 0,
+                    isCaptured: false,
+                    elapsedTime: 0
+                )
             }
             nextInputLevelHistorySampleID += Self.inputLevelHistoryCount
             lastInputLevelHistorySampleAt = 0
@@ -813,18 +872,20 @@ final class LiveTranscriptionManager: ObservableObject {
     }
 
     private func appendInputLevelHistoryIfNeeded(_ level: Float) {
-        let now = Date().timeIntervalSinceReferenceDate
-        guard now - lastInputLevelHistorySampleAt >= Self.inputLevelHistorySampleInterval else {
+        let now = Date()
+        let referenceTime = now.timeIntervalSinceReferenceDate
+        guard referenceTime - lastInputLevelHistorySampleAt >= Self.inputLevelHistorySampleInterval else {
             return
         }
 
-        lastInputLevelHistorySampleAt = now
+        lastInputLevelHistorySampleAt = referenceTime
         var updatedHistory = inputLevelHistory
         updatedHistory.append(
             InputLevelHistorySample(
                 id: nextInputLevelHistorySampleID,
                 level: level,
-                isCaptured: true
+                isCaptured: true,
+                elapsedTime: recordingElapsedTime(at: now)
             )
         )
         nextInputLevelHistorySampleID += 1
@@ -832,6 +893,13 @@ final class LiveTranscriptionManager: ObservableObject {
             updatedHistory.removeFirst(updatedHistory.count - Self.inputLevelHistoryCount)
         }
         inputLevelHistory = updatedHistory
+    }
+
+    private func recordingElapsedTime(at date: Date) -> TimeInterval {
+        guard let activeSegmentStartedAt else {
+            return isRecording ? accumulatedRecordingSeconds : 0
+        }
+        return accumulatedRecordingSeconds + max(0, date.timeIntervalSince(activeSegmentStartedAt))
     }
 
     private static func makeAnalyzerInputFormat() throws -> AVAudioFormat {
@@ -1231,24 +1299,30 @@ final class LiveTranscriptionManager: ObservableObject {
 
     private func beginElapsedTimer() {
         stopTimer()
-        recordingStartedAt = Date()
-        activeSegmentStartedAt = Date()
+        let now = Date()
+        recordingStartedAt = now
+        activeSegmentStartedAt = now
         accumulatedRecordingSeconds = 0
         setElapsedSeconds(0)
+        elapsedClock.beginTimeline(at: now)
         scheduleElapsedTimer()
     }
 
     private func resumeElapsedTimer() {
         stopTimer()
-        activeSegmentStartedAt = Date()
+        let now = Date()
+        activeSegmentStartedAt = now
+        elapsedClock.resumeTimeline(from: accumulatedRecordingSeconds, at: now)
         scheduleElapsedTimer()
     }
 
     private func pauseElapsedTimer() {
+        let now = Date()
         if let activeSegmentStartedAt {
-            accumulatedRecordingSeconds += Date().timeIntervalSince(activeSegmentStartedAt)
+            accumulatedRecordingSeconds += now.timeIntervalSince(activeSegmentStartedAt)
         }
         activeSegmentStartedAt = nil
+        elapsedClock.pauseTimeline(at: accumulatedRecordingSeconds, date: now)
         setElapsedSeconds(Int(accumulatedRecordingSeconds.rounded(.down)))
         stopTimer()
     }

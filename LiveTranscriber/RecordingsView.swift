@@ -1,8 +1,10 @@
 import AVFoundation
 import CoreLocation
+import CoreTransferable
 import MapKit
 import MediaPlayer
 import OSLog
+import PhotosUI
 import SwiftUI
 import Translation
 import UIKit
@@ -19,6 +21,184 @@ private func localizedFormat(_ resource: LocalizedStringResource, _ arguments: C
 private struct ShareSheetItem: Identifiable {
     let id = UUID()
     let url: URL
+}
+
+private struct PhotoLibraryVideoTransfer: Transferable {
+    let fileURL: URL
+
+    static var transferRepresentation: some TransferRepresentation {
+        FileRepresentation(contentType: .movie) { video in
+            SentTransferredFile(video.fileURL)
+        } importing: { received in
+            let fileExtension = received.file.pathExtension.isEmpty
+                ? "mov"
+                : received.file.pathExtension.lowercased()
+            let temporaryURL = FileManager.default.temporaryDirectory
+                .appendingPathComponent("LiveTranscriber-PhotoVideo-\(UUID().uuidString)")
+                .appendingPathExtension(fileExtension)
+            try FileManager.default.copyItem(at: received.file, to: temporaryURL)
+            return PhotoLibraryVideoTransfer(fileURL: temporaryURL)
+        }
+    }
+}
+
+private enum PhotoLibraryVideoImportError: LocalizedError {
+    case unavailable
+
+    var errorDescription: String? {
+        String(localized: L10n.Import.videoUnavailable)
+    }
+}
+
+private enum VideoImportProgressStage: Equatable {
+    case loadingVideo
+    case extractingAudio
+    case completed
+
+    var titleResource: LocalizedStringResource {
+        switch self {
+        case .loadingVideo:
+            return L10n.Import.loadingVideo
+        case .extractingAudio:
+            return L10n.Import.extractingAudio
+        case .completed:
+            return L10n.Import.videoImported
+        }
+    }
+
+    var systemImage: String {
+        switch self {
+        case .loadingVideo:
+            return "icloud.and.arrow.down"
+        case .extractingAudio:
+            return "waveform"
+        case .completed:
+            return "checkmark"
+        }
+    }
+
+    var order: Int {
+        switch self {
+        case .loadingVideo:
+            return 0
+        case .extractingAudio:
+            return 1
+        case .completed:
+            return 2
+        }
+    }
+}
+
+private struct VideoImportProgressState: Equatable {
+    var stage: VideoImportProgressStage
+    var progress: Double
+
+    init(stage: VideoImportProgressStage, progress: Double) {
+        self.stage = stage
+        self.progress = min(max(progress, 0), 1)
+    }
+}
+
+private struct VideoImportProgressRow: View {
+    let state: VideoImportProgressState
+
+    private var tint: Color {
+        state.stage == .completed ? AppTheme.success : AppTheme.info
+    }
+
+    var body: some View {
+        HStack(spacing: 12) {
+            ZStack {
+                RoundedRectangle(cornerRadius: AppTheme.compactCornerRadius, style: .continuous)
+                    .fill(tint.opacity(0.12))
+
+                Image(systemName: state.stage.systemImage)
+                    .font(.system(size: 17, weight: .semibold))
+                    .foregroundStyle(tint)
+                    .contentTransition(.symbolEffect(.replace))
+            }
+            .frame(width: 40, height: 40)
+
+            VStack(alignment: .leading, spacing: 7) {
+                HStack(spacing: 8) {
+                    Text(state.stage.titleResource)
+                        .font(.redditSans(.subheadline, weight: .semibold))
+                        .foregroundStyle(.primary)
+                        .lineLimit(1)
+
+                    Spacer(minLength: 8)
+
+                    Text(state.progress, format: .percent.precision(.fractionLength(0)))
+                        .font(.redditSans(.caption, weight: .semibold).monospacedDigit())
+                        .foregroundStyle(.secondary)
+                        .contentTransition(.numericText())
+                }
+
+                ProgressView(value: state.progress)
+                    .progressViewStyle(.linear)
+                    .tint(tint)
+                    .animation(.linear(duration: 0.16), value: state.progress)
+            }
+        }
+        .padding(14)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(AppTheme.cardBackground)
+        .overlay {
+            RoundedRectangle(cornerRadius: AppTheme.cornerRadius, style: .continuous)
+                .stroke(tint.opacity(0.18), lineWidth: 1)
+        }
+        .clipShape(RoundedRectangle(cornerRadius: AppTheme.cornerRadius, style: .continuous))
+        .shadow(
+            color: AppTheme.cardShadow,
+            radius: AppTheme.cardShadowRadius,
+            y: AppTheme.cardShadowYOffset
+        )
+        .accessibilityElement(children: .combine)
+        .accessibilityValue(Text(state.progress, format: .percent.precision(.fractionLength(0))))
+    }
+}
+
+private func loadPhotoLibraryVideo(
+    from item: PhotosPickerItem,
+    progressHandler: @escaping @MainActor @Sendable (Double) -> Void
+) async throws -> PhotoLibraryVideoTransfer {
+    let stream = AsyncThrowingStream<PhotoLibraryVideoTransfer, Error> { continuation in
+        let transferProgress = item.loadTransferable(type: PhotoLibraryVideoTransfer.self) { result in
+            switch result {
+            case .success(let video):
+                guard let video else {
+                    continuation.finish(throwing: PhotoLibraryVideoImportError.unavailable)
+                    return
+                }
+                continuation.yield(video)
+                continuation.finish()
+            case .failure(let error):
+                continuation.finish(throwing: error)
+            }
+        }
+
+        let monitoringTask = Task { @MainActor in
+            while !Task.isCancelled {
+                progressHandler(transferProgress.fractionCompleted)
+                if transferProgress.isFinished || transferProgress.isCancelled {
+                    break
+                }
+                try? await Task.sleep(for: .milliseconds(100))
+            }
+        }
+
+        continuation.onTermination = { @Sendable termination in
+            monitoringTask.cancel()
+            if case .cancelled = termination {
+                transferProgress.cancel()
+            }
+        }
+    }
+
+    for try await video in stream {
+        return video
+    }
+    throw PhotoLibraryVideoImportError.unavailable
 }
 
 private struct ActivityShareSheet: UIViewControllerRepresentable {
@@ -532,7 +712,10 @@ struct RecordingsView: View {
     @State private var analyzingRecordingID: RecordingItem.ID?
     @State private var analysisErrorMessage: String?
     @State private var showsImporter = false
+    @State private var showsVideoPicker = false
+    @State private var selectedVideoItem: PhotosPickerItem?
     @State private var isImporting = false
+    @State private var videoImportProgressState: VideoImportProgressState?
     @State private var importErrorMessage: String?
     @State private var transcriptionErrorMessage: String?
     @State private var deleteErrorMessage: String?
@@ -675,6 +858,17 @@ struct RecordingsView: View {
             allowsMultipleSelection: false
         ) { result in
             handleImportResult(result)
+        }
+        .photosPicker(
+            isPresented: $showsVideoPicker,
+            selection: $selectedVideoItem,
+            matching: .videos
+        )
+        .onChange(of: selectedVideoItem) { _, newItem in
+            guard let newItem else {
+                return
+            }
+            importVideoFromPhotos(newItem)
         }
         .sheet(isPresented: $isShowingRecordingsMap) {
             RecordingMapView(store: store, transcriber: transcriber, player: player)
@@ -951,7 +1145,15 @@ struct RecordingsView: View {
     @ViewBuilder
     private var recordingsList: some View {
         List {
-            if visibleCategoryFolders.isEmpty {
+            if let videoImportProgressState {
+                VideoImportProgressRow(state: videoImportProgressState)
+                    .listRowSeparator(.hidden)
+                    .listRowBackground(Color.clear)
+                    .listRowInsets(EdgeInsets(top: 8, leading: 16, bottom: 8, trailing: 16))
+                    .transition(.move(edge: .top).combined(with: .opacity))
+            }
+
+            if visibleCategoryFolders.isEmpty && videoImportProgressState == nil {
                 EmptyStateView(
                     icon: isSearchingCategoryRoot ? "magnifyingglass" : "folder",
                     titleResource: isSearchingCategoryRoot ? L10n.Recordings.noSearchResults : L10n.Recordings.noRecordings
@@ -969,6 +1171,7 @@ struct RecordingsView: View {
         .scrollContentBackground(.hidden)
         .background(AppTheme.groupedBackground)
         .scrollDismissesKeyboard(.interactively)
+        .animation(.snappy(duration: 0.28, extraBounce: 0), value: videoImportProgressState != nil)
         .safeAreaInset(edge: .bottom) {
             Color.clear.frame(height: 8)
         }
@@ -978,7 +1181,7 @@ struct RecordingsView: View {
     private var recordingsToolbar: some ToolbarContent {
         ToolbarItem(placement: .topBarTrailing) {
             HStack(spacing: 8) {
-                if isImporting {
+                if isImporting && videoImportProgressState == nil {
                     ProgressView()
                         .controlSize(.small)
                 }
@@ -995,9 +1198,20 @@ struct RecordingsView: View {
                     }
                     .accessibilityLabel(Text(L10n.Recordings.map))
 
-                    Button {
-                        HapticFeedback.play(.primaryAction)
-                        showsImporter = true
+                    Menu {
+                        Button {
+                            HapticFeedback.play(.primaryAction)
+                            showsImporter = true
+                        } label: {
+                            Label(localized(L10n.Recordings.importAudioFile), systemImage: "waveform")
+                        }
+
+                        Button {
+                            HapticFeedback.play(.primaryAction)
+                            showsVideoPicker = true
+                        } label: {
+                            Label(localized(L10n.Recordings.importVideoFromPhotos), systemImage: "video.badge.plus")
+                        }
                     } label: {
                         Image(systemName: "square.and.arrow.down")
                             .frame(width: 32, height: 28)
@@ -1158,6 +1372,74 @@ struct RecordingsView: View {
                 HapticFeedback.play(.failure)
             }
             isImporting = false
+        }
+    }
+
+    private func importVideoFromPhotos(_ item: PhotosPickerItem) {
+        guard !isImporting else {
+            selectedVideoItem = nil
+            HapticFeedback.play(.blocked)
+            return
+        }
+
+        navigationPath.removeAll()
+        isImporting = true
+        updateVideoImportProgress(stage: .loadingVideo, progress: 0)
+        HapticFeedback.play(.importStart)
+
+        Task {
+            var temporaryVideoURL: URL?
+            defer {
+                if let temporaryVideoURL {
+                    try? FileManager.default.removeItem(at: temporaryVideoURL)
+                }
+                selectedVideoItem = nil
+                isImporting = false
+                withAnimation(.snappy(duration: 0.28, extraBounce: 0)) {
+                    videoImportProgressState = nil
+                }
+            }
+
+            do {
+                let video = try await loadPhotoLibraryVideo(from: item) { progress in
+                    updateVideoImportProgress(
+                        stage: .loadingVideo,
+                        progress: progress * 0.42
+                    )
+                }
+                temporaryVideoURL = video.fileURL
+                updateVideoImportProgress(stage: .extractingAudio, progress: 0.42)
+                _ = try await store.importVideoRecording(from: video.fileURL) { progress in
+                    updateVideoImportProgress(
+                        stage: .extractingAudio,
+                        progress: 0.42 + progress * 0.56
+                    )
+                }
+                updateVideoImportProgress(stage: .completed, progress: 1)
+                HapticFeedback.play(.importComplete)
+                try? await Task.sleep(for: .milliseconds(450))
+            } catch {
+                importErrorMessage = error.localizedDescription
+                HapticFeedback.play(.failure)
+            }
+        }
+    }
+
+    private func updateVideoImportProgress(stage: VideoImportProgressStage, progress: Double) {
+        let previousState = videoImportProgressState
+        if let previousState, stage.order < previousState.stage.order {
+            return
+        }
+        let clampedProgress = min(max(progress, 0), 1)
+        let monotonicProgress = max(previousState?.progress ?? 0, clampedProgress)
+        let nextState = VideoImportProgressState(stage: stage, progress: monotonicProgress)
+
+        if previousState?.stage != stage || previousState == nil {
+            withAnimation(.snappy(duration: 0.24, extraBounce: 0)) {
+                videoImportProgressState = nextState
+            }
+        } else {
+            videoImportProgressState = nextState
         }
     }
 
@@ -3893,7 +4175,7 @@ struct RecordingDetailView: View {
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .background(AppTheme.cardBackground, in: RoundedRectangle(cornerRadius: AppTheme.cornerRadius, style: .continuous))
             } else if let analysis = currentItem.audioEventAnalysis, !analysis.events.isEmpty {
-                VStack(alignment: .leading, spacing: 8) {
+                LazyVStack(alignment: .leading, spacing: 8) {
                     ForEach(analysis.events) { event in
                         audioEventRow(event)
                     }
@@ -5997,10 +6279,34 @@ private struct RecordingTimelineScrubber: View {
                     .frame(height: trackHeight)
                     .offset(y: trackCenterY - trackHeight / 2)
 
-                ForEach(audioEvents) { event in
-                    audioEventMarker(event, trackWidth: width, markerHeight: markerHeight)
-                        .offset(x: markerX(for: event, trackWidth: width), y: trackCenterY - markerHeight / 2)
+                Canvas(opaque: false, rendersAsynchronously: true) { context, _ in
+                    for event in audioEvents {
+                        let rect = markerRect(
+                            for: event,
+                            trackWidth: width,
+                            markerHeight: markerHeight
+                        )
+                        context.fill(
+                            Path(roundedRect: rect, cornerRadius: 3),
+                            with: .color(AppTheme.info.opacity(markerOpacity(for: event)))
+                        )
+                        context.fill(
+                            Path(
+                                roundedRect: CGRect(
+                                    x: rect.minX,
+                                    y: rect.minY,
+                                    width: rect.width,
+                                    height: 1
+                                ),
+                                cornerRadius: 0.5
+                            ),
+                            with: .color(Color.white.opacity(0.26))
+                        )
+                    }
                 }
+                .frame(width: width, height: markerHeight)
+                .offset(y: trackCenterY - markerHeight / 2)
+                .allowsHitTesting(false)
 
                 Capsule()
                     .fill(AppTheme.brand.opacity(isEnabled ? 0.88 : 0.34))
@@ -6036,17 +6342,6 @@ private struct RecordingTimelineScrubber: View {
             @unknown default:
                 break
             }
-        }
-    }
-
-    private func audioEventMarker(_ event: RecordingAudioEvent, trackWidth: CGFloat, markerHeight: CGFloat) -> some View {
-        RoundedRectangle(cornerRadius: 3, style: .continuous)
-            .fill(AppTheme.info.opacity(markerOpacity(for: event)))
-            .frame(width: markerWidth(for: event, trackWidth: trackWidth), height: markerHeight)
-            .overlay(alignment: .top) {
-                RoundedRectangle(cornerRadius: 3, style: .continuous)
-                    .fill(Color.white.opacity(0.26))
-                    .frame(height: 1)
         }
     }
 
@@ -6107,19 +6402,19 @@ private struct RecordingTimelineScrubber: View {
     }
 
     private func activeAudioEvent(at time: TimeInterval) -> RecordingAudioEvent? {
-        audioEvents
-            .filter { event in
-                time >= event.startTime - 0.45 && time <= event.endTime + 0.45
+        var closestEvent: RecordingAudioEvent?
+        var closestDistance = TimeInterval.infinity
+
+        for event in audioEvents where time >= event.startTime - 0.45 && time <= event.endTime + 0.45 {
+            let eventDistance = distance(from: time, to: event)
+            if eventDistance < closestDistance
+                || (eventDistance == closestDistance && event.confidence > (closestEvent?.confidence ?? 0)) {
+                closestEvent = event
+                closestDistance = eventDistance
             }
-            .sorted {
-                let lhsDistance = distance(from: time, to: $0)
-                let rhsDistance = distance(from: time, to: $1)
-                if lhsDistance == rhsDistance {
-                    return $0.confidence > $1.confidence
-                }
-                return lhsDistance < rhsDistance
-            }
-            .first
+        }
+
+        return closestEvent
     }
 
     private func distance(from time: TimeInterval, to event: RecordingAudioEvent) -> TimeInterval {
@@ -6134,14 +6429,16 @@ private struct RecordingTimelineScrubber: View {
         return TimeInterval(normalized) * effectiveDuration
     }
 
-    private func markerX(for event: RecordingAudioEvent, trackWidth: CGFloat) -> CGFloat {
-        min(max(CGFloat(event.startTime / effectiveDuration) * trackWidth, 0), trackWidth)
-    }
-
-    private func markerWidth(for event: RecordingAudioEvent, trackWidth: CGFloat) -> CGFloat {
+    private func markerRect(
+        for event: RecordingAudioEvent,
+        trackWidth: CGFloat,
+        markerHeight: CGFloat
+    ) -> CGRect {
+        let markerX = min(max(CGFloat(event.startTime / effectiveDuration) * trackWidth, 0), trackWidth)
         let rawWidth = CGFloat(max(event.duration, 0.1) / effectiveDuration) * trackWidth
-        let remainingWidth = max(trackWidth - markerX(for: event, trackWidth: trackWidth), 3)
-        return min(max(rawWidth, 4), remainingWidth)
+        let remainingWidth = max(trackWidth - markerX, 3)
+        let markerWidth = min(max(rawWidth, 4), remainingWidth)
+        return CGRect(x: markerX, y: 0, width: markerWidth, height: markerHeight)
     }
 
     private func markerOpacity(for event: RecordingAudioEvent) -> Double {

@@ -18,8 +18,8 @@ enum RecordingSoundAnalysisError: LocalizedError {
 
 enum RecordingSoundAnalysisService {
     private static let confidenceThreshold = 0.35
-    private static let maximumEvents = 40
     private static let mergeGapSeconds: TimeInterval = 0.75
+    private static let schemaVersion = 3
 
     static func analyze(url: URL) async throws -> RecordingAudioEventAnalysis {
         try await Task.detached(priority: .userInitiated) {
@@ -41,10 +41,10 @@ enum RecordingSoundAnalysisService {
             }
 
             return RecordingAudioEventAnalysis(
-                events: Array(events.prefix(maximumEvents)),
+                events: events,
                 generatedAt: Date(),
                 provider: "SoundAnalysis",
-                schemaVersion: 1
+                schemaVersion: schemaVersion
             )
         }.value
     }

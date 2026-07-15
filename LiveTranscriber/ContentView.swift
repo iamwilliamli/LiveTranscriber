@@ -1,3 +1,4 @@
+import AppIntents
 import SwiftUI
 import UIKit
 
@@ -10,13 +11,32 @@ struct ContentView: View {
     @State private var pendingOpenRecordingID: RecordingItem.ID?
     @State private var pendingRecordingDraftFromLiveActivity: RecordingDraft?
     @State private var pendingDeepLinkSpeechLocaleReleaseRequest: SpeechLocaleReleaseRequest?
+    @State private var pendingQuickRecordingRequest = false
     @State private var speechLocaleErrorMessage: String?
     @AppStorage(OnboardingState.completedDefaultsKey) private var hasCompletedOnboarding = false
+    // Cold-launch only, and never stacked on top of onboarding: evaluated once at scene creation.
+    @State private var isShowingLaunchSplash = UserDefaults.standard.bool(forKey: OnboardingState.completedDefaultsKey)
 
     var body: some View {
         Group {
             if hasCompletedOnboarding {
-                mainTabs
+                // The main UI mounts only after the splash so its initial build
+                // never steals main-thread time from the choreography.
+                ZStack {
+                    if !isShowingLaunchSplash {
+                        mainTabs
+                            .transition(.opacity)
+                    }
+
+                    if isShowingLaunchSplash {
+                        LaunchSplashView {
+                            withAnimation(.easeOut(duration: 0.35)) {
+                                isShowingLaunchSplash = false
+                            }
+                        }
+                        .transition(.opacity)
+                    }
+                }
             } else {
                 OnboardingIntroView(transcriber: transcriber) {
                     withAnimation(.easeInOut(duration: 0.32)) {
@@ -27,15 +47,24 @@ struct ContentView: View {
         }
         .font(.redditSans(.body))
         .tint(AppTheme.brand)
+        .onAppIntentExecution(StartQuickRecordingIntent.self) { intent in
+            guard intent.target == .quickRecording else {
+                return
+            }
+            handleQuickRecordingControl()
+        }
         .onOpenURL { url in
+            dismissLaunchSplash()
             handleOpenedURL(url)
         }
         .onReceive(NotificationCenter.default.publisher(for: HomeScreenQuickActionRouter.didRequestRoute)) { _ in
+            dismissLaunchSplash()
             consumePendingHomeScreenQuickAction()
         }
         .onChange(of: hasCompletedOnboarding) { _, completed in
             if completed {
                 consumePendingHomeScreenQuickAction()
+                consumePendingQuickRecordingRequest()
             }
         }
         .alert(
@@ -77,30 +106,35 @@ struct ContentView: View {
     }
 
     private var mainTabs: some View {
-        TabView(selection: tabSelection) {
-            Tab(String(localized: L10n.App.transcribeTab), systemImage: "waveform.and.mic", value: AppTab.transcribe) {
-                TranscriptionView(
-                    transcriber: transcriber,
-                    recordingStore: recordingStore,
-                    externalPendingRecordingDraft: $pendingRecordingDraftFromLiveActivity
-                )
-            }
+        ZStack {
+            AppTheme.groupedBackground
+                .ignoresSafeArea()
 
-            Tab(String(localized: L10n.App.recordingsTab), systemImage: "folder", value: AppTab.recordings) {
-                RecordingsView(
-                    store: recordingStore,
-                    transcriber: transcriber,
-                    incomingImportURL: $incomingRecordingImportURL,
-                    pendingOpenRecordingID: $pendingOpenRecordingID,
-                    player: recordingPlayer
-                )
-            }
+            TabView(selection: tabSelection) {
+                Tab(String(localized: L10n.App.transcribeTab), systemImage: "waveform.and.mic", value: AppTab.transcribe) {
+                    TranscriptionView(
+                        transcriber: transcriber,
+                        recordingStore: recordingStore,
+                        externalPendingRecordingDraft: $pendingRecordingDraftFromLiveActivity
+                    )
+                }
 
-            Tab(String(localized: L10n.App.settingsTab), systemImage: "gearshape", value: AppTab.settings) {
-                SettingsView(transcriber: transcriber, recordingStore: recordingStore)
+                Tab(String(localized: L10n.App.recordingsTab), systemImage: "folder", value: AppTab.recordings) {
+                    RecordingsView(
+                        store: recordingStore,
+                        transcriber: transcriber,
+                        incomingImportURL: $incomingRecordingImportURL,
+                        pendingOpenRecordingID: $pendingOpenRecordingID,
+                        player: recordingPlayer
+                    )
+                }
+
+                Tab(String(localized: L10n.App.settingsTab), systemImage: "gearshape", value: AppTab.settings) {
+                    SettingsView(transcriber: transcriber, recordingStore: recordingStore)
+                }
             }
+            .tabBarMinimizeBehavior(.onScrollDown)
         }
-        .tabBarMinimizeBehavior(.onScrollDown)
         .task {
             await recordingStore.reload()
             await transcriber.refreshSupportedLanguages()
@@ -124,6 +158,38 @@ struct ContentView: View {
             selectedTab = newTab
             HapticFeedback.play(.tabSelection)
         }
+    }
+
+    private func dismissLaunchSplash() {
+        guard isShowingLaunchSplash else {
+            return
+        }
+        withAnimation(.easeOut(duration: 0.15)) {
+            isShowingLaunchSplash = false
+        }
+    }
+
+    private func handleQuickRecordingControl() {
+        dismissLaunchSplash()
+        selectedTab = .transcribe
+
+        guard hasCompletedOnboarding else {
+            pendingQuickRecordingRequest = true
+            return
+        }
+
+        pendingQuickRecordingRequest = false
+        startRecordingFromDeepLink()
+    }
+
+    private func consumePendingQuickRecordingRequest() {
+        guard pendingQuickRecordingRequest else {
+            return
+        }
+
+        pendingQuickRecordingRequest = false
+        selectedTab = .transcribe
+        startRecordingFromDeepLink()
     }
 
     private func consumePendingHomeScreenQuickAction() {

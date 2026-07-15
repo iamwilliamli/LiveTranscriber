@@ -1891,6 +1891,48 @@
         }
       }
     },
+    "import.error.audio_extraction_failed": {
+      "comment": "Error shown when AVFoundation cannot extract audio from a selected video.",
+      "extractionState": "manual",
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Die Audiospur des Videos konnte nicht extrahiert werden."
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The video's audio could not be extracted."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ビデオからオーディオを抽出できませんでした。"
+          }
+        },
+        "nl": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "De audio van de video kon niet worden geëxtraheerd."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "无法提取视频中的音频。"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "無法擷取影片中的音訊。"
+          }
+        }
+      }
+    },
     "import.error.duplicate_recording_name": {
       "comment": "Recording detail validation error.",
       "extractionState": "stale",
@@ -2101,6 +2143,132 @@
         }
       }
     },
+    "import.error.video_has_no_audio": {
+      "comment": "Error shown when a selected video contains no audio track.",
+      "extractionState": "manual",
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Das ausgewählte Video enthält keine Audiospur."
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The selected video has no audio track."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "選択したビデオにオーディオトラックがありません。"
+          }
+        },
+        "nl": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "De geselecteerde video bevat geen audiospoor."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "所选视频没有音轨。"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "所選影片沒有音軌。"
+          }
+        }
+      }
+    },
+    "import.error.video_unavailable": {
+      "comment": "Error shown when a video selected from Photos cannot be loaded.",
+      "extractionState": "manual",
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Das ausgewählte Video konnte nicht geladen werden."
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The selected video could not be loaded."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "選択したビデオを読み込めませんでした。"
+          }
+        },
+        "nl": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "De geselecteerde video kon niet worden geladen."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "无法加载所选视频。"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "無法載入所選影片。"
+          }
+        }
+      }
+    },
+    "import.status.extracting_audio": {
+      "comment": "Import status shown while extracting the audio track from a selected video.",
+      "extractionState": "manual",
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Audio wird extrahiert"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Extracting audio"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "オーディオを抽出中"
+          }
+        },
+        "nl": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Audio extraheren"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "正在提取音频"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "正在擷取音訊"
+          }
+        }
+      }
+    },
     "import.status.importing_recording": {
       "comment": "Import status message.",
       "extractionState": "stale",
@@ -2139,6 +2307,48 @@
           "stringUnit": {
             "state": "translated",
             "value": "正在匯入錄音"
+          }
+        }
+      }
+    },
+    "import.status.loading_video": {
+      "comment": "Import status shown while loading a selected video from Photos or iCloud.",
+      "extractionState": "manual",
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Video wird geladen"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Loading video"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ビデオを読み込み中"
+          }
+        },
+        "nl": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Video laden"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "正在加载视频"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "正在載入影片"
           }
         }
       }
@@ -2307,6 +2517,48 @@
           "stringUnit": {
             "state": "translated",
             "value": "正在上傳到 OpenAI"
+          }
+        }
+      }
+    },
+    "import.status.video_imported": {
+      "comment": "Import status shown briefly after a video's audio has been added to recordings.",
+      "extractionState": "manual",
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Video importiert"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Video imported"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ビデオを読み込みました"
+          }
+        },
+        "nl": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Video geïmporteerd"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "视频已导入"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "影片已匯入"
           }
         }
       }
@@ -12601,6 +12853,48 @@
         }
       }
     },
+    "recordings.import_audio_file": {
+      "comment": "Menu action for importing an audio file from the document picker.",
+      "extractionState": "manual",
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Audiodatei importieren"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Import Audio File"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "オーディオファイルを読み込む"
+          }
+        },
+        "nl": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Audiobestand importeren"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "导入音频文件"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "匯入音訊檔案"
+          }
+        }
+      }
+    },
     "recordings.import_failed": {
       "comment": "Alert title for import failure.",
       "extractionState": "stale",
@@ -12681,6 +12975,48 @@
           "stringUnit": {
             "state": "translated",
             "value": "匯入錄音"
+          }
+        }
+      }
+    },
+    "recordings.import_video_from_photos": {
+      "comment": "Menu action for importing the audio track of a video selected from Photos.",
+      "extractionState": "manual",
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Video aus Fotos importieren"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Import Video from Photos"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "写真からビデオを読み込む"
+          }
+        },
+        "nl": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Video uit Foto's importeren"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "从相册导入视频"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "從照片匯入影片"
           }
         }
       }
@@ -17515,6 +17851,48 @@
         }
       }
     },
+    "settings.privacy_policy": {
+      "comment": "Settings link title for opening the app privacy policy.",
+      "extractionState": "manual",
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Datenschutzerklärung"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Privacy Policy"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "プライバシーポリシー"
+          }
+        },
+        "nl": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Privacybeleid"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "隐私政策"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "隱私權政策"
+          }
+        }
+      }
+    },
     "settings.public_beta_feedback": {
       "comment": "Settings row title for opening the public beta Telegram feedback group.",
       "extractionState": "manual",
@@ -20157,6 +20535,48 @@
           "stringUnit": {
             "state": "translated",
             "value": "Runtime Analyzer 輸入：等待錄音"
+          }
+        }
+      }
+    },
+    "splash.tagline": {
+      "comment": "Tagline under the app name on the animated launch splash.",
+      "extractionState": "manual",
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ausgepackt. Bereit zur Aufnahme."
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Unboxed. Ready to record."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "開けたら、すぐ録音。"
+          }
+        },
+        "nl": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Uitgepakt. Klaar om op te nemen."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "开箱即录 · 实时转写"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "開箱即錄 · 即時轉寫"
           }
         }
       }

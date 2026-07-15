@@ -5,8 +5,24 @@ import WidgetKit
 @main
 struct LiveTranscriberWidgetBundle: WidgetBundle {
     var body: some Widget {
+        QuickRecordingControl()
         LiveTranscriberHomeWidget()
         TranscriptionLiveActivityWidget()
+    }
+}
+
+struct QuickRecordingControl: ControlWidget {
+    static let kind = "com.iamwilliamli.LiveTranscriber.quickRecording"
+
+    var body: some ControlWidgetConfiguration {
+        StaticControlConfiguration(kind: Self.kind) {
+            ControlWidgetButton(action: StartQuickRecordingIntent()) {
+                Label(QuickRecordingControlL10n.startRecording, systemImage: "waveform.and.mic")
+                    .controlWidgetActionHint(QuickRecordingControlL10n.startRecording)
+            }
+        }
+        .displayName(QuickRecordingControlL10n.title)
+        .description(QuickRecordingControlL10n.description)
     }
 }
 
@@ -18,7 +34,14 @@ struct LiveTranscriberHomeWidget: Widget {
         }
         .configurationDisplayName("Live Transcriber")
         .description("Start recording, open saved files, and change recording settings.")
-        .supportedFamilies([.systemSmall, .systemMedium, .systemLarge])
+        .supportedFamilies([
+            .systemSmall,
+            .systemMedium,
+            .systemLarge,
+            .accessoryCircular,
+            .accessoryRectangular,
+            .accessoryInline
+        ])
     }
 }
 
@@ -53,9 +76,61 @@ private struct LiveTranscriberHomeWidgetView: View {
                 .widgetURL(WidgetRoute.record.url)
         case .systemLarge:
             LargeHomeWidget()
+        case .accessoryCircular:
+            QuickRecordingCircularWidget()
+                .widgetURL(WidgetRoute.record.url)
+        case .accessoryRectangular:
+            QuickRecordingRectangularWidget()
+                .widgetURL(WidgetRoute.record.url)
+        case .accessoryInline:
+            QuickRecordingInlineWidget()
+                .widgetURL(WidgetRoute.record.url)
         default:
             MediumHomeWidget()
         }
+    }
+}
+
+private struct QuickRecordingCircularWidget: View {
+    var body: some View {
+        ZStack {
+            AccessoryWidgetBackground()
+
+            Image(systemName: "waveform.and.mic")
+                .font(.system(size: 22, weight: .semibold))
+                .widgetAccentable()
+        }
+        .accessibilityLabel(Text(QuickRecordingControlL10n.startRecording))
+    }
+}
+
+private struct QuickRecordingRectangularWidget: View {
+    var body: some View {
+        HStack(spacing: 8) {
+            Image(systemName: "waveform.and.mic")
+                .font(.system(size: 21, weight: .semibold))
+                .widgetAccentable()
+
+            VStack(alignment: .leading, spacing: 1) {
+                Text(QuickRecordingControlL10n.title)
+                    .font(.redditSans(.headline, weight: .semibold))
+                    .lineLimit(1)
+
+                Text(QuickRecordingControlL10n.startRecording)
+                    .font(.redditSans(.caption, weight: .medium))
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+            }
+
+            Spacer(minLength: 0)
+        }
+        .accessibilityElement(children: .combine)
+    }
+}
+
+private struct QuickRecordingInlineWidget: View {
+    var body: some View {
+        Label(QuickRecordingControlL10n.startRecording, systemImage: "waveform.and.mic")
     }
 }
 

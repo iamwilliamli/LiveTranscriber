@@ -13,6 +13,12 @@ private func localizedFormat(_ resource: LocalizedStringResource, _ arguments: C
     String(format: String(localized: resource), arguments: arguments)
 }
 
+private enum TranscriptionAmbientState: Equatable {
+    case standby
+    case recording
+    case paused
+}
+
 struct TranscriptionView: View {
     @Environment(\.colorScheme) private var colorScheme
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
@@ -206,17 +212,27 @@ struct TranscriptionView: View {
             AppTheme.groupedBackground
 
             ambientBackgroundGradient(color: AppTheme.warning)
-                .opacity(transcriber.isRecording ? 0 : 1)
+                .opacity(transcriptionAmbientState == .standby ? 1 : 0)
 
             ambientBackgroundGradient(color: AppTheme.danger)
-                .opacity(transcriber.isRecording ? 1 : 0)
+                .opacity(transcriptionAmbientState == .recording ? 1 : 0)
+
+            ambientBackgroundGradient(color: AppTheme.success)
+                .opacity(transcriptionAmbientState == .paused ? 1 : 0)
         }
         .animation(
-            reduceMotion ? nil : .easeInOut(duration: 0.65),
-            value: transcriber.isRecording
+            reduceMotion ? nil : .easeInOut(duration: 0.55),
+            value: transcriptionAmbientState
         )
         .ignoresSafeArea()
         .allowsHitTesting(false)
+    }
+
+    private var transcriptionAmbientState: TranscriptionAmbientState {
+        guard transcriber.isRecording else {
+            return .standby
+        }
+        return transcriber.isPaused ? .paused : .recording
     }
 
     private func ambientBackgroundGradient(color: Color) -> some View {
@@ -1117,10 +1133,6 @@ private struct LiveRecordingWaveTimeline: View {
     private let rulerHeight: CGFloat = 36
     private let playheadFraction: CGFloat = 0.5
 
-    @State private var elapsedSecondAnchor = 0
-    @State private var elapsedAnchorDate = Date()
-    @State private var sampleMotionAnchorDate = Date()
-
     var body: some View {
         TimelineView(.animation(minimumInterval: 1.0 / 30.0, paused: !isActive || reduceMotion)) { context in
             GeometryReader { proxy in
@@ -1135,20 +1147,6 @@ private struct LiveRecordingWaveTimeline: View {
             }
         }
         .frame(height: height)
-        .onAppear {
-            resetElapsedAnchor(to: clock.elapsedSeconds)
-            sampleMotionAnchorDate = Date()
-        }
-        .onChange(of: clock.elapsedSeconds) { _, newValue in
-            resetElapsedAnchor(to: newValue)
-        }
-        .onChange(of: isActive) { _, _ in
-            resetElapsedAnchor(to: clock.elapsedSeconds)
-            sampleMotionAnchorDate = Date()
-        }
-        .onChange(of: samples) { _, _ in
-            sampleMotionAnchorDate = Date()
-        }
     }
 
     private func timelineContent(
@@ -1166,6 +1164,10 @@ private struct LiveRecordingWaveTimeline: View {
             timelineTicks(width: size.width, elapsed: elapsed)
                 .frame(width: size.width, height: rulerHeight)
                 .offset(y: size.height - rulerHeight)
+                .transaction { transaction in
+                    transaction.animation = nil
+                    transaction.disablesAnimations = true
+                }
         }
         .frame(width: size.width, height: size.height, alignment: .topLeading)
     }
@@ -1274,14 +1276,20 @@ private struct LiveRecordingWaveTimeline: View {
     private var normalizedSamples: [InputLevelHistorySample] {
         let source = samples.isEmpty
             ? (0..<72).map {
-                InputLevelHistorySample(id: -72 + $0, level: 0, isCaptured: false)
+                InputLevelHistorySample(
+                    id: -72 + $0,
+                    level: 0,
+                    isCaptured: false,
+                    elapsedTime: 0
+                )
             }
             : samples
         return source.map { sample in
             InputLevelHistorySample(
                 id: sample.id,
                 level: min(max(sample.level, 0), 1),
-                isCaptured: sample.isCaptured
+                isCaptured: sample.isCaptured,
+                elapsedTime: sample.elapsedTime
             )
         }
     }
@@ -1310,24 +1318,21 @@ private struct LiveRecordingWaveTimeline: View {
     }
 
     private func displayedElapsed(at date: Date) -> TimeInterval {
-        guard isActive, !reduceMotion else {
+        guard !reduceMotion else {
             return TimeInterval(clock.elapsedSeconds)
         }
-        return TimeInterval(elapsedSecondAnchor) + date.timeIntervalSince(elapsedAnchorDate)
+        return clock.timelineAnchor.elapsed(at: date)
     }
 
     private func samplePhase(at date: Date) -> CGFloat {
-        guard isActive, !reduceMotion else {
+        guard !reduceMotion,
+              let latestSample = samples.last(where: { $0.isCaptured }) else {
             return 0
         }
 
-        let phase = date.timeIntervalSince(sampleMotionAnchorDate) / sampleInterval
+        let currentElapsed = clock.timelineAnchor.elapsed(at: date)
+        let phase = (currentElapsed - latestSample.elapsedTime) / sampleInterval
         return CGFloat(min(max(phase, 0), 1))
-    }
-
-    private func resetElapsedAnchor(to seconds: Int) {
-        elapsedSecondAnchor = seconds
-        elapsedAnchorDate = Date()
     }
 }
 

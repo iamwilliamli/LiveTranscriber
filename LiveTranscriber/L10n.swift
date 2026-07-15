@@ -16,6 +16,14 @@ enum L10n {
         )
     }
 
+    enum Splash {
+        static let tagline = L10n.resource(
+            "splash.tagline",
+            defaultValue: "Unboxed. Ready to record.",
+            comment: "Tagline under the app name on the animated launch splash."
+        )
+    }
+
     enum Common {
         static let unknown = L10n.resource(
             "common.unknown",
@@ -113,6 +121,7 @@ enum L10n {
         static let recording = L10n.resource("settings.recording", defaultValue: "Recording", comment: "Settings section title for recording.")
         static let files = L10n.resource("settings.files", defaultValue: "Files", comment: "Settings section title for files.")
         static let privacy = L10n.resource("settings.privacy", defaultValue: "Privacy", comment: "Settings section title for privacy.")
+        static let privacyPolicy = L10n.resource("settings.privacy_policy", defaultValue: "Privacy Policy", comment: "Settings link title for opening the app privacy policy.")
         static let localProcessing = L10n.resource("settings.local_processing", defaultValue: "Local Processing", comment: "Privacy setting value and section title.")
         static let developerOptions = L10n.resource("settings.developer_options", defaultValue: "Developer Options", comment: "Developer options settings title.")
         static let languageAndModel = L10n.resource("settings.subtitle.language_model", defaultValue: "Language and transcription model", comment: "Settings row subtitle.")
@@ -321,8 +330,14 @@ enum L10n {
 
     enum Import {
         static let importingRecording = L10n.resource("import.status.importing_recording", defaultValue: "Importing recording", comment: "Import status message.")
+        static let loadingVideo = L10n.resource("import.status.loading_video", defaultValue: "Loading video", comment: "Import status shown while loading a selected video from Photos or iCloud.")
+        static let extractingAudio = L10n.resource("import.status.extracting_audio", defaultValue: "Extracting audio", comment: "Import status shown while extracting the audio track from a selected video.")
+        static let videoImported = L10n.resource("import.status.video_imported", defaultValue: "Video imported", comment: "Import status shown briefly after a video's audio has been added to recordings.")
         static let preparingTranscription = L10n.resource("import.status.preparing_transcription", defaultValue: "Preparing transcription", comment: "Import status message.")
         static let transcribing = L10n.resource("import.status.transcribing", defaultValue: "Transcribing", comment: "Import status message.")
+        static let videoUnavailable = L10n.resource("import.error.video_unavailable", defaultValue: "The selected video could not be loaded.", comment: "Error shown when a video selected from Photos cannot be loaded.")
+        static let videoHasNoAudio = L10n.resource("import.error.video_has_no_audio", defaultValue: "The selected video has no audio track.", comment: "Error shown when a selected video contains no audio track.")
+        static let audioExtractionFailed = L10n.resource("import.error.audio_extraction_failed", defaultValue: "The video's audio could not be extracted.", comment: "Error shown when AVFoundation cannot extract audio from a selected video.")
         static let emptyRecordingName = L10n.resource("import.error.empty_recording_name", defaultValue: "Recording name cannot be empty", comment: "Recording detail validation error.")
         static let duplicateRecordingName = L10n.resource("import.error.duplicate_recording_name", defaultValue: "A recording file with this name already exists", comment: "Recording detail validation error.")
         static let recordingFileNotFound = L10n.resource("import.error.recording_file_not_found", defaultValue: "Recording file could not be found", comment: "Recording detail validation error.")
@@ -338,6 +353,8 @@ enum L10n {
         static let searchPrompt = L10n.resource("recordings.search_prompt", defaultValue: "Search recordings or transcripts", comment: "Search prompt on recordings list.")
         static let chooseTranscriptionLanguage = L10n.resource("recordings.choose_transcription_language", defaultValue: "Choose Transcription Language", comment: "Dialog title for choosing a transcription language.")
         static let importRecording = L10n.resource("recordings.import_recording", defaultValue: "Import Recording", comment: "Import recording action or dialog message.")
+        static let importAudioFile = L10n.resource("recordings.import_audio_file", defaultValue: "Import Audio File", comment: "Menu action for importing an audio file from the document picker.")
+        static let importVideoFromPhotos = L10n.resource("recordings.import_video_from_photos", defaultValue: "Import Video from Photos", comment: "Menu action for importing the audio track of a video selected from Photos.")
         static let analysisFailed = L10n.resource("recordings.analysis_failed", defaultValue: "Analysis Failed", comment: "Alert title for analysis failure.")
         static let importFailed = L10n.resource("recordings.import_failed", defaultValue: "Import Failed", comment: "Alert title for import failure.")
         static let transcriptionFailed = L10n.resource("recordings.transcription_failed", defaultValue: "Transcription Failed", comment: "Alert title for transcription failure.")
