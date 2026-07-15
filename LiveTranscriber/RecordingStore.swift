@@ -30,8 +30,13 @@ struct RecordingItem: Identifiable, Codable, Hashable {
     var intelligence: RecordingIntelligence?
     var importStatus: RecordingImportStatus?
     var manualTags: [String]?
+    var projectName: String?
+    var categoryName: String?
+    var keyPoints: String?
     var location: RecordingLocation?
     var isTranscriptLocked: Bool
+    var meetingAnalysis: RecordingMeetingAnalysis?
+    var audioEventAnalysis: RecordingAudioEventAnalysis?
 
     init(
         id: UUID,
@@ -46,8 +51,13 @@ struct RecordingItem: Identifiable, Codable, Hashable {
         intelligence: RecordingIntelligence?,
         importStatus: RecordingImportStatus?,
         manualTags: [String]?,
+        projectName: String? = nil,
+        categoryName: String? = nil,
+        keyPoints: String? = nil,
         location: RecordingLocation?,
-        isTranscriptLocked: Bool = false
+        isTranscriptLocked: Bool = false,
+        meetingAnalysis: RecordingMeetingAnalysis? = nil,
+        audioEventAnalysis: RecordingAudioEventAnalysis? = nil
     ) {
         self.id = id
         self.createdAt = createdAt
@@ -61,8 +71,13 @@ struct RecordingItem: Identifiable, Codable, Hashable {
         self.intelligence = intelligence
         self.importStatus = importStatus
         self.manualTags = manualTags
+        self.projectName = Self.normalizedProjectName(projectName)
+        self.categoryName = Self.normalizedCategoryName(categoryName)
+        self.keyPoints = Self.normalizedKeyPoints(keyPoints)
         self.location = location
         self.isTranscriptLocked = isTranscriptLocked
+        self.meetingAnalysis = meetingAnalysis
+        self.audioEventAnalysis = audioEventAnalysis
     }
 
     private enum CodingKeys: String, CodingKey {
@@ -78,8 +93,13 @@ struct RecordingItem: Identifiable, Codable, Hashable {
         case intelligence
         case importStatus
         case manualTags
+        case projectName
+        case categoryName
+        case keyPoints
         case location
         case isTranscriptLocked
+        case meetingAnalysis
+        case audioEventAnalysis
     }
 
     init(from decoder: Decoder) throws {
@@ -96,12 +116,37 @@ struct RecordingItem: Identifiable, Codable, Hashable {
         intelligence = try container.decodeIfPresent(RecordingIntelligence.self, forKey: .intelligence)
         importStatus = try container.decodeIfPresent(RecordingImportStatus.self, forKey: .importStatus)
         manualTags = try container.decodeIfPresent([String].self, forKey: .manualTags)
+        projectName = Self.normalizedProjectName(try container.decodeIfPresent(String.self, forKey: .projectName))
+        categoryName = Self.normalizedCategoryName(try container.decodeIfPresent(String.self, forKey: .categoryName))
+        keyPoints = Self.normalizedKeyPoints(try container.decodeIfPresent(String.self, forKey: .keyPoints))
         location = try container.decodeIfPresent(RecordingLocation.self, forKey: .location)
         isTranscriptLocked = try container.decodeIfPresent(Bool.self, forKey: .isTranscriptLocked) ?? false
+        meetingAnalysis = try container.decodeIfPresent(RecordingMeetingAnalysis.self, forKey: .meetingAnalysis)
+        audioEventAnalysis = try container.decodeIfPresent(RecordingAudioEventAnalysis.self, forKey: .audioEventAnalysis)
     }
 
     var combinedTags: [String] {
         Self.mergedTags(manualTags ?? [], intelligence?.tags ?? [])
+    }
+
+    static func normalizedProjectName(_ projectName: String?) -> String? {
+        normalizedMetadataText(projectName)
+    }
+
+    static func normalizedCategoryName(_ categoryName: String?) -> String? {
+        normalizedMetadataText(categoryName)
+    }
+
+    static func normalizedKeyPoints(_ keyPoints: String?) -> String? {
+        normalizedMetadataText(keyPoints)
+    }
+
+    private static func normalizedMetadataText(_ text: String?) -> String? {
+        guard let text else {
+            return nil
+        }
+        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        return trimmed.isEmpty ? nil : trimmed
     }
 
     var localizedLanguageName: String {
@@ -158,6 +203,76 @@ struct RecordingIntelligence: Codable, Hashable {
     var summary: String
     var tags: [String]
     var generatedAt: Date
+}
+
+struct RecordingMeetingAnalysis: Codable, Hashable {
+    var summary: String?
+    var actionItems: [RecordingActionItem]
+    var decisions: [RecordingDecisionItem]
+    var openQuestions: [RecordingOpenQuestion]
+    var markdownNotes: String
+    var generatedAt: Date
+    var provider: String
+    var schemaVersion: Int
+}
+
+struct RecordingActionItem: Codable, Hashable, Identifiable {
+    var id = UUID()
+    var task: String
+    var owner: String?
+    var dueDate: String?
+}
+
+struct RecordingDecisionItem: Codable, Hashable, Identifiable {
+    var id = UUID()
+    var decision: String
+    var rationale: String?
+}
+
+struct RecordingOpenQuestion: Codable, Hashable, Identifiable {
+    var id = UUID()
+    var question: String
+    var owner: String?
+}
+
+extension RecordingMeetingAnalysis {
+    var searchableText: String {
+        [
+            summary ?? "",
+            markdownNotes,
+            actionItems.map { [$0.task, $0.owner, $0.dueDate].compactMap(\.self).joined(separator: " ") }.joined(separator: "\n"),
+            decisions.map { [$0.decision, $0.rationale].compactMap(\.self).joined(separator: " ") }.joined(separator: "\n"),
+            openQuestions.map { [$0.question, $0.owner].compactMap(\.self).joined(separator: " ") }.joined(separator: "\n")
+        ]
+        .joined(separator: "\n")
+    }
+}
+
+struct RecordingAudioEventAnalysis: Codable, Hashable {
+    var events: [RecordingAudioEvent]
+    var generatedAt: Date
+    var provider: String
+    var schemaVersion: Int
+}
+
+struct RecordingAudioEvent: Codable, Hashable, Identifiable {
+    var id = UUID()
+    var label: String
+    var confidence: Double
+    var startTime: TimeInterval
+    var duration: TimeInterval
+    var sourceIdentifier: String
+
+    var endTime: TimeInterval {
+        startTime + duration
+    }
+}
+
+extension RecordingAudioEventAnalysis {
+    var searchableText: String {
+        events.map { [$0.label, $0.sourceIdentifier].joined(separator: " ") }
+            .joined(separator: "\n")
+    }
 }
 
 struct RecordingTitleSuggestion: Hashable {
@@ -395,6 +510,9 @@ final class RecordingIndexRecord {
     var importStatusMessage: String?
     var importStatusIsFailed: Bool = false
     var manualTagsJSON: String?
+    var projectName: String?
+    var categoryName: String?
+    var keyPoints: String?
     var locationLatitude: Double?
     var locationLongitude: Double?
     var locationHorizontalAccuracy: Double?
@@ -402,6 +520,9 @@ final class RecordingIndexRecord {
     var locationCity: String?
     var locationCountry: String?
     var isTranscriptLocked: Bool = false
+    var meetingAnalysisJSON: String?
+    var speakerDiarizationJSON: String?
+    var audioEventAnalysisJSON: String?
 
     init(item: RecordingItem) {
         apply(item)
@@ -439,6 +560,9 @@ final class RecordingIndexRecord {
         }
 
         manualTagsJSON = Self.encodeTags(item.manualTags ?? [])
+        projectName = item.projectName
+        categoryName = item.categoryName
+        keyPoints = item.keyPoints
         locationLatitude = item.location?.latitude
         locationLongitude = item.location?.longitude
         locationHorizontalAccuracy = item.location?.horizontalAccuracy
@@ -446,6 +570,8 @@ final class RecordingIndexRecord {
         locationCity = item.location?.city
         locationCountry = item.location?.country
         isTranscriptLocked = item.isTranscriptLocked
+        meetingAnalysisJSON = Self.encodeCodable(item.meetingAnalysis)
+        audioEventAnalysisJSON = Self.encodeCodable(item.audioEventAnalysis)
     }
 
     var item: RecordingItem {
@@ -462,8 +588,13 @@ final class RecordingIndexRecord {
             intelligence: intelligence,
             importStatus: importStatus,
             manualTags: Self.decodeTags(manualTagsJSON),
+            projectName: projectName,
+            categoryName: categoryName,
+            keyPoints: keyPoints,
             location: location,
-            isTranscriptLocked: isTranscriptLocked
+            isTranscriptLocked: isTranscriptLocked,
+            meetingAnalysis: Self.decodeCodable(RecordingMeetingAnalysis.self, from: meetingAnalysisJSON),
+            audioEventAnalysis: Self.decodeCodable(RecordingAudioEventAnalysis.self, from: audioEventAnalysisJSON)
         )
     }
 
@@ -511,19 +642,28 @@ final class RecordingIndexRecord {
     }
 
     private static func encodeTags(_ tags: [String]) -> String? {
-        guard let data = try? JSONEncoder().encode(tags) else {
+        encodeCodable(tags)
+    }
+
+    private static func decodeTags(_ json: String?) -> [String] {
+        decodeCodable([String].self, from: json) ?? []
+    }
+
+    private static func encodeCodable<T: Encodable>(_ value: T?) -> String? {
+        guard let value,
+              let data = try? JSONEncoder().encode(value) else {
             return nil
         }
         return String(data: data, encoding: .utf8)
     }
 
-    private static func decodeTags(_ json: String?) -> [String] {
+    private static func decodeCodable<T: Decodable>(_ type: T.Type, from json: String?) -> T? {
         guard let json,
               let data = json.data(using: .utf8),
-              let tags = try? JSONDecoder().decode([String].self, from: data) else {
-            return []
+              let value = try? JSONDecoder().decode(T.self, from: data) else {
+            return nil
         }
-        return tags
+        return value
     }
 }
 
@@ -969,6 +1109,9 @@ final class RecordingStore: ObservableObject {
         preferredName: String? = nil,
         manualTags: [String] = [],
         intelligence: RecordingIntelligence? = nil,
+        projectName: String? = nil,
+        categoryName: String? = nil,
+        keyPoints: String? = nil,
         location: RecordingLocation? = nil
     ) async -> RecordingItem? {
         do {
@@ -1001,6 +1144,9 @@ final class RecordingStore: ObservableObject {
                 intelligence: intelligence,
                 importStatus: nil,
                 manualTags: manualTags,
+                projectName: projectName,
+                categoryName: categoryName,
+                keyPoints: keyPoints,
                 location: location
             )
 
@@ -1561,6 +1707,9 @@ final class RecordingStore: ObservableObject {
         proposedName: String,
         manualTags: [String],
         summary: String?,
+        projectName: String?,
+        categoryName: String?,
+        keyPoints: String?,
         location: RecordingLocation?
     ) throws -> RecordingItem {
         let renamedItem = try rename(item, to: proposedName)
@@ -1569,13 +1718,81 @@ final class RecordingStore: ObservableObject {
         }
 
         recordings[index].manualTags = manualTags
+        recordings[index].projectName = RecordingItem.normalizedProjectName(projectName)
+        recordings[index].categoryName = RecordingItem.normalizedCategoryName(categoryName)
+        recordings[index].keyPoints = RecordingItem.normalizedKeyPoints(keyPoints)
         recordings[index].intelligence = Self.updatedIntelligence(
             from: renamedItem.intelligence,
             summary: summary
         )
         recordings[index].location = location
+        searchIndexCache[renamedItem.id] = nil
         try persist()
         return recordings[index]
+    }
+
+    @discardableResult
+    func updateCategory(
+        for item: RecordingItem,
+        categoryName: String?
+    ) throws -> RecordingItem {
+        guard let index = recordings.firstIndex(where: { $0.id == item.id }) else {
+            throw RecordingRenameError.itemMissing
+        }
+
+        recordings[index].categoryName = RecordingItem.normalizedCategoryName(categoryName)
+        searchIndexCache[item.id] = nil
+        try persist()
+        return recordings[index]
+    }
+
+    @discardableResult
+    func renameCategory(named oldName: String, to newName: String) throws -> Int {
+        guard let cleanedOldName = RecordingItem.normalizedCategoryName(oldName),
+              let cleanedNewName = RecordingItem.normalizedCategoryName(newName) else {
+            return 0
+        }
+
+        let oldKey = cleanedOldName.normalizedForRecordingSearch
+        var updatedCount = 0
+        for index in recordings.indices {
+            guard recordings[index].categoryName?.normalizedForRecordingSearch == oldKey else {
+                continue
+            }
+
+            recordings[index].categoryName = cleanedNewName
+            searchIndexCache[recordings[index].id] = nil
+            updatedCount += 1
+        }
+
+        if updatedCount > 0 {
+            try persist()
+        }
+        return updatedCount
+    }
+
+    @discardableResult
+    func removeCategory(named name: String) throws -> Int {
+        guard let cleanedName = RecordingItem.normalizedCategoryName(name) else {
+            return 0
+        }
+
+        let key = cleanedName.normalizedForRecordingSearch
+        var updatedCount = 0
+        for index in recordings.indices {
+            guard recordings[index].categoryName?.normalizedForRecordingSearch == key else {
+                continue
+            }
+
+            recordings[index].categoryName = nil
+            searchIndexCache[recordings[index].id] = nil
+            updatedCount += 1
+        }
+
+        if updatedCount > 0 {
+            try persist()
+        }
+        return updatedCount
     }
 
     @discardableResult
@@ -1779,7 +1996,12 @@ final class RecordingStore: ObservableObject {
             item.languageName,
             item.transcriptPreview,
             item.combinedTags.joined(separator: " "),
+            item.projectName ?? "",
+            item.categoryName ?? "",
+            item.keyPoints ?? "",
             item.intelligence?.summary ?? "",
+            item.meetingAnalysis?.searchableText ?? "",
+            item.audioEventAnalysis?.searchableText ?? "",
             transcriptText(for: item)
         ]
         let normalizedText = searchableFields
@@ -1855,6 +2077,44 @@ final class RecordingStore: ObservableObject {
         recordings[index].manualTags = RecordingItem.mergedTags(recordings[index].manualTags ?? [], intelligence.tags)
         try persist()
         return intelligence
+    }
+
+    @discardableResult
+    func analyzeMeeting(
+        for item: RecordingItem,
+        transcriptOverride: String? = nil,
+        languageNameOverride: String? = nil,
+        summaryProvider: RecordingSummaryProvider = .selected
+    ) async throws -> RecordingMeetingAnalysis {
+        let transcript = (transcriptOverride ?? transcriptText(for: item)).plainTranscriptTextForIntelligence
+        let analysis = try await MeetingAnalysisService.generate(
+            transcript: transcript,
+            languageName: languageNameOverride ?? item.languageName,
+            summaryProvider: summaryProvider
+        )
+
+        guard let index = recordings.firstIndex(where: { $0.id == item.id }) else {
+            return analysis
+        }
+
+        recordings[index].meetingAnalysis = analysis
+        try persist()
+        return analysis
+    }
+
+    @discardableResult
+    func analyzeAudioEvents(for item: RecordingItem) async throws -> RecordingAudioEventAnalysis {
+        let currentItem = recording(withID: item.id) ?? item
+        let analysis = try await RecordingSoundAnalysisService.analyze(url: audioURL(for: currentItem))
+
+        guard let index = recordings.firstIndex(where: { $0.id == item.id }) else {
+            return analysis
+        }
+
+        recordings[index].audioEventAnalysis = analysis
+        searchIndexCache[item.id] = nil
+        try persist()
+        return analysis
     }
 
     func generateSuggestedTitle(for draft: RecordingDraft) async throws -> RecordingTitleSuggestion {
@@ -2226,7 +2486,11 @@ final class RecordingStore: ObservableObject {
                     item.languageName,
                     item.transcriptPreview,
                     item.combinedTags.joined(separator: " "),
-                    item.intelligence?.summary ?? ""
+                    item.projectName ?? "",
+                    item.categoryName ?? "",
+                    item.keyPoints ?? "",
+                    item.intelligence?.summary ?? "",
+                    item.meetingAnalysis?.searchableText ?? ""
                 ].joined(separator: "\n"),
                 transcriptURL: transcriptURL(for: item)
             )
@@ -2284,7 +2548,12 @@ final class RecordingStore: ObservableObject {
             "\(item.lineCount)",
             "\(item.transcriptPreview.hashValue)",
             "\(item.combinedTags.hashValue)",
+            "\(item.projectName?.hashValue ?? 0)",
+            "\(item.categoryName?.hashValue ?? 0)",
+            "\(item.keyPoints?.hashValue ?? 0)",
             "\(item.intelligence?.summary.hashValue ?? 0)",
+            "\(item.meetingAnalysis?.searchableText.hashValue ?? 0)",
+            "\(item.audioEventAnalysis?.searchableText.hashValue ?? 0)",
             "\(transcriptModificationTime(for: item))",
             "\(item.importStatus == nil)"
         ].joined(separator: "|")

@@ -7,6 +7,12 @@ import Speech
 
 private let liveTranscriptionLogger = Logger(subsystem: "com.reddownloader.LiveTranscriber", category: "LiveTranscription")
 
+struct InputLevelHistorySample: Identifiable, Equatable, Sendable {
+    let id: Int
+    let level: Float
+    let isCaptured: Bool
+}
+
 private func liveAudioFormatSummary(_ format: AVAudioFormat) -> String {
     let channels = format.channelCount == 1 ? "mono" : "\(format.channelCount) ch"
     let interleaving = format.isInterleaved ? "interleaved" : "non-interleaved"
@@ -96,8 +102,10 @@ final class LiveTranscriptionManager: ObservableObject {
     let interimTranscriptStore = LiveInterimTranscriptStore()
     let elapsedClock = RecordingElapsedClock()
     private(set) var elapsedSeconds: Int = 0
-    private(set) var inputLevel: Float = 0
-    private(set) var inputLevelHistory: [Float] = Array(repeating: 0, count: 72)
+    @Published private(set) var inputLevel: Float = 0
+    @Published private(set) var inputLevelHistory: [InputLevelHistorySample] = (0..<72).map {
+        InputLevelHistorySample(id: $0, level: 0, isCaptured: false)
+    }
     @Published private(set) var supportedLanguages: [TranscriptionLanguage] = TranscriptionLanguage.fallbackOptions
     @Published private(set) var speechPipelineRuntimeFormatText = String(localized: L10n.SpeechText.runtimeInputWaitingRecording)
     @Published var selectedAudioFormat: RecordingAudioFormat {
@@ -151,7 +159,14 @@ final class LiveTranscriptionManager: ObservableObject {
     private static let openAITranscriptionEnabledDefaultsKey = "openai.transcription.enabled"
     private static let analyzerSampleRate: Double = 16_000
     private static let inputLevelHistoryCount = 72
-    private static let inputLevelHistorySampleInterval: TimeInterval = 0.08
+    private static let inputLevelHistorySampleInterval: TimeInterval = 1.0 / 6.0
+    private static var shouldUseSimulatorRecordingOnlyFallback: Bool {
+        #if targetEnvironment(simulator)
+        return !SpeechTranscriber.isAvailable
+        #else
+        return false
+        #endif
+    }
 
     private let audioSessionQueue = DispatchQueue(label: "com.reddownloader.live-transcription.audio-session", qos: .userInitiated)
     private var analyzer: SpeechAnalyzer?
@@ -170,6 +185,7 @@ final class LiveTranscriptionManager: ObservableObject {
     private var currentRecordingFormat: AVAudioFormat?
     private var smoothedInputLevel: Float = 0
     private var lastInputLevelHistorySampleAt: TimeInterval = 0
+    private var nextInputLevelHistorySampleID = 72
     private var finalizedLines: [TranscriptionLine] = []
     private var interimLine: TranscriptionLine?
     private var manuallyEditedFinalLineIDs = Set<TranscriptionLine.ID>()
@@ -420,6 +436,8 @@ final class LiveTranscriptionManager: ObservableObject {
     private func startCaptureSessionRecording(language: TranscriptionLanguage) async throws {
         if selectedTranscriptionBackend.usesLocalWhisper {
             try await startLocalWhisperCaptureSessionRecording(language: language)
+        } else if Self.shouldUseSimulatorRecordingOnlyFallback {
+            try await startRecordingOnlyCaptureSessionRecording(language: language)
         } else {
             try await startAppleSpeechCaptureSessionRecording(language: language)
         }
@@ -440,7 +458,8 @@ final class LiveTranscriptionManager: ObservableObject {
             recordingFormat: recordingFormat,
             analyzerSourceFormat: analyzerSourceFormat,
             writer: writer,
-            analyzerPipeline: prepared.pipeline
+            analyzerPipeline: prepared.pipeline,
+            inputLevelObserver: makeInputLevelObserver()
         )
 
         analyzer = prepared.analyzer
@@ -453,6 +472,34 @@ final class LiveTranscriptionManager: ObservableObject {
 
         startResultReader(for: prepared.transcriber)
         startAnalyzer(prepared.analyzer, stream: prepared.stream)
+        try await capturePipeline.start()
+    }
+
+    private func startRecordingOnlyCaptureSessionRecording(language _: TranscriptionLanguage) async throws {
+        statusText = String(localized: L10n.RecordingStatus.configuringAudioInput)
+        try await configureAudioSession()
+
+        let audioFormat = selectedAudioFormat
+        let recordingFormat = try Self.makeCaptureSessionRecordingFormat()
+        let analyzerSourceFormat = try Self.makeCaptureSessionAnalyzerSourceFormat(sampleRate: recordingFormat.sampleRate)
+        statusText = String(localized: L10n.RecordingStatus.startingRecorder)
+
+        let recordingURL = try Self.makeTemporaryRecordingURL(format: audioFormat)
+        let writer = try AudioFileWriter(url: recordingURL, inputFormat: recordingFormat, outputFormat: audioFormat)
+        let capturePipeline = CaptureSessionRecordingPipeline(
+            recordingFormat: recordingFormat,
+            analyzerSourceFormat: analyzerSourceFormat,
+            writer: writer,
+            analyzerPipeline: nil,
+            inputLevelObserver: makeInputLevelObserver()
+        )
+
+        captureRecordingPipeline = capturePipeline
+        audioWriter = writer
+        currentAudioURL = recordingURL
+        currentRecordingFormat = recordingFormat
+        speechPipelineRuntimeFormatText = String(localized: L10n.SpeechText.analyzerUnavailable)
+
         try await capturePipeline.start()
     }
 
@@ -495,7 +542,8 @@ final class LiveTranscriptionManager: ObservableObject {
             analyzerSourceFormat: localWhisperFormat,
             writer: writer,
             analyzerPipeline: nil,
-            localWhisperPipeline: localWhisperPipeline
+            localWhisperPipeline: localWhisperPipeline,
+            inputLevelObserver: makeInputLevelObserver()
         )
 
         self.localWhisperPipeline = localWhisperPipeline
@@ -505,6 +553,14 @@ final class LiveTranscriptionManager: ObservableObject {
         currentRecordingFormat = recordingFormat
 
         try await capturePipeline.start()
+    }
+
+    private func makeInputLevelObserver() -> @Sendable (Float) -> Void {
+        { [weak self] level in
+            Task { @MainActor [weak self] in
+                self?.handleInputLevel(level)
+            }
+        }
     }
 
     func pauseRecording() async {
@@ -731,13 +787,13 @@ final class LiveTranscriptionManager: ObservableObject {
     }
 
     private func handleInputLevel(_ level: Float) {
-        guard isRecording, !isPaused else {
+        guard (isPreparing || isRecording), !isPaused else {
             resetInputLevel()
             return
         }
 
         let clampedLevel = min(max(level, 0), 1)
-        let response: Float = clampedLevel > smoothedInputLevel ? 0.42 : 0.16
+        let response: Float = clampedLevel > smoothedInputLevel ? 0.62 : 0.30
         smoothedInputLevel += (clampedLevel - smoothedInputLevel) * response
         inputLevel = smoothedInputLevel
         appendInputLevelHistoryIfNeeded(smoothedInputLevel)
@@ -747,7 +803,11 @@ final class LiveTranscriptionManager: ObservableObject {
         smoothedInputLevel = 0
         inputLevel = 0
         if clearHistory {
-            inputLevelHistory = Array(repeating: 0, count: Self.inputLevelHistoryCount)
+            let firstSampleID = nextInputLevelHistorySampleID
+            inputLevelHistory = (0..<Self.inputLevelHistoryCount).map { offset in
+                InputLevelHistorySample(id: firstSampleID + offset, level: 0, isCaptured: false)
+            }
+            nextInputLevelHistorySampleID += Self.inputLevelHistoryCount
             lastInputLevelHistorySampleAt = 0
         }
     }
@@ -759,10 +819,19 @@ final class LiveTranscriptionManager: ObservableObject {
         }
 
         lastInputLevelHistorySampleAt = now
-        inputLevelHistory.append(level)
-        if inputLevelHistory.count > Self.inputLevelHistoryCount {
-            inputLevelHistory.removeFirst(inputLevelHistory.count - Self.inputLevelHistoryCount)
+        var updatedHistory = inputLevelHistory
+        updatedHistory.append(
+            InputLevelHistorySample(
+                id: nextInputLevelHistorySampleID,
+                level: level,
+                isCaptured: true
+            )
+        )
+        nextInputLevelHistorySampleID += 1
+        if updatedHistory.count > Self.inputLevelHistoryCount {
+            updatedHistory.removeFirst(updatedHistory.count - Self.inputLevelHistoryCount)
         }
+        inputLevelHistory = updatedHistory
     }
 
     private static func makeAnalyzerInputFormat() throws -> AVAudioFormat {
@@ -1802,10 +1871,9 @@ private final class CaptureSessionRecordingPipeline: NSObject, AVCaptureAudioDat
         }
 
         let captureInput = try AVCaptureDeviceInput(device: device)
-        guard captureInput.isMultichannelAudioModeSupported(.stereo) else {
-            throw LiveTranscriptionError.stereoCaptureUnavailable
+        if captureInput.isMultichannelAudioModeSupported(.stereo) {
+            captureInput.multichannelAudioMode = .stereo
         }
-        captureInput.multichannelAudioMode = .stereo
 
         session.beginConfiguration()
         defer { session.commitConfiguration() }
@@ -1949,7 +2017,7 @@ private final class CaptureSessionRecordingPipeline: NSObject, AVCaptureAudioDat
 
         let rms = sqrt(sum / Float(count))
         let decibels = 20 * log10(max(rms, 0.000_001))
-        return min(max((decibels + 54) / 54, 0), 1)
+        return min(max((decibels + 60) / 60, 0), 1)
     }
 
     private func reportFirstFormatIfNeeded(

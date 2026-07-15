@@ -1,8 +1,11 @@
 import SwiftUI
 
 enum AppTheme {
-    static let cornerRadius: CGFloat = 8
+    static let navigationBarCornerRadius: CGFloat = 28
+    static let cornerRadius = navigationBarCornerRadius
     static let compactCornerRadius: CGFloat = 7
+    static let cardShadowRadius: CGFloat = 14
+    static let cardShadowYOffset: CGFloat = 6
 
     static let brand = Color(red: 0.96, green: 0.22, blue: 0.10)
     static let brandSoft = Color(red: 1.0, green: 0.49, blue: 0.25)
@@ -40,5 +43,5 @@ enum AppTheme {
     static let playbackGlassTint = Color.black.opacity(0.08)
     static let subtleBorder = Color(.separator).opacity(0.18)
     static let cardBorder = Color(.separator).opacity(0.36)
-    static let cardShadow = Color.black.opacity(0.06)
+    static let cardShadow = Color.black.opacity(0.10)
 }

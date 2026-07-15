@@ -16,6 +16,21 @@ private func localizedFormat(_ resource: LocalizedStringResource, _ arguments: C
     String(format: String(localized: resource), arguments: arguments)
 }
 
+private struct ShareSheetItem: Identifiable {
+    let id = UUID()
+    let url: URL
+}
+
+private struct ActivityShareSheet: UIViewControllerRepresentable {
+    let activityItems: [Any]
+
+    func makeUIViewController(context: Context) -> UIActivityViewController {
+        UIActivityViewController(activityItems: activityItems, applicationActivities: nil)
+    }
+
+    func updateUIViewController(_ uiViewController: UIActivityViewController, context: Context) {}
+}
+
 private func localWhisperDownloadedModels() -> [LocalWhisperModel] {
     LocalWhisperModelManager.downloadedStatuses().map(\.model)
 }
@@ -514,7 +529,6 @@ struct RecordingsView: View {
     @Binding var pendingOpenRecordingID: RecordingItem.ID?
     @ObservedObject var player: RecordingPlaybackController
     @State private var deleteRequest: RecordingDeleteRequest?
-    @State private var selectedRecording: RecordingItem?
     @State private var analyzingRecordingID: RecordingItem.ID?
     @State private var analysisErrorMessage: String?
     @State private var showsImporter = false
@@ -529,43 +543,96 @@ struct RecordingsView: View {
     @State private var localWhisperLanguageOptionsByModelID: [String: [TranscriptionLanguage]] = [:]
     @State private var localWhisperRetranscriptionRequest: LocalWhisperRetranscriptionRequest?
     @State private var searchText = ""
+    @State private var navigationPath: [RecordingNavigationDestination] = []
+    @State private var isShowingNewCategorySheet = false
+    @State private var newCategoryName = ""
+    @State private var newCategoryErrorMessage: String?
+    @State private var newCategoryAssignmentItem: RecordingItem?
+    @State private var renameCategoryName = ""
+    @State private var renameCategoryErrorMessage: String?
+    @State private var renameCategoryTarget: RecordingCategoryFolder?
+    @State private var deleteCategoryTarget: RecordingCategoryFolder?
+    @State private var addRecordingsCategoryTarget: RecordingCategoryFolder?
+    @State private var isShowingCategoryOrganizer = false
     @State private var isShowingRecordingsMap = false
     @State private var hidesTabBarForRecordingDetail = false
     @State private var tabBarRestoreTask: Task<Void, Never>?
+    @AppStorage("Recordings.customCategoriesJSON") private var customCategoriesJSON = "[]"
     @AppStorage(RecordingSummaryProvider.selectedDefaultsKey) private var selectedSummaryProviderRawValue = RecordingSummaryProvider.automatic.rawValue
+
+    private static let uncategorizedCategoryID = "__uncategorized__"
 
     private var selectedSummaryProvider: RecordingSummaryProvider {
         RecordingSummaryProvider(rawValue: selectedSummaryProviderRawValue) ?? .automatic
     }
 
-    private var filteredRecordings: [RecordingItem] {
-        let query = normalizedSearchText(searchText)
-        guard !query.isEmpty else {
-            return store.recordings
+    private var customCategoryNames: [String] {
+        guard let data = customCategoriesJSON.data(using: .utf8),
+              let decoded = try? JSONDecoder().decode([String].self, from: data) else {
+            return []
+        }
+        return RecordingCategoryCatalog.normalized(decoded)
+    }
+
+    private var categoryNames: [String] {
+        RecordingCategoryCatalog.normalized(store.recordings.compactMap(\.categoryName) + customCategoryNames)
+    }
+
+    private var categoryFolders: [RecordingCategoryFolder] {
+        var folders = categoryNames.map { categoryName in
+            RecordingCategoryFolder(
+                id: categoryName,
+                name: categoryName,
+                count: store.recordings.filter { $0.categoryName == categoryName }.count,
+                isUncategorized: false
+            )
         }
 
-        return store.recordings.filter { item in
-            recording(item, matches: query)
+        let uncategorizedCount = store.recordings.filter { $0.categoryName == nil }.count
+        if uncategorizedCount > 0 {
+            folders.append(
+                RecordingCategoryFolder(
+                    id: Self.uncategorizedCategoryID,
+                    name: localized(L10n.Recordings.uncategorized),
+                    count: uncategorizedCount,
+                    isUncategorized: true
+                )
+            )
+        }
+
+        return folders.sorted { lhs, rhs in
+            if lhs.isUncategorized != rhs.isUncategorized {
+                return !lhs.isUncategorized
+            }
+            return lhs.name.localizedCaseInsensitiveCompare(rhs.name) == .orderedAscending
         }
     }
 
+    private var visibleCategoryFolders: [RecordingCategoryFolder] {
+        let query = normalizedSearchText(searchText)
+        guard !query.isEmpty else {
+            return categoryFolders
+        }
+        return categoryFolders.filter { folder in
+            folder.name.normalizedForRecordingSearch.contains(query)
+                || recordings(in: folder.id).contains { recording($0, matches: query) }
+        }
+    }
+
+    private var isSearchingCategoryRoot: Bool {
+        !normalizedSearchText(searchText).isEmpty
+    }
+
     var body: some View {
-        NavigationStack {
+        NavigationStack(path: $navigationPath) {
             recordingsList
                 .navigationTitle(localized(L10n.Recordings.title))
                 .navigationBarTitleDisplayMode(.large)
                 .toolbar {
                     recordingsToolbar
                 }
-                .navigationDestination(item: $selectedRecording) { item in
-                    RecordingDetailView(
-                        item: item,
-                        store: store,
-                        transcriber: transcriber,
-                        player: player,
-                        downloadedLocalWhisperModels: downloadedLocalWhisperModels,
-                        localWhisperLanguageOptionsByModelID: localWhisperLanguageOptionsByModelID
-                    )
+                .navigationDestination(for: RecordingNavigationDestination.self) { destination in
+                    navigationDestinationView(for: destination)
                 }
         }
         .toolbar(hidesTabBarForRecordingDetail ? .hidden : .visible, for: .tabBar)
@@ -596,16 +663,11 @@ struct RecordingsView: View {
         .onChange(of: pendingOpenRecordingID) { _, _ in
             consumePendingOpenRecordingIDIfNeeded()
         }
+        .onChange(of: navigationPath) { _, newPath in
+            updateTabBarVisibility(for: newPath)
+        }
         .onChange(of: store.recordings) { _, _ in
             consumePendingOpenRecordingIDIfNeeded()
-        }
-        .onChange(of: selectedRecording?.id) { _, newValue in
-            if newValue == nil {
-                HapticFeedback.play(.navigation)
-                scheduleTabBarRestoreAfterPop()
-            } else {
-                hideTabBarForDetail()
-            }
         }
         .fileImporter(
             isPresented: $showsImporter,
@@ -616,6 +678,56 @@ struct RecordingsView: View {
         }
         .sheet(isPresented: $isShowingRecordingsMap) {
             RecordingMapView(store: store, transcriber: transcriber, player: player)
+        }
+        .sheet(isPresented: $isShowingNewCategorySheet) {
+            RecordingCategoryNameSheet(
+                titleResource: L10n.Recordings.newCategory,
+                iconSystemImage: "folder.badge.plus",
+                categoryName: $newCategoryName,
+                errorMessage: newCategoryErrorMessage,
+                onSave: createCategory,
+                onCancel: {
+                    isShowingNewCategorySheet = false
+                    newCategoryAssignmentItem = nil
+                }
+            )
+            .presentationDetents([.medium])
+            .presentationDragIndicator(.visible)
+        }
+        .sheet(isPresented: $isShowingCategoryOrganizer) {
+            RecordingCategoryOrganizerSheet(
+                store: store,
+                onUpdateCategory: updateRecordingCategory,
+                onDone: {
+                    isShowingCategoryOrganizer = false
+                }
+            )
+        }
+        .sheet(item: $renameCategoryTarget) { _ in
+            RecordingCategoryNameSheet(
+                titleResource: L10n.Recordings.renameCategory,
+                iconSystemImage: "pencil",
+                categoryName: $renameCategoryName,
+                errorMessage: renameCategoryErrorMessage,
+                onSave: renameCategory,
+                onCancel: {
+                    renameCategoryTarget = nil
+                }
+            )
+            .presentationDetents([.medium])
+            .presentationDragIndicator(.visible)
+        }
+        .sheet(item: $addRecordingsCategoryTarget) { folder in
+            RecordingCategoryAddRecordingsSheet(
+                folder: folder,
+                store: store,
+                onAdd: { item in
+                    updateRecordingCategory(item, folder.categoryAssignmentName)
+                },
+                onDone: {
+                    addRecordingsCategoryTarget = nil
+                }
+            )
         }
         .sheet(item: $localWhisperRetranscriptionRequest) { request in
             LocalWhisperRetranscriptionPicker(
@@ -733,6 +845,33 @@ struct RecordingsView: View {
             Text(localizedFormat(L10n.Recordings.deleteConfirmationFormat, deleteRequest?.item.audioFileName ?? ""))
         }
         .alert(
+            localized(L10n.Recordings.deleteCategory),
+            isPresented: Binding(
+                get: { deleteCategoryTarget != nil },
+                set: { isPresented in
+                    if !isPresented {
+                        deleteCategoryTarget = nil
+                    }
+                }
+            )
+        ) {
+            Button(localized(L10n.Common.delete), role: .destructive) {
+                if let target = deleteCategoryTarget {
+                    performDeleteCategory(target)
+                    deleteCategoryTarget = nil
+                }
+            }
+            Button(localized(L10n.Common.cancel), role: .cancel) {}
+        } message: {
+            Text(
+                localizedFormat(
+                    L10n.Recordings.deleteCategoryConfirmationFormat,
+                    deleteCategoryTarget?.name ?? "",
+                    deleteCategoryTarget?.count ?? 0
+                )
+            )
+        }
+        .alert(
             localized(L10n.Recordings.deleteFailed),
             isPresented: Binding(
                 get: { deleteErrorMessage != nil },
@@ -750,21 +889,79 @@ struct RecordingsView: View {
     }
 
     @ViewBuilder
+    private func navigationDestinationView(for destination: RecordingNavigationDestination) -> some View {
+        switch destination {
+        case .category(let id):
+            if let folder = categoryFolder(for: id) {
+                RecordingCategoryDetailList(
+                    folder: folder,
+                    store: store,
+                    transcriber: transcriber,
+                    player: player,
+                    downloadedLocalWhisperModels: downloadedLocalWhisperModels,
+                    localWhisperLanguageOptionsByModelID: localWhisperLanguageOptionsByModelID,
+                    analyzingRecordingID: analyzingRecordingID,
+                    onOpen: openRecording,
+                    onAnalyze: { item, provider in
+                        analyze(item, summaryProvider: provider)
+                    },
+                    onDeleteRequest: { item in
+                        deleteRequest = RecordingDeleteRequest(item: item)
+                    },
+                    onRequestRetranscription: { item in
+                        appleSpeechRetranscriptionRequest = AppleSpeechRetranscriptionRequest(item: item)
+                    },
+                    onRequestNewCategory: { item in
+                        beginNewCategory(assigning: item)
+                    },
+                    onUpdateCategory: updateRecordingCategory,
+                    onRetranscribeWithOpenAI: { item, mode in
+                        retranscribeWithOpenAI(item, mode: mode)
+                    },
+                    onRetranscribeWithLocalWhisper: { item in
+                        localWhisperRetranscriptionRequest = LocalWhisperRetranscriptionRequest(item: item)
+                    },
+                    onAddRecordings: { folder in
+                        addRecordingsCategoryTarget = folder
+                    }
+                )
+            } else {
+                EmptyStateView(icon: "folder", titleResource: L10n.Recordings.noRecordings)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .background(AppTheme.groupedBackground)
+            }
+        case .recording(let id):
+            if let item = store.recording(withID: id) {
+                RecordingDetailView(
+                    item: item,
+                    store: store,
+                    transcriber: transcriber,
+                    player: player,
+                    downloadedLocalWhisperModels: downloadedLocalWhisperModels,
+                    localWhisperLanguageOptionsByModelID: localWhisperLanguageOptionsByModelID
+                )
+            } else {
+                EmptyStateView(icon: "exclamationmark.triangle", titleResource: L10n.Recordings.noRecordings)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .background(AppTheme.groupedBackground)
+            }
+        }
+    }
+
+    @ViewBuilder
     private var recordingsList: some View {
         List {
-            if store.recordings.isEmpty {
-                EmptyStateView(icon: "waveform.path.badge.plus", titleResource: L10n.Recordings.noRecordings)
-                    .frame(maxWidth: .infinity, minHeight: 360)
-                    .listRowSeparator(.hidden)
-                    .listRowBackground(Color.clear)
-            } else if filteredRecordings.isEmpty {
-                EmptyStateView(icon: "magnifyingglass", titleResource: L10n.Recordings.noSearchResults)
-                    .frame(maxWidth: .infinity, minHeight: 360)
+            if visibleCategoryFolders.isEmpty {
+                EmptyStateView(
+                    icon: isSearchingCategoryRoot ? "magnifyingglass" : "folder",
+                    titleResource: isSearchingCategoryRoot ? L10n.Recordings.noSearchResults : L10n.Recordings.noRecordings
+                )
+                    .frame(maxWidth: .infinity, minHeight: 320)
                     .listRowSeparator(.hidden)
                     .listRowBackground(Color.clear)
             } else {
-                ForEach(filteredRecordings) { item in
-                    recordingRow(for: item)
+                ForEach(visibleCategoryFolders) { folder in
+                    categoryFolderRow(folder)
                 }
             }
         }
@@ -786,7 +983,9 @@ struct RecordingsView: View {
                         .controlSize(.small)
                 }
 
-                HStack(spacing: 0) {
+                categoryManagementMenu
+
+                HStack(spacing: 10) {
                     Button {
                         HapticFeedback.play(.navigation)
                         isShowingRecordingsMap = true
@@ -795,10 +994,6 @@ struct RecordingsView: View {
                             .frame(width: 32, height: 28)
                     }
                     .accessibilityLabel(Text(L10n.Recordings.map))
-
-                    Divider()
-                        .frame(height: 18)
-                        .fixedSize()
 
                     Button {
                         HapticFeedback.play(.primaryAction)
@@ -815,107 +1010,84 @@ struct RecordingsView: View {
         }
     }
 
-    private func recordingRow(for item: RecordingItem) -> some View {
-        RecordingRow(
-            item: item,
-            isAnalyzing: analyzingRecordingID == item.id,
-            canGenerateIntelligence: store.intelligenceAvailability.isAvailable
-        ) {
-            openRecording(item)
+    private var categoryManagementMenu: some View {
+        Menu {
+            Button {
+                beginNewCategory()
+            } label: {
+                Label(localized(L10n.Recordings.newCategory), systemImage: "folder.badge.plus")
+            }
+
+            Button {
+                isShowingCategoryOrganizer = true
+                HapticFeedback.play(.menuSelection)
+            } label: {
+                Label(localized(L10n.Recordings.organize), systemImage: "square.grid.2x2")
+            }
+            .disabled(store.recordings.isEmpty)
+        } label: {
+            Image(systemName: "ellipsis.circle")
+                .frame(width: 32, height: 28)
         }
+        .accessibilityLabel(Text(L10n.Common.more))
+    }
+
+    private func categoryFolderRow(_ folder: RecordingCategoryFolder) -> some View {
+        Button {
+            HapticFeedback.play(.navigation)
+            navigationPath.append(.category(folder.id))
+        } label: {
+            HStack(spacing: 12) {
+                ZStack {
+                    RoundedRectangle(cornerRadius: AppTheme.compactCornerRadius, style: .continuous)
+                        .fill((folder.isUncategorized ? Color.secondary : AppTheme.brand).opacity(0.12))
+                    Image(systemName: folder.isUncategorized ? "tray" : "folder.fill")
+                        .font(.system(size: 18, weight: .semibold))
+                        .foregroundStyle(folder.isUncategorized ? .secondary : AppTheme.brand)
+                }
+                .frame(width: 40, height: 40)
+
+                VStack(alignment: .leading, spacing: 3) {
+                    Text(folder.name)
+                        .font(.redditSans(.headline, weight: .semibold))
+                        .foregroundStyle(.primary)
+                        .lineLimit(1)
+
+                    Text(localizedFormat(L10n.Recordings.categoryCountFormat, folder.count))
+                        .font(.redditSans(.caption))
+                        .foregroundStyle(.secondary)
+                }
+
+                Spacer(minLength: 8)
+            }
+            .padding(14)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(AppTheme.cardBackground)
+            .overlay {
+                RoundedRectangle(cornerRadius: AppTheme.cornerRadius, style: .continuous)
+                    .stroke(AppTheme.cardBorder, lineWidth: 1)
+            }
+            .clipShape(RoundedRectangle(cornerRadius: AppTheme.cornerRadius, style: .continuous))
+            .contentShape(RoundedRectangle(cornerRadius: AppTheme.cornerRadius, style: .continuous))
+        }
+        .buttonStyle(.plain)
         .listRowSeparator(.hidden)
         .listRowBackground(Color.clear)
         .listRowInsets(EdgeInsets(top: 6, leading: 16, bottom: 6, trailing: 16))
         .contextMenu {
-            Button {
-                HapticFeedback.play(.copy)
-                UIPasteboard.general.string = store.transcriptText(for: item)
-            } label: {
-                Label(localized(L10n.Recordings.copyTranscript), systemImage: "doc.on.doc")
-            }
-
-            if store.summaryProviderAvailability.hasAnyAvailableProvider {
-                SummaryAnalysisMenu(
-                    selectedProvider: selectedSummaryProvider,
-                    providerAvailability: store.summaryProviderAvailability,
-                    isDisabled: analyzingRecordingID != nil
-                ) { provider in
-                    analyze(item, summaryProvider: provider)
-                } label: {
-                    Label(
-                        item.intelligence == nil
-                            ? localized(L10n.Recordings.generateTagsAndSummary)
-                            : localized(L10n.Recordings.analyzeAgain),
-                        systemImage: "sparkles"
-                    )
-                }
-            }
-
-            Button {
-                appleSpeechRetranscriptionRequest = AppleSpeechRetranscriptionRequest(item: item)
-            } label: {
-                Label(localized(L10n.Recordings.retranscribe), systemImage: "arrow.triangle.2.circlepath")
-            }
-            .disabled(item.importStatus?.isFailed == false || transcriber.isRecording || transcriber.isPreparing)
-
-            if transcriber.isOpenAITranscriptionEnabled {
-                Menu {
-                    Button {
-                        retranscribeWithOpenAI(item, mode: .longForm)
-                    } label: {
-                        Label(localized(L10n.Recordings.retranscribeWithOpenAILongForm), systemImage: "text.alignleft")
-                    }
-
-                    Button {
-                        retranscribeWithOpenAI(item, mode: .segmented)
-                    } label: {
-                        Label(localized(L10n.Recordings.retranscribeWithOpenAISegmented), systemImage: "list.bullet.rectangle")
-                    }
-
-                    Button {
-                        retranscribeWithOpenAI(item, mode: .refinedSegments)
-                    } label: {
-                        Label(localized(L10n.Recordings.retranscribeWithOpenAIRefinedSegments), systemImage: "wand.and.sparkles")
-                    }
-                } label: {
-                    Label(localized(L10n.Recordings.retranscribeWithOpenAI), systemImage: "cloud")
-                }
-                .disabled(item.importStatus?.isFailed == false || transcriber.isRecording || transcriber.isPreparing)
-            }
-
-            LocalWhisperRetranscriptionButton(
-                downloadedModels: downloadedLocalWhisperModels,
-                isDisabled: item.isTranscriptLocked || item.importStatus?.isFailed == false || transcriber.isRecording || transcriber.isPreparing
-            ) {
-                localWhisperRetranscriptionRequest = LocalWhisperRetranscriptionRequest(item: item)
-            }
-
-            Button(role: .destructive) {
-                requestDelete(item)
-            } label: {
-                Label(localized(L10n.Common.delete), systemImage: "trash")
-            }
-            .disabled(item.importStatus?.isFailed == false)
-        }
-        .swipeActions(edge: .leading, allowsFullSwipe: false) {
-            if store.intelligenceAvailability.isAvailable {
+            if !folder.isUncategorized {
                 Button {
-                    analyze(item, summaryProvider: selectedSummaryProvider)
+                    beginRenameCategory(folder)
                 } label: {
-                    Label(localized(L10n.Recordings.analyze), systemImage: "sparkles")
+                    Label(localized(L10n.Recordings.renameCategory), systemImage: "pencil")
                 }
-                .tint(AppTheme.info)
-                .disabled(analyzingRecordingID != nil)
+
+                Button(role: .destructive) {
+                    requestDeleteCategory(folder)
+                } label: {
+                    Label(localized(L10n.Recordings.deleteCategory), systemImage: "trash")
+                }
             }
-        }
-        .swipeActions(edge: .trailing, allowsFullSwipe: false) {
-            Button {
-                requestDelete(item)
-            } label: {
-                Label(localized(L10n.Common.delete), systemImage: "trash")
-            }
-            .tint(AppTheme.danger)
-            .disabled(item.importStatus?.isFailed == false)
         }
     }
 
@@ -965,7 +1137,7 @@ struct RecordingsView: View {
             return
         }
 
-        selectedRecording = nil
+        navigationPath.removeAll()
         importRecording(from: url)
     }
 
@@ -1064,7 +1236,7 @@ struct RecordingsView: View {
     private func openRecording(_ item: RecordingItem) {
         HapticFeedback.play(.navigation)
         hideTabBarForDetail()
-        selectedRecording = item
+        navigationPath.append(.recording(item.id))
     }
 
     private func consumePendingOpenRecordingIDIfNeeded() {
@@ -1093,7 +1265,7 @@ struct RecordingsView: View {
         tabBarRestoreTask?.cancel()
         tabBarRestoreTask = Task { @MainActor in
             try? await Task.sleep(for: .milliseconds(180))
-            guard selectedRecording == nil else {
+            guard !navigationPath.containsRecordingDetail else {
                 return
             }
 
@@ -1187,8 +1359,11 @@ struct RecordingsView: View {
 
     private func delete(_ item: RecordingItem) {
         do {
-            if selectedRecording?.id == item.id {
-                selectedRecording = nil
+            navigationPath.removeAll { destination in
+                if case .recording(let id) = destination, id == item.id {
+                    return true
+                }
+                return false
             }
             if analyzingRecordingID == item.id {
                 analyzingRecordingID = nil
@@ -1207,6 +1382,171 @@ struct RecordingsView: View {
 
     private func normalizedSearchText(_ text: String) -> String {
         text.normalizedForRecordingSearch
+    }
+
+    private func recordings(in categoryID: String?) -> [RecordingItem] {
+        guard let categoryID else {
+            return []
+        }
+        if categoryID == Self.uncategorizedCategoryID {
+            return store.recordings.filter { $0.categoryName == nil }
+        }
+        let matchKey = categoryID.normalizedForRecordingSearch
+        return store.recordings.filter { $0.categoryName?.normalizedForRecordingSearch == matchKey }
+    }
+
+    private func categoryFolder(for id: String) -> RecordingCategoryFolder? {
+        categoryFolders.first { $0.id == id }
+    }
+
+    private func updateTabBarVisibility(for path: [RecordingNavigationDestination]) {
+        if path.containsRecordingDetail {
+            hideTabBarForDetail()
+        } else {
+            scheduleTabBarRestoreAfterPop()
+        }
+    }
+
+    private func beginNewCategory(assigning item: RecordingItem? = nil) {
+        newCategoryName = ""
+        newCategoryErrorMessage = nil
+        newCategoryAssignmentItem = item
+        isShowingNewCategorySheet = true
+        HapticFeedback.play(.menuSelection)
+    }
+
+    private func createCategory() {
+        let cleanedName = RecordingItem.normalizedCategoryName(newCategoryName) ?? ""
+        guard !cleanedName.isEmpty else {
+            newCategoryErrorMessage = localized(L10n.Recordings.categoryNamePlaceholder)
+            HapticFeedback.play(.failure)
+            return
+        }
+
+        let newKey = cleanedName.normalizedForRecordingSearch
+        if let existingName = categoryNames.first(where: { $0.normalizedForRecordingSearch == newKey }) {
+            if let item = newCategoryAssignmentItem {
+                updateRecordingCategory(item, existingName)
+            } else {
+                navigationPath.append(.category(existingName))
+            }
+            isShowingNewCategorySheet = false
+            newCategoryErrorMessage = nil
+            newCategoryAssignmentItem = nil
+            HapticFeedback.play(.navigation)
+            return
+        }
+
+        guard !isReservedCategoryName(cleanedName) else {
+            newCategoryErrorMessage = localized(L10n.Recordings.categoryExists)
+            HapticFeedback.play(.failure)
+            return
+        }
+
+        RecordingCategoryCatalog.register(cleanedName)
+        if let item = newCategoryAssignmentItem {
+            updateRecordingCategory(item, cleanedName)
+        } else {
+            navigationPath.append(.category(cleanedName))
+        }
+        newCategoryName = ""
+        newCategoryErrorMessage = nil
+        newCategoryAssignmentItem = nil
+        isShowingNewCategorySheet = false
+        HapticFeedback.play(.primaryAction)
+    }
+
+    private func beginRenameCategory(_ folder: RecordingCategoryFolder) {
+        renameCategoryName = folder.name
+        renameCategoryErrorMessage = nil
+        renameCategoryTarget = folder
+        HapticFeedback.play(.menuSelection)
+    }
+
+    private func renameCategory() {
+        guard let target = renameCategoryTarget else {
+            return
+        }
+
+        let cleanedName = RecordingItem.normalizedCategoryName(renameCategoryName) ?? ""
+        guard !cleanedName.isEmpty else {
+            renameCategoryErrorMessage = localized(L10n.Recordings.categoryNamePlaceholder)
+            HapticFeedback.play(.failure)
+            return
+        }
+
+        let oldKey = target.name.normalizedForRecordingSearch
+        let newKey = cleanedName.normalizedForRecordingSearch
+        if newKey != oldKey,
+           categoryNames.contains(where: { $0.normalizedForRecordingSearch == newKey }) {
+            renameCategoryErrorMessage = localized(L10n.Recordings.categoryExists)
+            HapticFeedback.play(.failure)
+            return
+        }
+        guard !isReservedCategoryName(cleanedName) else {
+            renameCategoryErrorMessage = localized(L10n.Recordings.categoryExists)
+            HapticFeedback.play(.failure)
+            return
+        }
+
+        do {
+            _ = try store.renameCategory(named: target.name, to: cleanedName)
+            RecordingCategoryCatalog.rename(target.name, to: cleanedName)
+            navigationPath = navigationPath.map { destination in
+                if case .category(let id) = destination, id == target.id {
+                    return .category(cleanedName)
+                }
+                return destination
+            }
+            renameCategoryTarget = nil
+            HapticFeedback.play(.primaryAction)
+        } catch {
+            renameCategoryErrorMessage = error.localizedDescription
+            HapticFeedback.play(.failure)
+        }
+    }
+
+    private func requestDeleteCategory(_ folder: RecordingCategoryFolder) {
+        HapticFeedback.play(.deleteRequested)
+        if folder.count == 0 {
+            performDeleteCategory(folder)
+        } else {
+            deleteCategoryTarget = folder
+        }
+    }
+
+    private func performDeleteCategory(_ folder: RecordingCategoryFolder) {
+        do {
+            _ = try store.removeCategory(named: folder.name)
+            RecordingCategoryCatalog.remove(folder.name)
+            navigationPath.removeAll { destination in
+                if case .category(let id) = destination, id == folder.id {
+                    return true
+                }
+                return false
+            }
+            HapticFeedback.play(.primaryAction)
+        } catch {
+            transcriptionErrorMessage = error.localizedDescription
+            HapticFeedback.play(.failure)
+        }
+    }
+
+    private func updateRecordingCategory(_ item: RecordingItem, _ categoryName: String?) {
+        do {
+            _ = try store.updateCategory(for: item, categoryName: categoryName)
+            if let categoryName {
+                RecordingCategoryCatalog.register(categoryName)
+            }
+            HapticFeedback.play(.menuSelection)
+        } catch {
+            transcriptionErrorMessage = error.localizedDescription
+            HapticFeedback.play(.failure)
+        }
+    }
+
+    private func isReservedCategoryName(_ name: String) -> Bool {
+        name.normalizedForRecordingSearch == localized(L10n.Recordings.uncategorized).normalizedForRecordingSearch
     }
 }
 
@@ -1247,6 +1587,562 @@ private struct RecordingDeleteRequest: Identifiable {
 
     var id: RecordingItem.ID {
         item.id
+    }
+}
+
+/// Central store for the user's category names. Recording assignments live on
+/// `RecordingItem.categoryName`; this registry additionally keeps categories
+/// that currently have no recordings, and is the single place that mutates
+/// the persisted list so create/rename/delete stay consistent across entry
+/// points (folder list, organizer, edit sheet, save sheet).
+enum RecordingCategoryCatalog {
+    static let customCategoriesDefaultsKey = "Recordings.customCategoriesJSON"
+
+    static func customNames() -> [String] {
+        guard let json = UserDefaults.standard.string(forKey: customCategoriesDefaultsKey),
+              let data = json.data(using: .utf8),
+              let decoded = try? JSONDecoder().decode([String].self, from: data) else {
+            return []
+        }
+        return normalized(decoded)
+    }
+
+    static func allNames(recordings: [RecordingItem]) -> [String] {
+        normalized(recordings.compactMap(\.categoryName) + customNames())
+    }
+
+    static func register(_ name: String?) {
+        guard let cleaned = RecordingItem.normalizedCategoryName(name ?? "") else {
+            return
+        }
+        write(customNames() + [cleaned])
+    }
+
+    static func remove(_ name: String) {
+        let key = name.normalizedForRecordingSearch
+        write(customNames().filter { $0.normalizedForRecordingSearch != key })
+    }
+
+    static func rename(_ oldName: String, to newName: String) {
+        let oldKey = oldName.normalizedForRecordingSearch
+        write(customNames().filter { $0.normalizedForRecordingSearch != oldKey } + [newName])
+    }
+
+    static func normalized(_ names: [String]) -> [String] {
+        var seen = Set<String>()
+        var normalized: [String] = []
+
+        for name in names {
+            guard let cleaned = RecordingItem.normalizedCategoryName(name) else {
+                continue
+            }
+            let key = cleaned.normalizedForRecordingSearch
+            guard seen.insert(key).inserted else {
+                continue
+            }
+            normalized.append(cleaned)
+        }
+
+        return normalized.sorted {
+            $0.localizedCaseInsensitiveCompare($1) == .orderedAscending
+        }
+    }
+
+    private static func write(_ names: [String]) {
+        let cleaned = normalized(names)
+        guard let data = try? JSONEncoder().encode(cleaned),
+              let json = String(data: data, encoding: .utf8) else {
+            return
+        }
+        UserDefaults.standard.set(json, forKey: customCategoriesDefaultsKey)
+    }
+}
+
+private struct RecordingCategoryFolder: Identifiable, Hashable {
+    let id: String
+    let name: String
+    let count: Int
+    let isUncategorized: Bool
+
+    /// Matching key used for membership and counting, so "Work" and "work"
+    /// land in the same folder instead of one of them becoming invisible.
+    var matchKey: String? {
+        isUncategorized ? nil : id.normalizedForRecordingSearch
+    }
+
+    var categoryAssignmentName: String? {
+        isUncategorized ? nil : name
+    }
+}
+
+private enum RecordingNavigationDestination: Hashable {
+    case category(String)
+    case recording(RecordingItem.ID)
+}
+
+private extension Array where Element == RecordingNavigationDestination {
+    var containsRecordingDetail: Bool {
+        contains { destination in
+            if case .recording = destination {
+                return true
+            }
+            return false
+        }
+    }
+}
+
+private struct RecordingCategoryDetailList: View {
+    let folder: RecordingCategoryFolder
+    @ObservedObject var store: RecordingStore
+    @ObservedObject var transcriber: LiveTranscriptionManager
+    @ObservedObject var player: RecordingPlaybackController
+    let downloadedLocalWhisperModels: [LocalWhisperModel]
+    let localWhisperLanguageOptionsByModelID: [String: [TranscriptionLanguage]]
+    let analyzingRecordingID: RecordingItem.ID?
+    let onOpen: (RecordingItem) -> Void
+    let onAnalyze: (RecordingItem, RecordingSummaryProvider) -> Void
+    let onDeleteRequest: (RecordingItem) -> Void
+    let onRequestRetranscription: (RecordingItem) -> Void
+    let onRequestNewCategory: (RecordingItem) -> Void
+    let onUpdateCategory: (RecordingItem, String?) -> Void
+    let onRetranscribeWithOpenAI: (RecordingItem, OpenAIFileTranscriptionMode) -> Void
+    let onRetranscribeWithLocalWhisper: (RecordingItem) -> Void
+    let onAddRecordings: (RecordingCategoryFolder) -> Void
+    @State private var searchText = ""
+
+    private var categories: [String] {
+        RecordingCategoryCatalog.allNames(recordings: store.recordings)
+    }
+
+    private var recordings: [RecordingItem] {
+        let categoryRecordings = store.recordings.filter { item in
+            if folder.isUncategorized {
+                return item.categoryName == nil
+            }
+            return item.categoryName?.normalizedForRecordingSearch == folder.matchKey
+        }
+
+        let query = searchText.normalizedForRecordingSearch
+        guard !query.isEmpty else {
+            return categoryRecordings
+        }
+        return categoryRecordings.filter { item in
+            store.normalizedSearchText(for: item).contains(query)
+        }
+    }
+
+    var body: some View {
+        List {
+            if recordings.isEmpty {
+                EmptyStateView(icon: "waveform", titleResource: L10n.Recordings.noRecordings)
+                    .frame(maxWidth: .infinity, minHeight: 320)
+                    .listRowSeparator(.hidden)
+                    .listRowBackground(Color.clear)
+            } else {
+                ForEach(recordings) { item in
+                    let isTranscriptionRunning = item.importStatus?.isFailed == false
+                    let isTranscriptionActionDisabled = item.isTranscriptLocked
+                        || isTranscriptionRunning
+                        || transcriber.isRecording
+                        || transcriber.isPreparing
+
+                    RecordingRow(
+                        item: item,
+                        isAnalyzing: analyzingRecordingID == item.id,
+                        canGenerateIntelligence: store.intelligenceAvailability.isAvailable
+                    ) {
+                        onOpen(item)
+                    }
+                    .listRowSeparator(.hidden)
+                    .listRowBackground(Color.clear)
+                    .listRowInsets(EdgeInsets(top: 6, leading: 16, bottom: 6, trailing: 16))
+                    .contextMenu {
+                        Button {
+                            HapticFeedback.play(.copy)
+                            UIPasteboard.general.string = store.transcriptText(for: item)
+                        } label: {
+                            Label(localized(L10n.Recordings.copyTranscript), systemImage: "doc.on.doc")
+                        }
+
+                        RecordingCategoryMenu(
+                            selection: item.categoryName,
+                            categories: categories,
+                            onRequestNewCategory: {
+                                onRequestNewCategory(item)
+                            },
+                            onSelect: { categoryName in
+                                onUpdateCategory(item, categoryName)
+                            }
+                        ) {
+                            Label(localized(L10n.Recordings.moveToCategory), systemImage: "folder")
+                        }
+
+                        if store.summaryProviderAvailability.hasAnyAvailableProvider {
+                            Button {
+                                onAnalyze(item, .automatic)
+                            } label: {
+                                Label(localized(L10n.Recordings.analyze), systemImage: "sparkles")
+                        }
+                        .disabled(analyzingRecordingID != nil)
+                    }
+
+                    Button {
+                        onRequestRetranscription(item)
+                    } label: {
+                        Label(localized(L10n.Recordings.retranscribe), systemImage: "arrow.triangle.2.circlepath")
+                    }
+                    .disabled(isTranscriptionActionDisabled)
+
+                    if transcriber.isOpenAITranscriptionEnabled {
+                        Menu {
+                            Button {
+                                onRetranscribeWithOpenAI(item, .longForm)
+                            } label: {
+                                Label(localized(L10n.Recordings.retranscribeWithOpenAILongForm), systemImage: "text.alignleft")
+                            }
+
+                            Button {
+                                onRetranscribeWithOpenAI(item, .segmented)
+                            } label: {
+                                Label(localized(L10n.Recordings.retranscribeWithOpenAISegmented), systemImage: "list.bullet.rectangle")
+                            }
+
+                            Button {
+                                onRetranscribeWithOpenAI(item, .refinedSegments)
+                            } label: {
+                                Label(localized(L10n.Recordings.retranscribeWithOpenAIRefinedSegments), systemImage: "wand.and.sparkles")
+                            }
+                        } label: {
+                            Label(localized(L10n.Recordings.retranscribeWithOpenAI), systemImage: "cloud")
+                        }
+                        .disabled(isTranscriptionActionDisabled)
+                    }
+
+                    LocalWhisperRetranscriptionButton(
+                        downloadedModels: downloadedLocalWhisperModels,
+                        isDisabled: isTranscriptionActionDisabled
+                    ) {
+                        onRetranscribeWithLocalWhisper(item)
+                    }
+
+                        Button(role: .destructive) {
+                            HapticFeedback.play(.deleteRequested)
+                            onDeleteRequest(item)
+                        } label: {
+                            Label(localized(L10n.Recordings.deleteRecording), systemImage: "trash")
+                        }
+                    }
+                    .swipeActions(edge: .trailing) {
+                        Button(role: .destructive) {
+                            HapticFeedback.play(.deleteRequested)
+                            onDeleteRequest(item)
+                        } label: {
+                            Label(localized(L10n.Recordings.deleteRecording), systemImage: "trash")
+                        }
+                    }
+                    .swipeActions(edge: .leading) {
+                        if store.summaryProviderAvailability.hasAnyAvailableProvider {
+                            Button {
+                                onAnalyze(item, .automatic)
+                            } label: {
+                                Label(localized(L10n.Recordings.analyze), systemImage: "sparkles")
+                            }
+                            .tint(AppTheme.info)
+                            .disabled(analyzingRecordingID != nil)
+                        }
+                    }
+                }
+            }
+        }
+        .listStyle(.plain)
+        .scrollContentBackground(.hidden)
+        .background(AppTheme.groupedBackground)
+        .navigationTitle(folder.name)
+        .navigationBarTitleDisplayMode(.large)
+        .toolbar {
+            ToolbarItem(placement: .topBarTrailing) {
+                Button {
+                    HapticFeedback.play(.menuSelection)
+                    onAddRecordings(folder)
+                } label: {
+                    Image(systemName: "plus")
+                }
+                .accessibilityLabel(Text(L10n.Recordings.addRecordingsToCategory))
+            }
+        }
+        .searchable(
+            text: $searchText,
+            placement: .navigationBarDrawer(displayMode: .always),
+            prompt: Text(L10n.Recordings.searchPrompt)
+        )
+        .safeAreaInset(edge: .bottom) {
+            Color.clear.frame(height: 8)
+        }
+    }
+}
+
+private struct RecordingCategoryNameSheet: View {
+    let titleResource: LocalizedStringResource
+    let iconSystemImage: String
+    @Binding var categoryName: String
+    let errorMessage: String?
+    let onSave: () -> Void
+    let onCancel: () -> Void
+
+    private var trimmedName: String {
+        categoryName.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    var body: some View {
+        NavigationStack {
+            VStack(alignment: .leading, spacing: 14) {
+                Label(localized(titleResource), systemImage: iconSystemImage)
+                    .font(.redditSans(.headline, weight: .semibold))
+
+                TextField(localized(L10n.Recordings.categoryNamePlaceholder), text: $categoryName)
+                    .font(.redditSans(.body, weight: .semibold))
+                    .textInputAutocapitalization(.words)
+                    .autocorrectionDisabled()
+                    .padding(.horizontal, 12)
+                    .frame(height: 48)
+                    .background(AppTheme.elevatedBackground, in: RoundedRectangle(cornerRadius: AppTheme.compactCornerRadius, style: .continuous))
+
+                if let errorMessage {
+                    Label(errorMessage, systemImage: "exclamationmark.triangle")
+                        .font(.redditSans(.caption, weight: .semibold))
+                        .foregroundStyle(AppTheme.warning)
+                }
+
+                Spacer(minLength: 0)
+            }
+            .padding(16)
+            .background(AppTheme.groupedBackground.ignoresSafeArea())
+            .navigationTitle(localized(titleResource))
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button(localized(L10n.Common.cancel)) {
+                        onCancel()
+                    }
+                }
+
+                ToolbarItem(placement: .confirmationAction) {
+                    Button(localized(L10n.Common.save)) {
+                        onSave()
+                    }
+                    .disabled(trimmedName.isEmpty)
+                }
+            }
+        }
+    }
+}
+
+private struct RecordingCategoryOrganizerSheet: View {
+    @ObservedObject var store: RecordingStore
+    let onUpdateCategory: (RecordingItem, String?) -> Void
+    let onDone: () -> Void
+
+    private var categories: [String] {
+        RecordingCategoryCatalog.allNames(recordings: store.recordings)
+    }
+
+    var body: some View {
+        NavigationStack {
+            List {
+                ForEach(store.recordings) { item in
+                    HStack(spacing: 12) {
+                        VStack(alignment: .leading, spacing: 3) {
+                            Text((item.audioFileName as NSString).deletingPathExtension)
+                                .font(.redditSans(.subheadline, weight: .semibold))
+                                .lineLimit(1)
+                                .truncationMode(.middle)
+
+                            Text(item.categoryName ?? localized(L10n.Recordings.uncategorized))
+                                .font(.redditSans(.caption))
+                                .foregroundStyle(.secondary)
+                                .lineLimit(1)
+                        }
+
+                        Spacer(minLength: 8)
+
+                        RecordingCategoryMenu(
+                            selection: item.categoryName,
+                            categories: categories,
+                            onSelect: { categoryName in
+                                onUpdateCategory(item, categoryName)
+                            }
+                        ) {
+                            Image(systemName: "folder")
+                                .frame(width: 32, height: 28)
+                        }
+                    }
+                    .padding(.vertical, 4)
+                }
+            }
+            .navigationTitle(localized(L10n.Recordings.organize))
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button(localized(L10n.Common.done)) {
+                        onDone()
+                    }
+                }
+            }
+        }
+    }
+}
+
+private struct RecordingCategoryAddRecordingsSheet: View {
+    let folder: RecordingCategoryFolder
+    @ObservedObject var store: RecordingStore
+    let onAdd: (RecordingItem) -> Void
+    let onDone: () -> Void
+    @State private var searchText = ""
+
+    private var candidateRecordings: [RecordingItem] {
+        let query = searchText.normalizedForRecordingSearch
+        let candidates = store.recordings.filter { item in
+            if folder.isUncategorized {
+                return item.categoryName != nil
+            }
+            return item.categoryName?.normalizedForRecordingSearch != folder.matchKey
+        }
+
+        guard !query.isEmpty else {
+            return candidates
+        }
+        return candidates.filter { item in
+            store.normalizedSearchText(for: item).contains(query)
+        }
+    }
+
+    var body: some View {
+        NavigationStack {
+            List {
+                if candidateRecordings.isEmpty {
+                    EmptyStateView(
+                        icon: searchText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? "checkmark.folder" : "magnifyingglass",
+                        titleResource: searchText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? L10n.Recordings.noRecordingsToAdd : L10n.Recordings.noSearchResults
+                    )
+                    .frame(maxWidth: .infinity, minHeight: 260)
+                    .listRowSeparator(.hidden)
+                    .listRowBackground(Color.clear)
+                } else {
+                    ForEach(candidateRecordings) { item in
+                        HStack(spacing: 12) {
+                            VStack(alignment: .leading, spacing: 3) {
+                                Text((item.audioFileName as NSString).deletingPathExtension)
+                                    .font(.redditSans(.subheadline, weight: .semibold))
+                                    .lineLimit(1)
+                                    .truncationMode(.middle)
+
+                                Text(item.categoryName ?? localized(L10n.Recordings.uncategorized))
+                                    .font(.redditSans(.caption))
+                                    .foregroundStyle(.secondary)
+                                    .lineLimit(1)
+                            }
+
+                            Spacer(minLength: 8)
+
+                            Button {
+                                onAdd(item)
+                            } label: {
+                                Label(localized(L10n.Recordings.addToCategory), systemImage: "plus.circle")
+                                    .labelStyle(.iconOnly)
+                            }
+                            .buttonStyle(.bordered)
+                        }
+                        .padding(.vertical, 4)
+                    }
+                }
+            }
+            .navigationTitle(localizedFormat(L10n.Recordings.addRecordingsToCategoryFormat, folder.name))
+            .navigationBarTitleDisplayMode(.inline)
+            .searchable(
+                text: $searchText,
+                placement: .navigationBarDrawer(displayMode: .always),
+                prompt: Text(L10n.Recordings.searchPrompt)
+            )
+            .toolbar {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button(localized(L10n.Common.done)) {
+                        onDone()
+                    }
+                }
+            }
+        }
+    }
+}
+
+/// Shared category chooser: uncategorized, every known category, and a
+/// "New Category" option, so all assignment entry points behave the same.
+struct RecordingCategoryMenu<MenuLabel: View>: View {
+    let selection: String?
+    let categories: [String]
+    var onRequestNewCategory: (() -> Void)?
+    let onSelect: (String?) -> Void
+    @ViewBuilder let menuLabel: () -> MenuLabel
+
+    @State private var isShowingNewCategoryAlert = false
+    @State private var newCategoryName = ""
+
+    private var selectionKey: String? {
+        selection?.normalizedForRecordingSearch
+    }
+
+    var body: some View {
+        Menu {
+            Button {
+                HapticFeedback.play(.menuSelection)
+                onSelect(nil)
+            } label: {
+                Label(localized(L10n.Recordings.uncategorized), systemImage: selection == nil ? "checkmark" : "tray")
+            }
+
+            if !categories.isEmpty {
+                Divider()
+
+                ForEach(categories, id: \.self) { category in
+                    Button {
+                        HapticFeedback.play(.menuSelection)
+                        onSelect(category)
+                    } label: {
+                        Label(
+                            category,
+                            systemImage: category.normalizedForRecordingSearch == selectionKey ? "checkmark" : "folder"
+                        )
+                    }
+                }
+            }
+
+            Divider()
+
+            Button {
+                HapticFeedback.play(.menuSelection)
+                if let onRequestNewCategory {
+                    DispatchQueue.main.async {
+                        onRequestNewCategory()
+                    }
+                } else {
+                    newCategoryName = ""
+                    isShowingNewCategoryAlert = true
+                }
+            } label: {
+                Label(localized(L10n.Recordings.newCategory), systemImage: "folder.badge.plus")
+            }
+        } label: {
+            menuLabel()
+        }
+        .alert(localized(L10n.Recordings.newCategory), isPresented: $isShowingNewCategoryAlert) {
+            TextField(localized(L10n.Recordings.categoryNamePlaceholder), text: $newCategoryName)
+            Button(localized(L10n.Common.save)) {
+                if let cleanedName = RecordingItem.normalizedCategoryName(newCategoryName) {
+                    HapticFeedback.play(.primaryAction)
+                    onSelect(cleanedName)
+                }
+            }
+            Button(localized(L10n.Common.cancel), role: .cancel) {}
+        }
     }
 }
 
@@ -1623,7 +2519,11 @@ private struct RecordingRow: View {
                 .stroke(AppTheme.cardBorder, lineWidth: 1)
         }
         .clipShape(RoundedRectangle(cornerRadius: AppTheme.cornerRadius, style: .continuous))
-        .shadow(color: AppTheme.cardShadow, radius: 7, y: 2)
+        .shadow(
+            color: AppTheme.cardShadow,
+            radius: AppTheme.cardShadowRadius,
+            y: AppTheme.cardShadowYOffset
+        )
     }
 
     @ViewBuilder
@@ -1656,6 +2556,12 @@ private struct RecordingMetadataStrip: View {
             HStack(spacing: 6) {
                 RecordingMetadataChip(systemImage: "globe", text: item.localizedLanguageName)
                 RecordingMetadataChip(systemImage: "text.alignleft", text: "\(item.lineCount)")
+                if let projectName = item.projectName {
+                    RecordingMetadataChip(systemImage: "briefcase", text: projectName)
+                }
+                if let categoryName = item.categoryName {
+                    RecordingMetadataChip(systemImage: "folder", text: categoryName)
+                }
                 if let location = item.location {
                     RecordingMetadataChip(systemImage: "mappin.and.ellipse") {
                         RecordingLocationNameText(location: location)
@@ -1734,6 +2640,171 @@ private struct FlowTags: View {
     }
 }
 
+private struct MeetingAnalysisSection<Content: View>: View {
+    let title: String
+    let systemImage: String
+    @ViewBuilder var content: () -> Content
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Label(title, systemImage: systemImage)
+                .font(.redditSans(.caption, weight: .bold))
+                .foregroundStyle(.secondary)
+                .textCase(.uppercase)
+
+            VStack(alignment: .leading, spacing: 8) {
+                content()
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+        }
+    }
+}
+
+private struct MeetingAnalysisBulletRow: View {
+    let title: String
+    let metadata: String
+    var actionTitle: String?
+    var actionSystemImage: String?
+    var isActionDisabled = false
+    var action: (() -> Void)?
+
+    var body: some View {
+        HStack(alignment: .top, spacing: 8) {
+            Circle()
+                .fill(AppTheme.brand)
+                .frame(width: 5, height: 5)
+                .padding(.top, 7)
+
+            VStack(alignment: .leading, spacing: 3) {
+                Text(title)
+                    .font(.redditSans(.subheadline, weight: .semibold))
+                    .foregroundStyle(.primary)
+                    .fixedSize(horizontal: false, vertical: true)
+
+                if !metadata.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                    Text(metadata)
+                        .font(.redditSans(.caption))
+                        .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+                }
+            }
+
+            if let action, let actionTitle, let actionSystemImage {
+                Spacer(minLength: 8)
+
+                Button(action: action) {
+                    Image(systemName: actionSystemImage)
+                        .font(.system(size: 15, weight: .semibold))
+                }
+                .buttonStyle(.bordered)
+                .disabled(isActionDisabled)
+                .accessibilityLabel(Text(actionTitle))
+            }
+        }
+    }
+}
+
+private struct ReminderDraftRequest: Identifiable {
+    let id = UUID()
+    let drafts: [ReminderDraft]
+}
+
+private struct ReminderDraftReviewSheet: View {
+    let initialDrafts: [ReminderDraft]
+    let isSaving: Bool
+    let onSave: ([ReminderDraft]) -> Void
+    let onCancel: () -> Void
+    @State private var drafts: [ReminderDraft]
+
+    init(
+        initialDrafts: [ReminderDraft],
+        isSaving: Bool,
+        onSave: @escaping ([ReminderDraft]) -> Void,
+        onCancel: @escaping () -> Void
+    ) {
+        self.initialDrafts = initialDrafts
+        self.isSaving = isSaving
+        self.onSave = onSave
+        self.onCancel = onCancel
+        _drafts = State(initialValue: initialDrafts)
+    }
+
+    private var validDrafts: [ReminderDraft] {
+        drafts.filter { !$0.title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
+    }
+
+    var body: some View {
+        NavigationStack {
+            List {
+                Section {
+                    ForEach($drafts) { $draft in
+                        VStack(alignment: .leading, spacing: 10) {
+                            TextField(localized(L10n.Recordings.reminderTitle), text: $draft.title)
+                                .font(.redditSans(.subheadline, weight: .semibold))
+                                .textInputAutocapitalization(.sentences)
+
+                            Toggle(isOn: $draft.hasDueDate) {
+                                Label(localized(L10n.Recordings.reminderDueDate), systemImage: "calendar")
+                                    .font(.redditSans(.caption, weight: .semibold))
+                            }
+
+                            if draft.hasDueDate {
+                                DatePicker(
+                                    localized(L10n.Recordings.reminderDueDate),
+                                    selection: Binding(
+                                        get: { draft.dueDate ?? Date() },
+                                        set: { draft.dueDate = $0 }
+                                    ),
+                                    displayedComponents: [.date, .hourAndMinute]
+                                )
+                                .labelsHidden()
+                                .datePickerStyle(.compact)
+                            }
+
+                            TextEditor(text: $draft.notes)
+                                .font(.redditSans(.caption))
+                                .frame(minHeight: 72)
+                                .scrollContentBackground(.hidden)
+                                .padding(8)
+                                .background(AppTheme.elevatedBackground, in: RoundedRectangle(cornerRadius: AppTheme.compactCornerRadius, style: .continuous))
+                        }
+                        .padding(.vertical, 6)
+                    }
+                    .onDelete { offsets in
+                        drafts.remove(atOffsets: offsets)
+                    }
+                } footer: {
+                    Text(L10n.Recordings.reminderReviewFooter)
+                }
+            }
+            .navigationTitle(localized(L10n.Recordings.reviewReminders))
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button(localized(L10n.Common.cancel)) {
+                        onCancel()
+                    }
+                    .disabled(isSaving)
+                }
+
+                ToolbarItem(placement: .confirmationAction) {
+                    Button {
+                        onSave(validDrafts)
+                    } label: {
+                        if isSaving {
+                            ProgressView()
+                                .controlSize(.small)
+                        } else {
+                            Text(L10n.Recordings.addToReminders)
+                        }
+                    }
+                    .disabled(isSaving || validDrafts.isEmpty)
+                }
+            }
+        }
+    }
+}
+
 struct RecordingDetailView: View {
     let item: RecordingItem
     @ObservedObject var store: RecordingStore
@@ -1747,15 +2818,26 @@ struct RecordingDetailView: View {
     @State private var copied = false
     @State private var deleteRequest: RecordingDeleteRequest?
     @State private var isAnalyzing = false
+    @State private var isAnalyzingMeeting = false
+    @State private var isAnalyzingAudioEvents = false
+    @State private var isAddingReminders = false
+    @State private var reminderDraftRequest: ReminderDraftRequest?
+    @State private var reminderBannerMessage: String?
+    @State private var reminderBannerIsVisible = false
+    @State private var reminderBannerTask: Task<Void, Never>?
     @State private var analysisErrorMessage: String?
     @State private var transcriptionErrorMessage: String?
+    @State private var exportErrorMessage: String?
     @State private var deleteErrorMessage: String?
     @State private var audioFileInfo: RecordingAudioFileInfo?
     @State private var audioFileInfoError: String?
     @State private var isShowingAudioFileInfo = false
+    @State private var isShowingAudioEventsSheet = false
     @StateObject private var editLocationProvider = RecordingEditLocationProvider()
     @State private var isShowingRecordingEditSheet = false
     @State private var editRecordingName = ""
+    @State private var editRecordingCategory = ""
+    @State private var editRecordingKeyPoints = ""
     @State private var editRecordingTags: [String] = []
     @State private var editRecordingSummary = ""
     @State private var editRecordingIncludesLocation = false
@@ -1778,6 +2860,7 @@ struct RecordingDetailView: View {
     @State private var isTranslatingTranscript = false
     @State private var translationErrorMessage: String?
     @State private var isShowingTranscriptTranslationLanguagePicker = false
+    @State private var exportShareItem: ShareSheetItem?
     @State private var pendingSpeechLocaleReleaseAction: PendingSpeechLocaleReleaseAction?
     @State private var isShowingAppleSpeechRetranscriptionPicker = false
     @State private var isShowingLocalWhisperRetranscriptionPicker = false
@@ -1812,6 +2895,34 @@ struct RecordingDetailView: View {
         pendingSpeechLocaleReleaseAction?.request.messageText ?? ""
     }
 
+    @ViewBuilder
+    private var reminderAddedBanner: some View {
+        if let reminderBannerMessage {
+            HStack(spacing: 10) {
+                Image(systemName: "checkmark.circle.fill")
+                    .font(.system(size: 17, weight: .semibold))
+                    .foregroundStyle(AppTheme.success)
+
+                Text(reminderBannerMessage)
+                    .font(.redditSans(.caption, weight: .semibold))
+                    .foregroundStyle(.primary)
+                    .lineLimit(1)
+                    .truncationMode(.middle)
+            }
+            .padding(.horizontal, 14)
+            .frame(height: 42)
+            .frame(maxWidth: 340)
+            .background(.ultraThinMaterial, in: Capsule())
+            .overlay {
+                Capsule()
+                    .stroke(AppTheme.success.opacity(0.22), lineWidth: 1)
+            }
+            .shadow(color: Color.black.opacity(0.12), radius: 14, y: 6)
+            .offset(y: reminderBannerIsVisible ? 0 : -74)
+            .opacity(reminderBannerIsVisible ? 1 : 0)
+        }
+    }
+
     var body: some View {
         // A page-style TabView clips its pages at the bottom safe area,
         // which letterboxes the content above the home indicator. Plain
@@ -1829,6 +2940,13 @@ struct RecordingDetailView: View {
                 .offset(x: selectedDetailPage == .aiAnalysis ? 0 : 44)
                 .allowsHitTesting(selectedDetailPage == .aiAnalysis)
                 .accessibilityHidden(selectedDetailPage != .aiAnalysis)
+
+            reminderAddedBanner
+                .padding(.top, 12)
+                .padding(.horizontal, 20)
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+                .allowsHitTesting(false)
+                .zIndex(20)
         }
         .animation(.easeInOut(duration: 0.22), value: selectedDetailPage)
         .gesture(detailPageSwipeGesture)
@@ -1846,8 +2964,8 @@ struct RecordingDetailView: View {
                 // rounded bottom edge, so the navigation bar area and this
                 // strip cannot render with different tints.
                 UnevenRoundedRectangle(
-                    bottomLeadingRadius: 20,
-                    bottomTrailingRadius: 20,
+                    bottomLeadingRadius: AppTheme.navigationBarCornerRadius,
+                    bottomTrailingRadius: AppTheme.navigationBarCornerRadius,
                     style: .continuous
                 )
                 .fill(.ultraThinMaterial)
@@ -1879,6 +2997,9 @@ struct RecordingDetailView: View {
                 detailActionsMenu
             }
         }
+        .onDisappear {
+            hideReminderAddedBanner()
+        }
         .sheet(isPresented: $isShowingAudioFileInfo) {
             NavigationStack {
                 ScrollView {
@@ -1897,15 +3018,47 @@ struct RecordingDetailView: View {
                 }
             }
         }
+        .sheet(isPresented: $isShowingAudioEventsSheet) {
+            NavigationStack {
+                ScrollView {
+                    audioEventsSheetContent
+                        .padding()
+                }
+                .background(AppTheme.groupedBackground.ignoresSafeArea())
+                .navigationTitle(localized(L10n.Recordings.audioEvents))
+                .navigationBarTitleDisplayMode(.inline)
+                .toolbar {
+                    ToolbarItem(placement: .topBarLeading) {
+                        if currentItem.audioEventAnalysis != nil {
+                            Button(localized(L10n.Recordings.analyzeAudioEventsAgain)) {
+                                analyzeCurrentAudioEvents()
+                            }
+                            .disabled(isAnalyzingAudioEvents)
+                        }
+                    }
+
+                    ToolbarItem(placement: .topBarTrailing) {
+                        Button(localized(L10n.Common.done)) {
+                            isShowingAudioEventsSheet = false
+                        }
+                    }
+                }
+            }
+            .presentationDetents([.medium, .large])
+            .presentationDragIndicator(.visible)
+        }
         .sheet(isPresented: $isShowingRecordingEditSheet) {
             RecordingEditSheet(
                 item: currentItem,
                 recordingName: $editRecordingName,
+                categoryName: $editRecordingCategory,
+                keyPoints: $editRecordingKeyPoints,
                 tags: $editRecordingTags,
                 summary: $editRecordingSummary,
                 includesLocation: $editRecordingIncludesLocation,
                 locationProvider: editLocationProvider,
                 isSaving: isSavingRecordingEdit,
+                availableCategories: RecordingCategoryCatalog.allNames(recordings: store.recordings),
                 showsTitleGeneration: store.summaryProviderAvailability.hasAnyAvailableProvider,
                 onGenerateTitle: {
                     try await store.generateSuggestedTitle(for: currentItem)
@@ -1936,6 +3089,19 @@ struct RecordingDetailView: View {
                 }
             )
             .interactiveDismissDisabled(isSavingSummaryEdit)
+            .presentationDetents([.medium, .large])
+            .presentationDragIndicator(.visible)
+        }
+        .sheet(item: $reminderDraftRequest) { request in
+            ReminderDraftReviewSheet(
+                initialDrafts: request.drafts,
+                isSaving: isAddingReminders,
+                onSave: saveReminderDrafts,
+                onCancel: {
+                    reminderDraftRequest = nil
+                }
+            )
+            .interactiveDismissDisabled(isAddingReminders)
             .presentationDetents([.medium, .large])
             .presentationDragIndicator(.visible)
         }
@@ -1996,6 +3162,10 @@ struct RecordingDetailView: View {
             )
             .presentationDetents([.medium, .large])
             .presentationDragIndicator(.visible)
+        }
+        .sheet(item: $exportShareItem) { item in
+            ActivityShareSheet(activityItems: [item.url])
+                .ignoresSafeArea()
         }
         .onAppear {
             chatEngine.configure(recordingID: currentItem.id)
@@ -2077,6 +3247,21 @@ struct RecordingDetailView: View {
             Button(localized(L10n.Common.ok), role: .cancel) {}
         } message: {
             Text(transcriptionErrorMessage ?? "")
+        }
+        .alert(
+            localized(L10n.Recordings.exportFailed),
+            isPresented: Binding(
+                get: { exportErrorMessage != nil },
+                set: { isPresented in
+                    if !isPresented {
+                        exportErrorMessage = nil
+                    }
+                }
+            )
+        ) {
+            Button(localized(L10n.Common.ok), role: .cancel) {}
+        } message: {
+            Text(exportErrorMessage ?? "")
         }
         .alert(
             localized(L10n.Recordings.deleteRecording),
@@ -2167,6 +3352,41 @@ struct RecordingDetailView: View {
 
                 ShareLink(item: transcriptText) {
                     Label(localized(L10n.Recordings.shareTranscript), systemImage: "text.alignleft")
+                }
+                .disabled(transcriptText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+
+                Menu {
+                    Button {
+                        exportCurrentTranscript(as: .txt)
+                    } label: {
+                        Label(localized(L10n.Recordings.exportTXT), systemImage: "doc.text")
+                    }
+
+                    Button {
+                        exportCurrentTranscript(as: .markdown)
+                    } label: {
+                        Label(localized(L10n.Recordings.exportMarkdown), systemImage: "doc.richtext")
+                    }
+
+                    Button {
+                        exportCurrentTranscript(as: .srt)
+                    } label: {
+                        Label(localized(L10n.Recordings.exportSRT), systemImage: "captions.bubble")
+                    }
+
+                    Button {
+                        exportCurrentTranscript(as: .vtt)
+                    } label: {
+                        Label(localized(L10n.Recordings.exportVTT), systemImage: "captions.bubble.fill")
+                    }
+
+                    Button {
+                        exportCurrentTranscript(as: .json)
+                    } label: {
+                        Label(localized(L10n.Recordings.exportJSON), systemImage: "curlybraces")
+                    }
+                } label: {
+                    Label(localized(L10n.Recordings.exportTranscript), systemImage: "square.and.arrow.up.on.square")
                 }
                 .disabled(transcriptText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
             } label: {
@@ -2265,6 +3485,9 @@ struct RecordingDetailView: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: 16) {
                     header
+                    if currentItem.keyPoints != nil {
+                        keyPointsCard
+                    }
                     transcript
                 }
                 .padding(.horizontal)
@@ -2278,6 +3501,8 @@ struct RecordingDetailView: View {
                     .padding(.horizontal, 18)
                     .padding(.top, 6)
                     .padding(.bottom, 6)
+                    .contentShape(Rectangle())
+                    .onTapGesture {}
             }
         }
     }
@@ -2296,6 +3521,9 @@ struct RecordingDetailView: View {
         ) {
             if store.intelligenceAvailability.isAvailable || currentItem.intelligence != nil {
                 intelligenceCard
+            }
+            if store.summaryProviderAvailability.hasAnyAvailableProvider || currentItem.meetingAnalysis != nil {
+                meetingAnalysisCard
             }
         }
     }
@@ -2335,6 +3563,20 @@ struct RecordingDetailView: View {
                 FlowTags(tags: item.combinedTags)
             }
 
+            if let projectName = item.projectName {
+                Label(projectName, systemImage: "briefcase")
+                    .font(.redditSans(.caption, weight: .semibold))
+                    .foregroundStyle(AppTheme.brand)
+                    .lineLimit(1)
+            }
+
+            if let categoryName = item.categoryName {
+                Label(categoryName, systemImage: "folder.fill")
+                    .font(.redditSans(.caption, weight: .semibold))
+                    .foregroundStyle(AppTheme.info)
+                    .lineLimit(1)
+            }
+
             if let location = item.location {
                 Label {
                     RecordingLocationNameText(location: location)
@@ -2354,6 +3596,43 @@ struct RecordingDetailView: View {
                 .stroke(AppTheme.cardBorder, lineWidth: 1)
         }
         .clipShape(RoundedRectangle(cornerRadius: AppTheme.cornerRadius, style: .continuous))
+    }
+
+    private var keyPointsCard: some View {
+        guard let keyPoints = currentItem.keyPoints else {
+            return AnyView(EmptyView())
+        }
+
+        return AnyView(
+            VStack(alignment: .leading, spacing: 10) {
+                Label(localized(L10n.Recordings.keyPoints), systemImage: "list.bullet.clipboard")
+                    .font(.redditSans(.headline, weight: .semibold))
+
+                Text(keyPoints)
+                    .font(.redditSans(.body))
+                    .foregroundStyle(.primary)
+                    .lineSpacing(4)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .contentShape(Rectangle())
+                    .contextMenu {
+                        Button {
+                            HapticFeedback.play(.copy)
+                            UIPasteboard.general.string = keyPoints
+                        } label: {
+                            Label(localized(L10n.Common.copy), systemImage: "doc.on.doc")
+                        }
+                    }
+            }
+            .padding(14)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(AppTheme.cardBackground)
+            .overlay {
+                RoundedRectangle(cornerRadius: AppTheme.cornerRadius, style: .continuous)
+                    .stroke(AppTheme.cardBorder, lineWidth: 1)
+            }
+            .clipShape(RoundedRectangle(cornerRadius: AppTheme.cornerRadius, style: .continuous))
+        )
     }
 
     private var intelligenceCard: some View {
@@ -2441,6 +3720,215 @@ struct RecordingDetailView: View {
         }
     }
 
+    private var meetingAnalysisCard: some View {
+        let item = currentItem
+
+        return VStack(alignment: .leading, spacing: 14) {
+            HStack(alignment: .center, spacing: 12) {
+                Label(localized(L10n.Recordings.meetingAnalysis), systemImage: "checklist")
+                    .font(.redditSans(.headline))
+
+                Spacer(minLength: 8)
+
+                if store.summaryProviderAvailability.hasAnyAvailableProvider {
+                    SummaryAnalysisMenu(
+                        selectedProvider: selectedSummaryProvider,
+                        providerAvailability: store.summaryProviderAvailability,
+                        isDisabled: isAnalyzingMeeting,
+                        primaryAction: {
+                            analyzeCurrentMeeting(summaryProvider: selectedSummaryProvider)
+                        }
+                    ) { provider in
+                        analyzeCurrentMeeting(summaryProvider: provider)
+                    } label: {
+                        HStack(spacing: 6) {
+                            if isAnalyzingMeeting {
+                                ProgressView()
+                                    .controlSize(.small)
+                            } else {
+                                Text(item.meetingAnalysis == nil ? localized(L10n.Recordings.analyzeMeeting) : localized(L10n.Recordings.analyzeMeetingAgain))
+                                    .font(.redditSans(.caption, weight: .semibold))
+                            }
+                        }
+                    }
+                    .buttonStyle(.bordered)
+                }
+            }
+
+            if isAnalyzingMeeting {
+                Label(localized(L10n.Recordings.analyzingMeeting), systemImage: "checklist")
+                    .font(.redditSans(.caption, weight: .semibold))
+                    .foregroundStyle(AppTheme.info)
+            } else if let analysis = item.meetingAnalysis {
+                if let summary = meetingSummaryText(for: analysis) {
+                    MeetingAnalysisSection(title: localized(L10n.Recordings.meetingSummary), systemImage: "text.bubble") {
+                        MeetingAnalysisBulletRow(
+                            title: summary,
+                            metadata: ""
+                        )
+                    }
+                }
+
+                if !analysis.actionItems.isEmpty {
+                    MeetingAnalysisSection(title: localized(L10n.Recordings.actionItems), systemImage: "checkmark.circle") {
+                        ForEach(analysis.actionItems) { item in
+                            MeetingAnalysisBulletRow(
+                                title: item.task,
+                                metadata: [item.owner, item.dueDate].compactMap(\.self).joined(separator: " · "),
+                                actionTitle: localized(L10n.Recordings.addActionItemToReminders),
+                                actionSystemImage: "plus.circle",
+                                isActionDisabled: isAddingReminders
+                            ) {
+                                addActionItemsToReminders([item])
+                            }
+                        }
+
+                    }
+                }
+
+                if !analysis.decisions.isEmpty {
+                    MeetingAnalysisSection(title: localized(L10n.Recordings.decisions), systemImage: "checkmark.seal") {
+                        ForEach(analysis.decisions) { decision in
+                            MeetingAnalysisBulletRow(
+                                title: decision.decision,
+                                metadata: decision.rationale ?? ""
+                            )
+                        }
+                    }
+                }
+
+                if !analysis.openQuestions.isEmpty {
+                    MeetingAnalysisSection(title: localized(L10n.Recordings.openQuestions), systemImage: "questionmark.circle") {
+                        ForEach(analysis.openQuestions) { question in
+                            MeetingAnalysisBulletRow(
+                                title: question.question,
+                                metadata: question.owner ?? ""
+                            )
+                        }
+                    }
+                }
+
+                Text(analysis.generatedAt, format: .dateTime.year().month().day().hour().minute())
+                    .font(.redditSans(.caption2))
+                    .foregroundStyle(.secondary)
+                    .contextMenu {
+                        Button {
+                            HapticFeedback.play(.copy)
+                            UIPasteboard.general.string = meetingAnalysisPlainText(analysis)
+                        } label: {
+                            Label(localized(L10n.Common.copy), systemImage: "doc.on.doc")
+                        }
+                    }
+            } else {
+                EmptyStateView(icon: "checklist", titleResource: L10n.Recordings.noMeetingAnalysis)
+                    .frame(maxWidth: .infinity)
+                    .frame(height: 96)
+            }
+        }
+        .padding(14)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background {
+            ZStack {
+                RoundedRectangle(cornerRadius: AppTheme.cornerRadius, style: .continuous)
+                    .fill(AppTheme.cardBackground)
+                RoundedRectangle(cornerRadius: AppTheme.cornerRadius, style: .continuous)
+                    .stroke(AppTheme.cardBorder, lineWidth: 1)
+            }
+        }
+    }
+
+    private func audioEventRow(_ event: RecordingAudioEvent) -> some View {
+        Button {
+            HapticFeedback.play(.timelineSeek)
+            player.seek(to: event.startTime)
+            scrubbedPlaybackTime = nil
+            isShowingAudioEventsSheet = false
+        } label: {
+            HStack(alignment: .center, spacing: 10) {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(event.label)
+                        .font(.redditSans(.subheadline, weight: .semibold))
+                        .foregroundStyle(.primary)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+
+                    Text(localizedFormat(L10n.Recordings.audioEventConfidenceFormat, event.confidence * 100))
+                        .font(.redditSans(.caption))
+                        .foregroundStyle(.secondary)
+                }
+
+                Text(audioEventTimeRangeText(event))
+                    .font(.redditSans(.caption, weight: .bold))
+                    .foregroundStyle(AppTheme.info)
+                    .lineLimit(1)
+                    .monospacedDigit()
+                    .padding(.horizontal, 8)
+                    .frame(height: 24)
+                    .background(AppTheme.info.opacity(0.12), in: Capsule())
+            }
+            .padding(.vertical, 8)
+            .padding(.horizontal, 10)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(Color.secondary.opacity(0.08), in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+        }
+        .buttonStyle(.plain)
+    }
+
+    private func audioEventTimeRangeText(_ event: RecordingAudioEvent) -> String {
+        let start = TranscriptionLine.formatTimestamp(event.startTime)
+        let end = TranscriptionLine.formatTimestamp(event.endTime)
+        return "\(start)-\(end)"
+    }
+
+    private var audioEventsSheetContent: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            if isAnalyzingAudioEvents {
+                HStack(spacing: 10) {
+                    ProgressView()
+                        .controlSize(.small)
+                    Text(L10n.Recordings.analyzingAudioEvents)
+                        .font(.redditSans(.subheadline, weight: .semibold))
+                }
+                .foregroundStyle(AppTheme.info)
+                .padding(14)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background(AppTheme.cardBackground, in: RoundedRectangle(cornerRadius: AppTheme.cornerRadius, style: .continuous))
+            } else if let analysis = currentItem.audioEventAnalysis, !analysis.events.isEmpty {
+                VStack(alignment: .leading, spacing: 8) {
+                    ForEach(analysis.events) { event in
+                        audioEventRow(event)
+                    }
+                }
+                .padding(14)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background(AppTheme.cardBackground, in: RoundedRectangle(cornerRadius: AppTheme.cornerRadius, style: .continuous))
+
+                Text(analysis.generatedAt, format: .dateTime.year().month().day().hour().minute())
+                    .font(.redditSans(.caption2))
+                    .foregroundStyle(.secondary)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.horizontal, 4)
+            } else {
+                VStack(spacing: 12) {
+                    EmptyStateView(icon: "waveform.badge.magnifyingglass", titleResource: L10n.Recordings.noAudioEvents)
+                        .frame(maxWidth: .infinity)
+                        .frame(height: 112)
+
+                    Button {
+                        analyzeCurrentAudioEvents()
+                    } label: {
+                        Label(localized(L10n.Recordings.analyzeAudioEvents), systemImage: "waveform.badge.magnifyingglass")
+                            .font(.redditSans(.subheadline, weight: .semibold))
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .disabled(isAnalyzingAudioEvents)
+                }
+                .padding(14)
+                .frame(maxWidth: .infinity)
+                .background(AppTheme.cardBackground, in: RoundedRectangle(cornerRadius: AppTheme.cornerRadius, style: .continuous))
+            }
+        }
+    }
+
     private var audioParametersCard: some View {
         let iCloudSyncStatus = store.iCloudSyncStatus(for: currentItem)
 
@@ -2511,20 +3999,22 @@ struct RecordingDetailView: View {
                     .lineLimit(1)
                     .frame(minWidth: 50, alignment: .leading)
 
-                Slider(
-                    value: Binding(
-                        get: { scrubbedPlaybackTime ?? player.currentTime },
-                        set: { scrubbedPlaybackTime = $0 }
-                    ),
-                    in: 0...max(player.duration, 1),
-                    onEditingChanged: { isEditing in
-                        if !isEditing, let scrubbedPlaybackTime {
-                            player.seek(to: scrubbedPlaybackTime)
-                            self.scrubbedPlaybackTime = nil
-                        }
+                RecordingTimelineScrubber(
+                    currentTime: player.currentTime,
+                    duration: player.duration,
+                    scrubbedTime: $scrubbedPlaybackTime,
+                    audioEvents: currentItem.audioEventAnalysis?.events ?? [],
+                    isEnabled: player.isLoaded,
+                    onSeek: { time in
+                        HapticFeedback.play(.timelineSeek)
+                        player.seek(to: time)
+                    },
+                    onEventTap: { event in
+                        HapticFeedback.play(.timelineSeek)
+                        scrubbedPlaybackTime = nil
+                        player.seek(to: event.startTime)
                     }
                 )
-                .disabled(!player.isLoaded)
                 .frame(maxWidth: .infinity)
 
                 Text(TranscriptionLine.formatTimestamp(player.duration))
@@ -2563,7 +4053,10 @@ struct RecordingDetailView: View {
                 .frame(width: 196)
 
                 HStack {
+                    audioEventsTimelineControl
+
                     Spacer(minLength: 0)
+
                     playbackSpeedMenu
                 }
             }
@@ -2580,6 +4073,37 @@ struct RecordingDetailView: View {
         .padding(.vertical, 10)
         .frame(maxWidth: .infinity, alignment: .leading)
         .glassEffect(.regular.tint(AppTheme.playbackGlassTint), in: shape)
+    }
+
+    private var audioEventsTimelineControl: some View {
+        Button {
+            if currentItem.audioEventAnalysis == nil {
+                analyzeCurrentAudioEvents()
+            } else {
+                isShowingAudioEventsSheet = true
+            }
+        } label: {
+            HStack(spacing: 6) {
+                if isAnalyzingAudioEvents {
+                    ProgressView()
+                        .controlSize(.small)
+                } else {
+                    Image(systemName: "waveform.badge.magnifyingglass")
+                        .font(.system(size: 13, weight: .semibold))
+
+                    if let eventCount = currentItem.audioEventAnalysis?.events.count {
+                        Text("\(eventCount)")
+                            .font(.redditSans(.caption2, weight: .bold).monospacedDigit())
+                    }
+                }
+            }
+            .foregroundStyle(AppTheme.info)
+            .padding(.horizontal, currentItem.audioEventAnalysis == nil ? 8 : 7)
+            .frame(height: 24)
+        }
+        .buttonStyle(.glass)
+        .disabled(!player.isLoaded || isAnalyzingAudioEvents)
+        .accessibilityLabel(Text(L10n.Recordings.audioEvents))
     }
 
     private var playbackSpeedMenu: some View {
@@ -2764,6 +4288,269 @@ struct RecordingDetailView: View {
             }
             isAnalyzing = false
         }
+    }
+
+    private func exportCurrentTranscript(as format: TranscriptExportFormat) {
+        do {
+            let url = try TranscriptExportService.export(
+                item: currentItem,
+                transcript: store.transcriptText(for: currentItem),
+                format: format
+            )
+            exportShareItem = ShareSheetItem(url: url)
+            HapticFeedback.play(.primaryAction)
+        } catch {
+            exportErrorMessage = error.localizedDescription
+            HapticFeedback.play(.failure)
+        }
+    }
+
+    private func analyzeCurrentMeeting(summaryProvider: RecordingSummaryProvider) {
+        guard store.summaryProviderAvailability.isAvailable(summaryProvider) else {
+            HapticFeedback.play(.blocked)
+            store.refreshIntelligenceAvailability()
+            return
+        }
+        guard !isAnalyzingMeeting else {
+            HapticFeedback.play(.blocked)
+            return
+        }
+
+        let item = currentItem
+        if selectedTranslationLanguage != nil, isTranslatingTranscript {
+            analysisErrorMessage = localized(L10n.Recordings.waitForTranslationBeforeSummary)
+            HapticFeedback.play(.blocked)
+            return
+        }
+        let translatedAnalysisInput = translatedTranscriptAnalysisInput()
+        if selectedTranslationLanguage != nil, translatedAnalysisInput == nil {
+            analysisErrorMessage = localized(L10n.Recordings.noTranslatedTextForSummary)
+            HapticFeedback.play(.blocked)
+            return
+        }
+
+        isAnalyzingMeeting = true
+        HapticFeedback.play(.analysisStart)
+        Task {
+            do {
+                _ = try await store.analyzeMeeting(
+                    for: item,
+                    transcriptOverride: translatedAnalysisInput?.transcript,
+                    languageNameOverride: translatedAnalysisInput?.languageName,
+                    summaryProvider: summaryProvider
+                )
+                HapticFeedback.play(.analysisComplete)
+            } catch {
+                analysisErrorMessage = error.localizedDescription
+                HapticFeedback.play(.failure)
+            }
+            isAnalyzingMeeting = false
+        }
+    }
+
+    private func analyzeCurrentAudioEvents() {
+        guard !isAnalyzingAudioEvents else {
+            HapticFeedback.play(.blocked)
+            return
+        }
+
+        let item = currentItem
+        isAnalyzingAudioEvents = true
+        HapticFeedback.play(.analysisStart)
+        Task {
+            do {
+                _ = try await store.analyzeAudioEvents(for: item)
+                HapticFeedback.play(.analysisComplete)
+            } catch {
+                analysisErrorMessage = error.localizedDescription
+                HapticFeedback.play(.failure)
+            }
+            isAnalyzingAudioEvents = false
+        }
+    }
+
+    private func meetingAnalysisPlainText(_ analysis: RecordingMeetingAnalysis) -> String {
+        var sections: [String] = []
+
+        if let summary = meetingSummaryText(for: analysis) {
+            sections.append("\(localized(L10n.Recordings.meetingSummary))\n- \(summary)")
+        }
+
+        if !analysis.actionItems.isEmpty {
+            let lines = analysis.actionItems.map { item in
+                let metadata = [item.owner, item.dueDate].compactMap(\.self).joined(separator: " · ")
+                return metadata.isEmpty ? "- \(item.task)" : "- \(item.task) (\(metadata))"
+            }
+            sections.append("\(localized(L10n.Recordings.actionItems))\n\(lines.joined(separator: "\n"))")
+        }
+
+        if !analysis.decisions.isEmpty {
+            let lines = analysis.decisions.map { item in
+                if let rationale = item.rationale, !rationale.isEmpty {
+                    return "- \(item.decision) - \(rationale)"
+                }
+                return "- \(item.decision)"
+            }
+            sections.append("\(localized(L10n.Recordings.decisions))\n\(lines.joined(separator: "\n"))")
+        }
+
+        if !analysis.openQuestions.isEmpty {
+            let lines = analysis.openQuestions.map { item in
+                if let owner = item.owner, !owner.isEmpty {
+                    return "- \(item.question) (\(owner))"
+                }
+                return "- \(item.question)"
+            }
+            sections.append("\(localized(L10n.Recordings.openQuestions))\n\(lines.joined(separator: "\n"))")
+        }
+
+        return sections.joined(separator: "\n\n")
+    }
+
+    private func meetingSummaryText(for analysis: RecordingMeetingAnalysis) -> String? {
+        if let summary = analysis.summary?.trimmingCharacters(in: .whitespacesAndNewlines), !summary.isEmpty {
+            return summary
+        }
+
+        return meetingSummaryFromMarkdown(analysis.markdownNotes)
+    }
+
+    private func meetingSummaryFromMarkdown(_ markdown: String) -> String? {
+        let lines = markdown
+            .replacingOccurrences(of: "\r\n", with: "\n")
+            .replacingOccurrences(of: "\r", with: "\n")
+            .split(whereSeparator: \.isNewline)
+            .map { String($0).trimmingCharacters(in: .whitespacesAndNewlines) }
+
+        var isInsideSummary = false
+        var summaryLines: [String] = []
+        let summaryHeadings: Set<String> = ["summary", "meeting summary", "摘要", "会议摘要", "會議摘要"]
+        let sectionHeadings = summaryHeadings.union([
+            "action items",
+            "actions",
+            "todo",
+            "todos",
+            "decisions",
+            "open questions",
+            "questions",
+            "待办事项",
+            "待辦事項",
+            "行动项",
+            "行動項",
+            "决策点",
+            "決策點",
+            "待确认问题",
+            "待確認問題"
+        ])
+
+        for line in lines {
+            let normalizedLine = line
+                .trimmingCharacters(in: CharacterSet(charactersIn: "#*-•:： "))
+                .localizedLowercase
+            let isKnownHeading = sectionHeadings.contains(normalizedLine)
+            let isHeading = isKnownHeading
+                || line.hasPrefix("#")
+                || line.hasSuffix(":")
+                || line.hasSuffix("：")
+
+            if isHeading, summaryHeadings.contains(normalizedLine) {
+                isInsideSummary = true
+                continue
+            }
+
+            if isInsideSummary, isHeading {
+                break
+            }
+
+            if isInsideSummary {
+                let cleaned = line.trimmingCharacters(in: CharacterSet(charactersIn: "-*• "))
+                if !cleaned.isEmpty {
+                    summaryLines.append(cleaned)
+                }
+            }
+        }
+
+        let summary = summaryLines.joined(separator: " ").trimmingCharacters(in: .whitespacesAndNewlines)
+        return summary.isEmpty ? nil : summary
+    }
+
+    private func addActionItemsToReminders(_ actionItems: [RecordingActionItem]) {
+        guard !isAddingReminders else {
+            HapticFeedback.play(.blocked)
+            return
+        }
+
+        let drafts = actionItems
+            .filter { !$0.task.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
+            .map { ReminderDraft(actionItem: $0, recordingTitle: currentItem.audioFileName) }
+        guard !drafts.isEmpty else {
+            analysisErrorMessage = localized(L10n.Recordings.reminderNoActionItems)
+            HapticFeedback.play(.blocked)
+            return
+        }
+
+        reminderDraftRequest = ReminderDraftRequest(drafts: drafts)
+        HapticFeedback.play(.menuSelection)
+    }
+
+    private func saveReminderDrafts(_ drafts: [ReminderDraft]) {
+        guard !isAddingReminders else {
+            HapticFeedback.play(.blocked)
+            return
+        }
+        guard !drafts.isEmpty else {
+            analysisErrorMessage = localized(L10n.Recordings.reminderNoActionItems)
+            HapticFeedback.play(.blocked)
+            return
+        }
+
+        isAddingReminders = true
+        HapticFeedback.play(.primaryAction)
+
+        Task {
+            do {
+                let count = try await ReminderExportService.addDrafts(drafts)
+                showReminderAddedBanner(localizedFormat(L10n.Recordings.addedRemindersFormat, count))
+                reminderDraftRequest = nil
+                HapticFeedback.play(.analysisComplete)
+            } catch {
+                analysisErrorMessage = error.localizedDescription
+                HapticFeedback.play(.failure)
+            }
+            isAddingReminders = false
+        }
+    }
+
+    private func showReminderAddedBanner(_ message: String) {
+        reminderBannerTask?.cancel()
+        reminderBannerMessage = message
+        reminderBannerIsVisible = false
+
+        withAnimation(.snappy(duration: 0.24, extraBounce: 0.03)) {
+            reminderBannerIsVisible = true
+        }
+
+        reminderBannerTask = Task { @MainActor in
+            try? await Task.sleep(for: .milliseconds(1800))
+            withAnimation(.easeInOut(duration: 0.22)) {
+                reminderBannerIsVisible = false
+            }
+            try? await Task.sleep(for: .milliseconds(240))
+            guard !Task.isCancelled else {
+                return
+            }
+            reminderBannerMessage = nil
+            reminderBannerTask = nil
+        }
+    }
+
+    private func hideReminderAddedBanner() {
+        reminderBannerTask?.cancel()
+        reminderBannerTask = nil
+        withAnimation(.easeInOut(duration: 0.18)) {
+            reminderBannerIsVisible = false
+        }
+        reminderBannerMessage = nil
     }
 
     private func translatedTranscriptAnalysisInput() -> (transcript: String, languageName: String)? {
@@ -3146,6 +4933,8 @@ struct RecordingDetailView: View {
     private func prepareRecordingEditSheet() {
         let item = currentItem
         editRecordingName = (item.audioFileName as NSString).deletingPathExtension
+        editRecordingCategory = item.categoryName ?? ""
+        editRecordingKeyPoints = item.keyPoints ?? ""
         editRecordingTags = item.combinedTags
         editRecordingSummary = item.intelligence?.summary ?? ""
         editRecordingIncludesLocation = item.location != nil
@@ -3179,8 +4968,12 @@ struct RecordingDetailView: View {
                 proposedName: editRecordingName,
                 manualTags: editRecordingTags,
                 summary: editRecordingSummary,
+                projectName: currentItem.projectName,
+                categoryName: editRecordingCategory,
+                keyPoints: editRecordingKeyPoints,
                 location: location
             )
+            RecordingCategoryCatalog.register(editRecordingCategory)
             HapticFeedback.play(.primaryAction)
             isShowingRecordingEditSheet = false
             player.load(item: updatedItem, url: store.audioURL(for: updatedItem))
@@ -3211,6 +5004,9 @@ struct RecordingDetailView: View {
                 proposedName: (currentItem.audioFileName as NSString).deletingPathExtension,
                 manualTags: currentItem.manualTags ?? [],
                 summary: editedSummaryText,
+                projectName: currentItem.projectName,
+                categoryName: currentItem.categoryName,
+                keyPoints: currentItem.keyPoints,
                 location: currentItem.location
             )
             HapticFeedback.play(.primaryAction)
@@ -3243,11 +5039,14 @@ struct RecordingDetailView: View {
 private struct RecordingEditSheet: View {
     let item: RecordingItem
     @Binding var recordingName: String
+    @Binding var categoryName: String
+    @Binding var keyPoints: String
     @Binding var tags: [String]
     @Binding var summary: String
     @Binding var includesLocation: Bool
     @ObservedObject var locationProvider: RecordingEditLocationProvider
     let isSaving: Bool
+    var availableCategories: [String] = []
     var showsTitleGeneration = false
     var onGenerateTitle: (() async throws -> RecordingTitleSuggestion)? = nil
     let onSave: () -> Void
@@ -3260,6 +5059,8 @@ private struct RecordingEditSheet: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: 14) {
                     nameSection
+                    categorySection
+                    keyPointsSection
                     summarySection
                     tagsEntry
                     durationRow
@@ -3348,6 +5149,76 @@ private struct RecordingEditSheet: View {
             .padding(.leading, 12)
             .padding(.trailing, showsTitleGeneration && onGenerateTitle != nil ? 7 : 12)
             .frame(height: 48)
+            .background(AppTheme.elevatedBackground, in: RoundedRectangle(cornerRadius: AppTheme.compactCornerRadius, style: .continuous))
+        }
+        .recordingEditSectionSurface()
+    }
+
+    private var categorySection: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Label(localized(L10n.Recordings.categoryName), systemImage: "folder")
+                .font(.redditSans(.caption, weight: .semibold))
+                .foregroundStyle(.secondary)
+
+            RecordingCategoryMenu(
+                selection: categoryName.isEmpty ? nil : categoryName,
+                categories: RecordingCategoryCatalog.normalized(availableCategories + [categoryName]),
+                onSelect: { selectedName in
+                    categoryName = selectedName ?? ""
+                }
+            ) {
+                HStack(spacing: 8) {
+                    Image(systemName: categoryName.isEmpty ? "tray" : "folder.fill")
+                        .font(.system(size: 14, weight: .semibold))
+                        .foregroundStyle(categoryName.isEmpty ? AnyShapeStyle(.secondary) : AnyShapeStyle(AppTheme.brand))
+
+                    Text(categoryName.isEmpty ? localized(L10n.Recordings.uncategorized) : categoryName)
+                        .font(.redditSans(.subheadline, weight: .semibold))
+                        .foregroundStyle(.primary)
+                        .lineLimit(1)
+
+                    Spacer(minLength: 8)
+
+                    Image(systemName: "chevron.up.chevron.down")
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundStyle(.tertiary)
+                }
+                .padding(.horizontal, 12)
+                .frame(height: 44)
+                .frame(maxWidth: .infinity)
+                .background(AppTheme.elevatedBackground, in: RoundedRectangle(cornerRadius: AppTheme.compactCornerRadius, style: .continuous))
+                .contentShape(RoundedRectangle(cornerRadius: AppTheme.compactCornerRadius, style: .continuous))
+            }
+            .buttonStyle(.plain)
+        }
+        .recordingEditSectionSurface()
+    }
+
+    private var keyPointsSection: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Label(localized(L10n.Recordings.keyPoints), systemImage: "list.bullet.clipboard")
+                .font(.redditSans(.caption, weight: .semibold))
+                .foregroundStyle(.secondary)
+
+            ZStack(alignment: .topLeading) {
+                if keyPoints.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                    Text(L10n.Recordings.keyPointsPlaceholder)
+                        .font(.redditSans(.body))
+                        .foregroundStyle(.tertiary)
+                        .padding(.horizontal, 5)
+                        .padding(.vertical, 8)
+                        .allowsHitTesting(false)
+                }
+
+                TextEditor(text: $keyPoints)
+                    .font(.redditSans(.body))
+                    .scrollContentBackground(.hidden)
+                    .frame(minHeight: 96)
+                    .padding(.horizontal, -4)
+                    .background(Color.clear)
+            }
+            .padding(.horizontal, 12)
+            .padding(.vertical, 8)
             .background(AppTheme.elevatedBackground, in: RoundedRectangle(cornerRadius: AppTheme.compactCornerRadius, style: .continuous))
         }
         .recordingEditSectionSurface()
@@ -4083,6 +5954,204 @@ private struct RecordingAudioFileInfo: Equatable, Sendable {
             return "0x\(String(rawValue, radix: 16, uppercase: true))"
         }
         return String(bytes: bytes, encoding: .ascii) ?? "0x\(String(rawValue, radix: 16, uppercase: true))"
+    }
+}
+
+private struct RecordingTimelineScrubber: View {
+    let currentTime: TimeInterval
+    let duration: TimeInterval
+    @Binding var scrubbedTime: TimeInterval?
+    let audioEvents: [RecordingAudioEvent]
+    let isEnabled: Bool
+    let onSeek: (TimeInterval) -> Void
+    let onEventTap: (RecordingAudioEvent) -> Void
+
+    @State private var isScrubbing = false
+
+    private var displayedTime: TimeInterval {
+        min(max(scrubbedTime ?? currentTime, 0), effectiveDuration)
+    }
+
+    private var effectiveDuration: TimeInterval {
+        max(duration, 1)
+    }
+
+    var body: some View {
+        GeometryReader { proxy in
+            let width = max(proxy.size.width, 1)
+            let progress = CGFloat(displayedTime / effectiveDuration)
+            let thumbX = min(max(progress * width, 0), width)
+            let thumbSize: CGFloat = isScrubbing ? 18 : 14
+            let trackCenterY: CGFloat = 29
+            let trackHeight: CGFloat = 6
+            let markerHeight: CGFloat = 16
+
+            ZStack(alignment: .topLeading) {
+                if isScrubbing, let event = activeAudioEvent(at: displayedTime) {
+                    audioEventCallout(event, thumbX: thumbX, trackWidth: width)
+                        .transition(.opacity.combined(with: .scale(scale: 0.96, anchor: .bottom)))
+                }
+
+                Capsule()
+                    .fill(Color.secondary.opacity(0.18))
+                    .frame(height: trackHeight)
+                    .offset(y: trackCenterY - trackHeight / 2)
+
+                ForEach(audioEvents) { event in
+                    audioEventMarker(event, trackWidth: width, markerHeight: markerHeight)
+                        .offset(x: markerX(for: event, trackWidth: width), y: trackCenterY - markerHeight / 2)
+                }
+
+                Capsule()
+                    .fill(AppTheme.brand.opacity(isEnabled ? 0.88 : 0.34))
+                    .frame(width: max(thumbX, 0), height: trackHeight)
+                    .offset(y: trackCenterY - trackHeight / 2)
+
+                Circle()
+                    .fill(isEnabled ? AppTheme.brand : Color.secondary.opacity(0.55))
+                    .frame(width: thumbSize, height: thumbSize)
+                    .shadow(color: AppTheme.brand.opacity(isScrubbing ? 0.24 : 0.14), radius: isScrubbing ? 8 : 4, y: isScrubbing ? 4 : 2)
+                    .offset(x: thumbX - thumbSize / 2, y: trackCenterY - thumbSize / 2)
+                    .animation(.snappy(duration: 0.16, extraBounce: 0), value: isScrubbing)
+            }
+            .frame(width: width, height: 58, alignment: .topLeading)
+            .contentShape(Rectangle())
+            .gesture(timelineGesture(trackWidth: width))
+        }
+        .frame(height: 58)
+        .opacity(isEnabled ? 1 : 0.55)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(Text(L10n.Recordings.audioEvents))
+        .accessibilityValue(Text(TranscriptionLine.formatTimestamp(displayedTime)))
+        .accessibilityAdjustableAction { direction in
+            guard isEnabled else {
+                return
+            }
+            let step: TimeInterval = 5
+            switch direction {
+            case .increment:
+                onSeek(min(displayedTime + step, duration))
+            case .decrement:
+                onSeek(max(displayedTime - step, 0))
+            @unknown default:
+                break
+            }
+        }
+    }
+
+    private func audioEventMarker(_ event: RecordingAudioEvent, trackWidth: CGFloat, markerHeight: CGFloat) -> some View {
+        RoundedRectangle(cornerRadius: 3, style: .continuous)
+            .fill(AppTheme.info.opacity(markerOpacity(for: event)))
+            .frame(width: markerWidth(for: event, trackWidth: trackWidth), height: markerHeight)
+            .overlay(alignment: .top) {
+                RoundedRectangle(cornerRadius: 3, style: .continuous)
+                    .fill(Color.white.opacity(0.26))
+                    .frame(height: 1)
+        }
+    }
+
+    private func audioEventCallout(_ event: RecordingAudioEvent, thumbX: CGFloat, trackWidth: CGFloat) -> some View {
+        let width = min(trackWidth, 178)
+        let x = min(max(thumbX - width / 2, 0), max(trackWidth - width, 0))
+
+        return HStack(spacing: 6) {
+            Text(event.label)
+                .font(.redditSans(.caption2, weight: .bold))
+                .foregroundStyle(.primary)
+                .lineLimit(1)
+
+            Text(audioEventTimeRangeText(event))
+                .font(.redditSans(.caption2, weight: .semibold).monospacedDigit())
+                .foregroundStyle(.secondary)
+                .lineLimit(1)
+        }
+        .padding(.horizontal, 9)
+        .frame(width: width, height: 24)
+        .background(.ultraThinMaterial, in: Capsule())
+        .overlay {
+            Capsule()
+                .stroke(Color.white.opacity(0.18), lineWidth: 1)
+        }
+        .offset(x: x, y: 0)
+    }
+
+    private func timelineGesture(trackWidth: CGFloat) -> some Gesture {
+        DragGesture(minimumDistance: 0)
+            .onChanged { value in
+                guard isEnabled else {
+                    return
+                }
+                if !isScrubbing {
+                    withAnimation(.snappy(duration: 0.16, extraBounce: 0)) {
+                        isScrubbing = true
+                    }
+                }
+                scrubbedTime = time(for: value.location.x, trackWidth: trackWidth)
+            }
+            .onEnded { value in
+                guard isEnabled else {
+                    return
+                }
+                let time = time(for: value.location.x, trackWidth: trackWidth)
+                let tapDistance = hypot(value.translation.width, value.translation.height)
+                scrubbedTime = nil
+                withAnimation(.snappy(duration: 0.18, extraBounce: 0)) {
+                    isScrubbing = false
+                }
+                if tapDistance < 4, let event = activeAudioEvent(at: time) {
+                    onEventTap(event)
+                    return
+                }
+                onSeek(time)
+            }
+    }
+
+    private func activeAudioEvent(at time: TimeInterval) -> RecordingAudioEvent? {
+        audioEvents
+            .filter { event in
+                time >= event.startTime - 0.45 && time <= event.endTime + 0.45
+            }
+            .sorted {
+                let lhsDistance = distance(from: time, to: $0)
+                let rhsDistance = distance(from: time, to: $1)
+                if lhsDistance == rhsDistance {
+                    return $0.confidence > $1.confidence
+                }
+                return lhsDistance < rhsDistance
+            }
+            .first
+    }
+
+    private func distance(from time: TimeInterval, to event: RecordingAudioEvent) -> TimeInterval {
+        if time >= event.startTime, time <= event.endTime {
+            return 0
+        }
+        return min(abs(time - event.startTime), abs(time - event.endTime))
+    }
+
+    private func time(for xPosition: CGFloat, trackWidth: CGFloat) -> TimeInterval {
+        let normalized = min(max(xPosition / max(trackWidth, 1), 0), 1)
+        return TimeInterval(normalized) * effectiveDuration
+    }
+
+    private func markerX(for event: RecordingAudioEvent, trackWidth: CGFloat) -> CGFloat {
+        min(max(CGFloat(event.startTime / effectiveDuration) * trackWidth, 0), trackWidth)
+    }
+
+    private func markerWidth(for event: RecordingAudioEvent, trackWidth: CGFloat) -> CGFloat {
+        let rawWidth = CGFloat(max(event.duration, 0.1) / effectiveDuration) * trackWidth
+        let remainingWidth = max(trackWidth - markerX(for: event, trackWidth: trackWidth), 3)
+        return min(max(rawWidth, 4), remainingWidth)
+    }
+
+    private func markerOpacity(for event: RecordingAudioEvent) -> Double {
+        min(max(0.28 + event.confidence * 0.58, 0.34), 0.88)
+    }
+
+    private func audioEventTimeRangeText(_ event: RecordingAudioEvent) -> String {
+        let start = TranscriptionLine.formatTimestamp(event.startTime)
+        let end = TranscriptionLine.formatTimestamp(event.endTime)
+        return "\(start)-\(end)"
     }
 }
 
@@ -4853,6 +6922,7 @@ final class RecordingPlaybackController: ObservableObject {
         let commandCenter = MPRemoteCommandCenter.shared()
         commandCenter.skipForwardCommand.preferredIntervals = [5]
         commandCenter.skipBackwardCommand.preferredIntervals = [5]
+        commandCenter.changePlaybackRateCommand.supportedPlaybackRates = Self.availablePlaybackRates.map { NSNumber(value: $0) }
 
         remoteCommandTargets = [
             RemoteCommandTarget(command: commandCenter.playCommand, token: commandCenter.playCommand.addTarget { [weak self] _ in
@@ -4905,6 +6975,15 @@ final class RecordingPlaybackController: ObservableObject {
                     self?.seek(to: event.positionTime)
                 }
                 return .success
+            }),
+            RemoteCommandTarget(command: commandCenter.changePlaybackRateCommand, token: commandCenter.changePlaybackRateCommand.addTarget { [weak self] event in
+                guard let event = event as? MPChangePlaybackRateCommandEvent else {
+                    return .commandFailed
+                }
+                Task { @MainActor in
+                    self?.setPlaybackRate(event.playbackRate)
+                }
+                return .success
             })
         ]
     }
@@ -4918,6 +6997,7 @@ final class RecordingPlaybackController: ObservableObject {
         commandCenter.skipForwardCommand.isEnabled = isEnabled
         commandCenter.skipBackwardCommand.isEnabled = isEnabled
         commandCenter.changePlaybackPositionCommand.isEnabled = isEnabled
+        commandCenter.changePlaybackRateCommand.isEnabled = isEnabled
         commandCenter.nextTrackCommand.isEnabled = false
         commandCenter.previousTrackCommand.isEnabled = false
     }
@@ -4945,7 +7025,6 @@ final class RecordingPlaybackController: ObservableObject {
 
         let center = MPNowPlayingInfoCenter.default()
         center.nowPlayingInfo = info
-        center.playbackState = isPlaying ? .playing : .paused
         Self.logger.debug(
             "[RecordingPlayback] NowPlaying updated title=\(self.nowPlayingTitle, privacy: .public) elapsed=\(elapsedTime, privacy: .public) duration=\(self.duration, privacy: .public) rate=\(self.playbackRate, privacy: .public) playing=\(self.isPlaying, privacy: .public)"
         )
@@ -4954,7 +7033,6 @@ final class RecordingPlaybackController: ObservableObject {
     private func clearNowPlayingInfo() {
         let center = MPNowPlayingInfoCenter.default()
         center.nowPlayingInfo = nil
-        center.playbackState = .stopped
         Self.logger.debug("[RecordingPlayback] NowPlaying cleared")
     }
 

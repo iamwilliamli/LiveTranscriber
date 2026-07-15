@@ -15,6 +15,8 @@ private func localizedFormat(_ resource: LocalizedStringResource, _ arguments: C
 
 struct TranscriptionView: View {
     @Environment(\.colorScheme) private var colorScheme
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.verticalSizeClass) private var verticalSizeClass
     @ObservedObject var transcriber: LiveTranscriptionManager
     @ObservedObject var recordingStore: RecordingStore
     @Binding var externalPendingRecordingDraft: RecordingDraft?
@@ -24,6 +26,8 @@ struct TranscriptionView: View {
     @StateObject private var locationProvider = RecordingLocationProvider()
     @State private var pendingRecordingSave: PendingRecordingSave?
     @State private var pendingRecordingName = ""
+    @State private var pendingRecordingCategory = ""
+    @State private var pendingRecordingKeyPoints = ""
     @State private var pendingRecordingTags: [String] = []
     @State private var pendingRecordingIntelligence: RecordingIntelligence?
     @State private var pendingRecordingIncludesLocation = false
@@ -53,32 +57,8 @@ struct TranscriptionView: View {
     }
 
     var body: some View {
-        ZStack(alignment: .bottom) {
-            AppTheme.groupedBackground
-                .ignoresSafeArea()
-
-            VStack(alignment: .leading, spacing: 14) {
-                assistantGreetingHeader
-
-                recorderCard
-
-                transcriptCard
-            }
-            .padding(.horizontal, 16)
-            .padding(.top, 12)
-            .padding(.bottom, 112)
-            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
-
-            floatingRecorderDock
-                .padding(.horizontal, 18)
-                .padding(.bottom, 12)
-
-            savedRecordingBanner
-                .padding(.top, 10)
-                .padding(.horizontal, 20)
-                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
-                .allowsHitTesting(false)
-                .zIndex(20)
+        GeometryReader { proxy in
+            transcriptionCanvas(usesLandscapeLayout: proxy.size.width > proxy.size.height)
         }
         .toolbar(.hidden, for: .navigationBar)
         .animation(.snappy(duration: 0.22, extraBounce: 0.02), value: transcriber.isRecording)
@@ -174,11 +154,14 @@ struct TranscriptionView: View {
             RecordingSaveSheet(
                 draft: pendingSave.draft,
                 recordingName: $pendingRecordingName,
+                categoryName: $pendingRecordingCategory,
+                keyPoints: $pendingRecordingKeyPoints,
                 tags: $pendingRecordingTags,
                 generatedIntelligence: $pendingRecordingIntelligence,
                 includesLocation: $pendingRecordingIncludesLocation,
                 locationProvider: locationProvider,
                 isSaving: isSavingPendingRecording,
+                availableCategories: RecordingCategoryCatalog.allNames(recordings: recordingStore.recordings),
                 showsTitleGeneration: recordingStore.intelligenceAvailability.isAvailable,
                 onGenerateTitle: {
                     try await recordingStore.generateSuggestedTitle(for: pendingSave.draft)
@@ -197,6 +180,89 @@ struct TranscriptionView: View {
                 }
             }
         }
+    }
+
+    private func transcriptionCanvas(usesLandscapeLayout: Bool) -> some View {
+        ZStack(alignment: .bottom) {
+            transcriptionBackground
+
+            if usesLandscapeLayout {
+                landscapeWorkspace
+            } else {
+                portraitWorkspace
+            }
+
+            savedRecordingBanner
+                .padding(.top, 10)
+                .padding(.horizontal, 20)
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+                .allowsHitTesting(false)
+                .zIndex(20)
+        }
+    }
+
+    private var transcriptionBackground: some View {
+        ZStack {
+            AppTheme.groupedBackground
+
+            ambientBackgroundGradient(color: AppTheme.warning)
+                .opacity(transcriber.isRecording ? 0 : 1)
+
+            ambientBackgroundGradient(color: AppTheme.danger)
+                .opacity(transcriber.isRecording ? 1 : 0)
+        }
+        .animation(
+            reduceMotion ? nil : .easeInOut(duration: 0.65),
+            value: transcriber.isRecording
+        )
+        .ignoresSafeArea()
+        .allowsHitTesting(false)
+    }
+
+    private func ambientBackgroundGradient(color: Color) -> some View {
+        LinearGradient(
+            stops: [
+                .init(color: color.opacity(colorScheme == .dark ? 0.20 : 0.52), location: 0),
+                .init(color: color.opacity(colorScheme == .dark ? 0.12 : 0.25), location: 0.20),
+                .init(color: color.opacity(colorScheme == .dark ? 0.04 : 0.08), location: 0.42),
+                .init(color: .clear, location: 0.64)
+            ],
+            startPoint: .top,
+            endPoint: .bottom
+        )
+    }
+
+    private var portraitWorkspace: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            assistantGreetingHeader
+
+            recorderCard(expandsVertically: false)
+
+            transcriptCard
+        }
+        .padding(.horizontal, 16)
+        .padding(.top, 12)
+        .padding(.bottom, 16)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+    }
+
+    private var landscapeWorkspace: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            compactAssistantGreetingHeader
+
+            HStack(alignment: .top, spacing: 16) {
+                recorderCard(expandsVertically: true)
+                    .frame(maxWidth: .infinity, alignment: .top)
+
+                transcriptCard
+                    .frame(maxWidth: .infinity)
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+        }
+        .padding(.horizontal, 16)
+        .padding(.top, 8)
+        .padding(.bottom, 12)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
     }
 
     @ViewBuilder
@@ -233,6 +299,12 @@ struct TranscriptionView: View {
                 .resizable()
                 .scaledToFit()
                 .frame(width: 52, height: 52)
+                .scaleEffect(transcriber.isRecording && !transcriber.isPaused ? 1.04 : 1)
+                .offset(y: transcriber.isRecording && !transcriber.isPaused ? -2 : 0)
+                .animation(
+                    reduceMotion ? nil : .snappy(duration: 0.32, extraBounce: 0.08),
+                    value: transcriber.isRecording && !transcriber.isPaused
+                )
                 .accessibilityHidden(true)
 
             Text(assistantGreetingTitle)
@@ -244,6 +316,31 @@ struct TranscriptionView: View {
             Spacer(minLength: 0)
         }
         .padding(.horizontal, 1)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .accessibilityElement(children: .combine)
+    }
+
+    private var compactAssistantGreetingHeader: some View {
+        HStack(alignment: .center, spacing: 8) {
+            Image("AssistantRobot")
+                .resizable()
+                .scaledToFit()
+                .frame(width: 34, height: 34)
+                .scaleEffect(transcriber.isRecording && !transcriber.isPaused ? 1.04 : 1)
+                .animation(
+                    reduceMotion ? nil : .snappy(duration: 0.32, extraBounce: 0.08),
+                    value: transcriber.isRecording && !transcriber.isPaused
+                )
+                .accessibilityHidden(true)
+
+            Text(assistantGreetingTitle)
+                .font(.redditSans(.headline, weight: .bold))
+                .foregroundStyle(.primary)
+                .lineLimit(1)
+
+            Spacer(minLength: 0)
+        }
+        .frame(height: 36)
         .frame(maxWidth: .infinity, alignment: .leading)
         .accessibilityElement(children: .combine)
     }
@@ -260,7 +357,7 @@ struct TranscriptionView: View {
         }
     }
 
-    private var recorderCard: some View {
+    private func recorderCard(expandsVertically: Bool) -> some View {
         VStack(alignment: .leading, spacing: 12) {
             recorderDeck
 
@@ -285,59 +382,57 @@ struct TranscriptionView: View {
         }
         .padding(16)
         .frame(maxWidth: .infinity)
+        .frame(maxHeight: expandsVertically ? .infinity : nil, alignment: .top)
         .cardSurface()
     }
 
     private var recorderDeck: some View {
-        ZStack {
-            RoundedRectangle(cornerRadius: AppTheme.cornerRadius, style: .continuous)
-                .fill(recorderDeckBackgroundColor)
-
-            RoundedRectangle(cornerRadius: AppTheme.cornerRadius, style: .continuous)
-                .stroke(recorderDeckBorderColor, lineWidth: 1)
-
-            RecordingElapsedTimeText(
-                clock: transcriber.elapsedClock,
-                color: recorderDeckPrimaryColor
-            )
-            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
-            .padding(.top, 18)
-            .allowsHitTesting(false)
-
-            VStack(alignment: .leading, spacing: 0) {
-                HStack(alignment: .top, spacing: 12) {
-                    Label {
-                        Text(L10n.Transcription.liveTranscription)
-                    } icon: {
-                        Image(systemName: "waveform.and.mic")
-                    }
+        VStack(alignment: .leading, spacing: 0) {
+            ZStack {
+                HStack(alignment: .center, spacing: 10) {
+                    Image(systemName: "waveform.and.mic")
                         .font(.redditSans(.caption, weight: .bold))
-                        .foregroundStyle(recorderDeckSecondaryColor)
-                        .labelStyle(.titleAndIcon)
-                        .lineLimit(1)
-                        .frame(maxWidth: 150, alignment: .leading)
+                        .foregroundStyle(
+                            transcriber.isRecording && !transcriber.isPaused
+                                ? AppTheme.danger
+                                : recorderDeckSecondaryColor
+                        )
+                        .scaleEffect(transcriber.isRecording && !transcriber.isPaused ? 1.08 : 1)
+                        .animation(
+                            reduceMotion ? nil : .snappy(duration: 0.2, extraBounce: 0),
+                            value: transcriber.isRecording && !transcriber.isPaused
+                        )
+                        .frame(width: 34, height: 34, alignment: .leading)
+                        .accessibilityLabel(Text(L10n.Transcription.liveTranscription))
 
                     Spacer(minLength: 8)
 
                     audioFormatMenu
                 }
 
-                Spacer(minLength: 0)
-
-                Text(transcriber.statusText)
-                    .font(.redditSans(.caption, weight: .semibold))
-                    .foregroundStyle(transcriber.isRecording && !transcriber.isPaused ? AppTheme.brandSoft : recorderDeckSecondaryColor)
-                    .lineLimit(1)
-                    .frame(maxWidth: 180, alignment: .leading)
+                RollingRecorderElapsedTimeText(
+                    clock: transcriber.elapsedClock,
+                    color: recorderDeckPrimaryColor
+                )
+                .allowsHitTesting(false)
             }
-            .padding(12)
-        }
-        .frame(height: 138)
-        .clipShape(RoundedRectangle(cornerRadius: AppTheme.cornerRadius, style: .continuous))
-    }
+            .frame(height: 38)
 
-    private var recorderDeckBackgroundColor: Color {
-        AppTheme.elevatedBackground
+            LiveRecordingWaveTimeline(
+                samples: transcriber.inputLevelHistory,
+                clock: transcriber.elapsedClock,
+                isActive: transcriber.isRecording && !transcriber.isPaused,
+                primaryColor: recorderDeckPrimaryColor,
+                secondaryColor: recorderDeckSecondaryColor,
+                height: verticalSizeClass == .compact ? 120 : 150
+            )
+            .padding(.top, 8)
+            .padding(.bottom, 8)
+            .allowsHitTesting(false)
+
+            Spacer(minLength: 0)
+        }
+        .frame(height: verticalSizeClass == .compact ? 176 : 206)
     }
 
     private var recorderDeckPrimaryColor: Color {
@@ -346,10 +441,6 @@ struct TranscriptionView: View {
 
     private var recorderDeckSecondaryColor: Color {
         colorScheme == .dark ? .white.opacity(0.72) : .secondary
-    }
-
-    private var recorderDeckBorderColor: Color {
-        colorScheme == .dark ? .white.opacity(0.14) : .black.opacity(0.10)
     }
 
     private var recorderDeckPillColor: Color {
@@ -465,63 +556,94 @@ struct TranscriptionView: View {
         }
     }
 
-    @ViewBuilder
     private var floatingRecorderDock: some View {
-        if transcriber.isRecording {
-            HStack(spacing: 10) {
-                FloatingControlButton(
-                    titleResource: transcriber.isPaused ? L10n.Transcription.resume : L10n.Transcription.pause,
-                    systemImage: transcriber.isPaused ? "play.fill" : "pause.fill",
-                    tint: .primary,
-                    background: Color.secondary.opacity(0.14)
-                ) {
-                    togglePause()
-                }
-
-                FloatingControlButton(
-                    titleResource: L10n.Transcription.stop,
-                    systemImage: "stop.fill",
-                    tint: .white,
-                    background: AppTheme.danger
-                ) {
-                    stopRecording()
-                }
-            }
-            .padding(8)
-            .floatingDockSurface()
-        } else {
-            Button {
-                startRecording()
-            } label: {
-                HStack(spacing: 12) {
-                    if transcriber.isPreparing {
-                        ProgressView()
-                            .tint(.white)
-                            .controlSize(.small)
-                    } else if isCompletingRecording {
-                        Image(systemName: "tray.and.arrow.down.fill")
-                            .font(.system(size: 20, weight: .semibold))
-                    } else {
-                        Image(systemName: "mic.fill")
-                            .font(.system(size: 20, weight: .semibold))
-                    }
-
-                    Text(isCompletingRecording ? L10n.Transcription.saveRecording : L10n.Transcription.startRecording)
-                        .font(.redditSans(.subheadline, weight: .semibold))
-                }
-                .foregroundStyle(.white)
-                .frame(maxWidth: .infinity)
-                .frame(height: 62)
-                .background(AppTheme.danger, in: Capsule())
+        ZStack {
+            Capsule()
+                .fill(.ultraThinMaterial)
                 .overlay {
                     Capsule()
-                        .stroke(.white.opacity(0.22), lineWidth: 1)
+                        .fill(
+                            AppTheme.danger.opacity(
+                                transcriber.isRecording
+                                    ? 0
+                                    : (colorScheme == .dark ? 0.80 : 0.86)
+                            )
+                        )
                 }
-                .shadow(color: AppTheme.danger.opacity(0.24), radius: 18, y: 8)
+                .overlay {
+                    Capsule()
+                        .stroke(.white.opacity(0.28), lineWidth: 1)
+                }
+                .frame(width: transcriber.isRecording ? 120 : 64, height: 64)
+                .shadow(
+                    color: Color.black.opacity(colorScheme == .dark ? 0.24 : 0.08),
+                    radius: 2,
+                    y: 2
+                )
+                .shadow(
+                    color: Color.black.opacity(colorScheme == .dark ? 0.22 : 0.12),
+                    radius: transcriber.isRecording ? 14 : 10,
+                    y: transcriber.isRecording ? 9 : 7
+                )
+                .accessibilityHidden(true)
+
+            if transcriber.isRecording {
+                HStack(spacing: 8) {
+                    FloatingIconControlButton(
+                        titleResource: transcriber.isPaused
+                            ? L10n.Transcription.resume
+                            : L10n.Transcription.pause,
+                        systemImage: transcriber.isPaused ? "play.fill" : "pause.fill",
+                        tint: .primary,
+                        background: Color.secondary.opacity(0.14)
+                    ) {
+                        togglePause()
+                    }
+
+                    FloatingIconControlButton(
+                        titleResource: L10n.Transcription.stop,
+                        systemImage: "stop.fill",
+                        tint: .white,
+                        background: AppTheme.danger
+                    ) {
+                        stopRecording()
+                    }
+                }
+                .transition(.opacity.combined(with: .scale(scale: 0.90)))
+            } else {
+                Button {
+                    startRecording()
+                } label: {
+                    Group {
+                        if transcriber.isPreparing {
+                            ProgressView()
+                                .tint(.white)
+                                .controlSize(.regular)
+                        } else if isCompletingRecording {
+                            Image(systemName: "tray.and.arrow.down.fill")
+                                .font(.system(size: 23, weight: .semibold))
+                        } else {
+                            Image(systemName: "mic.fill")
+                                .font(.system(size: 24, weight: .semibold))
+                        }
+                    }
+                    .foregroundStyle(.white)
+                    .frame(width: 64, height: 64)
+                    .contentShape(Circle())
+                }
+                .buttonStyle(RecorderPressButtonStyle(pressedScale: 0.94))
+                .disabled(transcriber.isPreparing || isCompletingRecording)
+                .accessibilityLabel(
+                    Text(isCompletingRecording ? L10n.Transcription.saveRecording : L10n.Transcription.startRecording)
+                )
+                .transition(.opacity.combined(with: .scale(scale: 0.90)))
             }
-            .buttonStyle(.plain)
-            .disabled(transcriber.isPreparing || isCompletingRecording)
         }
+        .frame(width: transcriber.isRecording ? 120 : 64, height: 64)
+        .animation(
+            reduceMotion ? nil : .spring(duration: 0.34, bounce: 0.12),
+            value: transcriber.isRecording
+        )
     }
 
     private func startRecording() {
@@ -585,6 +707,8 @@ struct TranscriptionView: View {
 
     private func presentSaveSheet(for draft: RecordingDraft) {
         pendingRecordingName = RecordingStore.defaultBaseName(for: draft.startedAt)
+        pendingRecordingCategory = ""
+        pendingRecordingKeyPoints = ""
         pendingRecordingTags = []
         pendingRecordingIntelligence = nil
         pendingRecordingIncludesLocation = false
@@ -622,8 +746,12 @@ struct TranscriptionView: View {
                 preferredName: pendingRecordingName,
                 manualTags: pendingRecordingTags,
                 intelligence: intelligence,
+                projectName: nil,
+                categoryName: pendingRecordingCategory,
+                keyPoints: pendingRecordingKeyPoints,
                 location: location
             ) {
+                RecordingCategoryCatalog.register(pendingRecordingCategory)
                 showSavedRecordingBanner(fileName: saved.audioFileName)
                 transcriber.clearTranscript()
                 self.pendingRecordingSave = nil
@@ -645,6 +773,8 @@ struct TranscriptionView: View {
         }
         pendingRecordingSave = nil
         pendingRecordingName = ""
+        pendingRecordingCategory = ""
+        pendingRecordingKeyPoints = ""
         pendingRecordingTags = []
         pendingRecordingIntelligence = nil
         pendingRecordingIncludesLocation = false
@@ -727,11 +857,11 @@ struct TranscriptionView: View {
                 }
                     .font(.redditSans(.headline))
                 Spacer()
-                liveTranscriptTranslationMenu
                 LiveTranscriptLineCount(
                     finalStore: transcriber.finalTranscriptStore,
                     interimStore: transcriber.interimTranscriptStore
                 )
+                liveTranscriptTranslationMenu
             }
 
             liveTranscriptTranslationStatus
@@ -743,6 +873,7 @@ struct TranscriptionView: View {
                 translatedLineSignatures: liveTranslatedLineSignatures,
                 isTranslating: isTranslatingLiveTranscript,
                 selectedTranslationLanguage: selectedLiveTranslationLanguage,
+                bottomContentInset: transcriptControlContentInset,
                 onEditFinalLine: beginLiveTranscriptLineEdit
             )
         }
@@ -750,6 +881,18 @@ struct TranscriptionView: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .frame(maxHeight: .infinity)
         .cardSurface()
+        .overlay(alignment: .bottom) {
+            floatingRecorderDock
+                .padding(.bottom, transcriptControlBottomInset)
+        }
+    }
+
+    private var transcriptControlBottomInset: CGFloat {
+        verticalSizeClass == .compact ? 16 : 24
+    }
+
+    private var transcriptControlContentInset: CGFloat {
+        transcriptControlBottomInset + 64
     }
 
     private var liveTranscriptTranslationMenu: some View {
@@ -958,6 +1101,236 @@ private enum TranscriptionSpeechLocaleReleaseOperation {
     case startRecording
 }
 
+private struct LiveRecordingWaveTimeline: View {
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    let samples: [InputLevelHistorySample]
+    @ObservedObject var clock: RecordingElapsedClock
+    let isActive: Bool
+    let primaryColor: Color
+    let secondaryColor: Color
+    let height: CGFloat
+
+    private let visibleDuration: TimeInterval = 12
+    private let majorTickInterval: TimeInterval = 2
+    private let minorTickInterval: TimeInterval = 0.5
+    private let sampleInterval: TimeInterval = 1.0 / 6.0
+    private let rulerHeight: CGFloat = 36
+    private let playheadFraction: CGFloat = 0.5
+
+    @State private var elapsedSecondAnchor = 0
+    @State private var elapsedAnchorDate = Date()
+    @State private var sampleMotionAnchorDate = Date()
+
+    var body: some View {
+        TimelineView(.animation(minimumInterval: 1.0 / 30.0, paused: !isActive || reduceMotion)) { context in
+            GeometryReader { proxy in
+                let size = proxy.size
+                let elapsed = displayedElapsed(at: context.date)
+                let phase = samplePhase(at: context.date)
+                let edgeFraction = min(32 / max(size.width, 1), 0.2)
+
+                timelineContent(size: size, elapsed: elapsed, phase: phase)
+                    .mask(timelineEdgeFadeMask(edgeFraction: edgeFraction))
+                    .clipped()
+            }
+        }
+        .frame(height: height)
+        .onAppear {
+            resetElapsedAnchor(to: clock.elapsedSeconds)
+            sampleMotionAnchorDate = Date()
+        }
+        .onChange(of: clock.elapsedSeconds) { _, newValue in
+            resetElapsedAnchor(to: newValue)
+        }
+        .onChange(of: isActive) { _, _ in
+            resetElapsedAnchor(to: clock.elapsedSeconds)
+            sampleMotionAnchorDate = Date()
+        }
+        .onChange(of: samples) { _, _ in
+            sampleMotionAnchorDate = Date()
+        }
+    }
+
+    private func timelineContent(
+        size: CGSize,
+        elapsed: TimeInterval,
+        phase: CGFloat
+    ) -> some View {
+        let waveformHeight = max(size.height - rulerHeight - 8, 40)
+
+        return ZStack(alignment: .topLeading) {
+            waveformSurface(size: CGSize(width: size.width, height: waveformHeight), phase: phase)
+                .frame(width: size.width, height: waveformHeight)
+                .clipped()
+
+            timelineTicks(width: size.width, elapsed: elapsed)
+                .frame(width: size.width, height: rulerHeight)
+                .offset(y: size.height - rulerHeight)
+        }
+        .frame(width: size.width, height: size.height, alignment: .topLeading)
+    }
+
+    private func timelineEdgeFadeMask(edgeFraction: CGFloat) -> some View {
+        LinearGradient(
+            stops: [
+                .init(color: .clear, location: 0),
+                .init(color: .black, location: edgeFraction),
+                .init(color: .black, location: 1 - edgeFraction),
+                .init(color: .clear, location: 1)
+            ],
+            startPoint: .leading,
+            endPoint: .trailing
+        )
+    }
+
+    @ViewBuilder
+    private func waveformSurface(size: CGSize, phase: CGFloat) -> some View {
+        ZStack {
+            Rectangle()
+                .fill(secondaryColor.opacity(hasAudibleSignal ? 0.08 : 0.16))
+                .frame(width: size.width, height: 1)
+                .position(x: size.width / 2, y: size.height / 2)
+                .animation(.easeOut(duration: 0.16), value: hasAudibleSignal)
+
+            waveform(size: size, phase: phase)
+        }
+    }
+
+    private func waveform(size: CGSize, phase: CGFloat) -> some View {
+        let baseSamples = normalizedSamples
+        let visibleBarCount = max(baseSamples.count, 1)
+        let pitch = size.width / CGFloat(visibleBarCount)
+        let barWidth = max(1.5, min(2.5, pitch * 0.48))
+        let spacing = max(pitch - barWidth, 0)
+        let latestSampleX = barWidth / 2 + CGFloat(visibleBarCount - 1) * pitch
+        let playheadX = size.width * playheadFraction
+        let waveformOffset = playheadX - latestSampleX - phase * pitch
+
+        return HStack(alignment: .center, spacing: spacing) {
+            ForEach(baseSamples) { sample in
+                let displayLevel = amplifiedLevel(for: sample.level)
+                Capsule()
+                    .fill(primaryColor.opacity(0.88))
+                    .frame(width: barWidth, height: barHeight(for: displayLevel, maxHeight: size.height))
+                    .frame(height: size.height, alignment: .center)
+                    .opacity(sample.isCaptured ? 1 : 0)
+            }
+        }
+        .frame(width: size.width, height: size.height, alignment: .leading)
+        .offset(x: waveformOffset)
+        .transaction { transaction in
+            transaction.animation = nil
+            transaction.disablesAnimations = true
+        }
+    }
+
+    private func timelineTicks(width: CGFloat, elapsed: TimeInterval) -> some View {
+        let currentTime = max(elapsed, 0)
+        let startTime = currentTime - visibleDuration * TimeInterval(playheadFraction)
+        let firstTickIndex = Int(floor(startTime / minorTickInterval))
+        let tickCount = Int(ceil(visibleDuration / minorTickInterval)) + 2
+        let finalTickIndex = firstTickIndex + tickCount
+        let majorTickStride = max(Int((majorTickInterval / minorTickInterval).rounded()), 1)
+
+        let labelWidth: CGFloat = 42
+        let baselineY: CGFloat = 16
+
+        return ZStack(alignment: .topLeading) {
+            Rectangle()
+                .fill(secondaryColor.opacity(0.16))
+                .frame(width: width, height: 1)
+                .offset(y: baselineY)
+
+            ForEach(firstTickIndex...finalTickIndex, id: \.self) { tickIndex in
+                let tickTime = TimeInterval(tickIndex) * minorTickInterval
+                let x = width * CGFloat((tickTime - startTime) / visibleDuration)
+                let isMajor = tickIndex.isMultiple(of: majorTickStride)
+
+                if x >= -1, x <= width + 1 {
+                    Rectangle()
+                        .fill(secondaryColor.opacity(isMajor ? 0.42 : 0.24))
+                        .frame(width: 1, height: isMajor ? 20 : 12)
+                        .position(x: x, y: baselineY + (isMajor ? 10 : 6))
+                }
+
+                if isMajor,
+                   tickTime >= 0,
+                   x >= -labelWidth / 2,
+                   x <= width + labelWidth / 2 {
+                    Text(tickLabel(for: tickTime))
+                        .font(.system(size: 10, weight: .medium, design: .monospaced))
+                        .foregroundStyle(secondaryColor.opacity(0.56))
+                        .monospacedDigit()
+                        .lineLimit(1)
+                        .frame(width: labelWidth, alignment: .center)
+                        .position(x: x, y: 6)
+                }
+            }
+        }
+        .frame(width: width, height: rulerHeight, alignment: .topLeading)
+        .clipped()
+    }
+
+    private var normalizedSamples: [InputLevelHistorySample] {
+        let source = samples.isEmpty
+            ? (0..<72).map {
+                InputLevelHistorySample(id: -72 + $0, level: 0, isCaptured: false)
+            }
+            : samples
+        return source.map { sample in
+            InputLevelHistorySample(
+                id: sample.id,
+                level: min(max(sample.level, 0), 1),
+                isCaptured: sample.isCaptured
+            )
+        }
+    }
+
+    private var hasAudibleSignal: Bool {
+        normalizedSamples.contains { $0.isCaptured && amplifiedLevel(for: $0.level) > 0 }
+    }
+
+    private func amplifiedLevel(for level: Float) -> CGFloat {
+        let noiseFloor: CGFloat = 0.04
+        let clampedLevel = min(max(CGFloat(level), 0), 1)
+        guard clampedLevel > noiseFloor else {
+            return 0
+        }
+
+        let normalizedLevel = (clampedLevel - noiseFloor) / (1 - noiseFloor)
+        return min(1, CGFloat(pow(Double(normalizedLevel), 1.18)) * 1.05)
+    }
+
+    private func barHeight(for displayLevel: CGFloat, maxHeight: CGFloat) -> CGFloat {
+        max(5, min(maxHeight, 5 + displayLevel * (maxHeight - 5)))
+    }
+
+    private func tickLabel(for seconds: TimeInterval) -> String {
+        TranscriptionLine.formatTimestamp(seconds)
+    }
+
+    private func displayedElapsed(at date: Date) -> TimeInterval {
+        guard isActive, !reduceMotion else {
+            return TimeInterval(clock.elapsedSeconds)
+        }
+        return TimeInterval(elapsedSecondAnchor) + date.timeIntervalSince(elapsedAnchorDate)
+    }
+
+    private func samplePhase(at date: Date) -> CGFloat {
+        guard isActive, !reduceMotion else {
+            return 0
+        }
+
+        let phase = date.timeIntervalSince(sampleMotionAnchorDate) / sampleInterval
+        return CGFloat(min(max(phase, 0), 1))
+    }
+
+    private func resetElapsedAnchor(to seconds: Int) {
+        elapsedSecondAnchor = seconds
+        elapsedAnchorDate = Date()
+    }
+}
+
 private struct RecordingElapsedTimeText: View {
     @ObservedObject var clock: RecordingElapsedClock
     let color: Color
@@ -1071,11 +1444,14 @@ private struct LiveTranslationLanguagePicker: View {
 private struct RecordingSaveSheet: View {
     let draft: RecordingDraft
     @Binding var recordingName: String
+    @Binding var categoryName: String
+    @Binding var keyPoints: String
     @Binding var tags: [String]
     @Binding var generatedIntelligence: RecordingIntelligence?
     @Binding var includesLocation: Bool
     @ObservedObject var locationProvider: RecordingLocationProvider
     let isSaving: Bool
+    let availableCategories: [String]
     let showsTitleGeneration: Bool
     let onGenerateTitle: () async throws -> RecordingTitleSuggestion
     let onSave: () -> Void
@@ -1088,6 +1464,8 @@ private struct RecordingSaveSheet: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: 14) {
                     nameSection
+                    categorySection
+                    keyPointsSection
                     tagsEntry
                     durationRow
                     locationSection
@@ -1190,6 +1568,84 @@ private struct RecordingSaveSheet: View {
         !isSaving
             && !isGeneratingTitle
             && !draft.lines.plainTranscriptText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    }
+
+    private var categorySection: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Label {
+                Text(L10n.Recordings.categoryName)
+            } icon: {
+                Image(systemName: "folder")
+            }
+                .font(.redditSans(.caption, weight: .semibold))
+                .foregroundStyle(.secondary)
+
+            RecordingCategoryMenu(
+                selection: categoryName.isEmpty ? nil : categoryName,
+                categories: RecordingCategoryCatalog.normalized(availableCategories + [categoryName]),
+                onSelect: { selectedName in
+                    categoryName = selectedName ?? ""
+                }
+            ) {
+                HStack(spacing: 8) {
+                    Image(systemName: categoryName.isEmpty ? "tray" : "folder.fill")
+                        .font(.system(size: 14, weight: .semibold))
+                        .foregroundStyle(categoryName.isEmpty ? AnyShapeStyle(.secondary) : AnyShapeStyle(AppTheme.brand))
+
+                    Text(categoryName.isEmpty ? localized(L10n.Recordings.uncategorized) : categoryName)
+                        .font(.redditSans(.subheadline, weight: .semibold))
+                        .foregroundStyle(.primary)
+                        .lineLimit(1)
+
+                    Spacer(minLength: 8)
+
+                    Image(systemName: "chevron.up.chevron.down")
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundStyle(.tertiary)
+                }
+                .padding(.horizontal, 12)
+                .frame(height: 44)
+                .frame(maxWidth: .infinity)
+                .background(AppTheme.elevatedBackground, in: RoundedRectangle(cornerRadius: AppTheme.compactCornerRadius, style: .continuous))
+                .contentShape(RoundedRectangle(cornerRadius: AppTheme.compactCornerRadius, style: .continuous))
+            }
+            .buttonStyle(.plain)
+        }
+        .recordingSaveSectionSurface()
+    }
+
+    private var keyPointsSection: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Label {
+                Text(L10n.Recordings.keyPoints)
+            } icon: {
+                Image(systemName: "list.bullet.clipboard")
+            }
+                .font(.redditSans(.caption, weight: .semibold))
+                .foregroundStyle(.secondary)
+
+            ZStack(alignment: .topLeading) {
+                if keyPoints.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                    Text(L10n.Recordings.keyPointsPlaceholder)
+                        .font(.redditSans(.body))
+                        .foregroundStyle(.tertiary)
+                        .padding(.horizontal, 5)
+                        .padding(.vertical, 8)
+                        .allowsHitTesting(false)
+                }
+
+                TextEditor(text: $keyPoints)
+                    .font(.redditSans(.body))
+                    .scrollContentBackground(.hidden)
+                    .frame(minHeight: 96)
+                    .padding(.horizontal, -4)
+                    .background(Color.clear)
+            }
+            .padding(.horizontal, 12)
+            .padding(.vertical, 8)
+            .background(AppTheme.elevatedBackground, in: RoundedRectangle(cornerRadius: AppTheme.compactCornerRadius, style: .continuous))
+        }
+        .recordingSaveSectionSurface()
     }
 
     private func generateTitleAndTags() {
@@ -1541,9 +1997,9 @@ private struct RollingRecorderTimeText: View {
     let text: String
     let color: Color
 
-    private let digitHeight: CGFloat = 46
-    private let digitWidth: CGFloat = 27
-    private let separatorWidth: CGFloat = 18
+    private let digitHeight: CGFloat = 28
+    private let digitWidth: CGFloat = 17
+    private let separatorWidth: CGFloat = 11
 
     var body: some View {
         HStack(alignment: .center, spacing: 2) {
@@ -1557,13 +2013,25 @@ private struct RollingRecorderTimeText: View {
                     )
                 } else {
                     Text(String(character))
-                        .font(.system(size: 36, weight: .semibold, design: .monospaced))
+                        .font(.system(size: 23, weight: .semibold, design: .monospaced))
                         .foregroundStyle(color)
                         .frame(width: separatorWidth, height: digitHeight)
                 }
             }
         }
         .accessibilityLabel(text)
+    }
+}
+
+private struct RollingRecorderElapsedTimeText: View {
+    @ObservedObject var clock: RecordingElapsedClock
+    let color: Color
+
+    var body: some View {
+        RollingRecorderTimeText(
+            text: TranscriptionLine.formatTimestamp(Double(clock.elapsedSeconds)),
+            color: color
+        )
     }
 }
 
@@ -1587,7 +2055,7 @@ private struct RollingRecorderDigit: View {
         VStack(spacing: 0) {
             ForEach(0..<20, id: \.self) { index in
                 Text("\(index % 10)")
-                    .font(.system(size: 40, weight: .semibold, design: .monospaced))
+                    .font(.system(size: 25, weight: .semibold, design: .monospaced))
                     .foregroundStyle(color)
                     .frame(width: width, height: height)
             }
@@ -1674,6 +2142,7 @@ private struct LiveTranscriptRows: View {
     let translatedLineSignatures: [TranscriptionLine.ID: String]
     let isTranslating: Bool
     let selectedTranslationLanguage: TranscriptionLanguage?
+    let bottomContentInset: CGFloat
     let onEditFinalLine: (TranscriptionLine) -> Void
 
     private var totalLineCount: Int {
@@ -1701,6 +2170,7 @@ private struct LiveTranscriptRows: View {
                         )
                     }
                     .padding(.vertical, 2)
+                    .padding(.bottom, bottomContentInset)
                     .frame(maxWidth: .infinity, alignment: .topLeading)
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -1858,11 +2328,19 @@ private struct RecordingStateBadge: View {
         return AppTheme.success
     }
 
+    private var systemImage: String {
+        if isPreparing {
+            return "ellipsis.circle"
+        }
+        return isRecording && !isPaused ? "record.circle" : "checkmark.circle"
+    }
+
     var body: some View {
         Label {
             Text(titleResource)
         } icon: {
-            Image(systemName: isRecording && !isPaused ? "record.circle" : "checkmark.circle")
+            Image(systemName: systemImage)
+                .contentTransition(.symbolEffect(.replace))
         }
             .font(.redditSans(.caption, weight: .semibold))
             .foregroundStyle(tint)
@@ -1875,6 +2353,7 @@ private struct RecordingStateBadge: View {
                 Capsule()
                     .stroke(tint.opacity(0.18), lineWidth: 1)
             }
+            .animation(.snappy(duration: 0.2, extraBounce: 0), value: systemImage)
     }
 }
 
@@ -1963,41 +2442,42 @@ private struct CompactDropdownBadge: View {
     }
 }
 
-private struct FloatingControlButton: View {
-    let title: Text
+private struct FloatingIconControlButton: View {
+    let titleResource: LocalizedStringResource
     let systemImage: String
     let tint: Color
     let background: Color
     let action: () -> Void
 
-    init(
-        titleResource: LocalizedStringResource,
-        systemImage: String,
-        tint: Color,
-        background: Color,
-        action: @escaping () -> Void
-    ) {
-        self.title = Text(titleResource)
-        self.systemImage = systemImage
-        self.tint = tint
-        self.background = background
-        self.action = action
-    }
-
     var body: some View {
         Button(action: action) {
-            HStack(spacing: 9) {
-                Image(systemName: systemImage)
-                    .font(.system(size: 16, weight: .semibold))
-                title
-                    .font(.redditSans(.subheadline, weight: .semibold))
-            }
-            .foregroundStyle(tint)
-            .frame(maxWidth: .infinity)
-            .frame(height: 54)
-            .background(background, in: Capsule())
+            Image(systemName: systemImage)
+                .font(.system(size: 18, weight: .semibold))
+                .foregroundStyle(tint)
+                .contentTransition(.symbolEffect(.replace))
+                .frame(width: 48, height: 48)
+                .background(background, in: Circle())
+                .contentShape(Circle())
         }
-        .buttonStyle(.plain)
+        .buttonStyle(RecorderPressButtonStyle(pressedScale: 0.94))
+        .accessibilityLabel(Text(titleResource))
+        .animation(.snappy(duration: 0.18, extraBounce: 0), value: systemImage)
+    }
+}
+
+private struct RecorderPressButtonStyle: ButtonStyle {
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.isEnabled) private var isEnabled
+    let pressedScale: CGFloat
+
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .scaleEffect(configuration.isPressed && !reduceMotion ? pressedScale : 1)
+            .opacity(isEnabled ? (configuration.isPressed ? 0.9 : 1) : 0.58)
+            .animation(
+                reduceMotion ? nil : .snappy(duration: 0.12, extraBounce: 0),
+                value: configuration.isPressed
+            )
     }
 }
 
@@ -2009,17 +2489,13 @@ private extension View {
                     .stroke(AppTheme.cardBorder, lineWidth: 1)
             }
             .clipShape(RoundedRectangle(cornerRadius: AppTheme.cornerRadius, style: .continuous))
-            .shadow(color: AppTheme.cardShadow, radius: 7, y: 2)
+            .shadow(
+                color: AppTheme.cardShadow,
+                radius: AppTheme.cardShadowRadius,
+                y: AppTheme.cardShadowYOffset
+            )
     }
 
-    func floatingDockSurface() -> some View {
-        background(.ultraThinMaterial, in: Capsule())
-            .overlay {
-                Capsule()
-                    .stroke(.white.opacity(0.28), lineWidth: 1)
-            }
-            .shadow(color: Color.black.opacity(0.14), radius: 18, y: 8)
-    }
 }
 
 #if DEBUG

@@ -231,7 +231,11 @@ struct OnboardingIntroView: View {
             RoundedRectangle(cornerRadius: AppTheme.cornerRadius, style: .continuous)
                 .stroke(AppTheme.cardBorder, lineWidth: 1)
         }
-        .shadow(color: AppTheme.cardShadow, radius: 12, y: 5)
+        .shadow(
+            color: AppTheme.cardShadow,
+            radius: AppTheme.cardShadowRadius,
+            y: AppTheme.cardShadowYOffset
+        )
     }
 
     private var privacyNote: some View {
@@ -817,7 +821,11 @@ private struct OnboardingFeatureCard: View {
             RoundedRectangle(cornerRadius: AppTheme.cornerRadius, style: .continuous)
                 .stroke(AppTheme.cardBorder, lineWidth: 1)
         }
-        .shadow(color: AppTheme.cardShadow, radius: 12, y: 5)
+        .shadow(
+            color: AppTheme.cardShadow,
+            radius: AppTheme.cardShadowRadius,
+            y: AppTheme.cardShadowYOffset
+        )
     }
 }
 

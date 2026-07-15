@@ -61,6 +61,10 @@
 	<string>Used to record audio for live transcription. 用于录音并实时转录文本。</string>
 	<key>NSLocationWhenInUseUsageDescription</key>
 	<string>Used only when you choose to attach a location to a saved recording. 仅在你选择给录音添加地理位置时使用。</string>
+	<key>NSRemindersFullAccessUsageDescription</key>
+	<string>Used only when you choose to add extracted action items to Reminders. 仅在你选择把提取出的待办事项加入提醒事项时使用。</string>
+	<key>NSRemindersUsageDescription</key>
+	<string>Used only when you choose to add extracted action items to Reminders. 仅在你选择把提取出的待办事项加入提醒事项时使用。</string>
 	<key>NSSpeechRecognitionUsageDescription</key>
 	<string>Used to turn recorded speech into live transcription text. 用于把录到的语音实时转成文字。</string>
 	<key>NSUbiquitousContainers</key>

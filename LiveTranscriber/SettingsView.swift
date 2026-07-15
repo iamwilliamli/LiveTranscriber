@@ -2315,7 +2315,11 @@ private extension View {
                     .stroke(AppTheme.cardBorder, lineWidth: 1)
             }
             .clipShape(RoundedRectangle(cornerRadius: AppTheme.cornerRadius, style: .continuous))
-            .shadow(color: AppTheme.cardShadow, radius: 7, y: 2)
+            .shadow(
+                color: AppTheme.cardShadow,
+                radius: AppTheme.cardShadowRadius,
+                y: AppTheme.cardShadowYOffset
+            )
     }
 }
 

@@ -57,6 +57,10 @@
 		7B0000000000000000000032 /* RecordingSiriIntegration.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7B0000000000000000001037 /* RecordingSiriIntegration.swift */; };
 		7B0000000000000000000033 /* RecordingChatView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7B0000000000000000001038 /* RecordingChatView.swift */; };
 		7B0000000000000000000034 /* TranscriptContextBuilder.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7B0000000000000000001039 /* TranscriptContextBuilder.swift */; };
+		7B0000000000000000000035 /* MeetingAnalysisService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7B000000000000000000103A /* MeetingAnalysisService.swift */; };
+		7B0000000000000000000036 /* ReminderExportService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7B000000000000000000103B /* ReminderExportService.swift */; };
+		7B0000000000000000000037 /* TranscriptExportService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7B000000000000000000103C /* TranscriptExportService.swift */; };
+		7B0000000000000000000038 /* RecordingSoundAnalysisService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7B000000000000000000103D /* RecordingSoundAnalysisService.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -158,6 +162,10 @@
 		7B0000000000000000001037 /* RecordingSiriIntegration.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecordingSiriIntegration.swift; sourceTree = "<group>"; };
 		7B0000000000000000001038 /* RecordingChatView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecordingChatView.swift; sourceTree = "<group>"; };
 		7B0000000000000000001039 /* TranscriptContextBuilder.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TranscriptContextBuilder.swift; sourceTree = "<group>"; };
+		7B000000000000000000103A /* MeetingAnalysisService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MeetingAnalysisService.swift; sourceTree = "<group>"; };
+		7B000000000000000000103B /* ReminderExportService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReminderExportService.swift; sourceTree = "<group>"; };
+		7B000000000000000000103C /* TranscriptExportService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TranscriptExportService.swift; sourceTree = "<group>"; };
+		7B000000000000000000103D /* RecordingSoundAnalysisService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecordingSoundAnalysisService.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -226,6 +234,10 @@
 				7B0000000000000000001017 /* RecordingsView.swift */,
 				7B0000000000000000001038 /* RecordingChatView.swift */,
 				7B0000000000000000001039 /* TranscriptContextBuilder.swift */,
+				7B000000000000000000103A /* MeetingAnalysisService.swift */,
+				7B000000000000000000103B /* ReminderExportService.swift */,
+				7B000000000000000000103C /* TranscriptExportService.swift */,
+				7B000000000000000000103D /* RecordingSoundAnalysisService.swift */,
 				7B000000000000000000102A /* TranscriptLineEditSheet.swift */,
 				7B0000000000000000001018 /* SettingsView.swift */,
 				7B0000000000000000001019 /* TranscriptionActivityAttributes.swift */,
@@ -451,6 +463,10 @@
 				7B0000000000000000000013 /* RecordingsView.swift in Sources */,
 				7B0000000000000000000033 /* RecordingChatView.swift in Sources */,
 				7B0000000000000000000034 /* TranscriptContextBuilder.swift in Sources */,
+				7B0000000000000000000035 /* MeetingAnalysisService.swift in Sources */,
+				7B0000000000000000000036 /* ReminderExportService.swift in Sources */,
+				7B0000000000000000000037 /* TranscriptExportService.swift in Sources */,
+				7B0000000000000000000038 /* RecordingSoundAnalysisService.swift in Sources */,
 				7B0000000000000000000026 /* TranscriptLineEditSheet.swift in Sources */,
 				7B0000000000000000000014 /* SettingsView.swift in Sources */,
 				7B0000000000000000000015 /* TranscriptionActivityAttributes.swift in Sources */,
