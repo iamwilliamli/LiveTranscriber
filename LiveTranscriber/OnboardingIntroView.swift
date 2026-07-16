@@ -21,6 +21,8 @@ struct OnboardingIntroView: View {
     @State private var localSummaryDownloadProgress: Double = 0
     @State private var localSummaryDownloadErrorMessage: String?
 
+    private let contentMargin: CGFloat = 20
+
     private let featurePages: [OnboardingFeaturePage] = [
         OnboardingFeaturePage(
             icon: "waveform.and.mic",
@@ -60,7 +62,7 @@ struct OnboardingIntroView: View {
                         .padding(.bottom, 116)
                 }
                 .frame(maxWidth: .infinity)
-                .padding(.horizontal, 20)
+                .padding(.horizontal, contentMargin)
             }
             .scrollIndicators(.hidden)
         }
@@ -140,7 +142,7 @@ struct OnboardingIntroView: View {
         VStack(spacing: 8) {
             GeometryReader { geometry in
                 ScrollView(.horizontal) {
-                    LazyHStack(spacing: 0) {
+                    LazyHStack(spacing: contentMargin) {
                         ForEach(Array(featurePages.enumerated()), id: \.offset) { index, page in
                             OnboardingFeatureCard(page: page)
                                 .frame(width: geometry.size.width, height: geometry.size.height, alignment: .top)
@@ -150,9 +152,11 @@ struct OnboardingIntroView: View {
                     .scrollTargetLayout()
                 }
                 .scrollIndicators(.hidden)
-                .scrollTargetBehavior(.paging)
+                .scrollClipDisabled()
+                .scrollTargetBehavior(.viewAligned(limitBehavior: .alwaysByOne))
                 .scrollPosition(id: $selectedPage)
             }
+            .frame(height: 224)
 
             HStack(spacing: 6) {
                 ForEach(featurePages.indices, id: \.self) { index in
@@ -162,12 +166,11 @@ struct OnboardingIntroView: View {
                 }
             }
         }
-        .frame(height: 210)
         .frame(maxWidth: .infinity)
     }
 
     private var quickSetup: some View {
-        VStack(alignment: .leading, spacing: 12) {
+        VStack(alignment: .leading, spacing: 10) {
             Label {
                 Text(L10n.Onboarding.setupTitle)
                     .font(.redditSans(.headline, weight: .semibold))
@@ -175,67 +178,50 @@ struct OnboardingIntroView: View {
                 Image(systemName: "slider.horizontal.3")
                     .foregroundStyle(AppTheme.brand)
             }
+            .padding(.horizontal, 4)
 
-            OnboardingSettingMenuRow(
-                icon: "globe",
-                titleResource: L10n.Onboarding.languageTitle,
-                value: transcriber.selectedLanguage.displayName,
-                tint: AppTheme.info
-            ) {
-                ForEach(onboardingLanguages) { language in
-                    Button {
-                        HapticFeedback.play(.menuSelection)
-                        transcriber.selectedLanguageID = language.id
-                    } label: {
-                        Label(
-                            language.displayName,
-                            systemImage: language.id == transcriber.selectedLanguageID ? "checkmark" : "globe"
-                        )
+            VStack(spacing: 0) {
+                OnboardingSettingMenuRow(
+                    icon: "globe",
+                    titleResource: L10n.Onboarding.languageTitle,
+                    value: transcriber.selectedLanguage.displayName,
+                    tint: AppTheme.info
+                ) {
+                    ForEach(onboardingLanguages) { language in
+                        Button {
+                            HapticFeedback.play(.menuSelection)
+                            transcriber.selectedLanguageID = language.id
+                        } label: {
+                            Label(
+                                language.displayName,
+                                systemImage: language.id == transcriber.selectedLanguageID ? "checkmark" : "globe"
+                            )
+                        }
                     }
                 }
-            }
 
-            VStack(alignment: .leading, spacing: 8) {
-                Label {
-                    Text(L10n.Onboarding.formatTitle)
-                        .font(.redditSans(.subheadline, weight: .semibold))
-                } icon: {
-                    Image(systemName: "waveform.badge.mic")
-                        .foregroundStyle(AppTheme.brand)
-                }
+                quickSetupDivider
 
-                Picker("", selection: audioFormatBinding) {
-                    ForEach(RecordingAudioFormat.allCases) { format in
-                        Text(format.title)
-                            .tag(format)
-                    }
-                }
-                .pickerStyle(.segmented)
-                .labelsHidden()
+                audioFormatSetup
+
+                quickSetupDivider
+
+                whisperDownloadSetup
+
+                quickSetupDivider
+
+                localSummaryDownloadSetup
             }
-            .padding(12)
-            .background(.regularMaterial, in: RoundedRectangle(cornerRadius: AppTheme.cornerRadius, style: .continuous))
+            .background(
+                AppTheme.cardBackground,
+                in: RoundedRectangle(cornerRadius: AppTheme.cornerRadius, style: .continuous)
+            )
             .overlay {
                 RoundedRectangle(cornerRadius: AppTheme.cornerRadius, style: .continuous)
-                    .stroke(AppTheme.subtleBorder, lineWidth: 1)
+                    .strokeBorder(AppTheme.cardBorder, lineWidth: 1)
             }
-
-            whisperDownloadSetup
-
-            localSummaryDownloadSetup
         }
-        .padding(14)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(AppTheme.cardBackground, in: RoundedRectangle(cornerRadius: AppTheme.cornerRadius, style: .continuous))
-        .overlay {
-            RoundedRectangle(cornerRadius: AppTheme.cornerRadius, style: .continuous)
-                .stroke(AppTheme.cardBorder, lineWidth: 1)
-        }
-        .shadow(
-            color: AppTheme.cardShadow,
-            radius: AppTheme.cardShadowRadius,
-            y: AppTheme.cardShadowYOffset
-        )
     }
 
     private var privacyNote: some View {
@@ -277,7 +263,7 @@ struct OnboardingIntroView: View {
             .buttonStyle(.plain)
             .foregroundStyle(.secondary)
         }
-        .padding(.horizontal, 20)
+        .padding(.horizontal, contentMargin)
         .padding(.top, 12)
         .padding(.bottom, 8)
         .background(.regularMaterial)
@@ -296,8 +282,40 @@ struct OnboardingIntroView: View {
         }
     }
 
-    private var whisperDownloadSetup: some View {
+    private var audioFormatSetup: some View {
         VStack(alignment: .leading, spacing: 10) {
+            HStack(spacing: 12) {
+                Image(systemName: "waveform.badge.mic")
+                    .font(.system(size: 17, weight: .semibold))
+                    .foregroundStyle(AppTheme.brand)
+                    .frame(width: 28, height: 28)
+
+                Text(L10n.Onboarding.formatTitle)
+                    .font(.redditSans(.subheadline, weight: .semibold))
+                    .foregroundStyle(.primary)
+            }
+
+            Picker("", selection: audioFormatBinding) {
+                ForEach(RecordingAudioFormat.allCases) { format in
+                    Text(format.title)
+                        .tag(format)
+                }
+            }
+            .pickerStyle(.segmented)
+            .labelsHidden()
+            .padding(.leading, 40)
+        }
+        .padding(.horizontal, 14)
+        .padding(.vertical, 12)
+    }
+
+    private var quickSetupDivider: some View {
+        Divider()
+            .padding(.leading, 54)
+    }
+
+    private var whisperDownloadSetup: some View {
+        VStack(alignment: .leading, spacing: 0) {
             OnboardingSettingMenuRow(
                 icon: localWhisperModelIcon(for: selectedLocalWhisperModel),
                 titleResource: L10n.Onboarding.whisperModelTitle,
@@ -319,50 +337,48 @@ struct OnboardingIntroView: View {
                 }
             }
 
-            HStack(alignment: .top, spacing: 10) {
-                Image(systemName: localWhisperModelStatus.isAvailable ? "checkmark.circle.fill" : "arrow.down.circle")
-                    .font(.system(size: 18, weight: .semibold))
-                    .foregroundStyle(localWhisperModelStatus.isAvailable ? AppTheme.success : AppTheme.info)
-                    .frame(width: 24, height: 24)
+            VStack(alignment: .leading, spacing: 10) {
+                HStack(alignment: .top, spacing: 10) {
+                    Image(systemName: localWhisperModelStatus.isAvailable ? "checkmark.circle.fill" : "arrow.down.circle")
+                        .font(.system(size: 18, weight: .semibold))
+                        .foregroundStyle(localWhisperModelStatus.isAvailable ? AppTheme.success : AppTheme.info)
+                        .frame(width: 24, height: 24)
 
-                VStack(alignment: .leading, spacing: 3) {
-                    Text(localWhisperStatusValue)
-                        .font(.redditSans(.subheadline, weight: .semibold))
-                        .foregroundStyle(.primary)
+                    VStack(alignment: .leading, spacing: 3) {
+                        Text(localWhisperStatusValue)
+                            .font(.redditSans(.subheadline, weight: .semibold))
+                            .foregroundStyle(.primary)
 
-                    Text(localWhisperModelStatus.detailText)
-                        .font(.redditSans(.caption))
-                        .foregroundStyle(.secondary)
-                        .fixedSize(horizontal: false, vertical: true)
+                        Text(localWhisperModelStatus.detailText)
+                            .font(.redditSans(.caption))
+                            .foregroundStyle(.secondary)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+
+                    Spacer(minLength: 8)
                 }
 
-                Spacer(minLength: 8)
-            }
+                if isDownloadingLocalWhisperModel {
+                    ProgressView(value: localWhisperDownloadProgress)
+                        .tint(AppTheme.purple)
+                }
 
-            if isDownloadingLocalWhisperModel {
-                ProgressView(value: localWhisperDownloadProgress)
+                if !localWhisperModelStatus.isAvailable {
+                    Button {
+                        downloadLocalWhisperModel()
+                    } label: {
+                        Label(localWhisperDownloadButtonTitle, systemImage: "arrow.down.circle.fill")
+                            .font(.redditSans(.subheadline, weight: .semibold))
+                            .frame(maxWidth: .infinity)
+                            .frame(height: 42)
+                    }
+                    .buttonStyle(.borderedProminent)
                     .tint(AppTheme.purple)
-            }
-
-            if !localWhisperModelStatus.isAvailable {
-                Button {
-                    downloadLocalWhisperModel()
-                } label: {
-                    Label(localWhisperDownloadButtonTitle, systemImage: "arrow.down.circle.fill")
-                        .font(.redditSans(.subheadline, weight: .semibold))
-                        .frame(maxWidth: .infinity)
-                        .frame(height: 42)
+                    .disabled(isDownloadingLocalWhisperModel)
                 }
-                .buttonStyle(.borderedProminent)
-                .tint(AppTheme.purple)
-                .disabled(isDownloadingLocalWhisperModel)
             }
-        }
-        .padding(12)
-        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: AppTheme.cornerRadius, style: .continuous))
-        .overlay {
-            RoundedRectangle(cornerRadius: AppTheme.cornerRadius, style: .continuous)
-                .stroke(AppTheme.subtleBorder, lineWidth: 1)
+            .padding(.horizontal, 14)
+            .padding(.bottom, 14)
         }
     }
 
@@ -381,7 +397,7 @@ struct OnboardingIntroView: View {
     }
 
     private var localSummaryDownloadSetup: some View {
-        VStack(alignment: .leading, spacing: 10) {
+        VStack(alignment: .leading, spacing: 0) {
             OnboardingSettingMenuRow(
                 icon: "brain.head.profile",
                 titleResource: L10n.LocalSummary.modelTitle,
@@ -403,50 +419,48 @@ struct OnboardingIntroView: View {
                 }
             }
 
-            HStack(alignment: .top, spacing: 10) {
-                Image(systemName: localSummaryModelStatus.isAvailable ? "checkmark.circle.fill" : "arrow.down.circle")
-                    .font(.system(size: 18, weight: .semibold))
-                    .foregroundStyle(localSummaryModelStatus.isAvailable ? AppTheme.success : AppTheme.info)
-                    .frame(width: 24, height: 24)
+            VStack(alignment: .leading, spacing: 10) {
+                HStack(alignment: .top, spacing: 10) {
+                    Image(systemName: localSummaryModelStatus.isAvailable ? "checkmark.circle.fill" : "arrow.down.circle")
+                        .font(.system(size: 18, weight: .semibold))
+                        .foregroundStyle(localSummaryModelStatus.isAvailable ? AppTheme.success : AppTheme.info)
+                        .frame(width: 24, height: 24)
 
-                VStack(alignment: .leading, spacing: 3) {
-                    Text(localSummaryStatusValue)
-                        .font(.redditSans(.subheadline, weight: .semibold))
-                        .foregroundStyle(.primary)
+                    VStack(alignment: .leading, spacing: 3) {
+                        Text(localSummaryStatusValue)
+                            .font(.redditSans(.subheadline, weight: .semibold))
+                            .foregroundStyle(.primary)
 
-                    Text(localSummaryModelStatus.detailText)
-                        .font(.redditSans(.caption))
-                        .foregroundStyle(.secondary)
-                        .fixedSize(horizontal: false, vertical: true)
+                        Text(localSummaryModelStatus.detailText)
+                            .font(.redditSans(.caption))
+                            .foregroundStyle(.secondary)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+
+                    Spacer(minLength: 8)
                 }
 
-                Spacer(minLength: 8)
-            }
+                if isDownloadingLocalSummaryModel {
+                    ProgressView(value: localSummaryDownloadProgress)
+                        .tint(AppTheme.purple)
+                }
 
-            if isDownloadingLocalSummaryModel {
-                ProgressView(value: localSummaryDownloadProgress)
+                if !localSummaryModelStatus.isAvailable {
+                    Button {
+                        downloadLocalSummaryModel()
+                    } label: {
+                        Label(String(localized: L10n.LocalSummary.downloadSelectedModel), systemImage: "arrow.down.circle.fill")
+                            .font(.redditSans(.subheadline, weight: .semibold))
+                            .frame(maxWidth: .infinity)
+                            .frame(height: 42)
+                    }
+                    .buttonStyle(.borderedProminent)
                     .tint(AppTheme.purple)
-            }
-
-            if !localSummaryModelStatus.isAvailable {
-                Button {
-                    downloadLocalSummaryModel()
-                } label: {
-                    Label(String(localized: L10n.LocalSummary.downloadSelectedModel), systemImage: "arrow.down.circle.fill")
-                        .font(.redditSans(.subheadline, weight: .semibold))
-                        .frame(maxWidth: .infinity)
-                        .frame(height: 42)
+                    .disabled(isDownloadingLocalSummaryModel)
                 }
-                .buttonStyle(.borderedProminent)
-                .tint(AppTheme.purple)
-                .disabled(isDownloadingLocalSummaryModel)
             }
-        }
-        .padding(12)
-        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: AppTheme.cornerRadius, style: .continuous))
-        .overlay {
-            RoundedRectangle(cornerRadius: AppTheme.cornerRadius, style: .continuous)
-                .stroke(AppTheme.subtleBorder, lineWidth: 1)
+            .padding(.horizontal, 14)
+            .padding(.bottom, 14)
         }
     }
 
@@ -815,17 +829,15 @@ private struct OnboardingFeatureCard: View {
             Spacer(minLength: 0)
         }
         .padding(16)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(AppTheme.cardBackground, in: RoundedRectangle(cornerRadius: AppTheme.cornerRadius, style: .continuous))
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        .background(
+            AppTheme.cardBackground,
+            in: RoundedRectangle(cornerRadius: AppTheme.cornerRadius, style: .continuous)
+        )
         .overlay {
             RoundedRectangle(cornerRadius: AppTheme.cornerRadius, style: .continuous)
-                .stroke(AppTheme.cardBorder, lineWidth: 1)
+                .strokeBorder(AppTheme.cardBorder, lineWidth: 1)
         }
-        .shadow(
-            color: AppTheme.cardShadow,
-            radius: AppTheme.cardShadowRadius,
-            y: AppTheme.cardShadowYOffset
-        )
     }
 }
 
@@ -876,12 +888,9 @@ private struct OnboardingSettingMenuRow<Content: View>: View {
                     .font(.system(size: 12, weight: .semibold))
                     .foregroundStyle(.tertiary)
             }
-            .padding(12)
-            .background(.regularMaterial, in: RoundedRectangle(cornerRadius: AppTheme.cornerRadius, style: .continuous))
-            .overlay {
-                RoundedRectangle(cornerRadius: AppTheme.cornerRadius, style: .continuous)
-                    .stroke(AppTheme.subtleBorder, lineWidth: 1)
-            }
+            .padding(.horizontal, 14)
+            .padding(.vertical, 11)
+            .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
     }

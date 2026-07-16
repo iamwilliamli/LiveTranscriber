@@ -738,8 +738,6 @@ struct RecordingsView: View {
     @State private var addRecordingsCategoryTarget: RecordingCategoryFolder?
     @State private var isShowingCategoryOrganizer = false
     @State private var isShowingRecordingsMap = false
-    @State private var hidesTabBarForRecordingDetail = false
-    @State private var tabBarRestoreTask: Task<Void, Never>?
     @AppStorage("Recordings.customCategoriesJSON") private var customCategoriesJSON = "[]"
     @AppStorage(RecordingSummaryProvider.selectedDefaultsKey) private var selectedSummaryProviderRawValue = RecordingSummaryProvider.automatic.rawValue
 
@@ -818,7 +816,6 @@ struct RecordingsView: View {
                     navigationDestinationView(for: destination)
                 }
         }
-        .toolbar(hidesTabBarForRecordingDetail ? .hidden : .visible, for: .tabBar)
         .searchable(
             text: $searchText,
             placement: .navigationBarDrawer(displayMode: .always),
@@ -845,9 +842,6 @@ struct RecordingsView: View {
         }
         .onChange(of: pendingOpenRecordingID) { _, _ in
             consumePendingOpenRecordingIDIfNeeded()
-        }
-        .onChange(of: navigationPath) { _, newPath in
-            updateTabBarVisibility(for: newPath)
         }
         .onChange(of: store.recordings) { _, _ in
             consumePendingOpenRecordingIDIfNeeded()
@@ -1517,7 +1511,6 @@ struct RecordingsView: View {
 
     private func openRecording(_ item: RecordingItem) {
         HapticFeedback.play(.navigation)
-        hideTabBarForDetail()
         navigationPath.append(.recording(item.id))
     }
 
@@ -1529,33 +1522,6 @@ struct RecordingsView: View {
 
         pendingOpenRecordingID = nil
         openRecording(item)
-    }
-
-    private func hideTabBarForDetail() {
-        tabBarRestoreTask?.cancel()
-        tabBarRestoreTask = nil
-        guard !hidesTabBarForRecordingDetail else {
-            return
-        }
-
-        withAnimation(.easeInOut(duration: 0.16)) {
-            hidesTabBarForRecordingDetail = true
-        }
-    }
-
-    private func scheduleTabBarRestoreAfterPop() {
-        tabBarRestoreTask?.cancel()
-        tabBarRestoreTask = Task { @MainActor in
-            try? await Task.sleep(for: .milliseconds(180))
-            guard !navigationPath.containsRecordingDetail else {
-                return
-            }
-
-            withAnimation(.easeInOut(duration: 0.24)) {
-                hidesTabBarForRecordingDetail = false
-            }
-            tabBarRestoreTask = nil
-        }
     }
 
     private func retranscribe(_ item: RecordingItem, language: TranscriptionLanguage) {
@@ -1679,14 +1645,6 @@ struct RecordingsView: View {
 
     private func categoryFolder(for id: String) -> RecordingCategoryFolder? {
         categoryFolders.first { $0.id == id }
-    }
-
-    private func updateTabBarVisibility(for path: [RecordingNavigationDestination]) {
-        if path.containsRecordingDetail {
-            hideTabBarForDetail()
-        } else {
-            scheduleTabBarRestoreAfterPop()
-        }
     }
 
     private func beginNewCategory(assigning item: RecordingItem? = nil) {
@@ -3258,6 +3216,7 @@ struct RecordingDetailView: View {
             HapticFeedback.play(.navigation)
         }
         .background(AppTheme.groupedBackground.ignoresSafeArea())
+        .toolbar(.hidden, for: .tabBar)
         .toolbar(.visible, for: .navigationBar)
         .toolbarBackground(.hidden, for: .navigationBar)
         .navigationTitle(currentItem.audioFileName)
@@ -3310,8 +3269,8 @@ struct RecordingDetailView: View {
                 .navigationTitle(localized(L10n.Recordings.audioEvents))
                 .navigationBarTitleDisplayMode(.inline)
                 .toolbar {
-                    ToolbarItem(placement: .topBarLeading) {
-                        if currentItem.audioEventAnalysis != nil {
+                    if currentItem.audioEventAnalysis != nil {
+                        ToolbarItem(placement: .topBarLeading) {
                             Button(localized(L10n.Recordings.analyzeAudioEventsAgain)) {
                                 analyzeCurrentAudioEvents()
                             }
@@ -6260,69 +6219,71 @@ private struct RecordingTimelineScrubber: View {
 
     var body: some View {
         GeometryReader { proxy in
-            let width = max(proxy.size.width, 1)
-            let progress = CGFloat(displayedTime / effectiveDuration)
-            let thumbX = min(max(progress * width, 0), width)
-            let thumbSize: CGFloat = isScrubbing ? 18 : 14
-            let trackCenterY: CGFloat = 29
-            let trackHeight: CGFloat = 6
-            let markerHeight: CGFloat = 16
+            if proxy.size.width > 1, proxy.size.height > 1 {
+                let width = proxy.size.width
+                let progress = CGFloat(displayedTime / effectiveDuration)
+                let thumbX = min(max(progress * width, 0), width)
+                let thumbSize: CGFloat = isScrubbing ? 18 : 14
+                let trackCenterY: CGFloat = 29
+                let trackHeight: CGFloat = 6
+                let markerHeight: CGFloat = 16
 
-            ZStack(alignment: .topLeading) {
-                if isScrubbing, let event = activeAudioEvent(at: displayedTime) {
-                    audioEventCallout(event, thumbX: thumbX, trackWidth: width)
-                        .transition(.opacity.combined(with: .scale(scale: 0.96, anchor: .bottom)))
-                }
-
-                Capsule()
-                    .fill(Color.secondary.opacity(0.18))
-                    .frame(height: trackHeight)
-                    .offset(y: trackCenterY - trackHeight / 2)
-
-                Canvas(opaque: false, rendersAsynchronously: true) { context, _ in
-                    for event in audioEvents {
-                        let rect = markerRect(
-                            for: event,
-                            trackWidth: width,
-                            markerHeight: markerHeight
-                        )
-                        context.fill(
-                            Path(roundedRect: rect, cornerRadius: 3),
-                            with: .color(AppTheme.info.opacity(markerOpacity(for: event)))
-                        )
-                        context.fill(
-                            Path(
-                                roundedRect: CGRect(
-                                    x: rect.minX,
-                                    y: rect.minY,
-                                    width: rect.width,
-                                    height: 1
-                                ),
-                                cornerRadius: 0.5
-                            ),
-                            with: .color(Color.white.opacity(0.26))
-                        )
+                ZStack(alignment: .topLeading) {
+                    if isScrubbing, let event = activeAudioEvent(at: displayedTime) {
+                        audioEventCallout(event, thumbX: thumbX, trackWidth: width)
+                            .transition(.opacity.combined(with: .scale(scale: 0.96, anchor: .bottom)))
                     }
+
+                    Capsule()
+                        .fill(Color.secondary.opacity(0.18))
+                        .frame(height: trackHeight)
+                        .offset(y: trackCenterY - trackHeight / 2)
+
+                    Canvas(opaque: false, rendersAsynchronously: false) { context, _ in
+                        for event in audioEvents {
+                            let rect = markerRect(
+                                for: event,
+                                trackWidth: width,
+                                markerHeight: markerHeight
+                            )
+                            context.fill(
+                                Path(roundedRect: rect, cornerRadius: 3),
+                                with: .color(AppTheme.info.opacity(markerOpacity(for: event)))
+                            )
+                            context.fill(
+                                Path(
+                                    roundedRect: CGRect(
+                                        x: rect.minX,
+                                        y: rect.minY,
+                                        width: rect.width,
+                                        height: 1
+                                    ),
+                                    cornerRadius: 0.5
+                                ),
+                                with: .color(Color.white.opacity(0.26))
+                            )
+                        }
+                    }
+                    .frame(width: width, height: markerHeight)
+                    .offset(y: trackCenterY - markerHeight / 2)
+                    .allowsHitTesting(false)
+
+                    Capsule()
+                        .fill(AppTheme.brand.opacity(isEnabled ? 0.88 : 0.34))
+                        .frame(width: max(thumbX, 0), height: trackHeight)
+                        .offset(y: trackCenterY - trackHeight / 2)
+
+                    Circle()
+                        .fill(isEnabled ? AppTheme.brand : Color.secondary.opacity(0.55))
+                        .frame(width: thumbSize, height: thumbSize)
+                        .shadow(color: AppTheme.brand.opacity(isScrubbing ? 0.24 : 0.14), radius: isScrubbing ? 8 : 4, y: isScrubbing ? 4 : 2)
+                        .offset(x: thumbX - thumbSize / 2, y: trackCenterY - thumbSize / 2)
+                        .animation(.snappy(duration: 0.16, extraBounce: 0), value: isScrubbing)
                 }
-                .frame(width: width, height: markerHeight)
-                .offset(y: trackCenterY - markerHeight / 2)
-                .allowsHitTesting(false)
-
-                Capsule()
-                    .fill(AppTheme.brand.opacity(isEnabled ? 0.88 : 0.34))
-                    .frame(width: max(thumbX, 0), height: trackHeight)
-                    .offset(y: trackCenterY - trackHeight / 2)
-
-                Circle()
-                    .fill(isEnabled ? AppTheme.brand : Color.secondary.opacity(0.55))
-                    .frame(width: thumbSize, height: thumbSize)
-                    .shadow(color: AppTheme.brand.opacity(isScrubbing ? 0.24 : 0.14), radius: isScrubbing ? 8 : 4, y: isScrubbing ? 4 : 2)
-                    .offset(x: thumbX - thumbSize / 2, y: trackCenterY - thumbSize / 2)
-                    .animation(.snappy(duration: 0.16, extraBounce: 0), value: isScrubbing)
+                .frame(width: width, height: 58, alignment: .topLeading)
+                .contentShape(Rectangle())
+                .gesture(timelineGesture(trackWidth: width))
             }
-            .frame(width: width, height: 58, alignment: .topLeading)
-            .contentShape(Rectangle())
-            .gesture(timelineGesture(trackWidth: width))
         }
         .frame(height: 58)
         .opacity(isEnabled ? 1 : 0.55)
@@ -6833,7 +6794,7 @@ final class RecordingPlaybackController: ObservableObject {
     private static let logger = Logger(subsystem: "com.reddownloader.LiveTranscriber", category: "RecordingPlayback")
     static let availablePlaybackRates: [Float] = [0.75, 1, 1.25, 1.5, 2]
 
-    private let audioSessionQueue = DispatchQueue(label: "com.reddownloader.live-transcriber.playback-session", qos: .userInitiated)
+    private let audioSessionOwner = UUID()
     private var audioEngine: AVAudioEngine?
     private var playerNode: AVAudioPlayerNode?
     private var timePitchUnit: AVAudioUnitTimePitch?
@@ -6924,8 +6885,12 @@ final class RecordingPlaybackController: ObservableObject {
         let commandID = playbackCommandID
         Task {
             do {
+                guard commandID == playbackCommandID, isLoaded else {
+                    return
+                }
                 try await configurePlaybackSession()
                 guard commandID == playbackCommandID, isLoaded else {
+                    await deactivatePlaybackSession()
                     return
                 }
 
@@ -7187,32 +7152,11 @@ final class RecordingPlaybackController: ObservableObject {
     }
 
     private func configurePlaybackSession() async throws {
-        try await withCheckedThrowingContinuation { continuation in
-            audioSessionQueue.async {
-                do {
-                    let session = AVAudioSession.sharedInstance()
-                    try session.setCategory(
-                        .playback,
-                        mode: .spokenAudio,
-                        policy: .longFormAudio,
-                        options: []
-                    )
-                    try session.setActive(true, options: .notifyOthersOnDeactivation)
-                    continuation.resume(returning: ())
-                } catch {
-                    continuation.resume(throwing: error)
-                }
-            }
-        }
+        try await AppAudioSessionCoordinator.shared.activatePlayback(owner: audioSessionOwner)
     }
 
     private func deactivatePlaybackSession() async {
-        await withCheckedContinuation { continuation in
-            audioSessionQueue.async {
-                try? AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
-                continuation.resume(returning: ())
-            }
-        }
+        await AppAudioSessionCoordinator.shared.deactivatePlayback(owner: audioSessionOwner)
     }
 
     private func configureRemoteCommands() {

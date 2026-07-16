@@ -437,6 +437,7 @@ struct TranscriptionView: View {
             LiveRecordingWaveTimeline(
                 samples: transcriber.inputLevelHistory,
                 clock: transcriber.elapsedClock,
+                timelineOffset: transcriber.inputLevelTimelineOffset,
                 isActive: transcriber.isRecording && !transcriber.isPaused,
                 primaryColor: recorderDeckPrimaryColor,
                 secondaryColor: recorderDeckSecondaryColor,
@@ -1121,6 +1122,7 @@ private struct LiveRecordingWaveTimeline: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     let samples: [InputLevelHistorySample]
     @ObservedObject var clock: RecordingElapsedClock
+    let timelineOffset: TimeInterval
     let isActive: Bool
     let primaryColor: Color
     let secondaryColor: Color
@@ -1129,20 +1131,24 @@ private struct LiveRecordingWaveTimeline: View {
     private let visibleDuration: TimeInterval = 12
     private let majorTickInterval: TimeInterval = 2
     private let minorTickInterval: TimeInterval = 0.5
-    private let sampleInterval: TimeInterval = 1.0 / 6.0
     private let rulerHeight: CGFloat = 36
-    private let playheadFraction: CGFloat = 0.5
+    private let liveEdgeInset: CGFloat = 24
 
     var body: some View {
         TimelineView(.animation(minimumInterval: 1.0 / 30.0, paused: !isActive || reduceMotion)) { context in
             GeometryReader { proxy in
                 let size = proxy.size
                 let elapsed = displayedElapsed(at: context.date)
-                let phase = samplePhase(at: context.date)
-                let edgeFraction = min(32 / max(size.width, 1), 0.2)
+                let leftEdgeFraction = min(32 / max(size.width, 1), 0.2)
+                let rightEdgeFraction = min(8 / max(size.width, 1), 0.06)
 
-                timelineContent(size: size, elapsed: elapsed, phase: phase)
-                    .mask(timelineEdgeFadeMask(edgeFraction: edgeFraction))
+                timelineContent(size: size, elapsed: elapsed)
+                    .mask(
+                        timelineEdgeFadeMask(
+                            leftEdgeFraction: leftEdgeFraction,
+                            rightEdgeFraction: rightEdgeFraction
+                        )
+                    )
                     .clipped()
             }
         }
@@ -1151,13 +1157,15 @@ private struct LiveRecordingWaveTimeline: View {
 
     private func timelineContent(
         size: CGSize,
-        elapsed: TimeInterval,
-        phase: CGFloat
+        elapsed: TimeInterval
     ) -> some View {
         let waveformHeight = max(size.height - rulerHeight - 8, 40)
 
         return ZStack(alignment: .topLeading) {
-            waveformSurface(size: CGSize(width: size.width, height: waveformHeight), phase: phase)
+            waveformSurface(
+                size: CGSize(width: size.width, height: waveformHeight),
+                elapsed: elapsed
+            )
                 .frame(width: size.width, height: waveformHeight)
                 .clipped()
 
@@ -1172,12 +1180,15 @@ private struct LiveRecordingWaveTimeline: View {
         .frame(width: size.width, height: size.height, alignment: .topLeading)
     }
 
-    private func timelineEdgeFadeMask(edgeFraction: CGFloat) -> some View {
+    private func timelineEdgeFadeMask(
+        leftEdgeFraction: CGFloat,
+        rightEdgeFraction: CGFloat
+    ) -> some View {
         LinearGradient(
             stops: [
                 .init(color: .clear, location: 0),
-                .init(color: .black, location: edgeFraction),
-                .init(color: .black, location: 1 - edgeFraction),
+                .init(color: .black, location: leftEdgeFraction),
+                .init(color: .black, location: 1 - rightEdgeFraction),
                 .init(color: .clear, location: 1)
             ],
             startPoint: .leading,
@@ -1186,7 +1197,7 @@ private struct LiveRecordingWaveTimeline: View {
     }
 
     @ViewBuilder
-    private func waveformSurface(size: CGSize, phase: CGFloat) -> some View {
+    private func waveformSurface(size: CGSize, elapsed: TimeInterval) -> some View {
         ZStack {
             Rectangle()
                 .fill(secondaryColor.opacity(hasAudibleSignal ? 0.08 : 0.16))
@@ -1194,32 +1205,29 @@ private struct LiveRecordingWaveTimeline: View {
                 .position(x: size.width / 2, y: size.height / 2)
                 .animation(.easeOut(duration: 0.16), value: hasAudibleSignal)
 
-            waveform(size: size, phase: phase)
+            waveform(size: size, elapsed: elapsed)
         }
     }
 
-    private func waveform(size: CGSize, phase: CGFloat) -> some View {
-        let baseSamples = normalizedSamples
-        let visibleBarCount = max(baseSamples.count, 1)
-        let pitch = size.width / CGFloat(visibleBarCount)
+    private func waveform(size: CGSize, elapsed: TimeInterval) -> some View {
+        let pitch = size.width / CGFloat(max(normalizedSamples.count, 1))
         let barWidth = max(1.5, min(2.5, pitch * 0.48))
-        let spacing = max(pitch - barWidth, 0)
-        let latestSampleX = barWidth / 2 + CGFloat(visibleBarCount - 1) * pitch
-        let playheadX = size.width * playheadFraction
-        let waveformOffset = playheadX - latestSampleX - phase * pitch
+        let playheadX = max(size.width - liveEdgeInset, 0)
 
-        return HStack(alignment: .center, spacing: spacing) {
-            ForEach(baseSamples) { sample in
+        return ZStack(alignment: .topLeading) {
+            ForEach(normalizedSamples) { sample in
                 let displayLevel = amplifiedLevel(for: sample.level)
+                let age = max(elapsed - sample.elapsedTime, 0)
+                let x = playheadX - CGFloat(age / visibleDuration) * size.width
+
                 Capsule()
                     .fill(primaryColor.opacity(0.88))
                     .frame(width: barWidth, height: barHeight(for: displayLevel, maxHeight: size.height))
-                    .frame(height: size.height, alignment: .center)
+                    .position(x: x, y: size.height / 2)
                     .opacity(sample.isCaptured ? 1 : 0)
             }
         }
         .frame(width: size.width, height: size.height, alignment: .leading)
-        .offset(x: waveformOffset)
         .transaction { transaction in
             transaction.animation = nil
             transaction.disablesAnimations = true
@@ -1228,6 +1236,8 @@ private struct LiveRecordingWaveTimeline: View {
 
     private func timelineTicks(width: CGFloat, elapsed: TimeInterval) -> some View {
         let currentTime = max(elapsed, 0)
+        let playheadX = max(width - liveEdgeInset, 0)
+        let playheadFraction = playheadX / max(width, 1)
         let startTime = currentTime - visibleDuration * TimeInterval(playheadFraction)
         let firstTickIndex = Int(floor(startTime / minorTickInterval))
         let tickCount = Int(ceil(visibleDuration / minorTickInterval)) + 2
@@ -1318,21 +1328,13 @@ private struct LiveRecordingWaveTimeline: View {
     }
 
     private func displayedElapsed(at date: Date) -> TimeInterval {
+        let rawElapsed: TimeInterval
         guard !reduceMotion else {
-            return TimeInterval(clock.elapsedSeconds)
+            rawElapsed = TimeInterval(clock.elapsedSeconds)
+            return max(rawElapsed - timelineOffset, 0)
         }
-        return clock.timelineAnchor.elapsed(at: date)
-    }
-
-    private func samplePhase(at date: Date) -> CGFloat {
-        guard !reduceMotion,
-              let latestSample = samples.last(where: { $0.isCaptured }) else {
-            return 0
-        }
-
-        let currentElapsed = clock.timelineAnchor.elapsed(at: date)
-        let phase = (currentElapsed - latestSample.elapsedTime) / sampleInterval
-        return CGFloat(min(max(phase, 0), 1))
+        rawElapsed = clock.timelineAnchor.elapsed(at: date)
+        return max(rawElapsed - timelineOffset, 0)
     }
 }
 

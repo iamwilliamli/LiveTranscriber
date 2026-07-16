@@ -7,6 +7,107 @@ import Speech
 
 private let liveTranscriptionLogger = Logger(subsystem: "com.reddownloader.LiveTranscriber", category: "LiveTranscription")
 
+actor AppAudioSessionCoordinator {
+    static let shared = AppAudioSessionCoordinator()
+
+    private var recordingOwner: UUID?
+    private var playbackOwner: UUID?
+
+    func activateRecording(owner: UUID) throws {
+        let recordingMode = RecordingAudioSessionMode.defaultMode
+        let session = AVAudioSession.sharedInstance()
+        try session.setCategory(
+            .playAndRecord,
+            mode: recordingMode.audioSessionMode,
+            options: recordingMode.audioSessionOptions
+        )
+
+        if let preferredInputChannelCount = recordingMode.preferredInputChannelCount {
+            do {
+                try session.setPreferredInputNumberOfChannels(preferredInputChannelCount)
+            } catch {
+                liveTranscriptionLogger.debug(
+                    "Preferred input channel count unavailable before activation: \(error.localizedDescription, privacy: .public)"
+                )
+            }
+        }
+
+        try session.setActive(true, options: .notifyOthersOnDeactivation)
+
+        if let preferredInputChannelCount = recordingMode.preferredInputChannelCount,
+           session.inputNumberOfChannels < preferredInputChannelCount {
+            do {
+                try session.setPreferredInputNumberOfChannels(preferredInputChannelCount)
+            } catch {
+                liveTranscriptionLogger.debug(
+                    "Preferred input channel count unavailable after activation: \(error.localizedDescription, privacy: .public)"
+                )
+            }
+        }
+
+        recordingOwner = owner
+        playbackOwner = nil
+
+        let route = session.currentRoute.inputs
+            .map { "\($0.portName) [\($0.portType.rawValue)]" }
+            .joined(separator: ", ")
+        liveTranscriptionLogger.debug(
+            "Recording audio session active route=\(route, privacy: .public) inputChannels=\(session.inputNumberOfChannels, privacy: .public) sampleRate=\(session.sampleRate, privacy: .public)"
+        )
+    }
+
+    func deactivateRecording(owner: UUID) {
+        guard recordingOwner == owner else {
+            return
+        }
+
+        recordingOwner = nil
+        guard playbackOwner == nil else {
+            return
+        }
+        try? AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
+    }
+
+    func activatePlayback(owner: UUID) throws {
+        guard recordingOwner == nil else {
+            throw AppAudioSessionError.recordingInProgress
+        }
+
+        let session = AVAudioSession.sharedInstance()
+        try session.setCategory(
+            .playback,
+            mode: .spokenAudio,
+            policy: .longFormAudio,
+            options: []
+        )
+        try session.setActive(true, options: .notifyOthersOnDeactivation)
+        playbackOwner = owner
+    }
+
+    func deactivatePlayback(owner: UUID) {
+        guard playbackOwner == owner else {
+            return
+        }
+
+        playbackOwner = nil
+        guard recordingOwner == nil else {
+            return
+        }
+        try? AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
+    }
+}
+
+private enum AppAudioSessionError: LocalizedError {
+    case recordingInProgress
+
+    var errorDescription: String? {
+        switch self {
+        case .recordingInProgress:
+            return "Recording is currently using the audio session."
+        }
+    }
+}
+
 struct InputLevelHistorySample: Identifiable, Equatable, Sendable {
     let id: Int
     let level: Float
@@ -159,6 +260,7 @@ final class LiveTranscriptionManager: ObservableObject {
     @Published private(set) var inputLevelHistory: [InputLevelHistorySample] = (0..<72).map {
         InputLevelHistorySample(id: $0, level: 0, isCaptured: false, elapsedTime: 0)
     }
+    @Published private(set) var inputLevelTimelineOffset: TimeInterval = 0
     @Published private(set) var supportedLanguages: [TranscriptionLanguage] = TranscriptionLanguage.fallbackOptions
     @Published private(set) var speechPipelineRuntimeFormatText = String(localized: L10n.SpeechText.runtimeInputWaitingRecording)
     @Published var selectedAudioFormat: RecordingAudioFormat {
@@ -221,7 +323,7 @@ final class LiveTranscriptionManager: ObservableObject {
         #endif
     }
 
-    private let audioSessionQueue = DispatchQueue(label: "com.reddownloader.live-transcription.audio-session", qos: .userInitiated)
+    private let audioSessionOwner = UUID()
     private var analyzer: SpeechAnalyzer?
     private var speechTranscriber: SpeechTranscriber?
     private var analyzerPipeline: AnalyzerInputPipeline?
@@ -238,14 +340,18 @@ final class LiveTranscriptionManager: ObservableObject {
     private var currentRecordingFormat: AVAudioFormat?
     private var smoothedInputLevel: Float = 0
     private var lastInputLevelHistorySampleAt: TimeInterval = 0
+    private var inputLevelTimelineOrigin: TimeInterval?
     private var nextInputLevelHistorySampleID = 72
     private var finalizedLines: [TranscriptionLine] = []
     private var interimLine: TranscriptionLine?
     private var manuallyEditedFinalLineIDs = Set<TranscriptionLine.ID>()
     private var lastLiveActivitySnapshot: LiveActivitySnapshot?
+    private var pendingLiveActivitySnapshot: LiveActivitySnapshot?
+    private var liveActivityUpdateTask: Task<Void, Never>?
     private var lastSpeechPipelineRuntimeFormat: SpeechPipelineRuntimeFormat?
 
     private static let liveActivityTextCharacterLimit = 700
+    private static let liveActivityUpdateDelay = Duration.milliseconds(300)
 
     var selectedLanguage: TranscriptionLanguage {
         supportedLanguages.first { $0.id == selectedLanguageID } ?? TranscriptionLanguage(id: selectedLanguageID)
@@ -664,7 +770,18 @@ final class LiveTranscriptionManager: ObservableObject {
 
         let pendingCapturePipeline = captureRecordingPipeline
         captureRecordingPipeline = nil
-        await pendingCapturePipeline?.stop()
+        let captureFinishSummary: CaptureSessionRecordingPipeline.FinishSummary?
+        if let pendingCapturePipeline {
+            captureFinishSummary = await pendingCapturePipeline.finish()
+        } else {
+            captureFinishSummary = audioWriter.map {
+                let writerSummary = $0.finish()
+                return CaptureSessionRecordingPipeline.FinishSummary(
+                    writtenFrameCount: writerSummary.writtenFrameCount,
+                    maximumInputLevel: 0
+                )
+            }
+        }
 
         let pendingLocalWhisperPipeline = localWhisperPipeline
         localWhisperPipeline = nil
@@ -703,6 +820,7 @@ final class LiveTranscriptionManager: ObservableObject {
             : String(localized: L10n.RecordingStatus.stopped)
         await deactivateAudioSession()
 
+        cancelScheduledLiveActivityUpdate()
         if endingLiveActivity {
             await TranscriptionLiveActivityCoordinator.end(
                 status: statusText,
@@ -712,9 +830,21 @@ final class LiveTranscriptionManager: ObservableObject {
                 lineCount: transcriptLines.count
             )
         }
+        resetLiveActivityUpdateTracking()
 
         guard let recordingURL else {
             return nil
+        }
+
+        if let captureFinishSummary {
+            liveTranscriptionLogger.debug(
+                "Recording finalized frames=\(captureFinishSummary.writtenFrameCount, privacy: .public) maximumInputLevel=\(captureFinishSummary.maximumInputLevel, privacy: .public)"
+            )
+            guard captureFinishSummary.writtenFrameCount > 0 else {
+                try? FileManager.default.removeItem(at: recordingURL)
+                fail(with: String(localized: L10n.SpeechText.cannotReadMicrophone))
+                return nil
+            }
         }
 
         return RecordingDraft(
@@ -764,9 +894,7 @@ final class LiveTranscriptionManager: ObservableObject {
         }
 
         finalTranscriptStore.publish(finalizedLines, incrementsRevision: true)
-        Task {
-            await updateLiveActivityFromCurrentState()
-        }
+        scheduleLiveActivityUpdate()
     }
 
     private func prepareSpeechPipeline(
@@ -868,6 +996,8 @@ final class LiveTranscriptionManager: ObservableObject {
             }
             nextInputLevelHistorySampleID += Self.inputLevelHistoryCount
             lastInputLevelHistorySampleAt = 0
+            inputLevelTimelineOrigin = nil
+            inputLevelTimelineOffset = 0
         }
     }
 
@@ -879,13 +1009,19 @@ final class LiveTranscriptionManager: ObservableObject {
         }
 
         lastInputLevelHistorySampleAt = referenceTime
+        let rawElapsedTime = recordingElapsedTime(at: now)
+        if inputLevelTimelineOrigin == nil {
+            inputLevelTimelineOrigin = rawElapsedTime
+            inputLevelTimelineOffset = rawElapsedTime
+        }
+        let elapsedTime = max(rawElapsedTime - (inputLevelTimelineOrigin ?? 0), 0)
         var updatedHistory = inputLevelHistory
         updatedHistory.append(
             InputLevelHistorySample(
                 id: nextInputLevelHistorySampleID,
                 level: level,
                 isCaptured: true,
-                elapsedTime: recordingElapsedTime(at: now)
+                elapsedTime: elapsedTime
             )
         )
         nextInputLevelHistorySampleID += 1
@@ -1117,50 +1253,11 @@ final class LiveTranscriptionManager: ObservableObject {
     }
 
     private func configureAudioSession() async throws {
-        let recordingMode = RecordingAudioSessionMode.defaultMode
-        let audioSessionMode = recordingMode.audioSessionMode
-        let audioSessionOptions = recordingMode.audioSessionOptions
-        let preferredInputChannelCount = recordingMode.preferredInputChannelCount
-        try await withCheckedThrowingContinuation { continuation in
-            audioSessionQueue.async {
-                do {
-                    let session = AVAudioSession.sharedInstance()
-                    try session.setCategory(
-                        .playAndRecord,
-                        mode: audioSessionMode,
-                        options: audioSessionOptions
-                    )
-                    if let preferredInputChannelCount {
-                        do {
-                            try session.setPreferredInputNumberOfChannels(preferredInputChannelCount)
-                        } catch {
-                            liveTranscriptionLogger.debug("Preferred input channel count unavailable before activation: \(error.localizedDescription, privacy: .public)")
-                        }
-                    }
-                    try session.setActive(true, options: .notifyOthersOnDeactivation)
-                    if let preferredInputChannelCount,
-                       session.inputNumberOfChannels < preferredInputChannelCount {
-                        do {
-                            try session.setPreferredInputNumberOfChannels(preferredInputChannelCount)
-                        } catch {
-                            liveTranscriptionLogger.debug("Preferred input channel count unavailable after activation: \(error.localizedDescription, privacy: .public)")
-                        }
-                    }
-                    continuation.resume(returning: ())
-                } catch {
-                    continuation.resume(throwing: error)
-                }
-            }
-        }
+        try await AppAudioSessionCoordinator.shared.activateRecording(owner: audioSessionOwner)
     }
 
     private func deactivateAudioSession() async {
-        await withCheckedContinuation { continuation in
-            audioSessionQueue.async {
-                try? AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
-                continuation.resume(returning: ())
-            }
-        }
+        await AppAudioSessionCoordinator.shared.deactivateRecording(owner: audioSessionOwner)
     }
 
     private func handleSpeechTranscriptionResult(_ result: SpeechTranscriber.Result) {
@@ -1235,9 +1332,7 @@ final class LiveTranscriptionManager: ObservableObject {
         }
 
         if isFinal {
-            Task {
-                await self.updateLiveActivityFromCurrentState(isRecording: self.isRecording && !self.isPaused)
-            }
+            scheduleLiveActivityUpdate(isRecording: isRecording && !isPaused)
         }
     }
 
@@ -1371,25 +1466,61 @@ final class LiveTranscriptionManager: ObservableObject {
         transcriptLines.liveActivityDisplayText(maxCharacters: Self.liveActivityTextCharacterLimit)
     }
 
-    private func updateLiveActivityFromCurrentState() async {
-        await updateLiveActivityFromCurrentState(isRecording: isRecording && !isPaused)
-    }
-
     private func updateLiveActivityFromCurrentState(isRecording liveActivityIsRecording: Bool) async {
-        let snapshot = LiveActivitySnapshot(
-            status: statusText,
-            languageName: selectedLanguage.displayName,
-            latestText: liveActivityTranscriptText,
-            elapsedSeconds: elapsedSeconds,
-            lineCount: transcriptLines.count,
-            isRecording: liveActivityIsRecording
-        )
+        cancelScheduledLiveActivityUpdate()
+        let snapshot = makeLiveActivitySnapshot(isRecording: liveActivityIsRecording)
 
         guard snapshot != lastLiveActivitySnapshot else {
             return
         }
 
         lastLiveActivitySnapshot = snapshot
+        await publishLiveActivitySnapshot(snapshot)
+    }
+
+    private func scheduleLiveActivityUpdate(isRecording liveActivityIsRecording: Bool? = nil) {
+        let snapshot = makeLiveActivitySnapshot(
+            isRecording: liveActivityIsRecording ?? (isRecording && !isPaused)
+        )
+        guard snapshot != lastLiveActivitySnapshot,
+              snapshot != pendingLiveActivitySnapshot else {
+            return
+        }
+
+        pendingLiveActivitySnapshot = snapshot
+        liveActivityUpdateTask?.cancel()
+        liveActivityUpdateTask = Task { @MainActor [weak self] in
+            do {
+                try await Task.sleep(for: Self.liveActivityUpdateDelay)
+            } catch {
+                return
+            }
+
+            guard !Task.isCancelled,
+                  let self,
+                  let snapshot = self.pendingLiveActivitySnapshot else {
+                return
+            }
+
+            self.pendingLiveActivitySnapshot = nil
+            self.lastLiveActivitySnapshot = snapshot
+            await self.publishLiveActivitySnapshot(snapshot)
+            self.liveActivityUpdateTask = nil
+        }
+    }
+
+    private func makeLiveActivitySnapshot(isRecording: Bool) -> LiveActivitySnapshot {
+        LiveActivitySnapshot(
+            status: statusText,
+            languageName: selectedLanguage.displayName,
+            latestText: liveActivityTranscriptText,
+            elapsedSeconds: elapsedSeconds,
+            lineCount: transcriptLines.count,
+            isRecording: isRecording
+        )
+    }
+
+    private func publishLiveActivitySnapshot(_ snapshot: LiveActivitySnapshot) async {
         await TranscriptionLiveActivityCoordinator.update(
             status: snapshot.status,
             languageName: snapshot.languageName,
@@ -1400,7 +1531,14 @@ final class LiveTranscriptionManager: ObservableObject {
         )
     }
 
+    private func cancelScheduledLiveActivityUpdate() {
+        liveActivityUpdateTask?.cancel()
+        liveActivityUpdateTask = nil
+        pendingLiveActivitySnapshot = nil
+    }
+
     private func resetLiveActivityUpdateTracking() {
+        cancelScheduledLiveActivityUpdate()
         lastLiveActivitySnapshot = nil
     }
 
@@ -1863,6 +2001,11 @@ private final class AnalyzerInputPipeline: @unchecked Sendable {
 }
 
 private final class CaptureSessionRecordingPipeline: NSObject, AVCaptureAudioDataOutputSampleBufferDelegate, @unchecked Sendable {
+    struct FinishSummary: Sendable {
+        let writtenFrameCount: AVAudioFramePosition
+        let maximumInputLevel: Float
+    }
+
     private let session = AVCaptureSession()
     private let output = AVCaptureAudioDataOutput()
     private let sessionQueue = DispatchQueue(label: "com.reddownloader.live-transcription.capture-session", qos: .userInitiated)
@@ -1880,8 +2023,9 @@ private final class CaptureSessionRecordingPipeline: NSObject, AVCaptureAudioDat
     private var deviceName = ""
     private var isConfigured = false
     private var didReportFirstFormat = false
-    private var didReportConversionFailure = false
+    private var reportedFailureStages = Set<String>()
     private var lastInputLevelReportTime: UInt64 = 0
+    private var maximumInputLevel: Float = 0
 
     init(
         recordingFormat: AVAudioFormat,
@@ -1933,6 +2077,35 @@ private final class CaptureSessionRecordingPipeline: NSObject, AVCaptureAudioDat
                 continuation.resume(returning: ())
             }
         }
+
+        await withCheckedContinuation { continuation in
+            sampleQueue.async {
+                continuation.resume(returning: ())
+            }
+        }
+    }
+
+    func finish() async -> FinishSummary {
+        await stop()
+
+        await withCheckedContinuation { continuation in
+            sessionQueue.async {
+                self.output.setSampleBufferDelegate(nil, queue: nil)
+                continuation.resume(returning: ())
+            }
+        }
+
+        await withCheckedContinuation { continuation in
+            sampleQueue.async {
+                continuation.resume(returning: ())
+            }
+        }
+
+        let writerSummary = writer.finish()
+        return FinishSummary(
+            writtenFrameCount: writerSummary.writtenFrameCount,
+            maximumInputLevel: maximumInputLevel
+        )
     }
 
     private func configureIfNeeded() throws {
@@ -1945,7 +2118,8 @@ private final class CaptureSessionRecordingPipeline: NSObject, AVCaptureAudioDat
         }
 
         let captureInput = try AVCaptureDeviceInput(device: device)
-        if captureInput.isMultichannelAudioModeSupported(.stereo) {
+        if recordingFormat.channelCount >= 2,
+           captureInput.isMultichannelAudioModeSupported(.stereo) {
             captureInput.multichannelAudioMode = .stereo
         }
 
@@ -1970,7 +2144,7 @@ private final class CaptureSessionRecordingPipeline: NSObject, AVCaptureAudioDat
         deviceName = device.localizedName
         isConfigured = true
         liveTranscriptionLogger.debug(
-            "AVCapture Stereo configured device=\(device.localizedName, privacy: .public) file=\(liveAudioFormatSummary(self.recordingFormat), privacy: .public) analyzer=\(liveAudioFormatSummary(self.analyzerSourceFormat), privacy: .public)"
+            "AVCapture configured device=\(device.localizedName, privacy: .public) multichannelMode=\(String(describing: captureInput.multichannelAudioMode), privacy: .public) file=\(liveAudioFormatSummary(self.recordingFormat), privacy: .public) analyzer=\(liveAudioFormatSummary(self.analyzerSourceFormat), privacy: .public)"
         )
     }
 
@@ -1983,21 +2157,33 @@ private final class CaptureSessionRecordingPipeline: NSObject, AVCaptureAudioDat
             return
         }
 
+        let sourceBuffer: AVAudioPCMBuffer
         do {
-            let sourceBuffer = try CaptureSampleBufferAudioConverter.makePCMBuffer(from: sampleBuffer)
+            sourceBuffer = try CaptureSampleBufferAudioConverter.makePCMBuffer(from: sampleBuffer)
+        } catch {
+            reportFailureIfNeeded(stage: "source buffer", error: error)
+            return
+        }
+
+        do {
             let recordingBuffer = try recordingConverter.convert(sourceBuffer)
-            let analyzerBuffer = try analyzerConverter.convert(sourceBuffer)
             reportInputLevelIfNeeded(recordingBuffer)
             reportFirstFormatIfNeeded(
                 sourceFormat: sourceBuffer.format,
                 recordingFormat: recordingBuffer.format,
-                analyzerSourceFormat: analyzerBuffer.format
+                analyzerSourceFormat: analyzerSourceFormat
             )
-            writer.write(recordingBuffer)
+            try writer.write(recordingBuffer)
+        } catch {
+            reportFailureIfNeeded(stage: "recording write", error: error)
+        }
+
+        do {
+            let analyzerBuffer = try analyzerConverter.convert(sourceBuffer)
             analyzerPipeline?.process(analyzerBuffer, audioTime: Self.audioTime(for: sampleBuffer, format: analyzerBuffer.format))
             localWhisperPipeline?.process(analyzerBuffer)
         } catch {
-            reportConversionFailureIfNeeded(error)
+            reportFailureIfNeeded(stage: "analyzer conversion", error: error)
         }
     }
 
@@ -2012,7 +2198,9 @@ private final class CaptureSessionRecordingPipeline: NSObject, AVCaptureAudioDat
         }
 
         lastInputLevelReportTime = now
-        inputLevelObserver(Self.normalizedInputLevel(for: buffer))
+        let level = Self.normalizedInputLevel(for: buffer)
+        maximumInputLevel = max(maximumInputLevel, level)
+        inputLevelObserver(level)
     }
 
     private static func normalizedInputLevel(for buffer: AVAudioPCMBuffer) -> Float {
@@ -2106,17 +2294,18 @@ private final class CaptureSessionRecordingPipeline: NSObject, AVCaptureAudioDat
         didReportFirstFormat = true
         let name = deviceName.isEmpty ? String(localized: L10n.Common.unknown) : deviceName
         liveTranscriptionLogger.debug(
-            "AVCapture Stereo first buffer device=\(name, privacy: .public) source=\(liveAudioFormatSummary(sourceFormat), privacy: .public) file=\(liveAudioFormatSummary(recordingFormat), privacy: .public) analyzer=\(liveAudioFormatSummary(analyzerSourceFormat), privacy: .public)"
+            "AVCapture first buffer device=\(name, privacy: .public) source=\(liveAudioFormatSummary(sourceFormat), privacy: .public) file=\(liveAudioFormatSummary(recordingFormat), privacy: .public) analyzer=\(liveAudioFormatSummary(analyzerSourceFormat), privacy: .public)"
         )
     }
 
-    private func reportConversionFailureIfNeeded(_ error: Error) {
-        guard !didReportConversionFailure else {
+    private func reportFailureIfNeeded(stage: String, error: Error) {
+        guard reportedFailureStages.insert(stage).inserted else {
             return
         }
 
-        didReportConversionFailure = true
-        liveTranscriptionLogger.error("AVCapture audio conversion failed: \(error.localizedDescription, privacy: .public)")
+        liveTranscriptionLogger.error(
+            "AVCapture \(stage, privacy: .public) failed: \(error.localizedDescription, privacy: .public)"
+        )
     }
 
     private static func audioTime(for sampleBuffer: CMSampleBuffer, format: AVAudioFormat) -> AVAudioTime {
@@ -2473,8 +2662,13 @@ private final class LiveLocalWhisperPipeline: @unchecked Sendable {
 }
 
 private final class AudioFileWriter: @unchecked Sendable {
-    private let file: AVAudioFile
+    struct FinishSummary: Sendable {
+        let writtenFrameCount: AVAudioFramePosition
+    }
+
+    private var file: AVAudioFile?
     private let lock = NSLock()
+    private var writtenFrameCount: AVAudioFramePosition = 0
 
     init(url: URL, inputFormat: AVAudioFormat, outputFormat: RecordingAudioFormat) throws {
         file = try AVAudioFile(
@@ -2485,10 +2679,21 @@ private final class AudioFileWriter: @unchecked Sendable {
         )
     }
 
-    func write(_ buffer: AVAudioPCMBuffer) {
+    func write(_ buffer: AVAudioPCMBuffer) throws {
         lock.lock()
         defer { lock.unlock() }
-        try? file.write(from: buffer)
+        guard let file else {
+            throw LiveTranscriptionError.invalidAudioInput
+        }
+        try file.write(from: buffer)
+        writtenFrameCount += AVAudioFramePosition(buffer.frameLength)
+    }
+
+    func finish() -> FinishSummary {
+        lock.lock()
+        defer { lock.unlock() }
+        file = nil
+        return FinishSummary(writtenFrameCount: writtenFrameCount)
     }
 
     static func settings(
