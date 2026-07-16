@@ -165,10 +165,10 @@ struct ReadRecordingSummaryIntent: AppIntent {
         comment: "Siri intent title for reading a recording summary."
     )
     static let description = IntentDescription(LocalizedStringResource(
-        "siri.read_summary.description",
+        "app_intents.read_recording_summary.description",
         defaultValue: "Reads the saved summary for a recording.",
         table: "Semantic",
-        comment: "Siri intent description for reading a recording summary."
+        comment: "App Intent description for reading a recording summary."
     ))
 
     @Parameter(title: LocalizedStringResource(
@@ -197,10 +197,10 @@ struct ReadRecordingTranscriptIntent: AppIntent {
         comment: "Siri intent title for reading a recording transcript."
     )
     static let description = IntentDescription(LocalizedStringResource(
-        "siri.read_transcript.description",
+        "app_intents.read_recording_transcript.description",
         defaultValue: "Reads the transcript for a recording.",
         table: "Semantic",
-        comment: "Siri intent description for reading a recording transcript."
+        comment: "App Intent description for reading a recording transcript."
     ))
 
     @Parameter(title: LocalizedStringResource(
@@ -229,10 +229,10 @@ struct SearchRecordingsIntent: AppIntent {
         comment: "Siri intent title for searching recordings."
     )
     static let description = IntentDescription(LocalizedStringResource(
-        "siri.search.description",
+        "app_intents.search_recordings.description",
         defaultValue: "Searches recording titles, summaries, tags, and transcripts.",
         table: "Semantic",
-        comment: "Siri intent description for searching recordings."
+        comment: "App Intent description for searching recordings."
     ))
 
     @Parameter(title: LocalizedStringResource(
@@ -272,10 +272,10 @@ struct OpenRecordingIntent: OpenIntent, URLRepresentableIntent {
         comment: "Siri intent title for opening a recording."
     )
     static let description = IntentDescription(LocalizedStringResource(
-        "siri.open.description",
+        "app_intents.open_recording.description",
         defaultValue: "Opens a recording in Live Transcriber.",
         table: "Semantic",
-        comment: "Siri intent description for opening a recording."
+        comment: "App Intent description for opening a recording."
     ))
 
     @Parameter(title: LocalizedStringResource(

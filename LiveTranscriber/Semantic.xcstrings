@@ -24786,8 +24786,8 @@
         }
       }
     },
-    "siri.open.description": {
-      "comment": "Siri intent description for opening a recording.",
+    "app_intents.open_recording.description": {
+      "comment": "App Intent description for opening a recording.",
       "localizations": {
         "de": {
           "stringUnit": {
@@ -24868,8 +24868,8 @@
         }
       }
     },
-    "siri.read_summary.description": {
-      "comment": "Siri intent description for reading a recording summary.",
+    "app_intents.read_recording_summary.description": {
+      "comment": "App Intent description for reading a recording summary.",
       "localizations": {
         "de": {
           "stringUnit": {
@@ -24991,8 +24991,8 @@
         }
       }
     },
-    "siri.read_transcript.description": {
-      "comment": "Siri intent description for reading a recording transcript.",
+    "app_intents.read_recording_transcript.description": {
+      "comment": "App Intent description for reading a recording transcript.",
       "localizations": {
         "de": {
           "stringUnit": {
@@ -25155,8 +25155,8 @@
         }
       }
     },
-    "siri.search.description": {
-      "comment": "Siri intent description for searching recordings.",
+    "app_intents.search_recordings.description": {
+      "comment": "App Intent description for searching recordings.",
       "localizations": {
         "de": {
           "stringUnit": {
