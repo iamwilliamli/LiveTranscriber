@@ -19,6 +19,7 @@ struct SettingsView: View {
     @ObservedObject var transcriber: LiveTranscriptionManager
     @ObservedObject var recordingStore: RecordingStore
     @State private var navigationPath: [SettingsRoute] = []
+    @State private var interactiveNavigationPopHasPlayedHaptic = false
     @State private var iCloudSyncRefreshTick = 0
     @State private var pendingSpeechLocaleReleaseRequest: SpeechLocaleReleaseRequest?
     @State private var speechLocaleErrorMessage: String?
@@ -200,6 +201,15 @@ struct SettingsView: View {
                 .padding()
             }
             .background(AppTheme.groupedBackground.ignoresSafeArea())
+            .onInteractiveNavigationPopGesture(
+                onBegan: {
+                    interactiveNavigationPopHasPlayedHaptic = true
+                    HapticFeedback.play(.navigation)
+                },
+                onCancelled: {
+                    interactiveNavigationPopHasPlayedHaptic = false
+                }
+            )
             .toolbar(.visible, for: .navigationBar)
             .navigationTitle(String(localized: L10n.Settings.title))
             .navigationBarTitleDisplayMode(.inline)
@@ -208,7 +218,11 @@ struct SettingsView: View {
             }
             .onChange(of: navigationPath) { oldValue, newValue in
                 if newValue.count < oldValue.count {
-                    HapticFeedback.play(.navigation)
+                    if interactiveNavigationPopHasPlayedHaptic {
+                        interactiveNavigationPopHasPlayedHaptic = false
+                    } else {
+                        HapticFeedback.play(.navigation)
+                    }
                 }
             }
         }
@@ -763,7 +777,10 @@ struct SettingsView: View {
 
     private func feedbackEmailSubject() -> String {
         let build = DeveloperBuildInfo.current
-        return "LiveTranscriber Feedback - \(build.version)"
+        return String(
+            format: String(localized: L10n.Settings.feedbackEmailSubjectFormat),
+            build.version
+        )
     }
 
     private func feedbackEmailBody() -> String {
@@ -774,44 +791,48 @@ struct SettingsView: View {
         let liveWhisperModel = LocalWhisperModelManager.selectedLiveModel?.displayName ?? String(localized: L10n.LocalWhisper.liveModelNotSelected)
         let localSummaryModel = LocalSummaryModelManager.defaultModel.displayName
         let localSummaryStatus = LocalSummaryModelManager.currentStatus().statusText
-        let coreMLEncoderState = LocalWhisperModelManager.isCoreMLEncoderLoadingEnabled ? "On" : "Off"
+        let coreMLEncoderState = String(localized:
+            LocalWhisperModelManager.isCoreMLEncoderLoadingEnabled
+                ? L10n.ICloud.enabled
+                : L10n.ICloud.disabled
+        )
 
         return [
-            "Hi,",
+            String(localized: L10n.Settings.feedbackEmailGreeting),
             "",
-            "Please describe your feedback or issue here:",
+            String(localized: L10n.Settings.feedbackEmailPrompt),
             "",
             "",
-            "Steps to reproduce:",
+            String(localized: L10n.Settings.feedbackEmailSteps),
             "1.",
             "2.",
             "3.",
             "",
-            "Expected result:",
+            String(localized: L10n.Settings.feedbackEmailExpected),
             "",
             "",
-            "Actual result:",
+            String(localized: L10n.Settings.feedbackEmailActual),
             "",
             "",
             "---",
-            "Diagnostics",
-            "App: LiveTranscriber",
-            "Version: \(build.version)",
-            "Build Time: \(build.buildTime)",
-            "Device: \(device.modelIdentifier)",
-            "System: \(device.systemVersion)",
-            "Current Pipeline: \(pipeline.activePipelineName)",
-            "Configured Pipeline: \(pipeline.configuredPipelineName)",
-            "Selected Language: \(transcriber.selectedLanguage.displayName) (\(transcriber.selectedLanguageID))",
-            "Live Backend: \(transcriber.selectedTranscriptionBackend.title)",
-            "Local Whisper Model: \(localWhisperModel)",
-            "Realtime Whisper Model: \(liveWhisperModel)",
-            "Summary Engine: \(selectedSummaryProvider.displayName)",
-            "Local Summary Model: \(localSummaryModel)",
-            "Local Summary Status: \(localSummaryStatus)",
-            "Core ML Encoder Loading: \(coreMLEncoderState)",
-            "Recording Count: \(recordingStore.recordings.count)",
-            "Storage: \(recordingStore.storageDisplayName)"
+            String(localized: L10n.Settings.feedbackEmailDiagnostics),
+            "\(String(localized: L10n.Settings.feedbackEmailApp)): LiveTranscriber",
+            "\(String(localized: L10n.Settings.version)): \(build.version)",
+            "\(String(localized: L10n.Settings.buildTime)): \(build.buildTime)",
+            "\(String(localized: L10n.Settings.device)): \(device.modelIdentifier)",
+            "\(String(localized: L10n.Settings.systemVersion)): \(device.systemVersion)",
+            "\(String(localized: L10n.Settings.feedbackEmailCurrentPipeline)): \(pipeline.activePipelineName)",
+            "\(String(localized: L10n.Settings.feedbackEmailConfiguredPipeline)): \(pipeline.configuredPipelineName)",
+            "\(String(localized: L10n.Settings.feedbackEmailSelectedLanguage)): \(transcriber.selectedLanguage.displayName) (\(transcriber.selectedLanguageID))",
+            "\(String(localized: L10n.Settings.feedbackEmailLiveBackend)): \(transcriber.selectedTranscriptionBackend.title)",
+            "\(String(localized: L10n.Settings.feedbackEmailLocalWhisperModel)): \(localWhisperModel)",
+            "\(String(localized: L10n.Settings.feedbackEmailRealtimeWhisperModel)): \(liveWhisperModel)",
+            "\(String(localized: L10n.Settings.feedbackEmailSummaryEngine)): \(selectedSummaryProvider.displayName)",
+            "\(String(localized: L10n.Settings.feedbackEmailLocalSummaryModel)): \(localSummaryModel)",
+            "\(String(localized: L10n.Settings.feedbackEmailLocalSummaryStatus)): \(localSummaryStatus)",
+            "\(String(localized: L10n.Settings.feedbackEmailCoreMLEncoderLoading)): \(coreMLEncoderState)",
+            "\(String(localized: L10n.Settings.recordingCount)): \(recordingStore.recordings.count)",
+            "\(String(localized: L10n.Settings.storage)): \(recordingStore.storageDisplayName)"
         ].joined(separator: "\r\n")
     }
 

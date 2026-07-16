@@ -266,11 +266,18 @@ struct RecordingAudioEvent: Codable, Hashable, Identifiable {
     var endTime: TimeInterval {
         startTime + duration
     }
+
+    var localizedLabel: String {
+        RecordingAudioEventLocalization.localizedLabel(
+            for: sourceIdentifier,
+            storedLabel: label
+        )
+    }
 }
 
 extension RecordingAudioEventAnalysis {
     var searchableText: String {
-        Set(events.flatMap { [$0.label, $0.sourceIdentifier] })
+        Set(events.flatMap { [$0.label, $0.localizedLabel, $0.sourceIdentifier] })
             .sorted { $0.localizedCaseInsensitiveCompare($1) == .orderedAscending }
             .joined(separator: "\n")
     }
@@ -3267,11 +3274,14 @@ private enum StructuredFoundationModelsRuntime {
         var errorDescription: String? {
             switch self {
             case .missingSymbol(let symbol):
-                return "Missing structured FoundationModels symbol: \(symbol)"
+                return String(
+                    format: String(localized: L10n.StructuredRuntime.missingSymbolFormat),
+                    symbol
+                )
             case .frameworkError(let message):
                 return message
             case .emptyResponse:
-                return "Structured FoundationModels returned an empty response."
+                return String(localized: L10n.StructuredRuntime.emptyResponse)
             }
         }
     }

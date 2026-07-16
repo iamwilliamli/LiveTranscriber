@@ -112,7 +112,7 @@ private final class RecordingSoundAnalysisObserver: NSObject, SNResultsObserving
 
         events.append(
             RecordingAudioEvent(
-                label: Self.displayLabel(for: identifier),
+                label: RecordingAudioEventLocalization.localizedLabel(for: identifier),
                 confidence: classification.confidence,
                 startTime: startTime,
                 duration: duration,
@@ -123,15 +123,6 @@ private final class RecordingSoundAnalysisObserver: NSObject, SNResultsObserving
 
     func request(_ request: SNRequest, didFailWithError error: Error) {
         analysisError = error
-    }
-
-    private static func displayLabel(for identifier: String) -> String {
-        let fallback = fallbackDisplayLabel(for: identifier)
-        return Bundle.main.localizedString(
-            forKey: "recordings.audio_events.label.\(identifier)",
-            value: fallback,
-            table: "Semantic"
-        )
     }
 
     private static func isExcludedClassification(_ identifier: String) -> Bool {
@@ -145,17 +136,37 @@ private final class RecordingSoundAnalysisObserver: NSObject, SNResultsObserving
             .components(separatedBy: CharacterSet.alphanumerics.inverted)
             .filter { !$0.isEmpty }
     }
+}
 
-    private static func fallbackDisplayLabel(for identifier: String) -> String {
-        let normalized = identifier
-            .replacingOccurrences(of: "_", with: " ")
-            .replacingOccurrences(of: "-", with: " ")
-            .replacingOccurrences(of: "/", with: " ")
-            .trimmingCharacters(in: .whitespacesAndNewlines)
+enum RecordingAudioEventLocalization {
+    private static let tableName = "AudioEvents"
+    private static let identifierLocale = Locale(identifier: "en_US_POSIX")
 
-        guard !normalized.isEmpty else {
-            return identifier
+    static func localizedLabel(for identifier: String, storedLabel: String? = nil) -> String {
+        let normalizedIdentifier = normalizedIdentifier(identifier)
+        guard !normalizedIdentifier.isEmpty else {
+            let fallback = storedLabel?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+            return fallback.isEmpty
+                ? String(localized: L10n.Recordings.audioEventUnknown)
+                : fallback
         }
-        return normalized.localizedCapitalized
+
+        let localized = Bundle.main.localizedString(
+            forKey: normalizedIdentifier,
+            value: nil,
+            table: tableName
+        )
+        guard localized != normalizedIdentifier else {
+            return String(localized: L10n.Recordings.audioEventUnknown)
+        }
+        return localized
+    }
+
+    private static func normalizedIdentifier(_ identifier: String) -> String {
+        identifier
+            .lowercased(with: identifierLocale)
+            .components(separatedBy: CharacterSet.alphanumerics.inverted)
+            .filter { !$0.isEmpty }
+            .joined(separator: "_")
     }
 }

@@ -365,11 +365,11 @@ struct TranscriptionView: View {
         let hour = Calendar.current.component(.hour, from: Date())
         switch hour {
         case 5..<12:
-            return "Good Morning!"
+            return localized(L10n.Greeting.morning)
         case 12..<18:
-            return "Good Afternoon!"
+            return localized(L10n.Greeting.afternoon)
         default:
-            return "Good Evening!"
+            return localized(L10n.Greeting.evening)
         }
     }
 
@@ -435,10 +435,8 @@ struct TranscriptionView: View {
             .frame(height: 38)
 
             LiveRecordingWaveTimeline(
-                samples: transcriber.inputLevelHistory,
+                store: transcriber.waveformStore,
                 clock: transcriber.elapsedClock,
-                timelineOffset: transcriber.inputLevelTimelineOffset,
-                isActive: transcriber.isRecording && !transcriber.isPaused,
                 primaryColor: recorderDeckPrimaryColor,
                 secondaryColor: recorderDeckSecondaryColor,
                 height: verticalSizeClass == .compact ? 120 : 150
@@ -1120,10 +1118,8 @@ private enum TranscriptionSpeechLocaleReleaseOperation {
 
 private struct LiveRecordingWaveTimeline: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
-    let samples: [InputLevelHistorySample]
+    @ObservedObject var store: RecordingWaveformStore
     @ObservedObject var clock: RecordingElapsedClock
-    let timelineOffset: TimeInterval
-    let isActive: Bool
     let primaryColor: Color
     let secondaryColor: Color
     let height: CGFloat
@@ -1135,49 +1131,83 @@ private struct LiveRecordingWaveTimeline: View {
     private let liveEdgeInset: CGFloat = 24
 
     var body: some View {
-        TimelineView(.animation(minimumInterval: 1.0 / 30.0, paused: !isActive || reduceMotion)) { context in
-            GeometryReader { proxy in
-                let size = proxy.size
-                let elapsed = displayedElapsed(at: context.date)
-                let leftEdgeFraction = min(32 / max(size.width, 1), 0.2)
-                let rightEdgeFraction = min(8 / max(size.width, 1), 0.06)
+        GeometryReader { proxy in
+            let size = proxy.size
+            let elapsed = reduceMotion
+                ? TimeInterval(clock.elapsedSeconds)
+                : clock.elapsedTime
+            let leftEdgeFraction = min(32 / max(size.width, 1), 0.2)
+            let rightEdgeFraction = min(8 / max(size.width, 1), 0.06)
 
-                timelineContent(size: size, elapsed: elapsed)
-                    .mask(
-                        timelineEdgeFadeMask(
-                            leftEdgeFraction: leftEdgeFraction,
-                            rightEdgeFraction: rightEdgeFraction
-                        )
+            timelineCanvas(size: size, elapsed: elapsed)
+                .mask(
+                    timelineEdgeFadeMask(
+                        leftEdgeFraction: leftEdgeFraction,
+                        rightEdgeFraction: rightEdgeFraction
                     )
-                    .clipped()
-            }
+                )
+                .clipped()
         }
         .frame(height: height)
     }
 
-    private func timelineContent(
+    private func timelineCanvas(
         size: CGSize,
         elapsed: TimeInterval
     ) -> some View {
         let waveformHeight = max(size.height - rulerHeight - 8, 40)
+        let samples = store.samples
+        let pitch = size.width / CGFloat(max(samples.count, 1))
+        let barWidth = max(1.5, min(2.5, pitch * 0.48))
+        let playheadX = max(size.width - liveEdgeInset, 0)
+        let rulerOriginY = size.height - rulerHeight
+        let rulerBaselineY = rulerOriginY + 16
+        let baselineOpacity = hasAudibleSignal ? 0.08 : 0.16
 
-        return ZStack(alignment: .topLeading) {
-            waveformSurface(
-                size: CGSize(width: size.width, height: waveformHeight),
-                elapsed: elapsed
+        return Canvas { context, canvasSize in
+            var waveformBaseline = Path()
+            waveformBaseline.move(to: CGPoint(x: 0, y: waveformHeight / 2))
+            waveformBaseline.addLine(to: CGPoint(x: canvasSize.width, y: waveformHeight / 2))
+            context.stroke(
+                waveformBaseline,
+                with: .color(secondaryColor.opacity(baselineOpacity)),
+                lineWidth: 1
             )
-                .frame(width: size.width, height: waveformHeight)
-                .clipped()
 
-            timelineTicks(width: size.width, elapsed: elapsed)
-                .frame(width: size.width, height: rulerHeight)
-                .offset(y: size.height - rulerHeight)
-                .transaction { transaction in
-                    transaction.animation = nil
-                    transaction.disablesAnimations = true
+            for sample in samples where sample.isCaptured {
+                let displayLevel = amplifiedLevel(for: sample.level)
+                let age = max(elapsed - sample.elapsedTime, 0)
+                let x = playheadX - CGFloat(age / visibleDuration) * canvasSize.width
+                guard x >= -barWidth, x <= canvasSize.width + barWidth else {
+                    continue
                 }
+
+                let resolvedBarHeight = barHeight(for: displayLevel, maxHeight: waveformHeight)
+                let barRect = CGRect(
+                    x: x - barWidth / 2,
+                    y: (waveformHeight - resolvedBarHeight) / 2,
+                    width: barWidth,
+                    height: resolvedBarHeight
+                )
+                context.fill(
+                    Path(roundedRect: barRect, cornerRadius: barWidth / 2),
+                    with: .color(primaryColor.opacity(0.88))
+                )
+            }
+
+            drawTimelineTicks(
+                context: &context,
+                width: canvasSize.width,
+                elapsed: elapsed,
+                rulerBaselineY: rulerBaselineY,
+                rulerLabelY: rulerOriginY + 6
+            )
         }
         .frame(width: size.width, height: size.height, alignment: .topLeading)
+        .transaction { transaction in
+            transaction.animation = nil
+            transaction.disablesAnimations = true
+        }
     }
 
     private func timelineEdgeFadeMask(
@@ -1196,45 +1226,13 @@ private struct LiveRecordingWaveTimeline: View {
         )
     }
 
-    @ViewBuilder
-    private func waveformSurface(size: CGSize, elapsed: TimeInterval) -> some View {
-        ZStack {
-            Rectangle()
-                .fill(secondaryColor.opacity(hasAudibleSignal ? 0.08 : 0.16))
-                .frame(width: size.width, height: 1)
-                .position(x: size.width / 2, y: size.height / 2)
-                .animation(.easeOut(duration: 0.16), value: hasAudibleSignal)
-
-            waveform(size: size, elapsed: elapsed)
-        }
-    }
-
-    private func waveform(size: CGSize, elapsed: TimeInterval) -> some View {
-        let pitch = size.width / CGFloat(max(normalizedSamples.count, 1))
-        let barWidth = max(1.5, min(2.5, pitch * 0.48))
-        let playheadX = max(size.width - liveEdgeInset, 0)
-
-        return ZStack(alignment: .topLeading) {
-            ForEach(normalizedSamples) { sample in
-                let displayLevel = amplifiedLevel(for: sample.level)
-                let age = max(elapsed - sample.elapsedTime, 0)
-                let x = playheadX - CGFloat(age / visibleDuration) * size.width
-
-                Capsule()
-                    .fill(primaryColor.opacity(0.88))
-                    .frame(width: barWidth, height: barHeight(for: displayLevel, maxHeight: size.height))
-                    .position(x: x, y: size.height / 2)
-                    .opacity(sample.isCaptured ? 1 : 0)
-            }
-        }
-        .frame(width: size.width, height: size.height, alignment: .leading)
-        .transaction { transaction in
-            transaction.animation = nil
-            transaction.disablesAnimations = true
-        }
-    }
-
-    private func timelineTicks(width: CGFloat, elapsed: TimeInterval) -> some View {
+    private func drawTimelineTicks(
+        context: inout GraphicsContext,
+        width: CGFloat,
+        elapsed: TimeInterval,
+        rulerBaselineY: CGFloat,
+        rulerLabelY: CGFloat
+    ) {
         let currentTime = max(elapsed, 0)
         let playheadX = max(width - liveEdgeInset, 0)
         let playheadFraction = playheadX / max(width, 1)
@@ -1245,67 +1243,52 @@ private struct LiveRecordingWaveTimeline: View {
         let majorTickStride = max(Int((majorTickInterval / minorTickInterval).rounded()), 1)
 
         let labelWidth: CGFloat = 42
-        let baselineY: CGFloat = 16
 
-        return ZStack(alignment: .topLeading) {
-            Rectangle()
-                .fill(secondaryColor.opacity(0.16))
-                .frame(width: width, height: 1)
-                .offset(y: baselineY)
+        var baseline = Path()
+        baseline.move(to: CGPoint(x: 0, y: rulerBaselineY))
+        baseline.addLine(to: CGPoint(x: width, y: rulerBaselineY))
+        context.stroke(
+            baseline,
+            with: .color(secondaryColor.opacity(0.16)),
+            lineWidth: 1
+        )
 
-            ForEach(firstTickIndex...finalTickIndex, id: \.self) { tickIndex in
-                let tickTime = TimeInterval(tickIndex) * minorTickInterval
-                let x = width * CGFloat((tickTime - startTime) / visibleDuration)
-                let isMajor = tickIndex.isMultiple(of: majorTickStride)
+        for tickIndex in firstTickIndex...finalTickIndex {
+            let tickTime = TimeInterval(tickIndex) * minorTickInterval
+            let x = width * CGFloat((tickTime - startTime) / visibleDuration)
+            let isMajor = tickIndex.isMultiple(of: majorTickStride)
 
-                if x >= -1, x <= width + 1 {
-                    Rectangle()
-                        .fill(secondaryColor.opacity(isMajor ? 0.42 : 0.24))
-                        .frame(width: 1, height: isMajor ? 20 : 12)
-                        .position(x: x, y: baselineY + (isMajor ? 10 : 6))
-                }
-
-                if isMajor,
-                   tickTime >= 0,
-                   x >= -labelWidth / 2,
-                   x <= width + labelWidth / 2 {
-                    Text(tickLabel(for: tickTime))
-                        .font(.system(size: 10, weight: .medium, design: .monospaced))
-                        .foregroundStyle(secondaryColor.opacity(0.56))
-                        .monospacedDigit()
-                        .lineLimit(1)
-                        .frame(width: labelWidth, alignment: .center)
-                        .position(x: x, y: 6)
-                }
-            }
-        }
-        .frame(width: width, height: rulerHeight, alignment: .topLeading)
-        .clipped()
-    }
-
-    private var normalizedSamples: [InputLevelHistorySample] {
-        let source = samples.isEmpty
-            ? (0..<72).map {
-                InputLevelHistorySample(
-                    id: -72 + $0,
-                    level: 0,
-                    isCaptured: false,
-                    elapsedTime: 0
+            if x >= -1, x <= width + 1 {
+                let tickHeight: CGFloat = isMajor ? 20 : 12
+                var tick = Path()
+                tick.move(to: CGPoint(x: x, y: rulerBaselineY))
+                tick.addLine(to: CGPoint(x: x, y: rulerBaselineY + tickHeight))
+                context.stroke(
+                    tick,
+                    with: .color(secondaryColor.opacity(isMajor ? 0.42 : 0.24)),
+                    lineWidth: 1
                 )
             }
-            : samples
-        return source.map { sample in
-            InputLevelHistorySample(
-                id: sample.id,
-                level: min(max(sample.level, 0), 1),
-                isCaptured: sample.isCaptured,
-                elapsedTime: sample.elapsedTime
-            )
+
+            if isMajor,
+               tickTime >= 0,
+               x >= -labelWidth / 2,
+               x <= width + labelWidth / 2 {
+                let label = Text(tickLabel(for: tickTime))
+                    .font(.system(size: 10, weight: .medium, design: .monospaced))
+                    .foregroundStyle(secondaryColor.opacity(0.56))
+                    .monospacedDigit()
+                context.draw(
+                    label,
+                    at: CGPoint(x: x, y: rulerLabelY),
+                    anchor: .center
+                )
+            }
         }
     }
 
     private var hasAudibleSignal: Bool {
-        normalizedSamples.contains { $0.isCaptured && amplifiedLevel(for: $0.level) > 0 }
+        store.samples.contains { $0.isCaptured && amplifiedLevel(for: $0.level) > 0 }
     }
 
     private func amplifiedLevel(for level: Float) -> CGFloat {
@@ -1325,31 +1308,6 @@ private struct LiveRecordingWaveTimeline: View {
 
     private func tickLabel(for seconds: TimeInterval) -> String {
         TranscriptionLine.formatTimestamp(seconds)
-    }
-
-    private func displayedElapsed(at date: Date) -> TimeInterval {
-        let rawElapsed: TimeInterval
-        guard !reduceMotion else {
-            rawElapsed = TimeInterval(clock.elapsedSeconds)
-            return max(rawElapsed - timelineOffset, 0)
-        }
-        rawElapsed = clock.timelineAnchor.elapsed(at: date)
-        return max(rawElapsed - timelineOffset, 0)
-    }
-}
-
-private struct RecordingElapsedTimeText: View {
-    @ObservedObject var clock: RecordingElapsedClock
-    let color: Color
-
-    var body: some View {
-        Text(TranscriptionLine.formatTimestamp(Double(clock.elapsedSeconds)))
-            .font(.system(size: 40, weight: .semibold, design: .monospaced))
-            .foregroundStyle(color)
-            .monospacedDigit()
-            .contentTransition(.identity)
-            .animation(nil, value: clock.elapsedSeconds)
-            .accessibilityLabel(TranscriptionLine.formatTimestamp(Double(clock.elapsedSeconds)))
     }
 }
 
@@ -2000,107 +1958,23 @@ private final class RecordingLocationProvider: NSObject, ObservableObject, CLLoc
     }
 }
 
-private struct RollingRecorderTimeText: View {
-    let text: String
-    let color: Color
-
-    private let digitHeight: CGFloat = 28
-    private let digitWidth: CGFloat = 17
-    private let separatorWidth: CGFloat = 11
-
-    var body: some View {
-        HStack(alignment: .center, spacing: 2) {
-            ForEach(Array(text.enumerated()), id: \.offset) { _, character in
-                if let value = character.wholeNumberValue {
-                    RollingRecorderDigit(
-                        value: value,
-                        width: digitWidth,
-                        height: digitHeight,
-                        color: color
-                    )
-                } else {
-                    Text(String(character))
-                        .font(.system(size: 23, weight: .semibold, design: .monospaced))
-                        .foregroundStyle(color)
-                        .frame(width: separatorWidth, height: digitHeight)
-                }
-            }
-        }
-        .accessibilityLabel(text)
-    }
-}
-
 private struct RollingRecorderElapsedTimeText: View {
     @ObservedObject var clock: RecordingElapsedClock
     let color: Color
 
     var body: some View {
-        RollingRecorderTimeText(
-            text: TranscriptionLine.formatTimestamp(Double(clock.elapsedSeconds)),
-            color: color
-        )
-    }
-}
+        let text = TranscriptionLine.formatTimestamp(clock.elapsedTime)
 
-private struct RollingRecorderDigit: View {
-    let value: Int
-    let width: CGFloat
-    let height: CGFloat
-    let color: Color
-
-    @State private var rollingValue = 0
-
-    init(value: Int, width: CGFloat, height: CGFloat, color: Color) {
-        self.value = value
-        self.width = width
-        self.height = height
-        self.color = color
-        _rollingValue = State(initialValue: value % 10)
-    }
-
-    var body: some View {
-        VStack(spacing: 0) {
-            ForEach(0..<20, id: \.self) { index in
-                Text("\(index % 10)")
-                    .font(.system(size: 25, weight: .semibold, design: .monospaced))
-                    .foregroundStyle(color)
-                    .frame(width: width, height: height)
+        Text(text)
+            .font(.system(size: 25, weight: .semibold, design: .monospaced))
+            .foregroundStyle(color)
+            .monospacedDigit()
+            .contentTransition(.identity)
+            .transaction { transaction in
+                transaction.animation = nil
+                transaction.disablesAnimations = true
             }
-        }
-        .offset(y: -CGFloat(rollingValue) * height)
-        .frame(width: width, height: height, alignment: .top)
-        .clipped()
-        .onAppear {
-            reset(to: value)
-        }
-        .onChange(of: value) { _, newValue in
-            roll(to: newValue)
-        }
-        .animation(.easeOut(duration: 0.24), value: rollingValue)
-    }
-
-    private func roll(to newValue: Int) {
-        let currentValue = rollingValue % 10
-        let step = (newValue - currentValue + 10) % 10
-        guard step != 0 else {
-            return
-        }
-
-        rollingValue += step
-        if rollingValue >= 10 {
-            let resetValue = newValue % 10
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.28) {
-                reset(to: resetValue)
-            }
-        }
-    }
-
-    private func reset(to newValue: Int) {
-        var transaction = Transaction()
-        transaction.disablesAnimations = true
-        withTransaction(transaction) {
-            rollingValue = newValue % 10
-        }
+            .accessibilityLabel(text)
     }
 }
 

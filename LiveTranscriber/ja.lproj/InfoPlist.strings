@@ -4,3 +4,8 @@
 "NSMicrophoneUsageDescription" = "ライブ文字起こし用の音声を録音するために使用されます。";
 "NSLocationWhenInUseUsageDescription" = "保存した録音に位置情報を追加する場合にのみ使用されます。";
 "NSSpeechRecognitionUsageDescription" = "録音した音声をライブ文字起こしテキストに変換するために使用されます。";
+"NSRemindersFullAccessUsageDescription" = "抽出したアクション項目をリマインダーに追加する場合にのみ使用されます。";
+"NSRemindersUsageDescription" = "抽出したアクション項目をリマインダーに追加する場合にのみ使用されます。";
+"Start Recording" = "録音を開始";
+"Audio Recording" = "音声録音";
+"NSUbiquitousContainerName" = "ライブ文字起こし";

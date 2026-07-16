@@ -4,3 +4,8 @@
 "NSMicrophoneUsageDescription" = "Used to record audio for live transcription.";
 "NSLocationWhenInUseUsageDescription" = "Used only when you choose to attach a location to a saved recording.";
 "NSSpeechRecognitionUsageDescription" = "Used to turn recorded speech into live transcription text.";
+"NSRemindersFullAccessUsageDescription" = "Used only when you choose to add extracted action items to Reminders.";
+"NSRemindersUsageDescription" = "Used only when you choose to add extracted action items to Reminders.";
+"Start Recording" = "Start Recording";
+"Audio Recording" = "Audio Recording";
+"NSUbiquitousContainerName" = "Live Transcriber";

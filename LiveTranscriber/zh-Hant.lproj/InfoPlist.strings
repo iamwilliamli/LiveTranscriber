@@ -4,3 +4,8 @@
 "NSMicrophoneUsageDescription" = "用於錄音並即時轉錄文字。";
 "NSLocationWhenInUseUsageDescription" = "僅在你選擇替錄音加入地理位置時使用。";
 "NSSpeechRecognitionUsageDescription" = "用於把錄到的語音即時轉成文字。";
+"NSRemindersFullAccessUsageDescription" = "僅在你選擇將擷取的行動項目加入「提醒事項」時使用。";
+"NSRemindersUsageDescription" = "僅在你選擇將擷取的行動項目加入「提醒事項」時使用。";
+"Start Recording" = "開始錄音";
+"Audio Recording" = "音訊錄音";
+"NSUbiquitousContainerName" = "即時轉錄";

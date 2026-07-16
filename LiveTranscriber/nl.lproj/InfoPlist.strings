@@ -4,3 +4,8 @@
 "NSMicrophoneUsageDescription" = "Gebruikt om audio op te nemen voor live transcriptie.";
 "NSLocationWhenInUseUsageDescription" = "Alleen gebruikt wanneer je een locatie toevoegt aan een bewaarde opname.";
 "NSSpeechRecognitionUsageDescription" = "Gebruikt om opgenomen spraak om te zetten in live transcriptietekst.";
+"NSRemindersFullAccessUsageDescription" = "Alleen gebruikt wanneer je geëxtraheerde actiepunten aan Herinneringen toevoegt.";
+"NSRemindersUsageDescription" = "Alleen gebruikt wanneer je geëxtraheerde actiepunten aan Herinneringen toevoegt.";
+"Start Recording" = "Opname starten";
+"Audio Recording" = "Audio-opname";
+"NSUbiquitousContainerName" = "Live Transcriptie";

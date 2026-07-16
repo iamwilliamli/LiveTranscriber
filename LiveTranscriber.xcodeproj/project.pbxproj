@@ -43,6 +43,9 @@
 		7B00000000000000000000C3 /* QuickRecordingControlIntent.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7B00000000000000000010C2 /* QuickRecordingControlIntent.swift */; };
 		7B00000000000000000000C4 /* ControlCenter.xcstrings in Resources */ = {isa = PBXBuildFile; fileRef = 7B00000000000000000010C3 /* ControlCenter.xcstrings */; };
 		7B00000000000000000000C5 /* ControlCenter.xcstrings in Resources */ = {isa = PBXBuildFile; fileRef = 7B00000000000000000010C3 /* ControlCenter.xcstrings */; };
+		7B00000000000000000000D0 /* AppShortcuts.strings in Resources */ = {isa = PBXBuildFile; fileRef = 7B00000000000000000030D0 /* AppShortcuts.strings */; };
+		7B00000000000000000000D1 /* InfoPlist.strings in Resources */ = {isa = PBXBuildFile; fileRef = 7B00000000000000000030D1 /* InfoPlist.strings */; };
+		7B00000000000000000000E0 /* AudioEvents.xcstrings in Resources */ = {isa = PBXBuildFile; fileRef = 7B00000000000000000010E0 /* AudioEvents.xcstrings */; };
 		7B0000000000000000000022 /* Semantic.xcstrings in Resources */ = {isa = PBXBuildFile; fileRef = 7B0000000000000000001022 /* Semantic.xcstrings */; };
 		7B0000000000000000000023 /* StructuredFoundationModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7B0000000000000000001027 /* StructuredFoundationModels.swift */; };
 		7B0000000000000000000024 /* LiveTranscriberStructuredFoundationModels.framework in Embed Frameworks */ = {isa = PBXBuildFile; fileRef = 7B0000000000000000001028 /* LiveTranscriberStructuredFoundationModels.framework */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
@@ -150,6 +153,19 @@
 		7B00000000000000000010C1 /* LaunchSplashView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LaunchSplashView.swift; sourceTree = "<group>"; };
 		7B00000000000000000010C2 /* QuickRecordingControlIntent.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QuickRecordingControlIntent.swift; sourceTree = "<group>"; };
 		7B00000000000000000010C3 /* ControlCenter.xcstrings */ = {isa = PBXFileReference; lastKnownFileType = text.json.xcstrings; path = ControlCenter.xcstrings; sourceTree = "<group>"; };
+		7B00000000000000000010D0 /* en */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = en; path = en.lproj/AppShortcuts.strings; sourceTree = "<group>"; };
+		7B00000000000000000010D1 /* zh-Hans */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = "zh-Hans"; path = "zh-Hans.lproj/AppShortcuts.strings"; sourceTree = "<group>"; };
+		7B00000000000000000010D2 /* zh-Hant */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = "zh-Hant"; path = "zh-Hant.lproj/AppShortcuts.strings"; sourceTree = "<group>"; };
+		7B00000000000000000010D3 /* de */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = de; path = de.lproj/AppShortcuts.strings; sourceTree = "<group>"; };
+		7B00000000000000000010D4 /* nl */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = nl; path = nl.lproj/AppShortcuts.strings; sourceTree = "<group>"; };
+		7B00000000000000000010D5 /* ja */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = ja; path = ja.lproj/AppShortcuts.strings; sourceTree = "<group>"; };
+		7B00000000000000000010D6 /* en */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = en; path = en.lproj/InfoPlist.strings; sourceTree = "<group>"; };
+		7B00000000000000000010D7 /* zh-Hans */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = "zh-Hans"; path = "zh-Hans.lproj/InfoPlist.strings"; sourceTree = "<group>"; };
+		7B00000000000000000010D8 /* zh-Hant */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = "zh-Hant"; path = "zh-Hant.lproj/InfoPlist.strings"; sourceTree = "<group>"; };
+		7B00000000000000000010D9 /* de */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = de; path = de.lproj/InfoPlist.strings; sourceTree = "<group>"; };
+		7B00000000000000000010DA /* nl */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = nl; path = nl.lproj/InfoPlist.strings; sourceTree = "<group>"; };
+		7B00000000000000000010DB /* ja */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = ja; path = ja.lproj/InfoPlist.strings; sourceTree = "<group>"; };
+		7B00000000000000000010E0 /* AudioEvents.xcstrings */ = {isa = PBXFileReference; lastKnownFileType = text.json.xcstrings; path = AudioEvents.xcstrings; sourceTree = "<group>"; };
 		7B0000000000000000001022 /* Semantic.xcstrings */ = {isa = PBXFileReference; lastKnownFileType = text.json.xcstrings; path = Semantic.xcstrings; sourceTree = "<group>"; };
 		7B0000000000000000001027 /* StructuredFoundationModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StructuredFoundationModels.swift; sourceTree = "<group>"; };
 		7B0000000000000000001028 /* LiveTranscriberStructuredFoundationModels.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; includeInIndex = 0; path = LiveTranscriberStructuredFoundationModels.framework; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -255,9 +271,11 @@
 				7B0000000000000000001007 /* EmptyStateView.swift */,
 				7B0000000000000000001008 /* Assets.xcassets */,
 				7B0000000000000000003010 /* Fonts */,
+				7B00000000000000000010E0 /* AudioEvents.xcstrings */,
 				7B0000000000000000001022 /* Semantic.xcstrings */,
 				7B00000000000000000010C3 /* ControlCenter.xcstrings */,
 				7B0000000000000000003006 /* InfoPlist.strings */,
+				7B00000000000000000030D0 /* AppShortcuts.strings */,
 				7B000000000000000000100A /* Info.plist */,
 				7B000000000000000000101E /* LiveTranscriber.entitlements */,
 				7B0000000000000000001009 /* PrivacyInfo.xcprivacy */,
@@ -279,6 +297,7 @@
 			isa = PBXGroup;
 			children = (
 				7B000000000000000000101B /* LiveTranscriberWidgetBundle.swift */,
+				7B00000000000000000030D1 /* InfoPlist.strings */,
 				7B000000000000000000101C /* Info.plist */,
 			);
 			path = LiveTranscriberWidget;
@@ -423,9 +442,11 @@
 			files = (
 				7B0000000000000000000008 /* Assets.xcassets in Resources */,
 				7B0000000000000000000009 /* PrivacyInfo.xcprivacy in Resources */,
+				7B00000000000000000000E0 /* AudioEvents.xcstrings in Resources */,
 				7B0000000000000000000022 /* Semantic.xcstrings in Resources */,
 				7B00000000000000000000C4 /* ControlCenter.xcstrings in Resources */,
 				7B000000000000000000000B /* InfoPlist.strings in Resources */,
+				7B00000000000000000000D0 /* AppShortcuts.strings in Resources */,
 				7B000000000000000000000C /* RedditSans-Regular.ttf in Resources */,
 				7B000000000000000000000D /* RedditSans-Medium.ttf in Resources */,
 				7B000000000000000000000E /* RedditSans-SemiBold.ttf in Resources */,
@@ -439,6 +460,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				7B00000000000000000000C5 /* ControlCenter.xcstrings in Resources */,
+				7B00000000000000000000D1 /* InfoPlist.strings in Resources */,
 				7B000000000000000000001A /* RedditSans-Regular.ttf in Resources */,
 				7B000000000000000000001B /* RedditSans-Medium.ttf in Resources */,
 				7B000000000000000000001C /* RedditSans-SemiBold.ttf in Resources */,
@@ -533,6 +555,32 @@
 				7B0000000000000000001023 /* de */,
 				7B0000000000000000001024 /* nl */,
 				7B0000000000000000001025 /* ja */,
+			);
+			name = InfoPlist.strings;
+			sourceTree = "<group>";
+		};
+		7B00000000000000000030D0 /* AppShortcuts.strings */ = {
+			isa = PBXVariantGroup;
+			children = (
+				7B00000000000000000010D0 /* en */,
+				7B00000000000000000010D1 /* zh-Hans */,
+				7B00000000000000000010D2 /* zh-Hant */,
+				7B00000000000000000010D3 /* de */,
+				7B00000000000000000010D4 /* nl */,
+				7B00000000000000000010D5 /* ja */,
+			);
+			name = AppShortcuts.strings;
+			sourceTree = "<group>";
+		};
+		7B00000000000000000030D1 /* InfoPlist.strings */ = {
+			isa = PBXVariantGroup;
+			children = (
+				7B00000000000000000010D6 /* en */,
+				7B00000000000000000010D7 /* zh-Hans */,
+				7B00000000000000000010D8 /* zh-Hant */,
+				7B00000000000000000010D9 /* de */,
+				7B00000000000000000010DA /* nl */,
+				7B00000000000000000010DB /* ja */,
 			);
 			name = InfoPlist.strings;
 			sourceTree = "<group>";

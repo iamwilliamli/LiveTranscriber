@@ -133,6 +133,24 @@ enum L10n {
         static let feedback = L10n.resource("settings.feedback", defaultValue: "Feedback", comment: "Settings row title for sending feedback email.")
         static let feedbackUnavailable = L10n.resource("settings.feedback.unavailable", defaultValue: "Feedback Unavailable", comment: "Alert title when feedback email cannot be opened.")
         static let feedbackOpenFailedFormat = L10n.resource("settings.feedback.open_failed.format", defaultValue: "No mail app is configured. Send feedback to %@.", comment: "Alert message when feedback email cannot be opened. Parameter: feedback email address.")
+        static let feedbackEmailSubjectFormat = L10n.resource("settings.feedback.email_subject.format", defaultValue: "LiveTranscriber Feedback - %@", comment: "Feedback email subject. Parameter: app version.")
+        static let feedbackEmailGreeting = L10n.resource("settings.feedback.email.greeting", defaultValue: "Hi,", comment: "Greeting at the start of the feedback email template.")
+        static let feedbackEmailPrompt = L10n.resource("settings.feedback.email.prompt", defaultValue: "Please describe your feedback or issue here:", comment: "Prompt in the feedback email template.")
+        static let feedbackEmailSteps = L10n.resource("settings.feedback.email.steps", defaultValue: "Steps to reproduce:", comment: "Steps section heading in the feedback email template.")
+        static let feedbackEmailExpected = L10n.resource("settings.feedback.email.expected", defaultValue: "Expected result:", comment: "Expected result heading in the feedback email template.")
+        static let feedbackEmailActual = L10n.resource("settings.feedback.email.actual", defaultValue: "Actual result:", comment: "Actual result heading in the feedback email template.")
+        static let feedbackEmailDiagnostics = L10n.resource("settings.feedback.email.diagnostics", defaultValue: "Diagnostics", comment: "Diagnostics heading in the feedback email template.")
+        static let feedbackEmailApp = L10n.resource("settings.feedback.email.app", defaultValue: "App", comment: "App label in the feedback email diagnostics.")
+        static let feedbackEmailCurrentPipeline = L10n.resource("settings.feedback.email.current_pipeline", defaultValue: "Current Pipeline", comment: "Current speech pipeline label in feedback diagnostics.")
+        static let feedbackEmailConfiguredPipeline = L10n.resource("settings.feedback.email.configured_pipeline", defaultValue: "Configured Pipeline", comment: "Configured speech pipeline label in feedback diagnostics.")
+        static let feedbackEmailSelectedLanguage = L10n.resource("settings.feedback.email.selected_language", defaultValue: "Selected Language", comment: "Selected transcription language label in feedback diagnostics.")
+        static let feedbackEmailLiveBackend = L10n.resource("settings.feedback.email.live_backend", defaultValue: "Live Backend", comment: "Live transcription backend label in feedback diagnostics.")
+        static let feedbackEmailLocalWhisperModel = L10n.resource("settings.feedback.email.local_whisper_model", defaultValue: "Local Whisper Model", comment: "Local Whisper model label in feedback diagnostics.")
+        static let feedbackEmailRealtimeWhisperModel = L10n.resource("settings.feedback.email.realtime_whisper_model", defaultValue: "Realtime Whisper Model", comment: "Realtime Whisper model label in feedback diagnostics.")
+        static let feedbackEmailSummaryEngine = L10n.resource("settings.feedback.email.summary_engine", defaultValue: "Summary Engine", comment: "Summary engine label in feedback diagnostics.")
+        static let feedbackEmailLocalSummaryModel = L10n.resource("settings.feedback.email.local_summary_model", defaultValue: "Local Summary Model", comment: "Local summary model label in feedback diagnostics.")
+        static let feedbackEmailLocalSummaryStatus = L10n.resource("settings.feedback.email.local_summary_status", defaultValue: "Local Summary Status", comment: "Local summary model status label in feedback diagnostics.")
+        static let feedbackEmailCoreMLEncoderLoading = L10n.resource("settings.feedback.email.core_ml_encoder_loading", defaultValue: "Core ML Encoder Loading", comment: "Core ML encoder loading label in feedback diagnostics.")
         static let transcriptionLanguage = L10n.resource("settings.transcription_language", defaultValue: "Transcription Language", comment: "Settings row title for transcription language.")
         static let betaFeatures = L10n.resource("settings.beta_features", defaultValue: "Beta Features", comment: "Settings section title for beta features.")
         static let localWhisperLiveBeta = L10n.resource("settings.local_whisper_live_beta", defaultValue: "Local Whisper Live", comment: "Settings toggle title for beta live Local Whisper transcription.")
@@ -408,6 +426,7 @@ enum L10n {
         static let noAudioEventsDetected = L10n.resource("recordings.audio_events.none_detected", defaultValue: "No clear audio events were detected in this recording.", comment: "Error shown when sound analysis completes without usable events.")
         static let audioEventAnalysisCancelled = L10n.resource("recordings.audio_events.cancelled", defaultValue: "Audio event analysis was cancelled.", comment: "Error shown when sound analysis is cancelled.")
         static let audioEventConfidenceFormat = L10n.resource("recordings.audio_events.confidence.format", defaultValue: "%.0f%% confidence", comment: "Audio event confidence text. Parameter: confidence percentage.")
+        static let audioEventUnknown = L10n.resource("recordings.audio_events.label.unknown", defaultValue: "Other Sound", comment: "Fallback label for a sound classification introduced after the app's localization table was built.")
         static let audioEventLabelAlarm = L10n.resource("recordings.audio_events.label.alarm", defaultValue: "Alarm", comment: "Localized sound event label.")
         static let audioEventLabelApplause = L10n.resource("recordings.audio_events.label.applause", defaultValue: "Applause", comment: "Localized sound event label.")
         static let audioEventLabelBabyCrying = L10n.resource("recordings.audio_events.label.baby_crying", defaultValue: "Baby Crying", comment: "Localized sound event label.")
@@ -463,6 +482,15 @@ enum L10n {
         static let chatUnavailable = L10n.resource("recordings.chat_unavailable", defaultValue: "AI chat is unavailable. Enable Apple Intelligence or download the local model in Settings.", comment: "Message shown when no AI provider is available for chat.")
         static let chatClear = L10n.resource("recordings.chat_clear", defaultValue: "Clear Conversation", comment: "Action that clears the recording chat conversation.")
         static let chatSend = L10n.resource("recordings.chat_send", defaultValue: "Send", comment: "Accessibility label for the chat send button.")
+        static let chatSearchingTranscriptExcerpts = L10n.resource("recordings.chat.status.searching_excerpts", defaultValue: "Searching transcript excerpts", comment: "AI chat status while finding relevant transcript excerpts.")
+        static let chatPreparingTranscriptContext = L10n.resource("recordings.chat.status.preparing_context", defaultValue: "Preparing transcript context", comment: "AI chat status while preparing transcript context.")
+        static let chatSwitchingToLocalQwen = L10n.resource("recordings.chat.status.switching_local_qwen", defaultValue: "Switching to local Qwen", comment: "AI chat status while switching from Apple Intelligence to local Qwen.")
+        static let chatGeneratingAnswer = L10n.resource("recordings.chat.status.generating_answer", defaultValue: "Generating answer", comment: "AI chat status while generating an answer.")
+        static let chatGeneratingAnswerWithContextFormat = L10n.resource("recordings.chat.status.generating_answer_with_context.format", defaultValue: "%@. Generating answer", comment: "AI chat status combining transcript context preparation with answer generation. Parameter: context status.")
+        static let chatRetryingSmallerExcerpt = L10n.resource("recordings.chat.status.retrying_smaller_excerpt", defaultValue: "Context was too long. Retrying with a smaller excerpt", comment: "AI chat status after the selected context exceeded the local model limit.")
+        static let chatUsingFullTranscript = L10n.resource("recordings.chat.status.using_full_transcript", defaultValue: "Using the full transcript", comment: "AI chat status when the complete transcript fits in context.")
+        static let chatCompressingTranscriptContext = L10n.resource("recordings.chat.status.compressing_context", defaultValue: "Compressing transcript context", comment: "AI chat status when a long transcript is reduced to a context digest.")
+        static let chatRelevantExcerptCountFormat = L10n.resource("recordings.chat.status.relevant_excerpt_count.format", defaultValue: "Relevant transcript excerpts: %d", comment: "AI chat status showing how many relevant transcript excerpts were selected. Parameter: excerpt count.")
         static let noSummary = L10n.resource("recordings.no_summary", defaultValue: "No Summary", comment: "Empty state title when no summary exists.")
         static let sampleRate = L10n.resource("recordings.audio.sample_rate", defaultValue: "Sample Rate", comment: "Audio parameter row title.")
         static let bitRate = L10n.resource("recordings.audio.bit_rate", defaultValue: "Bit Rate", comment: "Audio parameter row title.")
@@ -905,6 +933,41 @@ enum L10n {
             defaultValue: "Multilingual offline summary model in GGUF Q4_K_M format.",
             comment: "Local summary Qwen3 model detail."
         )
+    }
+
+    enum Greeting {
+        static let morning = L10n.resource("greeting.morning", defaultValue: "Good Morning!", comment: "Assistant greeting shown in the morning.")
+        static let afternoon = L10n.resource("greeting.afternoon", defaultValue: "Good Afternoon!", comment: "Assistant greeting shown in the afternoon.")
+        static let evening = L10n.resource("greeting.evening", defaultValue: "Good Evening!", comment: "Assistant greeting shown in the evening.")
+    }
+
+    enum AudioSession {
+        static let recordingInProgress = L10n.resource(
+            "audio_session.error.recording_in_progress",
+            defaultValue: "Recording is currently using the audio session.",
+            comment: "Playback error shown when recording already owns the audio session."
+        )
+    }
+
+    enum StructuredRuntime {
+        static let missingSymbolFormat = L10n.resource(
+            "structured_runtime.error.missing_symbol.format",
+            defaultValue: "Missing structured FoundationModels symbol: %@",
+            comment: "Structured FoundationModels runtime error. Parameter: missing symbol name."
+        )
+        static let emptyResponse = L10n.resource(
+            "structured_runtime.error.empty_response",
+            defaultValue: "Structured FoundationModels returned an empty response.",
+            comment: "Structured FoundationModels runtime error when no response is returned."
+        )
+    }
+
+    enum Siri {
+        static let noSummary = L10n.resource("siri.no_summary", defaultValue: "No summary is available for this recording.", comment: "Siri response when a recording has no summary.")
+        static let noTranscript = L10n.resource("siri.no_transcript", defaultValue: "No transcript is available for this recording.", comment: "Siri response when a recording has no transcript.")
+        static let searchNoMatches = L10n.resource("siri.search.no_matches", defaultValue: "No matching recordings were found.", comment: "Siri response when recording search has no matches.")
+        static let searchMatchesFormat = L10n.resource("siri.search.matches.format", defaultValue: "Matching recordings: %d. %@.", comment: "Siri search result response. Parameters: result count and a comma-separated list of recording titles.")
+        static let transcriptTruncated = L10n.resource("siri.transcript_truncated", defaultValue: "The transcript is longer, so I read the beginning. Open the recording to review the rest.", comment: "Siri message appended when a transcript is too long to read in full.")
     }
 
     enum ICloud {

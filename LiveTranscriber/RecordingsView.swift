@@ -815,6 +815,9 @@ struct RecordingsView: View {
                 .navigationDestination(for: RecordingNavigationDestination.self) { destination in
                     navigationDestinationView(for: destination)
                 }
+                .onInteractiveNavigationPopGesture {
+                    HapticFeedback.play(.navigation)
+                }
         }
         .searchable(
             text: $searchText,
@@ -2393,6 +2396,7 @@ struct RecordingMapView: View {
     @Environment(\.dismiss) private var dismiss
     @State private var selectedPoint: RecordingMapPoint?
     @State private var selectedRecording: RecordingItem?
+    @State private var interactiveNavigationPopHasPlayedHaptic = false
     @State private var downloadedLocalWhisperModels: [LocalWhisperModel] = []
     @State private var localWhisperLanguageOptionsByModelID: [String: [TranscriptionLanguage]] = [:]
 
@@ -2472,9 +2476,22 @@ struct RecordingMapView: View {
                     localWhisperLanguageOptionsByModelID: localWhisperLanguageOptionsByModelID
                 )
             }
+            .onInteractiveNavigationPopGesture(
+                onBegan: {
+                    interactiveNavigationPopHasPlayedHaptic = true
+                    HapticFeedback.play(.navigation)
+                },
+                onCancelled: {
+                    interactiveNavigationPopHasPlayedHaptic = false
+                }
+            )
             .onChange(of: selectedRecording?.id) { _, newValue in
                 if newValue == nil {
-                    HapticFeedback.play(.navigation)
+                    if interactiveNavigationPopHasPlayedHaptic {
+                        interactiveNavigationPopHasPlayedHaptic = false
+                    } else {
+                        HapticFeedback.play(.navigation)
+                    }
                 }
             }
         }
@@ -4087,7 +4104,7 @@ struct RecordingDetailView: View {
         } label: {
             HStack(alignment: .center, spacing: 10) {
                 VStack(alignment: .leading, spacing: 4) {
-                    Text(event.label)
+                    Text(event.localizedLabel)
                         .font(.redditSans(.subheadline, weight: .semibold))
                         .foregroundStyle(.primary)
                         .frame(maxWidth: .infinity, alignment: .leading)
@@ -6311,7 +6328,7 @@ private struct RecordingTimelineScrubber: View {
         let x = min(max(thumbX - width / 2, 0), max(trackWidth - width, 0))
 
         return HStack(spacing: 6) {
-            Text(event.label)
+            Text(event.localizedLabel)
                 .font(.redditSans(.caption2, weight: .bold))
                 .foregroundStyle(.primary)
                 .lineLimit(1)
