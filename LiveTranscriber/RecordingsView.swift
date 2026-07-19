@@ -3961,71 +3961,44 @@ struct RecordingDetailView: View {
     private var header: some View {
         let item = currentItem
         let iCloudSyncStatus = store.iCloudSyncStatus(for: item)
+        let displayDuration = player.duration > 0
+            ? player.duration
+            : Double(item.durationSeconds)
 
-        return VStack(alignment: .leading, spacing: 10) {
-            Label(item.audioFileName, systemImage: "waveform")
-                .font(.redditSans(.headline, weight: .semibold))
-                .lineLimit(2)
-                .truncationMode(.middle)
+        return VStack(alignment: .leading, spacing: 0) {
+            RetroRecordingDisplay(
+                statusText: localized(L10n.Recordings.recordingPlayback),
+                title: item.audioFileName,
+                audioURL: store.audioURL(for: item),
+                player: player,
+                scrubbedTime: scrubbedPlaybackTime,
+                duration: displayDuration
+            )
 
-            ViewThatFits(in: .horizontal) {
-                HStack(spacing: 10) {
-                    RecordingInfoPill(icon: "calendar", text: item.createdAt.formatted(date: .abbreviated, time: .shortened))
-                    RecordingInfoPill(icon: "clock", text: TranscriptionLine.formatTimestamp(Double(item.durationSeconds)))
-                    RecordingInfoPill(icon: "globe", text: item.localizedLanguageName)
-                    RecordingInfoPill(icon: iCloudSyncStatus.systemImage, text: iCloudSyncStatus.displayName)
+            VStack(alignment: .leading, spacing: 10) {
+                RecordingDetailFactsGrid(
+                    createdAtText: item.createdAt.formatted(date: .abbreviated, time: .shortened),
+                    durationText: TranscriptionLine.formatTimestamp(Double(item.durationSeconds)),
+                    languageText: item.localizedLanguageName,
+                    iCloudSyncStatus: iCloudSyncStatus
+                )
+
+                if !item.combinedTags.isEmpty
+                    || item.projectName != nil
+                    || item.categoryName != nil
+                    || item.location != nil {
+                    RecordingDetailContextStrip(
+                        tags: item.combinedTags,
+                        projectName: item.projectName,
+                        categoryName: item.categoryName,
+                        location: item.location
+                    )
                 }
-
-                VStack(alignment: .leading, spacing: 8) {
-                    HStack(spacing: 10) {
-                        RecordingInfoPill(icon: "calendar", text: item.createdAt.formatted(date: .abbreviated, time: .shortened))
-                        RecordingInfoPill(icon: "clock", text: TranscriptionLine.formatTimestamp(Double(item.durationSeconds)))
-                    }
-
-                    HStack(spacing: 10) {
-                        RecordingInfoPill(icon: "globe", text: item.localizedLanguageName)
-                        RecordingInfoPill(icon: iCloudSyncStatus.systemImage, text: iCloudSyncStatus.displayName)
-                    }
-                }
             }
-
-            if !item.combinedTags.isEmpty {
-                FlowTags(tags: item.combinedTags)
-            }
-
-            if let projectName = item.projectName {
-                Label(projectName, systemImage: "briefcase")
-                    .font(.redditSans(.caption, weight: .semibold))
-                    .foregroundStyle(AppTheme.brand)
-                    .lineLimit(1)
-            }
-
-            if let categoryName = item.categoryName {
-                Label(categoryName, systemImage: "folder.fill")
-                    .font(.redditSans(.caption, weight: .semibold))
-                    .foregroundStyle(AppTheme.info)
-                    .lineLimit(1)
-            }
-
-            if let location = item.location {
-                Label {
-                    RecordingLocationNameText(location: location)
-                } icon: {
-                    Image(systemName: "mappin.and.ellipse")
-                }
-                    .font(.redditSans(.caption, weight: .semibold))
-                    .foregroundStyle(.secondary)
-                    .lineLimit(1)
-            }
+            .padding(.horizontal, 2)
+            .padding(.top, 12)
         }
-        .padding(14)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(AppTheme.cardBackground)
-        .overlay {
-            RoundedRectangle(cornerRadius: AppTheme.cornerRadius, style: .continuous)
-                .stroke(AppTheme.cardBorder, lineWidth: 1)
-        }
-        .clipShape(RoundedRectangle(cornerRadius: AppTheme.cornerRadius, style: .continuous))
     }
 
     private var keyPointsCard: some View {
@@ -4419,40 +4392,48 @@ struct RecordingDetailView: View {
     }
 
     private var playerCard: some View {
-        let displayedTime = scrubbedPlaybackTime ?? player.currentTime
         let shape = RoundedRectangle(cornerRadius: 26, style: .continuous)
 
         return VStack(spacing: 10) {
-            HStack(alignment: .center, spacing: 8) {
-                Text(TranscriptionLine.formatTimestamp(displayedTime))
-                    .font(.redditSans(.caption2, weight: .semibold).monospacedDigit())
-                    .foregroundStyle(.primary)
-                    .lineLimit(1)
-                    .frame(minWidth: 50, alignment: .leading)
-
-                RecordingTimelineScrubber(
-                    currentTime: player.currentTime,
-                    duration: player.duration,
-                    scrubbedTime: $scrubbedPlaybackTime,
-                    audioEvents: currentItem.audioEventAnalysis?.events ?? [],
-                    isEnabled: player.isLoaded,
-                    onSeek: { time in
-                        HapticFeedback.play(.timelineSeek)
-                        player.seek(to: time)
-                    },
-                    onEventTap: { event in
-                        HapticFeedback.play(.timelineSeek)
-                        scrubbedPlaybackTime = nil
-                        player.seek(to: event.startTime)
-                    }
+            TimelineView(
+                .animation(
+                    minimumInterval: 1.0 / 60.0,
+                    paused: !player.isPlaying || scrubbedPlaybackTime != nil
                 )
-                .frame(maxWidth: .infinity)
+            ) { _ in
+                let displayedTime = scrubbedPlaybackTime ?? player.presentationTime()
 
-                Text(TranscriptionLine.formatTimestamp(player.duration))
-                    .font(.redditSans(.caption2, weight: .semibold).monospacedDigit())
-                    .foregroundStyle(.secondary)
-                    .lineLimit(1)
-                    .frame(minWidth: 50, alignment: .trailing)
+                HStack(alignment: .center, spacing: 8) {
+                    Text(TranscriptionLine.formatTimestamp(displayedTime))
+                        .font(.redditSans(.caption2, weight: .semibold).monospacedDigit())
+                        .foregroundStyle(.primary)
+                        .lineLimit(1)
+                        .frame(minWidth: 50, alignment: .leading)
+
+                    RecordingTimelineScrubber(
+                        currentTime: displayedTime,
+                        duration: player.duration,
+                        scrubbedTime: $scrubbedPlaybackTime,
+                        audioEvents: currentItem.audioEventAnalysis?.events ?? [],
+                        isEnabled: player.isLoaded,
+                        onSeek: { time in
+                            HapticFeedback.play(.timelineSeek)
+                            player.seek(to: time)
+                        },
+                        onEventTap: { event in
+                            HapticFeedback.play(.timelineSeek)
+                            scrubbedPlaybackTime = nil
+                            player.seek(to: event.startTime)
+                        }
+                    )
+                    .frame(maxWidth: .infinity)
+
+                    Text(TranscriptionLine.formatTimestamp(player.duration))
+                        .font(.redditSans(.caption2, weight: .semibold).monospacedDigit())
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                        .frame(minWidth: 50, alignment: .trailing)
+                }
             }
 
             ZStack {
@@ -7484,6 +7465,10 @@ final class RecordingPlaybackController: ObservableObject {
         updateNowPlayingInfo()
     }
 
+    func presentationTime() -> TimeInterval {
+        min(max(currentPlaybackTime(), 0), duration)
+    }
+
     func unload() {
         playbackCommandID += 1
         playbackScheduleID += 1
@@ -7832,19 +7817,693 @@ private struct RemoteCommandTarget {
     let token: Any
 }
 
-private struct RecordingInfoPill: View {
-    let icon: String
-    let text: String
+private struct RetroRecordingDisplay: View {
+    @State private var waveformSamples: [CGFloat] = []
+
+    let statusText: String
+    let title: String
+    let audioURL: URL
+    @ObservedObject var player: RecordingPlaybackController
+    let scrubbedTime: TimeInterval?
+    let duration: TimeInterval
+
+    private let displayRed = Color(red: 0.94, green: 0.08, blue: 0.13)
+
+    private func playbackProgress(for currentTime: TimeInterval) -> CGFloat {
+        guard duration > 0 else {
+            return 0
+        }
+        return CGFloat(min(max(currentTime / duration, 0), 1))
+    }
 
     var body: some View {
-        Label(text, systemImage: icon)
-            .font(.redditSans(.caption, weight: .semibold))
-            .foregroundStyle(.secondary)
-            .lineLimit(1)
-            .minimumScaleFactor(0.75)
-            .padding(.horizontal, 8)
-            .frame(height: 26)
-            .background(Color.secondary.opacity(0.12), in: Capsule())
+        ZStack {
+            Color(red: 0.018, green: 0.020, blue: 0.022)
+
+            RetroDotMatrixGrid()
+                .accessibilityHidden(true)
+
+            VStack(spacing: 8) {
+                HStack(spacing: 7) {
+                    RetroPlaybackStatusMark(color: displayRed, isActive: player.isPlaying)
+                        .accessibilityHidden(true)
+
+                    Text(statusText)
+                        .fixedSize(horizontal: true, vertical: false)
+
+                    Text("·")
+                        .foregroundStyle(Color.white.opacity(0.56))
+
+                    Spacer(minLength: 8)
+
+                    Text(title)
+                        .lineLimit(1)
+                        .truncationMode(.middle)
+                        .frame(maxWidth: .infinity, alignment: .trailing)
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .font(.system(size: 12, weight: .semibold, design: .monospaced))
+                .foregroundStyle(Color.white.opacity(0.92))
+                .minimumScaleFactor(0.72)
+
+                TimelineView(
+                    .animation(
+                        minimumInterval: 1.0 / 60.0,
+                        paused: !player.isPlaying || scrubbedTime != nil
+                    )
+                ) { _ in
+                    let currentTime = min(
+                        max(scrubbedTime ?? player.presentationTime(), 0),
+                        duration
+                    )
+
+                    VStack(spacing: 8) {
+                        RetroPixelWaveform(
+                            samples: waveformSamples,
+                            progress: playbackProgress(for: currentTime),
+                            playheadColor: displayRed,
+                            isActive: player.isPlaying
+                        )
+                        .frame(height: 106)
+                        .accessibilityHidden(true)
+
+                        RetroDotMatrixTime(
+                            text: Self.displayTimestamp(currentTime),
+                            accessibilityText: "\(TranscriptionLine.formatTimestamp(currentTime)) / \(TranscriptionLine.formatTimestamp(duration))"
+                        )
+                        .frame(maxWidth: .infinity, minHeight: 48, maxHeight: 52)
+                    }
+                }
+            }
+            .padding(.horizontal, 16)
+            .padding(.vertical, 14)
+        }
+        .frame(height: 226)
+        .clipShape(RoundedRectangle(cornerRadius: 23, style: .continuous))
+        .overlay {
+            RoundedRectangle(cornerRadius: 23, style: .continuous)
+                .strokeBorder(Color.black.opacity(0.88), lineWidth: 2)
+        }
+        .overlay {
+            RoundedRectangle(cornerRadius: 21, style: .continuous)
+                .strokeBorder(Color.white.opacity(0.08), lineWidth: 1)
+                .padding(3)
+        }
+        .task(id: audioURL) {
+            waveformSamples = []
+            let samples = await RecordingDisplayWaveformSampler.samples(
+                from: audioURL,
+                sampleCount: 96
+            )
+            guard !Task.isCancelled else {
+                return
+            }
+            waveformSamples = samples
+        }
+    }
+
+    private static func displayTimestamp(_ time: TimeInterval) -> String {
+        let safeSeconds = max(Int(time.rounded(.down)), 0)
+        let hours = safeSeconds / 3_600
+        let minutes = (safeSeconds % 3_600) / 60
+        let seconds = safeSeconds % 60
+        return String(format: "%02d:%02d:%02d", hours, minutes, seconds)
+    }
+}
+
+private enum RetroDisplayMetrics {
+    static let gridPitch: CGFloat = 4.6
+    static let backgroundDotSize: CGFloat = 2.15
+    static let activeDotSize: CGFloat = 2.7
+}
+
+private struct RetroDotMatrixGrid: View {
+    var body: some View {
+        Canvas(opaque: false, rendersAsynchronously: true) { context, size in
+            let pitch = RetroDisplayMetrics.gridPitch
+            let dotSize = RetroDisplayMetrics.backgroundDotSize
+            var y: CGFloat = 1.4
+
+            while y < size.height {
+                var x: CGFloat = 1.4
+                while x < size.width {
+                    let rect = CGRect(
+                        x: x,
+                        y: y,
+                        width: dotSize,
+                        height: dotSize
+                    )
+                    context.fill(
+                        Path(roundedRect: rect, cornerRadius: 0.45),
+                        with: .color(Color.white.opacity(0.065))
+                    )
+                    x += pitch
+                }
+                y += pitch
+            }
+        }
+    }
+}
+
+private struct RetroPlaybackStatusMark: View {
+    let color: Color
+    let isActive: Bool
+
+    var body: some View {
+        Canvas(opaque: false, rendersAsynchronously: false) { context, _ in
+            let squareSize: CGFloat = 3.8
+            let gap: CGFloat = 1.5
+
+            for row in 0..<2 {
+                for column in 0..<2 {
+                    let rect = CGRect(
+                        x: CGFloat(column) * (squareSize + gap),
+                        y: CGFloat(row) * (squareSize + gap),
+                        width: squareSize,
+                        height: squareSize
+                    )
+                    context.fill(
+                        Path(roundedRect: rect, cornerRadius: 0.55),
+                        with: .color(color.opacity(isActive ? 1 : 0.52))
+                    )
+                }
+            }
+        }
+        .frame(width: 9.1, height: 9.1)
+    }
+}
+
+private struct RetroDotMatrixTime: View {
+    let text: String
+    let accessibilityText: String
+
+    private static let glyphRows: [Character: [String]] = [
+        "0": ["0111110", "1100011", "1000001", "1000001", "1000001", "1000001", "1000001", "1000001", "1000001", "1100011", "0111110"],
+        "1": ["0011000", "0111000", "1011000", "0011000", "0011000", "0011000", "0011000", "0011000", "0011000", "0011000", "1111111"],
+        "2": ["0111110", "1100011", "0000001", "0000001", "0000010", "0001100", "0110000", "1000000", "1000000", "1000000", "1111111"],
+        "3": ["1111110", "0000011", "0000001", "0000001", "0000010", "0011110", "0000010", "0000001", "0000001", "1100011", "0111110"],
+        "4": ["0000110", "0001110", "0010110", "0100110", "1000110", "1000110", "1111111", "0000110", "0000110", "0000110", "0000110"],
+        "5": ["1111111", "1000000", "1000000", "1000000", "1111110", "0000011", "0000001", "0000001", "0000001", "1100011", "0111110"],
+        "6": ["0011110", "0110000", "1100000", "1000000", "1111110", "1100011", "1000001", "1000001", "1000001", "1100011", "0111110"],
+        "7": ["1111111", "0000011", "0000010", "0000100", "0001000", "0010000", "0010000", "0100000", "0100000", "1000000", "1000000"],
+        "8": ["0111110", "1100011", "1000001", "1000001", "1100011", "0111110", "1100011", "1000001", "1000001", "1100011", "0111110"],
+        "9": ["0111110", "1100011", "1000001", "1000001", "1100011", "0111111", "0000001", "0000001", "0000011", "0000110", "0111100"],
+        ":": ["00", "00", "11", "11", "00", "00", "00", "11", "11", "00", "00"]
+    ]
+
+    var body: some View {
+        Canvas(opaque: false, rendersAsynchronously: false) { context, size in
+            let glyphs = text.compactMap { Self.glyphRows[$0] }
+            guard !glyphs.isEmpty else {
+                return
+            }
+
+            let glyphWidths = glyphs.map { $0.first?.count ?? 0 }
+            let totalColumns = glyphWidths.reduce(0, +) + max(glyphs.count - 1, 0)
+            let rowCount = glyphs.map(\.count).max() ?? 0
+            guard totalColumns > 0, rowCount > 0 else {
+                return
+            }
+
+            let horizontalPitch = max((size.width - 4) / CGFloat(totalColumns), 1)
+            let verticalPitch = max((size.height - 2) / CGFloat(rowCount), 1)
+            let pitch = min(horizontalPitch, verticalPitch)
+            let dotSize = max(pitch * 0.66, 1.35)
+            let contentWidth = CGFloat(totalColumns - 1) * pitch + dotSize
+            let contentHeight = CGFloat(rowCount - 1) * pitch + dotSize
+            let originX = (size.width - contentWidth) / 2
+            let originY = (size.height - contentHeight) / 2
+            var glyphColumn = 0
+
+            for (glyphIndex, rows) in glyphs.enumerated() {
+                let width = glyphWidths[glyphIndex]
+
+                for (row, pattern) in rows.enumerated() {
+                    for (column, value) in pattern.enumerated() where value == "1" {
+                        let rect = CGRect(
+                            x: originX + CGFloat(glyphColumn + column) * pitch,
+                            y: originY + CGFloat(row) * pitch,
+                            width: dotSize,
+                            height: dotSize
+                        )
+                        context.fill(
+                            Path(roundedRect: rect, cornerRadius: dotSize * 0.12),
+                            with: .color(Color.white.opacity(0.96))
+                        )
+                    }
+                }
+
+                glyphColumn += width + 1
+            }
+        }
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(Text(accessibilityText))
+    }
+}
+
+private enum RecordingDisplayWaveformSampler {
+    private static let maximumFramesPerSample: AVAudioFrameCount = 8_192
+
+    static func samples(from url: URL, sampleCount: Int) async -> [CGFloat] {
+        await Task.detached(priority: .utility) {
+            guard FileManager.default.fileExists(atPath: url.path) else {
+                return []
+            }
+
+            do {
+                return try loadSamples(from: url, sampleCount: sampleCount)
+            } catch {
+                return []
+            }
+        }.value
+    }
+
+    private static func loadSamples(from url: URL, sampleCount: Int) throws -> [CGFloat] {
+        let resolvedSampleCount = max(sampleCount, 1)
+        let audioFile = try AVAudioFile(
+            forReading: url,
+            commonFormat: .pcmFormatFloat32,
+            interleaved: false
+        )
+        let format = audioFile.processingFormat
+        let fileLength = audioFile.length
+
+        guard fileLength > 0,
+              format.channelCount > 0 else {
+            return []
+        }
+
+        var levels = [Double](repeating: 0, count: resolvedSampleCount)
+
+        for index in 0..<resolvedSampleCount {
+            if Task.isCancelled {
+                return []
+            }
+
+            let bucketStart = fileLength * AVAudioFramePosition(index) / AVAudioFramePosition(resolvedSampleCount)
+            let bucketEnd = fileLength * AVAudioFramePosition(index + 1) / AVAudioFramePosition(resolvedSampleCount)
+            let bucketLength = max(bucketEnd - bucketStart, 1)
+            let framesToRead = AVAudioFrameCount(
+                min(bucketLength, AVAudioFramePosition(maximumFramesPerSample))
+            )
+            let centeredStart = bucketStart + max(
+                (bucketLength - AVAudioFramePosition(framesToRead)) / 2,
+                0
+            )
+
+            audioFile.framePosition = min(centeredStart, max(fileLength - 1, 0))
+
+            guard let buffer = AVAudioPCMBuffer(
+                pcmFormat: format,
+                frameCapacity: framesToRead
+            ) else {
+                continue
+            }
+
+            try audioFile.read(into: buffer, frameCount: framesToRead)
+
+            guard buffer.frameLength > 0,
+                  let channelData = buffer.floatChannelData else {
+                continue
+            }
+
+            let channelCount = Int(format.channelCount)
+            let frameCount = Int(buffer.frameLength)
+            var sumOfSquares = 0.0
+            var peak = 0.0
+            var valueCount = 0
+
+            for channel in 0..<channelCount {
+                let samples = channelData[channel]
+                for frame in 0..<frameCount {
+                    let value = Double(samples[frame])
+                    guard value.isFinite else {
+                        continue
+                    }
+                    let magnitude = abs(value)
+                    sumOfSquares += value * value
+                    peak = max(peak, magnitude)
+                    valueCount += 1
+                }
+            }
+
+            guard valueCount > 0 else {
+                continue
+            }
+
+            let rms = sqrt(sumOfSquares / Double(valueCount))
+            levels[index] = rms * 0.82 + peak * 0.18
+        }
+
+        let audibleLevels = levels.filter { $0 > 0 }.sorted()
+        guard !audibleLevels.isEmpty else {
+            return [CGFloat](repeating: 0, count: resolvedSampleCount)
+        }
+
+        let percentileIndex = min(
+            Int((Double(audibleLevels.count - 1) * 0.92).rounded(.down)),
+            audibleLevels.count - 1
+        )
+        let referenceLevel = max(audibleLevels[percentileIndex], 0.000_001)
+
+        return levels.map { level in
+            guard level > 0 else {
+                return 0
+            }
+            let normalized = min(level / referenceLevel, 1)
+            return CGFloat(pow(normalized, 0.55))
+        }
+    }
+}
+
+private struct RetroPixelWaveform: View {
+    let samples: [CGFloat]
+    let progress: CGFloat
+    let playheadColor: Color
+    let isActive: Bool
+
+    var body: some View {
+        Canvas(opaque: false, rendersAsynchronously: false) { context, size in
+            let centerY = size.height / 2
+            let pitch = RetroDisplayMetrics.gridPitch
+            let pixelSize = RetroDisplayMetrics.activeDotSize
+            let maximumHalfRows = max(Int((size.height / 2 - pitch) / pitch), 1)
+            let drawableWidth = max(size.width - pixelSize, 0)
+            let columnCount = max(Int((drawableWidth / pitch).rounded(.down)) + 1, 2)
+            let columnPitch = drawableWidth / CGFloat(columnCount - 1)
+            let playheadInset = pitch / 2 + pixelSize / 2
+            let rawPlayheadX = min(max(progress, 0), 1) * size.width
+            let playheadX = min(
+                max(rawPlayheadX, playheadInset),
+                max(size.width - playheadInset, playheadInset)
+            )
+
+            for index in 0..<columnCount {
+                let x = pixelSize / 2 + CGFloat(index) * columnPitch
+                let sample = interpolatedSample(at: index, columnCount: columnCount)
+                let halfRows = max(
+                    Int((min(max(sample, 0), 1) * CGFloat(maximumHalfRows)).rounded()),
+                    0
+                )
+                let waveformOpacity = x <= playheadX ? 0.94 : 0.34
+
+                for row in -halfRows...halfRows {
+                    let y = centerY + CGFloat(row) * pitch
+                    let rect = CGRect(
+                        x: x - pixelSize / 2,
+                        y: y - pixelSize / 2,
+                        width: pixelSize,
+                        height: pixelSize
+                    )
+                    context.fill(
+                        Path(roundedRect: rect, cornerRadius: pixelSize * 0.14),
+                        with: .color(Color.white.opacity(waveformOpacity))
+                    )
+                }
+            }
+
+            var playheadY = pixelSize / 2 + pitch * 2
+            while playheadY <= size.height - pixelSize / 2 {
+                let rect = CGRect(
+                    x: playheadX - pixelSize / 2,
+                    y: playheadY - pixelSize / 2,
+                    width: pixelSize,
+                    height: pixelSize
+                )
+                context.fill(
+                    Path(roundedRect: rect, cornerRadius: pixelSize * 0.14),
+                    with: .color(playheadColor.opacity(isActive ? 1 : 0.74))
+                )
+                playheadY += pitch
+            }
+
+            for row in 0..<2 {
+                for column in 0..<2 {
+                    let horizontalOffset = (CGFloat(column) - 0.5) * pitch
+                    let center = CGPoint(
+                        x: playheadX + horizontalOffset,
+                        y: pixelSize / 2 + CGFloat(row) * pitch
+                    )
+                    let rect = CGRect(
+                        x: center.x - pixelSize / 2,
+                        y: center.y - pixelSize / 2,
+                        width: pixelSize,
+                        height: pixelSize
+                    )
+                    context.fill(
+                        Path(roundedRect: rect, cornerRadius: pixelSize * 0.14),
+                        with: .color(playheadColor.opacity(isActive ? 1 : 0.74))
+                    )
+                }
+            }
+        }
+    }
+
+    private func interpolatedSample(at column: Int, columnCount: Int) -> CGFloat {
+        guard let firstSample = samples.first else {
+            return 0
+        }
+        guard samples.count > 1, columnCount > 1 else {
+            return firstSample
+        }
+
+        let position = CGFloat(column) / CGFloat(columnCount - 1) * CGFloat(samples.count - 1)
+        let lowerIndex = Int(position.rounded(.down))
+        let upperIndex = min(lowerIndex + 1, samples.count - 1)
+        let fraction = position - CGFloat(lowerIndex)
+        return samples[lowerIndex] + (samples[upperIndex] - samples[lowerIndex]) * fraction
+    }
+}
+
+private struct RecordingDetailFactsGrid: View {
+    let createdAtText: String
+    let durationText: String
+    let languageText: String
+    let iCloudSyncStatus: RecordingICloudSyncStatus
+
+    private let columns = [
+        GridItem(.flexible(minimum: 0), spacing: 8, alignment: .leading),
+        GridItem(.flexible(minimum: 0), spacing: 8, alignment: .leading)
+    ]
+
+    private var iCloudTint: Color {
+        switch iCloudSyncStatus.state {
+        case .uploaded:
+            return AppTheme.success
+        case .uploading:
+            return AppTheme.info
+        case .waiting, .iCloudUnavailable:
+            return AppTheme.warning
+        case .failed:
+            return AppTheme.danger
+        case .localOnly:
+            return Color(uiColor: .secondaryLabel)
+        }
+    }
+
+    var body: some View {
+        LazyVGrid(columns: columns, alignment: .leading, spacing: 8) {
+            RecordingDetailFactCell(
+                systemImage: "calendar",
+                text: createdAtText,
+                tint: Color(uiColor: .secondaryLabel)
+            )
+            RecordingDetailFactCell(
+                systemImage: "clock",
+                text: durationText,
+                tint: Color(uiColor: .secondaryLabel)
+            )
+            RecordingDetailFactCell(
+                systemImage: "globe",
+                text: languageText,
+                tint: AppTheme.info
+            )
+            RecordingDetailFactCell(
+                systemImage: iCloudSyncStatus.systemImage,
+                text: iCloudSyncStatus.displayName,
+                tint: iCloudTint
+            )
+        }
+    }
+}
+
+private struct RecordingDetailFactCell: View {
+    let systemImage: String
+    let text: String
+    let tint: Color
+
+    var body: some View {
+        HStack(spacing: 7) {
+            Image(systemName: systemImage)
+                .font(.system(size: 12, weight: .semibold))
+                .foregroundStyle(tint)
+                .frame(width: 15)
+
+            Text(text)
+                .font(.redditSans(.caption, weight: .semibold))
+                .foregroundStyle(.secondary)
+                .lineLimit(1)
+                .minimumScaleFactor(0.72)
+                .allowsTightening(true)
+        }
+        .padding(.horizontal, 10)
+        .frame(maxWidth: .infinity, minHeight: 32, alignment: .leading)
+        .background(AppTheme.cardBackground, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+    }
+}
+
+private struct RecordingDetailContextStrip: View {
+    private struct EdgeFade: Equatable {
+        var leading: CGFloat = 0
+        var trailing: CGFloat = 0
+    }
+
+    @State private var edgeFade = EdgeFade()
+
+    let tags: [String]
+    let projectName: String?
+    let categoryName: String?
+    let location: RecordingLocation?
+
+    private static let edgeFadeWidth: CGFloat = 14
+
+    var body: some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: 7) {
+                if let projectName {
+                    RecordingDetailContextChip(
+                        systemImage: "briefcase.fill",
+                        text: projectName,
+                        tint: AppTheme.brand
+                    )
+                }
+
+                if let categoryName {
+                    RecordingDetailContextChip(
+                        systemImage: "folder.fill",
+                        text: categoryName,
+                        tint: AppTheme.purple
+                    )
+                }
+
+                ForEach(tags, id: \.self) { tag in
+                    RecordingDetailContextChip(
+                        systemImage: nil,
+                        text: tag,
+                        tint: AppTheme.info
+                    )
+                }
+
+                if let location {
+                    RecordingDetailContextChip(
+                        systemImage: "mappin.and.ellipse",
+                        tint: AppTheme.success
+                    ) {
+                        RecordingLocationNameText(location: location)
+                    }
+                }
+            }
+            .padding(.vertical, 1)
+        }
+        .onScrollGeometryChange(for: EdgeFade.self) { geometry in
+            let leadingOffset = max(
+                geometry.contentOffset.x + geometry.contentInsets.leading,
+                0
+            )
+            let maximumOffset = max(
+                geometry.contentSize.width
+                    + geometry.contentInsets.leading
+                    + geometry.contentInsets.trailing
+                    - geometry.containerSize.width,
+                0
+            )
+            let trailingOffset = max(maximumOffset - leadingOffset, 0)
+
+            return EdgeFade(
+                leading: min(leadingOffset / Self.edgeFadeWidth, 1),
+                trailing: min(trailingOffset / Self.edgeFadeWidth, 1)
+            )
+        } action: { _, newValue in
+            edgeFade = newValue
+        }
+        .mask {
+            HStack(spacing: 0) {
+                LinearGradient(
+                    colors: [
+                        Color.black.opacity(1 - Double(edgeFade.leading)),
+                        .black
+                    ],
+                    startPoint: .leading,
+                    endPoint: .trailing
+                )
+                .frame(width: Self.edgeFadeWidth)
+
+                Rectangle()
+                    .fill(.black)
+
+                LinearGradient(
+                    colors: [
+                        .black,
+                        Color.black.opacity(1 - Double(edgeFade.trailing))
+                    ],
+                    startPoint: .leading,
+                    endPoint: .trailing
+                )
+                .frame(width: Self.edgeFadeWidth)
+            }
+        }
+    }
+}
+
+private struct RecordingDetailContextChip<Content: View>: View {
+    @Environment(\.colorScheme) private var colorScheme
+
+    let systemImage: String?
+    let tint: Color
+    @ViewBuilder var content: Content
+
+    init(systemImage: String?, text: String, tint: Color) where Content == Text {
+        self.systemImage = systemImage
+        self.tint = tint
+        content = Text(text)
+    }
+
+    init(systemImage: String?, tint: Color, @ViewBuilder content: () -> Content) {
+        self.systemImage = systemImage
+        self.tint = tint
+        self.content = content()
+    }
+
+    var body: some View {
+        HStack(spacing: 5) {
+            if let systemImage {
+                Image(systemName: systemImage)
+                    .font(.system(size: 11, weight: .semibold))
+            }
+
+            content
+                .font(.redditSans(.caption2, weight: .semibold))
+                .lineLimit(1)
+        }
+        .foregroundStyle(tint)
+        .padding(.horizontal, 9)
+        .frame(height: 27)
+        .background {
+            ZStack {
+                Capsule()
+                    .fill(Color.primary.opacity(colorScheme == .dark ? 0.055 : 0))
+
+                Capsule()
+                    .fill(tint.opacity(colorScheme == .dark ? 0.15 : 0.10))
+            }
+        }
+        .overlay {
+            Capsule()
+                .strokeBorder(
+                    tint.opacity(colorScheme == .dark ? 0.42 : 0.09),
+                    lineWidth: colorScheme == .dark ? 0.8 : 0.5
+                )
+        }
     }
 }
 
