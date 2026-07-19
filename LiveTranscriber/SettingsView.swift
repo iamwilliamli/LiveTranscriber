@@ -6,7 +6,9 @@ struct SettingsView: View {
         case transcription
         case recording
         case intelligence
+        case geminiCloud
         case files
+        case iCloudSyncDetails
         case privacy
         case developer
         case transcriptionLanguage
@@ -18,9 +20,9 @@ struct SettingsView: View {
 
     @ObservedObject var transcriber: LiveTranscriptionManager
     @ObservedObject var recordingStore: RecordingStore
+    @ObservedObject private var geminiUsageTracker = GeminiTokenUsageTracker.shared
     @State private var navigationPath: [SettingsRoute] = []
     @State private var interactiveNavigationPopHasPlayedHaptic = false
-    @State private var iCloudSyncRefreshTick = 0
     @State private var pendingSpeechLocaleReleaseRequest: SpeechLocaleReleaseRequest?
     @State private var speechLocaleErrorMessage: String?
     @State private var feedbackErrorMessage: String?
@@ -48,6 +50,9 @@ struct SettingsView: View {
     @State private var localSummaryDownloadProgress: Double = 0
     @State private var localSummaryDownloadErrorMessage: String?
     @State private var localSummaryDeleteErrorMessage: String?
+    @State private var geminiAPIKey = (try? GeminiAPIKeyStore.load()) ?? ""
+    @State private var geminiAPIKeyErrorMessage: String?
+    @State private var isGeminiCloudEnabled = GeminiCloudConfiguration.isEnabled
     @AppStorage(OnboardingState.completedDefaultsKey) private var hasCompletedOnboarding = true
     @AppStorage(RecordingSummaryProvider.selectedDefaultsKey) private var selectedSummaryProviderRawValue = RecordingSummaryProvider.automatic.rawValue
     private static let publicBetaFeedbackURL = URL(string: "https://t.me/livetranscriber")!
@@ -73,8 +78,12 @@ struct SettingsView: View {
             recordingSettingsPage
         case .intelligence:
             intelligenceSettingsPage
+        case .geminiCloud:
+            geminiCloudSettingsPage
         case .files:
             fileSettingsPage
+        case .iCloudSyncDetails:
+            iCloudSyncDetailsPage
         case .privacy:
             privacySettingsPage
         case .developer:
@@ -347,6 +356,21 @@ struct SettingsView: View {
         } message: {
             Text(feedbackErrorMessage ?? "")
         }
+        .alert(
+            String(localized: L10n.GeminiCloud.settingsErrorTitle),
+            isPresented: Binding(
+                get: { geminiAPIKeyErrorMessage != nil },
+                set: { isPresented in
+                    if !isPresented {
+                        geminiAPIKeyErrorMessage = nil
+                    }
+                }
+            )
+        ) {
+            Button(String(localized: L10n.Common.ok), role: .cancel) {}
+        } message: {
+            Text(geminiAPIKeyErrorMessage ?? "")
+        }
     }
 
     private var transcriptionSettingsPage: some View {
@@ -364,12 +388,6 @@ struct SettingsView: View {
                 .buttonStyle(.plain)
                 .settingsNavigationHaptic()
                 .disabled(transcriber.isRecording || transcriber.isPreparing)
-
-                openAITranscriptionToggleSettings
-
-                if transcriber.isOpenAITranscriptionEnabled {
-                    openAITranscriptionAPIKeySettings
-                }
 
                 localWhisperModelSettings
 
@@ -400,6 +418,7 @@ struct SettingsView: View {
                                 systemImage: provider == selectedSummaryProvider ? "checkmark" : provider.systemImage
                             )
                         }
+                        .disabled(!provider.isCurrentlyAvailable)
                     }
                 } label: {
                     SettingsPickerRow(
@@ -433,10 +452,86 @@ struct SettingsView: View {
                 )
             }
 
+            SettingsSection(titleResource: L10n.GeminiCloud.cloudModelTitle, systemImage: "cloud", tint: AppTheme.purple) {
+                NavigationLink(value: SettingsRoute.geminiCloud) {
+                    SettingsNavigationRow(
+                        icon: "cloud",
+                        titleResource: L10n.GeminiCloud.settingsTitle,
+                        value: geminiCloudStatusText,
+                        subtitleResource: L10n.GeminiCloud.submenuDescription,
+                        tint: AppTheme.purple
+                    )
+                }
+                .buttonStyle(.plain)
+                .settingsNavigationHaptic()
+            }
+
             SettingsSection(titleResource: L10n.LocalSummary.modelTitle, systemImage: "cpu", tint: AppTheme.purple) {
                 localSummaryModelSettings
             }
         }
+    }
+
+    private var geminiCloudSettingsPage: some View {
+        SettingsDetailPage(titleResource: L10n.GeminiCloud.settingsTitle) {
+            SettingsSection(
+                titleResource: L10n.GeminiCloud.controlTitle,
+                systemImage: "cloud",
+                tint: AppTheme.purple
+            ) {
+                Toggle(isOn: geminiCloudEnabledBinding) {
+                    HStack(alignment: .top, spacing: 10) {
+                        SettingsIcon(systemImage: "power", tint: AppTheme.purple)
+
+                        VStack(alignment: .leading, spacing: 3) {
+                            Text(L10n.GeminiCloud.enableTitle)
+                                .font(.redditSans(.subheadline, weight: .semibold))
+                                .foregroundStyle(.primary)
+
+                            Text(L10n.GeminiCloud.enableDescription)
+                                .font(.redditSans(.caption))
+                                .foregroundStyle(.secondary)
+                                .fixedSize(horizontal: false, vertical: true)
+                        }
+                    }
+                }
+                .toggleStyle(.switch)
+                .disabled(transcriber.isRecording || transcriber.isPreparing)
+
+                SettingsStatusRow(
+                    icon: GeminiCloudConfiguration.isAvailable ? "checkmark.seal.fill" : "exclamationmark.triangle.fill",
+                    textResource: GeminiCloudConfiguration.isAvailable
+                        ? L10n.GeminiCloud.readyDescription
+                        : L10n.GeminiCloud.notReadyDescription,
+                    tint: GeminiCloudConfiguration.isAvailable ? AppTheme.success : AppTheme.warning
+                )
+            }
+
+            SettingsSection(
+                titleResource: L10n.GeminiCloud.apiConfigurationTitle,
+                systemImage: "key",
+                tint: AppTheme.purple
+            ) {
+                geminiCloudSettings
+            }
+
+            SettingsSection(
+                titleResource: L10n.GeminiCloud.usageTitle,
+                systemImage: "chart.bar",
+                tint: AppTheme.info
+            ) {
+                geminiUsageSettings
+            }
+        }
+    }
+
+    private var geminiCloudStatusText: String {
+        guard isGeminiCloudEnabled else {
+            return String(localized: L10n.GeminiCloud.statusOff)
+        }
+        return GeminiAPIKeyStore.isConfigured
+            ? String(localized: L10n.GeminiCloud.statusOn)
+            : String(localized: L10n.GeminiCloud.statusNeedsAPIKey)
     }
 
     private var localSummaryModelSettings: some View {
@@ -1144,28 +1239,46 @@ struct SettingsView: View {
         }
     }
 
-    private var openAITranscriptionAPIKeySettings: some View {
+    private var geminiCloudSettings: some View {
         VStack(alignment: .leading, spacing: 12) {
             SettingsSecureTextFieldRow(
                 icon: "key",
-                titleResource: L10n.Settings.openAIAPIKey,
-                promptResource: L10n.Settings.openAIAPIKeyPrompt,
-                text: openAIAPIKeyBinding,
+                titleResource: L10n.GeminiCloud.apiKey,
+                promptResource: L10n.GeminiCloud.apiKeyPrompt,
+                text: geminiAPIKeyBinding,
                 tint: AppTheme.purple
             )
             .disabled(transcriber.isRecording || transcriber.isPreparing)
 
-            SettingsStatusRow(icon: "key", textResource: L10n.Settings.openAIAPIKeyDescription, tint: AppTheme.warning)
-            SettingsStatusRow(icon: "cloud", textResource: L10n.Settings.openAIManualRetranscriptionUploadsAudio, tint: AppTheme.warning)
+            SettingsStatusRow(
+                icon: "lock.shield",
+                textResource: L10n.GeminiCloud.apiKeyDescription,
+                tint: AppTheme.info
+            )
+            SettingsStatusRow(
+                icon: "arrow.up.circle",
+                textResource: L10n.GeminiCloud.manualUploadDescription,
+                tint: AppTheme.warning
+            )
 
-            if !transcriber.openAIAPIKey.isEmpty {
+            if !geminiAPIKey.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
                 Button(role: .destructive) {
                     HapticFeedback.play(.menuSelection)
-                    transcriber.openAIAPIKey = ""
+                    do {
+                        try GeminiAPIKeyStore.delete()
+                        geminiAPIKey = ""
+                        if selectedSummaryProvider == .geminiCloud {
+                            selectSummaryProvider(.automatic)
+                        }
+                        recordingStore.refreshIntelligenceAvailability()
+                    } catch {
+                        geminiAPIKeyErrorMessage = error.localizedDescription
+                        HapticFeedback.play(.failure)
+                    }
                 } label: {
                     SettingsCommandRow(
                         icon: "trash",
-                        titleResource: L10n.Settings.clearOpenAIAPIKey,
+                        titleResource: L10n.GeminiCloud.clearAPIKey,
                         tint: AppTheme.danger
                     )
                 }
@@ -1175,32 +1288,122 @@ struct SettingsView: View {
         }
     }
 
-    private var openAITranscriptionToggleSettings: some View {
-        Toggle(isOn: openAITranscriptionEnabledBinding) {
-            HStack(alignment: .top, spacing: 10) {
-                SettingsIcon(systemImage: "cloud", tint: AppTheme.purple)
+    private var geminiUsageSettings: some View {
+        let usage = geminiUsageTracker.snapshot
 
-                VStack(alignment: .leading, spacing: 3) {
-                    Text(L10n.Settings.onlineOpenAI)
-                        .font(.redditSans(.subheadline, weight: .semibold))
-                        .foregroundStyle(.primary)
+        return VStack(alignment: .leading, spacing: 12) {
+            SettingsMetricRow(
+                icon: "cpu",
+                titleResource: L10n.GeminiCloud.usageModel,
+                value: GeminiCloudService.model,
+                tint: AppTheme.purple
+            )
+            SettingsMetricRow(
+                icon: "number",
+                titleResource: L10n.GeminiCloud.usageRequests,
+                value: formattedGeminiTokenCount(usage.requestCount),
+                tint: AppTheme.info
+            )
+            SettingsMetricRow(
+                icon: "clock.arrow.circlepath",
+                titleResource: L10n.GeminiCloud.usageLastRequest,
+                value: formattedGeminiTokenCount(usage.lastTotalTokens),
+                tint: AppTheme.info
+            )
+            SettingsMetricRow(
+                icon: "sum",
+                titleResource: L10n.GeminiCloud.usageTotalTokens,
+                value: formattedGeminiTokenCount(usage.totalTokens),
+                tint: AppTheme.info
+            )
+            SettingsMetricRow(
+                icon: "arrow.down.circle",
+                titleResource: L10n.GeminiCloud.usageInputTokens,
+                value: formattedGeminiTokenCount(usage.inputTokens),
+                tint: AppTheme.info
+            )
+            SettingsMetricRow(
+                icon: "arrow.up.circle",
+                titleResource: L10n.GeminiCloud.usageOutputTokens,
+                value: formattedGeminiTokenCount(usage.outputTokens),
+                tint: AppTheme.info
+            )
+            SettingsMetricRow(
+                icon: "brain",
+                titleResource: L10n.GeminiCloud.usageThoughtTokens,
+                value: formattedGeminiTokenCount(usage.thoughtTokens),
+                tint: AppTheme.purple
+            )
+            SettingsMetricRow(
+                icon: "bolt.horizontal.circle",
+                titleResource: L10n.GeminiCloud.usageCachedTokens,
+                value: formattedGeminiTokenCount(usage.cachedTokens),
+                tint: AppTheme.info
+            )
 
-                    Text(L10n.Settings.onlineOpenAIDescription)
-                        .font(.redditSans(.caption))
-                        .foregroundStyle(.secondary)
-                        .fixedSize(horizontal: false, vertical: true)
+            if let lastUpdatedAt = usage.lastUpdatedAt {
+                SettingsVerbatimStatusRow(
+                    icon: "clock",
+                    text: String(
+                        format: String(localized: L10n.GeminiCloud.usageUpdatedFormat),
+                        lastUpdatedAt.formatted(date: .abbreviated, time: .shortened)
+                    ),
+                    tint: AppTheme.info
+                )
+            }
+
+            SettingsStatusRow(
+                icon: "info.circle",
+                textResource: L10n.GeminiCloud.usageLocalDescription,
+                tint: AppTheme.info
+            )
+
+            if usage.requestCount > 0 {
+                Button(role: .destructive) {
+                    HapticFeedback.play(.menuSelection)
+                    geminiUsageTracker.reset()
+                } label: {
+                    SettingsCommandRow(
+                        icon: "arrow.counterclockwise",
+                        titleResource: L10n.GeminiCloud.resetUsage,
+                        tint: AppTheme.danger
+                    )
                 }
+                .buttonStyle(.plain)
             }
         }
-        .toggleStyle(.switch)
-        .disabled(transcriber.isRecording || transcriber.isPreparing)
     }
 
-    private var openAITranscriptionEnabledBinding: Binding<Bool> {
+    private var geminiCloudEnabledBinding: Binding<Bool> {
         Binding {
-            transcriber.isOpenAITranscriptionEnabled
+            isGeminiCloudEnabled
+        } set: { isEnabled in
+            HapticFeedback.play(.menuSelection)
+            isGeminiCloudEnabled = isEnabled
+            GeminiCloudConfiguration.setEnabled(isEnabled)
+            if !isEnabled, selectedSummaryProvider == .geminiCloud {
+                selectSummaryProvider(.automatic)
+            }
+            recordingStore.refreshIntelligenceAvailability()
+        }
+    }
+
+    private func formattedGeminiTokenCount(_ value: Int64) -> String {
+        value.formatted(.number.grouping(.automatic))
+    }
+
+    private var geminiAPIKeyBinding: Binding<String> {
+        Binding {
+            geminiAPIKey
         } set: { value in
-            transcriber.isOpenAITranscriptionEnabled = value
+            geminiAPIKey = value
+            do {
+                try GeminiAPIKeyStore.save(value)
+                recordingStore.refreshIntelligenceAvailability()
+            } catch {
+                geminiAPIKeyErrorMessage = error.localizedDescription
+                HapticFeedback.play(.failure)
+            }
         }
     }
 
@@ -1364,14 +1567,6 @@ struct SettingsView: View {
         }
     }
 
-    private var openAIAPIKeyBinding: Binding<String> {
-        Binding {
-            transcriber.openAIAPIKey
-        } set: { value in
-            transcriber.openAIAPIKey = value
-        }
-    }
-
     private var transcriptionLanguagePage: some View {
         SettingsDetailPage(titleResource: L10n.Settings.transcriptionLanguage) {
             SettingsSection(titleResource: L10n.Settings.transcriptionLanguage, systemImage: "globe", tint: AppTheme.info) {
@@ -1490,6 +1685,79 @@ struct SettingsView: View {
         }
     }
 
+    private var iCloudSyncDetailsPage: some View {
+        let summary = recordingStore.iCloudSyncSummary
+        let groups = iCloudSyncDetailGroups
+        let summaryTint = summary.failedRecordingCount > 0 ? AppTheme.danger : AppTheme.info
+
+        return SettingsDetailPage(titleResource: L10n.Settings.iCloudProgress) {
+            SettingsSection(
+                titleResource: L10n.Settings.iCloudProgress,
+                systemImage: summary.systemImage,
+                tint: summaryTint
+            ) {
+                SettingsMetricRow(
+                    icon: "waveform",
+                    titleResource: L10n.Settings.recordingCount,
+                    value: "\(summary.totalRecordingCount)",
+                    tint: summaryTint
+                )
+
+                SettingsVerbatimStatusRow(
+                    icon: summary.systemImage,
+                    text: summary.detailText,
+                    tint: summaryTint
+                )
+            }
+
+            if groups.isEmpty {
+                SettingsSection(
+                    titleResource: L10n.Settings.iCloudProgress,
+                    systemImage: "icloud",
+                    tint: AppTheme.info
+                ) {
+                    SettingsStatusRow(
+                        icon: "waveform",
+                        textResource: L10n.ICloud.noRecordingsToSync,
+                        tint: AppTheme.info
+                    )
+                }
+            } else {
+                ForEach(groups) { group in
+                    SettingsICloudSyncStatusSection(group: group)
+                }
+            }
+        }
+        .task {
+            recordingStore.refreshICloudSyncStatus(logDiagnostics: true)
+        }
+    }
+
+    private var iCloudSyncDetailGroups: [SettingsICloudSyncGroup] {
+        let entries = recordingStore.recordings.map { item in
+            SettingsICloudSyncEntry(
+                item: item,
+                status: recordingStore.iCloudSyncStatus(for: item)
+            )
+        }
+        let stateOrder: [RecordingICloudSyncState] = [
+            .failed,
+            .uploading,
+            .waiting,
+            .iCloudUnavailable,
+            .localOnly,
+            .uploaded
+        ]
+
+        return stateOrder.compactMap { state in
+            let matchingEntries = entries.filter { $0.status.state == state }
+            guard !matchingEntries.isEmpty else {
+                return nil
+            }
+            return SettingsICloudSyncGroup(state: state, entries: matchingEntries)
+        }
+    }
+
     private var iCloudStorageBinding: Binding<Bool> {
         Binding {
             recordingStore.isICloudStorageEnabled
@@ -1525,14 +1793,6 @@ struct SettingsView: View {
                     textResource: L10n.Settings.onDeviceProcessing,
                     tint: AppTheme.info
                 )
-
-                if transcriber.isOpenAITranscriptionEnabled {
-                    SettingsStatusRow(
-                        icon: "cloud",
-                        textResource: L10n.Settings.openAIManualRetranscriptionUploadsAudio,
-                        tint: AppTheme.warning
-                    )
-                }
 
                 SettingsStatusRow(
                     icon: "person.crop.circle.badge.xmark",
@@ -1640,7 +1900,6 @@ struct SettingsView: View {
     }
 
     private var fileSection: some View {
-        let refreshTick = iCloudSyncRefreshTick
         let iCloudSyncSummary = recordingStore.iCloudSyncSummary
         let iCloudSyncTint = iCloudSyncSummary.failedRecordingCount > 0 ? AppTheme.warning : AppTheme.info
 
@@ -1691,33 +1950,30 @@ struct SettingsView: View {
                 tint: recordingStore.isICloudStorageEnabled ? AppTheme.info : AppTheme.success
             )
 
-            SettingsMetricRow(
-                icon: iCloudSyncSummary.systemImage,
-                titleResource: L10n.Settings.iCloudProgress,
-                value: iCloudSyncSummary.statusText,
-                tint: iCloudSyncTint
-            )
-            .id(refreshTick)
-
-            SettingsVerbatimStatusRow(
-                icon: iCloudSyncSummary.systemImage,
-                text: iCloudSyncSummary.detailText,
-                tint: iCloudSyncTint
-            )
-            .id("detail-\(refreshTick)")
+            NavigationLink(value: SettingsRoute.iCloudSyncDetails) {
+                SettingsNavigationRow(
+                    icon: iCloudSyncSummary.systemImage,
+                    titleResource: L10n.Settings.iCloudProgress,
+                    value: iCloudSyncSummary.statusText,
+                    subtitle: iCloudSyncSummary.detailText,
+                    tint: iCloudSyncTint
+                )
+            }
+            .buttonStyle(.plain)
+            .settingsNavigationHaptic()
         }
     }
 
     private func refreshICloudSyncStatusPeriodically() async {
         while !Task.isCancelled {
+            await MainActor.run {
+                recordingStore.refreshICloudSyncStatus()
+            }
+
             do {
                 try await Task.sleep(nanoseconds: 5_000_000_000)
             } catch {
                 return
-            }
-
-            await MainActor.run {
-                iCloudSyncRefreshTick &+= 1
             }
         }
     }
@@ -1896,6 +2152,140 @@ private struct DeveloperDeviceInfo {
             pointer.withMemoryRebound(to: CChar.self, capacity: 1) { reboundPointer in
                 String(cString: reboundPointer)
             }
+        }
+    }
+}
+
+private struct SettingsICloudSyncEntry: Identifiable {
+    let item: RecordingItem
+    let status: RecordingICloudSyncStatus
+
+    var id: RecordingItem.ID { item.id }
+}
+
+private struct SettingsICloudSyncGroup: Identifiable {
+    let state: RecordingICloudSyncState
+    let entries: [SettingsICloudSyncEntry]
+
+    var id: String { state.settingsID }
+    var displayName: String { entries.first?.status.displayName ?? "" }
+    var systemImage: String { entries.first?.status.systemImage ?? "icloud" }
+    var tint: Color { state.settingsTint }
+}
+
+private struct SettingsICloudSyncStatusSection: View {
+    let group: SettingsICloudSyncGroup
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack(spacing: 10) {
+                SettingsIcon(systemImage: group.systemImage, tint: group.tint)
+
+                Text(group.displayName)
+                    .font(.redditSans(.headline, weight: .semibold))
+                    .foregroundStyle(.primary)
+
+                Spacer(minLength: 12)
+
+                Text("\(group.entries.count)")
+                    .font(.redditSans(.caption, weight: .bold).monospacedDigit())
+                    .foregroundStyle(group.tint)
+                    .padding(.horizontal, 9)
+                    .frame(height: 26)
+                    .background(group.tint.opacity(0.12), in: Capsule())
+            }
+
+            VStack(spacing: 0) {
+                ForEach(group.entries) { entry in
+                    SettingsICloudSyncRecordingRow(entry: entry, tint: group.tint)
+
+                    if entry.id != group.entries.last?.id {
+                        Divider()
+                            .padding(.leading, 38)
+                    }
+                }
+            }
+        }
+        .settingsSurface()
+    }
+}
+
+private struct SettingsICloudSyncRecordingRow: View {
+    let entry: SettingsICloudSyncEntry
+    let tint: Color
+
+    private var supplementalFileProgress: String? {
+        switch entry.status.state {
+        case .waiting, .failed:
+            guard entry.status.totalFileCount > 0 else {
+                return nil
+            }
+            return String(
+                format: String(localized: L10n.ICloud.filesUploadedFormat),
+                entry.status.uploadedFileCount,
+                entry.status.totalFileCount
+            )
+        case .localOnly, .iCloudUnavailable, .uploading, .uploaded:
+            return nil
+        }
+    }
+
+    var body: some View {
+        HStack(alignment: .top, spacing: 10) {
+            Image(systemName: entry.status.systemImage)
+                .font(.system(size: 14, weight: .semibold))
+                .foregroundStyle(tint)
+                .frame(width: 28, height: 28)
+                .background(tint.opacity(0.10), in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+
+            VStack(alignment: .leading, spacing: 4) {
+                Text(entry.item.audioFileName)
+                    .font(.redditSans(.subheadline, weight: .semibold))
+                    .foregroundStyle(.primary)
+                    .lineLimit(1)
+                    .truncationMode(.middle)
+
+                Text(entry.item.createdAt, format: .dateTime.year().month().day().hour().minute())
+                    .font(.redditSans(.caption))
+                    .foregroundStyle(.secondary)
+
+                Text(entry.status.detailText)
+                    .font(.redditSans(.caption))
+                    .foregroundStyle(entry.status.state == .failed ? AppTheme.danger : Color.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+
+                if let supplementalFileProgress {
+                    Text(supplementalFileProgress)
+                        .font(.redditSans(.caption, weight: .semibold).monospacedDigit())
+                        .foregroundStyle(tint)
+                }
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+        }
+        .padding(.vertical, 8)
+    }
+}
+
+private extension RecordingICloudSyncState {
+    var settingsID: String {
+        switch self {
+        case .localOnly: return "localOnly"
+        case .iCloudUnavailable: return "iCloudUnavailable"
+        case .waiting: return "waiting"
+        case .uploading: return "uploading"
+        case .uploaded: return "uploaded"
+        case .failed: return "failed"
+        }
+    }
+
+    var settingsTint: Color {
+        switch self {
+        case .localOnly: return .secondary
+        case .iCloudUnavailable: return AppTheme.warning
+        case .waiting: return AppTheme.warning
+        case .uploading: return AppTheme.info
+        case .uploaded: return AppTheme.success
+        case .failed: return AppTheme.danger
         }
     }
 }

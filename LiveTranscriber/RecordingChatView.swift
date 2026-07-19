@@ -175,6 +175,8 @@ final class RecordingChatEngine: ObservableObject {
             try await appleStreamAnswer(question: question, context: context)
         case .localQwen:
             try await localStreamAnswer(question: question, context: context)
+        case .geminiCloud:
+            try await geminiStreamAnswer(question: question, context: context)
         case .automatic:
             if RecordingSummaryProvider.appleIntelligence.isCurrentlyAvailable {
                 do {
@@ -191,6 +193,30 @@ final class RecordingChatEngine: ObservableObject {
             }
             try await localStreamAnswer(question: question, context: context)
         }
+    }
+
+    private func geminiStreamAnswer(question: String, context: RecordingChatContext) async throws {
+        analysisStatusText = localized(L10n.Recordings.chatGeneratingAnswer)
+        let history = messages
+            .dropLast()
+            .suffix(6)
+            .filter { !$0.isError }
+            .map { message in
+                let label = message.role == .user ? "User" : "Assistant"
+                return "\(label): \(Self.limited(message.text, to: 500))"
+            }
+            .joined(separator: "\n")
+        let answer = try await GeminiCloudService.answerQuestion(
+            question: question,
+            transcript: context.transcript,
+            summary: context.summary,
+            languageName: context.languageName,
+            history: history
+        )
+
+        streamBuffer = answer
+        isStreamFinished = true
+        await revealLoop(messageID: UUID())
     }
 
     private func appleStreamAnswer(question: String, context: RecordingChatContext) async throws {

@@ -211,6 +211,101 @@ private struct ActivityShareSheet: UIViewControllerRepresentable {
     func updateUIViewController(_ uiViewController: UIActivityViewController, context: Context) {}
 }
 
+private struct ManualGeminiJSONImportSheet: View {
+    @Binding var jsonText: String
+    let errorMessage: String?
+    let onPaste: () -> Void
+    let onImport: () -> Void
+    let onCancel: () -> Void
+    @FocusState private var isEditorFocused: Bool
+
+    var body: some View {
+        NavigationStack {
+            ScrollView {
+                VStack(alignment: .leading, spacing: 16) {
+                    HStack(alignment: .top, spacing: 12) {
+                        Image(systemName: "sparkles")
+                            .font(.system(size: 17, weight: .bold))
+                            .foregroundStyle(AppTheme.purple)
+                            .frame(width: 38, height: 38)
+                            .background(AppTheme.purple.opacity(0.12), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+
+                        Text(L10n.Recordings.manualGeminiImportInstructions)
+                            .font(.redditSans(.subheadline))
+                            .foregroundStyle(.secondary)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                    .padding(14)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .background(AppTheme.cardBackground, in: RoundedRectangle(cornerRadius: AppTheme.cornerRadius, style: .continuous))
+                    .overlay {
+                        RoundedRectangle(cornerRadius: AppTheme.cornerRadius, style: .continuous)
+                            .stroke(AppTheme.cardBorder, lineWidth: 1)
+                    }
+
+                    VStack(alignment: .leading, spacing: 12) {
+                        ZStack(alignment: .topLeading) {
+                            if jsonText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                                Text(L10n.Recordings.manualGeminiJSONPlaceholder)
+                                    .font(.system(.footnote, design: .monospaced))
+                                    .foregroundStyle(.tertiary)
+                                    .padding(.horizontal, 5)
+                                    .padding(.vertical, 8)
+                                    .allowsHitTesting(false)
+                            }
+
+                            TextEditor(text: $jsonText)
+                                .font(.system(.footnote, design: .monospaced))
+                                .textInputAutocapitalization(.never)
+                                .autocorrectionDisabled()
+                                .scrollContentBackground(.hidden)
+                                .focused($isEditorFocused)
+                        }
+                        .frame(minHeight: 290)
+                        .padding(10)
+                        .background(AppTheme.elevatedBackground, in: RoundedRectangle(cornerRadius: AppTheme.cornerRadius, style: .continuous))
+                        .overlay {
+                            RoundedRectangle(cornerRadius: AppTheme.cornerRadius, style: .continuous)
+                                .stroke(AppTheme.cardBorder, lineWidth: 1)
+                        }
+
+                        Button(action: onPaste) {
+                            Label(localized(L10n.Recordings.manualGeminiPasteClipboard), systemImage: "doc.on.clipboard")
+                                .font(.redditSans(.subheadline, weight: .semibold))
+                                .frame(maxWidth: .infinity)
+                        }
+                        .buttonStyle(.bordered)
+                    }
+
+                    if let errorMessage {
+                        Label(errorMessage, systemImage: "exclamationmark.triangle.fill")
+                            .font(.redditSans(.subheadline, weight: .semibold))
+                            .foregroundStyle(AppTheme.warning)
+                            .fixedSize(horizontal: false, vertical: true)
+                            .padding(12)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .background(AppTheme.warning.opacity(0.1), in: RoundedRectangle(cornerRadius: AppTheme.compactCornerRadius, style: .continuous))
+                    }
+                }
+                .padding()
+            }
+            .background(AppTheme.groupedBackground.ignoresSafeArea())
+            .navigationTitle(localized(L10n.Recordings.manualGeminiImportJSON))
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button(localized(L10n.Common.cancel), action: onCancel)
+                }
+
+                ToolbarItem(placement: .confirmationAction) {
+                    Button(localized(L10n.Recordings.manualGeminiImportTranscript), action: onImport)
+                        .disabled(jsonText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                }
+            }
+        }
+    }
+}
+
 private func localWhisperDownloadedModels() -> [LocalWhisperModel] {
     LocalWhisperModelManager.downloadedStatuses().map(\.model)
 }
@@ -789,15 +884,12 @@ struct RecordingsView: View {
         }
     }
 
-    private var visibleCategoryFolders: [RecordingCategoryFolder] {
+    private var searchResultRecordings: [RecordingItem] {
         let query = normalizedSearchText(searchText)
         guard !query.isEmpty else {
-            return categoryFolders
+            return []
         }
-        return categoryFolders.filter { folder in
-            folder.name.normalizedForRecordingSearch.contains(query)
-                || recordings(in: folder.id).contains { recording($0, matches: query) }
-        }
+        return store.recordings.filter { recording($0, matches: query) }
     }
 
     private var isSearchingCategoryRoot: Bool {
@@ -1106,9 +1198,6 @@ struct RecordingsView: View {
                         beginNewCategory(assigning: item)
                     },
                     onUpdateCategory: updateRecordingCategory,
-                    onRetranscribeWithOpenAI: { item, mode in
-                        retranscribeWithOpenAI(item, mode: mode)
-                    },
                     onRetranscribeWithLocalWhisper: { item in
                         localWhisperRetranscriptionRequest = LocalWhisperRetranscriptionRequest(item: item)
                     },
@@ -1150,16 +1239,24 @@ struct RecordingsView: View {
                     .transition(.move(edge: .top).combined(with: .opacity))
             }
 
-            if visibleCategoryFolders.isEmpty && videoImportProgressState == nil {
-                EmptyStateView(
-                    icon: isSearchingCategoryRoot ? "magnifyingglass" : "folder",
-                    titleResource: isSearchingCategoryRoot ? L10n.Recordings.noSearchResults : L10n.Recordings.noRecordings
-                )
+            if isSearchingCategoryRoot {
+                if searchResultRecordings.isEmpty && videoImportProgressState == nil {
+                    EmptyStateView(icon: "magnifyingglass", titleResource: L10n.Recordings.noSearchResults)
+                        .frame(maxWidth: .infinity, minHeight: 320)
+                        .listRowSeparator(.hidden)
+                        .listRowBackground(Color.clear)
+                } else {
+                    ForEach(searchResultRecordings) { item in
+                        searchResultRecordingRow(item)
+                    }
+                }
+            } else if categoryFolders.isEmpty && videoImportProgressState == nil {
+                EmptyStateView(icon: "folder", titleResource: L10n.Recordings.noRecordings)
                     .frame(maxWidth: .infinity, minHeight: 320)
                     .listRowSeparator(.hidden)
                     .listRowBackground(Color.clear)
             } else {
-                ForEach(visibleCategoryFolders) { folder in
+                ForEach(categoryFolders) { folder in
                     categoryFolderRow(folder)
                 }
             }
@@ -1298,6 +1395,95 @@ struct RecordingsView: View {
                 } label: {
                     Label(localized(L10n.Recordings.deleteCategory), systemImage: "trash")
                 }
+            }
+        }
+    }
+
+    private func searchResultRecordingRow(_ item: RecordingItem) -> some View {
+        let isTranscriptionRunning = item.importStatus?.isFailed == false
+        let isTranscriptionActionDisabled = item.isTranscriptLocked
+            || isTranscriptionRunning
+            || transcriber.isRecording
+            || transcriber.isPreparing
+
+        return RecordingRow(
+            item: item,
+            isAnalyzing: analyzingRecordingID == item.id,
+            canGenerateIntelligence: store.intelligenceAvailability.isAvailable
+        ) {
+            openRecording(item)
+        }
+        .listRowSeparator(.hidden)
+        .listRowBackground(Color.clear)
+        .listRowInsets(EdgeInsets(top: 6, leading: 16, bottom: 6, trailing: 16))
+        .contextMenu {
+            Button {
+                HapticFeedback.play(.copy)
+                UIPasteboard.general.string = store.transcriptText(for: item)
+            } label: {
+                Label(localized(L10n.Recordings.copyTranscript), systemImage: "doc.on.doc")
+            }
+
+            RecordingCategoryMenu(
+                selection: item.categoryName,
+                categories: categoryNames,
+                onRequestNewCategory: {
+                    beginNewCategory(assigning: item)
+                },
+                onSelect: { categoryName in
+                    updateRecordingCategory(item, categoryName)
+                }
+            ) {
+                Label(localized(L10n.Recordings.moveToCategory), systemImage: "folder")
+            }
+
+            if store.summaryProviderAvailability.hasAnyAvailableProvider {
+                Button {
+                    analyze(item, summaryProvider: .automatic)
+                } label: {
+                    Label(localized(L10n.Recordings.analyze), systemImage: "sparkles")
+                }
+                .disabled(analyzingRecordingID != nil)
+            }
+
+            Button {
+                appleSpeechRetranscriptionRequest = AppleSpeechRetranscriptionRequest(item: item)
+            } label: {
+                Label(localized(L10n.Recordings.retranscribe), systemImage: "arrow.triangle.2.circlepath")
+            }
+            .disabled(isTranscriptionActionDisabled)
+
+            LocalWhisperRetranscriptionButton(
+                downloadedModels: downloadedLocalWhisperModels,
+                isDisabled: isTranscriptionActionDisabled
+            ) {
+                localWhisperRetranscriptionRequest = LocalWhisperRetranscriptionRequest(item: item)
+            }
+
+            Button(role: .destructive) {
+                HapticFeedback.play(.deleteRequested)
+                deleteRequest = RecordingDeleteRequest(item: item)
+            } label: {
+                Label(localized(L10n.Recordings.deleteRecording), systemImage: "trash")
+            }
+        }
+        .swipeActions(edge: .trailing) {
+            Button(role: .destructive) {
+                HapticFeedback.play(.deleteRequested)
+                deleteRequest = RecordingDeleteRequest(item: item)
+            } label: {
+                Label(localized(L10n.Recordings.deleteRecording), systemImage: "trash")
+            }
+        }
+        .swipeActions(edge: .leading) {
+            if store.summaryProviderAvailability.hasAnyAvailableProvider {
+                Button {
+                    analyze(item, summaryProvider: .automatic)
+                } label: {
+                    Label(localized(L10n.Recordings.analyze), systemImage: "sparkles")
+                }
+                .tint(AppTheme.info)
+                .disabled(analyzingRecordingID != nil)
             }
         }
     }
@@ -1545,38 +1731,6 @@ struct RecordingsView: View {
         }
     }
 
-    private func retranscribeWithOpenAI(_ item: RecordingItem, mode: OpenAIFileTranscriptionMode) {
-        guard transcriber.isOpenAITranscriptionEnabled else {
-            HapticFeedback.play(.blocked)
-            return
-        }
-        guard item.importStatus?.isFailed != false else {
-            HapticFeedback.play(.blocked)
-            return
-        }
-        guard !transcriber.isRecording, !transcriber.isPreparing else {
-            HapticFeedback.play(.blocked)
-            return
-        }
-
-        let language = TranscriptionLanguage(id: item.languageID)
-        HapticFeedback.play(.retranscribeStart)
-        Task {
-            do {
-                try await store.retranscribeWithOpenAI(
-                    item,
-                    language: language,
-                    apiKey: transcriber.openAIAPIKey,
-                    mode: mode
-                )
-                HapticFeedback.play(.retranscribeComplete)
-            } catch {
-                transcriptionErrorMessage = error.localizedDescription
-                HapticFeedback.play(.failure)
-            }
-        }
-    }
-
     private func retranscribeWithLocalWhisper(_ item: RecordingItem, language: TranscriptionLanguage, model: LocalWhisperModel? = nil) {
         guard item.importStatus?.isFailed != false else {
             HapticFeedback.play(.blocked)
@@ -1633,17 +1787,6 @@ struct RecordingsView: View {
 
     private func normalizedSearchText(_ text: String) -> String {
         text.normalizedForRecordingSearch
-    }
-
-    private func recordings(in categoryID: String?) -> [RecordingItem] {
-        guard let categoryID else {
-            return []
-        }
-        if categoryID == Self.uncategorizedCategoryID {
-            return store.recordings.filter { $0.categoryName == nil }
-        }
-        let matchKey = categoryID.normalizedForRecordingSearch
-        return store.recordings.filter { $0.categoryName?.normalizedForRecordingSearch == matchKey }
     }
 
     private func categoryFolder(for id: String) -> RecordingCategoryFolder? {
@@ -1948,7 +2091,6 @@ private struct RecordingCategoryDetailList: View {
     let onRequestRetranscription: (RecordingItem) -> Void
     let onRequestNewCategory: (RecordingItem) -> Void
     let onUpdateCategory: (RecordingItem, String?) -> Void
-    let onRetranscribeWithOpenAI: (RecordingItem, OpenAIFileTranscriptionMode) -> Void
     let onRetranscribeWithLocalWhisper: (RecordingItem) -> Void
     let onAddRecordings: (RecordingCategoryFolder) -> Void
     @State private var searchText = ""
@@ -2035,31 +2177,6 @@ private struct RecordingCategoryDetailList: View {
                         Label(localized(L10n.Recordings.retranscribe), systemImage: "arrow.triangle.2.circlepath")
                     }
                     .disabled(isTranscriptionActionDisabled)
-
-                    if transcriber.isOpenAITranscriptionEnabled {
-                        Menu {
-                            Button {
-                                onRetranscribeWithOpenAI(item, .longForm)
-                            } label: {
-                                Label(localized(L10n.Recordings.retranscribeWithOpenAILongForm), systemImage: "text.alignleft")
-                            }
-
-                            Button {
-                                onRetranscribeWithOpenAI(item, .segmented)
-                            } label: {
-                                Label(localized(L10n.Recordings.retranscribeWithOpenAISegmented), systemImage: "list.bullet.rectangle")
-                            }
-
-                            Button {
-                                onRetranscribeWithOpenAI(item, .refinedSegments)
-                            } label: {
-                                Label(localized(L10n.Recordings.retranscribeWithOpenAIRefinedSegments), systemImage: "wand.and.sparkles")
-                            }
-                        } label: {
-                            Label(localized(L10n.Recordings.retranscribeWithOpenAI), systemImage: "cloud")
-                        }
-                        .disabled(isTranscriptionActionDisabled)
-                    }
 
                     LocalWhisperRetranscriptionButton(
                         downloadedModels: downloadedLocalWhisperModels,
@@ -3121,6 +3238,11 @@ struct RecordingDetailView: View {
     @State private var pendingSpeechLocaleReleaseAction: PendingSpeechLocaleReleaseAction?
     @State private var isShowingAppleSpeechRetranscriptionPicker = false
     @State private var isShowingLocalWhisperRetranscriptionPicker = false
+    @State private var isShowingGeminiProcessingConfirmation = false
+    @State private var isShowingGeminiRestoreConfirmation = false
+    @State private var isShowingManualGeminiJSONImport = false
+    @State private var manualGeminiJSONText = ""
+    @State private var manualGeminiImportErrorMessage: String?
     @AppStorage(RecordingSummaryProvider.selectedDefaultsKey) private var selectedSummaryProviderRawValue = RecordingSummaryProvider.automatic.rawValue
     @State private var selectedDetailPage: RecordingDetailPage = .transcript
     @StateObject private var chatEngine = RecordingChatEngine()
@@ -3140,7 +3262,10 @@ struct RecordingDetailView: View {
             currentItem.transcriptFileName,
             "\(currentItem.lineCount)",
             "\(currentItem.transcriptPreview.hashValue)",
-            "\(currentItem.importStatus == nil)"
+            "\(currentItem.importStatus == nil)",
+            currentItem.speakerDiarization.map {
+                "\($0.schemaVersion)-\($0.segments.count)-\($0.generatedAt.timeIntervalSinceReferenceDate)"
+            } ?? "no-speaker-diarization"
         ].joined(separator: "-")
     }
 
@@ -3421,6 +3546,18 @@ struct RecordingDetailView: View {
             .presentationDetents([.medium, .large])
             .presentationDragIndicator(.visible)
         }
+        .sheet(isPresented: $isShowingManualGeminiJSONImport) {
+            ManualGeminiJSONImportSheet(
+                jsonText: $manualGeminiJSONText,
+                errorMessage: manualGeminiImportErrorMessage,
+                onPaste: pasteManualGeminiJSONFromClipboard,
+                onImport: importManualGeminiJSON,
+                onCancel: dismissManualGeminiJSONImport
+            )
+            .interactiveDismissDisabled(false)
+            .presentationDetents([.large])
+            .presentationDragIndicator(.visible)
+        }
         .sheet(item: $exportShareItem) { item in
             ActivityShareSheet(activityItems: [item.url])
                 .ignoresSafeArea()
@@ -3490,6 +3627,28 @@ struct RecordingDetailView: View {
             Button(localized(L10n.Common.ok), role: .cancel) {}
         } message: {
             Text(analysisErrorMessage ?? "")
+        }
+        .alert(
+            localized(L10n.Recordings.processWithGemini),
+            isPresented: $isShowingGeminiProcessingConfirmation
+        ) {
+            Button(localized(L10n.Recordings.uploadAndProcess)) {
+                processCurrentItemWithGemini()
+            }
+            Button(localized(L10n.Common.cancel), role: .cancel) {}
+        } message: {
+            Text(L10n.Recordings.geminiProcessingConfirmation)
+        }
+        .alert(
+            localized(L10n.Recordings.restoreBeforeGemini),
+            isPresented: $isShowingGeminiRestoreConfirmation
+        ) {
+            Button(localized(L10n.Recordings.restoreTranscript)) {
+                restoreCurrentTranscriptBeforeGemini()
+            }
+            Button(localized(L10n.Common.cancel), role: .cancel) {}
+        } message: {
+            Text(L10n.Recordings.restoreBeforeGeminiConfirmation)
         }
         .alert(
             localized(L10n.Recordings.transcriptionFailed),
@@ -3658,27 +3817,40 @@ struct RecordingDetailView: View {
             }
             .disabled(currentItem.isTranscriptLocked || isTranscriptionRunning || transcriber.isRecording || transcriber.isPreparing)
 
-            if transcriber.isOpenAITranscriptionEnabled {
-                Menu {
-                    Button {
-                        retranscribeCurrentItemWithOpenAI(mode: .longForm)
-                    } label: {
-                        Label(localized(L10n.Recordings.retranscribeWithOpenAILongForm), systemImage: "text.alignleft")
-                    }
-
-                    Button {
-                        retranscribeCurrentItemWithOpenAI(mode: .segmented)
-                    } label: {
-                        Label(localized(L10n.Recordings.retranscribeWithOpenAISegmented), systemImage: "list.bullet.rectangle")
-                    }
-
-                    Button {
-                        retranscribeCurrentItemWithOpenAI(mode: .refinedSegments)
-                    } label: {
-                        Label(localized(L10n.Recordings.retranscribeWithOpenAIRefinedSegments), systemImage: "wand.and.sparkles")
-                    }
+            Menu {
+                Button {
+                    shareCurrentAudioWithGeminiApp()
                 } label: {
-                    Label(localized(L10n.Recordings.retranscribeWithOpenAI), systemImage: "cloud")
+                    Label(localized(L10n.Recordings.manualGeminiShareAndCopyPrompt), systemImage: "square.and.arrow.up")
+                }
+                .disabled(isTranscriptionRunning)
+
+                Button {
+                    prepareManualGeminiJSONImport()
+                } label: {
+                    Label(localized(L10n.Recordings.manualGeminiImportJSON), systemImage: "doc.on.clipboard")
+                }
+                .disabled(currentItem.isTranscriptLocked || isTranscriptionRunning || transcriber.isRecording || transcriber.isPreparing)
+            } label: {
+                Label(localized(L10n.Recordings.manualGemini), systemImage: "sparkles")
+            }
+
+            if store.summaryProviderAvailability.isGeminiCloudAvailable {
+                Button {
+                    HapticFeedback.play(.menuSelection)
+                    isShowingGeminiProcessingConfirmation = true
+                } label: {
+                    Label(localized(L10n.Recordings.processWithGemini), systemImage: "cloud")
+                }
+                .disabled(currentItem.isTranscriptLocked || isTranscriptionRunning || transcriber.isRecording || transcriber.isPreparing)
+            }
+
+            if store.hasGeminiTranscriptBackup(for: currentItem) {
+                Button {
+                    HapticFeedback.play(.menuSelection)
+                    isShowingGeminiRestoreConfirmation = true
+                } label: {
+                    Label(localized(L10n.Recordings.restoreBeforeGemini), systemImage: "arrow.uturn.backward")
                 }
                 .disabled(currentItem.isTranscriptLocked || isTranscriptionRunning || transcriber.isRecording || transcriber.isPreparing)
             }
@@ -4220,6 +4392,7 @@ struct RecordingDetailView: View {
 
                     RecordingAudioParameterGroup(titleResource: L10n.Recordings.storage) {
                         RecordingAudioParameterRow(icon: "doc.text", titleResource: L10n.Recordings.fileName, value: audioFileInfo.fileName)
+                        RecordingAudioParameterRow(icon: "calendar", titleResource: L10n.Recordings.fileCreationDate, value: audioFileInfo.fileCreationDateText)
                         RecordingAudioParameterRow(icon: "doc", titleResource: L10n.Recordings.fileSize, value: audioFileInfo.fileSizeText)
                         RecordingAudioParameterRow(icon: iCloudSyncStatus.systemImage, titleResource: L10n.Recordings.iCloudSync, value: iCloudSyncStatus.displayName, showsDivider: false)
                     }
@@ -4393,6 +4566,9 @@ struct RecordingDetailView: View {
         let item = currentItem
         let lines = cachedTranscriptLines
         let currentLineID = StoredTranscriptLine.currentLineID(in: lines, time: player.currentTime)
+        let speakers = TranscriptSpeakerPresentation.makePresentations(for: lines)
+        let speakerByID = Dictionary(uniqueKeysWithValues: speakers.map { ($0.id, $0) })
+        let showsSpeakerDistinction = speakers.count > 1
 
         return VStack(alignment: .leading, spacing: 12) {
             HStack(alignment: .center, spacing: 12) {
@@ -4416,6 +4592,10 @@ struct RecordingDetailView: View {
                     .disabled(lines.isEmpty || isTranscriptionRunning)
             }
 
+            if showsSpeakerDistinction {
+                TranscriptSpeakerLegend(speakers: speakers)
+            }
+
             transcriptTranslationStatus
 
             if let importStatus = item.importStatus {
@@ -4433,6 +4613,7 @@ struct RecordingDetailView: View {
                     ForEach(lines) { line in
                         StoredTranscriptLineRow(
                             line: line,
+                            speaker: showsSpeakerDistinction ? line.speaker.flatMap { speakerByID[$0] } : nil,
                             translatedText: translatedTranscriptByLineID[line.id],
                             isShowingTranslation: isTranslatingTranscript && selectedTranslationLanguage != nil && translatedTranscriptByLineID[line.id] == nil,
                             isCurrent: line.id == currentLineID
@@ -4561,6 +4742,57 @@ struct RecordingDetailView: View {
             exportErrorMessage = error.localizedDescription
             HapticFeedback.play(.failure)
         }
+    }
+
+    private func shareCurrentAudioWithGeminiApp() {
+        let prompt = GeminiCloudService.manualTranscriptionPrompt(
+            languageName: currentItem.localizedLanguageName
+        )
+        UIPasteboard.general.string = prompt
+        exportShareItem = ShareSheetItem(url: store.audioURL(for: currentItem))
+        HapticFeedback.play(.primaryAction)
+    }
+
+    private func prepareManualGeminiJSONImport() {
+        manualGeminiJSONText = ""
+        manualGeminiImportErrorMessage = nil
+        isShowingManualGeminiJSONImport = true
+        HapticFeedback.play(.menuSelection)
+    }
+
+    private func pasteManualGeminiJSONFromClipboard() {
+        guard let clipboardText = UIPasteboard.general.string,
+              !clipboardText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+            manualGeminiImportErrorMessage = localized(L10n.Recordings.manualGeminiClipboardEmpty)
+            HapticFeedback.play(.blocked)
+            return
+        }
+
+        manualGeminiJSONText = clipboardText
+        manualGeminiImportErrorMessage = nil
+        HapticFeedback.play(.copy)
+    }
+
+    private func importManualGeminiJSON() {
+        do {
+            _ = try store.importManualGeminiTranscriptionJSON(
+                manualGeminiJSONText,
+                for: currentItem
+            )
+            manualGeminiImportErrorMessage = nil
+            manualGeminiJSONText = ""
+            isShowingManualGeminiJSONImport = false
+            HapticFeedback.play(.retranscribeComplete)
+        } catch {
+            manualGeminiImportErrorMessage = error.localizedDescription
+            HapticFeedback.play(.failure)
+        }
+    }
+
+    private func dismissManualGeminiJSONImport() {
+        manualGeminiImportErrorMessage = nil
+        manualGeminiJSONText = ""
+        isShowingManualGeminiJSONImport = false
     }
 
     private func analyzeCurrentMeeting(summaryProvider: RecordingSummaryProvider) {
@@ -4818,14 +5050,18 @@ struct RecordingDetailView: View {
 
         var translatedLines: [String] = []
         for line in cachedTranscriptLines {
-            guard !line.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+            guard !line.spokenText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
                 continue
             }
             guard let translatedText = translatedTranscriptByLineID[line.id]?.trimmingCharacters(in: .whitespacesAndNewlines),
                   !translatedText.isEmpty else {
                 return nil
             }
-            translatedLines.append(translatedText)
+            if let speaker = line.speaker {
+                translatedLines.append("\(speaker): \(translatedText)")
+            } else {
+                translatedLines.append(translatedText)
+            }
         }
 
         guard !translatedLines.isEmpty else {
@@ -4919,36 +5155,34 @@ struct RecordingDetailView: View {
         }
     }
 
-    private func retranscribeCurrentItemWithOpenAI(mode: OpenAIFileTranscriptionMode) {
-        guard transcriber.isOpenAITranscriptionEnabled else {
-            HapticFeedback.play(.blocked)
-            return
-        }
-        guard !isTranscriptionRunning else {
-            HapticFeedback.play(.blocked)
-            return
-        }
-        guard !transcriber.isRecording, !transcriber.isPreparing else {
+    private func processCurrentItemWithGemini() {
+        guard !isTranscriptionRunning,
+              !transcriber.isRecording,
+              !transcriber.isPreparing else {
             HapticFeedback.play(.blocked)
             return
         }
 
         let item = currentItem
-        let language = TranscriptionLanguage(id: item.languageID)
         HapticFeedback.play(.retranscribeStart)
         Task {
             do {
-                try await store.retranscribeWithOpenAI(
-                    item,
-                    language: language,
-                    apiKey: transcriber.openAIAPIKey,
-                    mode: mode
-                )
+                try await store.processWithGeminiCloud(item)
                 HapticFeedback.play(.retranscribeComplete)
             } catch {
                 transcriptionErrorMessage = error.localizedDescription
                 HapticFeedback.play(.failure)
             }
+        }
+    }
+
+    private func restoreCurrentTranscriptBeforeGemini() {
+        do {
+            _ = try store.restoreTranscriptBeforeGemini(for: currentItem)
+            HapticFeedback.play(.menuSelection)
+        } catch {
+            transcriptionErrorMessage = error.localizedDescription
+            HapticFeedback.play(.failure)
         }
     }
 
@@ -4993,9 +5227,10 @@ struct RecordingDetailView: View {
     private func refreshTranscriptCache() async {
         let item = currentItem
         let transcriptURL = store.transcriptURL(for: item)
+        let speakerDiarization = item.speakerDiarization
         let lines = await Task.detached(priority: .utility) {
             let text = (try? String(contentsOf: transcriptURL, encoding: .utf8)) ?? ""
-            return StoredTranscriptLine.parse(text)
+            return StoredTranscriptLine.parse(text, speakerDiarization: speakerDiarization)
         }.value
 
         guard currentItem.id == item.id,
@@ -5033,7 +5268,10 @@ struct RecordingDetailView: View {
                 lineID: transcriptLineEditRequest.lineID,
                 text: editedTranscriptLineText
             )
-            cachedTranscriptLines = StoredTranscriptLine.parse(store.transcriptText(for: updatedItem))
+            cachedTranscriptLines = StoredTranscriptLine.parse(
+                store.transcriptText(for: updatedItem),
+                speakerDiarization: updatedItem.speakerDiarization
+            )
             clearTranscriptTranslationState()
             self.transcriptLineEditRequest = nil
             HapticFeedback.play(.recordingSaved)
@@ -5132,7 +5370,7 @@ struct RecordingDetailView: View {
         let lines = cachedTranscriptLines
         let targetLanguageID = targetTranslationLanguage.id
         let requests = lines.map { line in
-            TranslationSession.Request(sourceText: line.text, clientIdentifier: line.id)
+            TranslationSession.Request(sourceText: line.spokenText, clientIdentifier: line.id)
         }
 
         do {
@@ -5977,13 +6215,14 @@ private struct RecordingAudioFileInfo: Equatable, Sendable {
     var frameCount: AVAudioFramePosition
     var durationSeconds: TimeInterval
     var fileName: String
+    var fileCreationDate: Date?
     var fileSize: Int64?
 
     init(url: URL) throws {
         let file = try AVAudioFile(forReading: url)
         let fileFormat = file.fileFormat
         let processingFormat = file.processingFormat
-        let resourceValues = try? url.resourceValues(forKeys: [.fileSizeKey])
+        let resourceValues = try? url.resourceValues(forKeys: [.creationDateKey, .fileSizeKey])
 
         self.fileSampleRate = fileFormat.sampleRate
         self.processingSampleRate = processingFormat.sampleRate
@@ -5999,6 +6238,7 @@ private struct RecordingAudioFileInfo: Equatable, Sendable {
         self.frameCount = file.length
         self.durationSeconds = processingFormat.sampleRate > 0 ? Double(file.length) / processingFormat.sampleRate : 0
         self.fileName = url.lastPathComponent
+        self.fileCreationDate = resourceValues?.creationDate
         self.fileSize = resourceValues?.fileSize.map { Int64($0) }
     }
 
@@ -6083,6 +6323,13 @@ private struct RecordingAudioFileInfo: Equatable, Sendable {
             return localized(L10n.Common.unknown)
         }
         return ByteCountFormatter.string(fromByteCount: fileSize, countStyle: .file)
+    }
+
+    var fileCreationDateText: String {
+        guard let fileCreationDate else {
+            return localized(L10n.Common.unknown)
+        }
+        return fileCreationDate.formatted(date: .abbreviated, time: .standard)
     }
 
     private static let integerFormatter: NumberFormatter = {
@@ -6650,8 +6897,13 @@ private struct StoredTranscriptLine: Identifiable, Hashable {
     let startSeconds: TimeInterval
     let timeText: String
     let text: String
+    let speaker: String?
+    let spokenText: String
 
-    static func parse(_ transcript: String) -> [StoredTranscriptLine] {
+    static func parse(
+        _ transcript: String,
+        speakerDiarization: RecordingSpeakerDiarization? = nil
+    ) -> [StoredTranscriptLine] {
         let lines = transcript
             .split(whereSeparator: \.isNewline)
             .enumerated()
@@ -6673,16 +6925,20 @@ private struct StoredTranscriptLine: Identifiable, Hashable {
                     id: "\(offset)-\(timeText)",
                     startSeconds: seconds,
                     timeText: timeText,
-                    text: text
+                    text: text,
+                    speaker: nil,
+                    spokenText: text
                 )
             }
 
-        return lines.sorted {
+        let sortedLines = lines.sorted {
             if $0.startSeconds == $1.startSeconds {
                 return $0.id < $1.id
             }
             return $0.startSeconds < $1.startSeconds
         }
+
+        return applyingSpeakerMetadata(to: sortedLines, speakerDiarization: speakerDiarization)
     }
 
     static func currentLineID(in lines: [StoredTranscriptLine], time: TimeInterval) -> StoredTranscriptLine.ID? {
@@ -6722,10 +6978,215 @@ private struct StoredTranscriptLine: Identifiable, Hashable {
 
         return TimeInterval(minutes * 60 + seconds) + TimeInterval(centiseconds) / 100
     }
+
+    private static func applyingSpeakerMetadata(
+        to lines: [StoredTranscriptLine],
+        speakerDiarization: RecordingSpeakerDiarization?
+    ) -> [StoredTranscriptLine] {
+        let segments = (speakerDiarization?.segments ?? []).sorted {
+            if $0.startSeconds == $1.startSeconds {
+                return $0.endSeconds < $1.endSeconds
+            }
+            return $0.startSeconds < $1.startSeconds
+        }
+        var nextSegmentIndex = 0
+
+        return lines.enumerated().map { offset, line in
+            let matchedSegment: RecordingSpeakerSegment?
+            if segments.count == lines.count {
+                matchedSegment = segments[offset]
+            } else if segments.indices.contains(nextSegmentIndex) {
+                while segments.indices.contains(nextSegmentIndex + 1),
+                      abs(segments[nextSegmentIndex + 1].startSeconds - line.startSeconds)
+                        < abs(segments[nextSegmentIndex].startSeconds - line.startSeconds) {
+                    nextSegmentIndex += 1
+                }
+
+                if abs(segments[nextSegmentIndex].startSeconds - line.startSeconds) <= 0.75 {
+                    matchedSegment = segments[nextSegmentIndex]
+                    nextSegmentIndex += 1
+                } else {
+                    matchedSegment = nil
+                }
+            } else {
+                matchedSegment = nil
+            }
+
+            let expectedSpeaker = TranscriptSpeakerNaming.normalizedID(matchedSegment?.speaker)
+            let parsedContent = speakerContent(from: line.text, expectedSpeaker: expectedSpeaker)
+            let speaker = expectedSpeaker ?? parsedContent.speaker
+            let spokenText = parsedContent.spokenText.trimmingCharacters(in: .whitespacesAndNewlines)
+
+            return StoredTranscriptLine(
+                id: line.id,
+                startSeconds: line.startSeconds,
+                timeText: line.timeText,
+                text: line.text,
+                speaker: speaker,
+                spokenText: spokenText.isEmpty ? line.text : spokenText
+            )
+        }
+    }
+
+    private static func speakerContent(
+        from text: String,
+        expectedSpeaker: String?
+    ) -> (speaker: String?, spokenText: String) {
+        if let expectedSpeaker {
+            for separator in [":", "："] {
+                let prefix = expectedSpeaker + separator
+                if let range = text.range(of: prefix, options: [.anchored, .caseInsensitive]) {
+                    return (
+                        expectedSpeaker,
+                        String(text[range.upperBound...]).trimmingCharacters(in: .whitespacesAndNewlines)
+                    )
+                }
+            }
+            return (expectedSpeaker, text)
+        }
+
+        guard let separatorIndex = text.firstIndex(where: { $0 == ":" || $0 == "：" }) else {
+            return (nil, text)
+        }
+        let candidate = String(text[..<separatorIndex]).trimmingCharacters(in: .whitespacesAndNewlines)
+        guard TranscriptSpeakerNaming.numberedIndex(candidate) != nil else {
+            return (nil, text)
+        }
+
+        return (
+            candidate,
+            String(text[text.index(after: separatorIndex)...]).trimmingCharacters(in: .whitespacesAndNewlines)
+        )
+    }
+}
+
+private enum TranscriptSpeakerNaming {
+    static func normalizedID(_ speaker: String?) -> String? {
+        guard let speaker else {
+            return nil
+        }
+        let trimmed = speaker.trimmingCharacters(in: .whitespacesAndNewlines)
+        return trimmed.isEmpty ? nil : trimmed
+    }
+
+    static func numberedIndex(_ speaker: String) -> Int? {
+        let parts = speaker.split(whereSeparator: \.isWhitespace)
+        guard parts.count == 2,
+              parts[0].caseInsensitiveCompare("Speaker") == .orderedSame,
+              let index = Int(parts[1]),
+              index >= 0 else {
+            return nil
+        }
+        return index
+    }
+
+    static func displayName(for speaker: String, presentationIndex: Int) -> String {
+        guard numberedIndex(speaker) != nil else {
+            return speaker
+        }
+        return localizedFormat(L10n.Recordings.transcriptSpeakerFormat, presentationIndex + 1)
+    }
+}
+
+private struct TranscriptSpeakerPresentation: Identifiable {
+    let id: String
+    let displayName: String
+    let paletteIndex: Int
+
+    var tint: Color {
+        TranscriptSpeakerPalette.tint(for: paletteIndex)
+    }
+
+    static func makePresentations(for lines: [StoredTranscriptLine]) -> [TranscriptSpeakerPresentation] {
+        var seen = Set<String>()
+        var speakers: [TranscriptSpeakerPresentation] = []
+
+        for speaker in lines.compactMap(\.speaker) {
+            let comparisonKey = speaker.folding(
+                options: [.caseInsensitive, .diacriticInsensitive, .widthInsensitive],
+                locale: .current
+            )
+            guard seen.insert(comparisonKey).inserted else {
+                continue
+            }
+
+            speakers.append(
+                TranscriptSpeakerPresentation(
+                    id: speaker,
+                    displayName: TranscriptSpeakerNaming.displayName(
+                        for: speaker,
+                        presentationIndex: speakers.count
+                    ),
+                    paletteIndex: speakers.count
+                )
+            )
+        }
+        return speakers
+    }
+}
+
+private enum TranscriptSpeakerPalette {
+    private static let colors: [Color] = [
+        AppTheme.info,
+        AppTheme.purple,
+        AppTheme.success,
+        AppTheme.brand,
+        Color.teal,
+        Color.pink,
+        AppTheme.warning,
+        Color.indigo
+    ]
+
+    static func tint(for index: Int) -> Color {
+        colors[index % colors.count]
+    }
+}
+
+private struct TranscriptSpeakerLegend: View {
+    let speakers: [TranscriptSpeakerPresentation]
+
+    var body: some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: 8) {
+                Label(
+                    localizedFormat(L10n.Recordings.transcriptSpeakersDetectedFormat, speakers.count),
+                    systemImage: "person.2.fill"
+                )
+                .font(.redditSans(.caption, weight: .semibold))
+                .foregroundStyle(.secondary)
+                .padding(.horizontal, 9)
+                .frame(height: 28)
+                .background(AppTheme.elevatedBackground, in: Capsule())
+
+                ForEach(speakers) { speaker in
+                    HStack(spacing: 6) {
+                        Circle()
+                            .fill(speaker.tint)
+                            .frame(width: 8, height: 8)
+
+                        Text(speaker.displayName)
+                            .font(.redditSans(.caption, weight: .semibold))
+                            .foregroundStyle(.primary)
+                            .lineLimit(1)
+                    }
+                    .padding(.horizontal, 9)
+                    .frame(height: 28)
+                    .background(speaker.tint.opacity(0.10), in: Capsule())
+                    .overlay {
+                        Capsule()
+                            .stroke(speaker.tint.opacity(0.20), lineWidth: 1)
+                    }
+                }
+            }
+            .padding(.horizontal, 1)
+        }
+        .accessibilityElement(children: .contain)
+    }
 }
 
 private struct StoredTranscriptLineRow: View {
     let line: StoredTranscriptLine
+    let speaker: TranscriptSpeakerPresentation?
     let translatedText: String?
     let isShowingTranslation: Bool
     let isCurrent: Bool
@@ -6737,13 +7198,33 @@ private struct StoredTranscriptLineRow: View {
             HStack(alignment: .top, spacing: 10) {
                 Text(line.timeText)
                     .font(.redditSans(.caption2, weight: .semibold).monospacedDigit())
-                    .foregroundStyle(isCurrent ? .white : AppTheme.brand)
+                    .foregroundStyle(isCurrent ? .white : (speaker?.tint ?? AppTheme.brand))
                     .padding(.horizontal, 8)
                     .frame(height: 24)
-                    .background(isCurrent ? AppTheme.brand : AppTheme.brand.opacity(0.12), in: Capsule())
+                    .background(
+                        isCurrent ? AppTheme.brand : (speaker?.tint ?? AppTheme.brand).opacity(0.12),
+                        in: Capsule()
+                    )
 
-                VStack(alignment: .leading, spacing: 4) {
-                    Text(translatedText ?? line.text)
+                VStack(alignment: .leading, spacing: speaker == nil ? 4 : 6) {
+                    if let speaker {
+                        HStack(spacing: 5) {
+                            Circle()
+                                .fill(speaker.tint)
+                                .frame(width: 7, height: 7)
+
+                            Text(speaker.displayName)
+                                .font(.redditSans(.caption2, weight: .bold))
+                                .foregroundStyle(speaker.tint)
+                                .lineLimit(1)
+                        }
+                        .padding(.horizontal, 7)
+                        .frame(height: 22)
+                        .background(speaker.tint.opacity(0.10), in: Capsule())
+                        .accessibilityHidden(true)
+                    }
+
+                    Text(translatedText ?? line.spokenText)
                         .font(.redditSans(.body))
                         .foregroundStyle(.primary)
                         .lineSpacing(4)
@@ -6751,7 +7232,7 @@ private struct StoredTranscriptLineRow: View {
                         .frame(maxWidth: .infinity, alignment: .leading)
 
                     if translatedText != nil {
-                        Text(line.text)
+                        Text(line.spokenText)
                             .font(.redditSans(.caption))
                             .foregroundStyle(.secondary)
                             .lineSpacing(3)
@@ -6765,9 +7246,19 @@ private struct StoredTranscriptLineRow: View {
                     }
                 }
             }
-            .padding(.vertical, 4)
-            .padding(.horizontal, 6)
-            .background(isCurrent ? AppTheme.brand.opacity(0.08) : Color.clear, in: RoundedRectangle(cornerRadius: AppTheme.compactCornerRadius, style: .continuous))
+            .padding(.vertical, speaker == nil ? 4 : 7)
+            .padding(.leading, speaker == nil ? 6 : 10)
+            .padding(.trailing, 6)
+            .background(rowBackground, in: RoundedRectangle(cornerRadius: AppTheme.compactCornerRadius, style: .continuous))
+            .overlay(alignment: .leading) {
+                if let speaker {
+                    Capsule()
+                        .fill(speaker.tint)
+                        .frame(width: 3)
+                        .padding(.vertical, 7)
+                        .padding(.leading, 3)
+                }
+            }
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
@@ -6788,11 +7279,19 @@ private struct StoredTranscriptLineRow: View {
         .accessibilityLabel(accessibilityText)
     }
 
-    private var accessibilityText: String {
-        if let translatedText {
-            return "\(line.timeText) \(translatedText) \(line.text)"
+    private var rowBackground: Color {
+        if isCurrent {
+            return AppTheme.brand.opacity(0.08)
         }
-        return "\(line.timeText) \(line.text)"
+        return speaker?.tint.opacity(0.055) ?? .clear
+    }
+
+    private var accessibilityText: String {
+        let speakerText = speaker.map { "\($0.displayName) " } ?? ""
+        if let translatedText {
+            return "\(speakerText)\(line.timeText) \(translatedText) \(line.spokenText)"
+        }
+        return "\(speakerText)\(line.timeText) \(line.spokenText)"
     }
 }
 

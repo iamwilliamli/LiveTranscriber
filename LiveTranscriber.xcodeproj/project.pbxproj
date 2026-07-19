@@ -49,7 +49,7 @@
 		7B0000000000000000000022 /* Semantic.xcstrings in Resources */ = {isa = PBXBuildFile; fileRef = 7B0000000000000000001022 /* Semantic.xcstrings */; };
 		7B0000000000000000000023 /* StructuredFoundationModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7B0000000000000000001027 /* StructuredFoundationModels.swift */; };
 		7B0000000000000000000024 /* LiveTranscriberStructuredFoundationModels.framework in Embed Frameworks */ = {isa = PBXBuildFile; fileRef = 7B0000000000000000001028 /* LiveTranscriberStructuredFoundationModels.framework */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
-		7B0000000000000000000025 /* OpenAITranscription.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7B0000000000000000001029 /* OpenAITranscription.swift */; };
+		7B0000000000000000000025 /* LiveTranscriptionBackend.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7B0000000000000000001029 /* LiveTranscriptionBackend.swift */; };
 		7B0000000000000000000026 /* TranscriptLineEditSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7B000000000000000000102A /* TranscriptLineEditSheet.swift */; };
 		7B0000000000000000000027 /* LocalWhisperTranscription.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7B000000000000000000102B /* LocalWhisperTranscription.swift */; };
 		7B0000000000000000000028 /* LocalWhisperBridge.m in Sources */ = {isa = PBXBuildFile; fileRef = 7B000000000000000000102D /* LocalWhisperBridge.m */; };
@@ -69,6 +69,7 @@
 		7B0000000000000000000036 /* ReminderExportService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7B000000000000000000103B /* ReminderExportService.swift */; };
 		7B0000000000000000000037 /* TranscriptExportService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7B000000000000000000103C /* TranscriptExportService.swift */; };
 		7B0000000000000000000038 /* RecordingSoundAnalysisService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7B000000000000000000103D /* RecordingSoundAnalysisService.swift */; };
+		7B0000000000000000000039 /* GeminiCloudService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7B000000000000000000103E /* GeminiCloudService.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -169,7 +170,7 @@
 		7B0000000000000000001022 /* Semantic.xcstrings */ = {isa = PBXFileReference; lastKnownFileType = text.json.xcstrings; path = Semantic.xcstrings; sourceTree = "<group>"; };
 		7B0000000000000000001027 /* StructuredFoundationModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StructuredFoundationModels.swift; sourceTree = "<group>"; };
 		7B0000000000000000001028 /* LiveTranscriberStructuredFoundationModels.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; includeInIndex = 0; path = LiveTranscriberStructuredFoundationModels.framework; sourceTree = BUILT_PRODUCTS_DIR; };
-		7B0000000000000000001029 /* OpenAITranscription.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OpenAITranscription.swift; sourceTree = "<group>"; };
+		7B0000000000000000001029 /* LiveTranscriptionBackend.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LiveTranscriptionBackend.swift; sourceTree = "<group>"; };
 		7B000000000000000000102A /* TranscriptLineEditSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TranscriptLineEditSheet.swift; sourceTree = "<group>"; };
 		7B000000000000000000102B /* LocalWhisperTranscription.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocalWhisperTranscription.swift; sourceTree = "<group>"; };
 		7B000000000000000000102C /* LocalWhisperBridge.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = LocalWhisperBridge.h; sourceTree = "<group>"; };
@@ -190,6 +191,7 @@
 		7B000000000000000000103B /* ReminderExportService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReminderExportService.swift; sourceTree = "<group>"; };
 		7B000000000000000000103C /* TranscriptExportService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TranscriptExportService.swift; sourceTree = "<group>"; };
 		7B000000000000000000103D /* RecordingSoundAnalysisService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecordingSoundAnalysisService.swift; sourceTree = "<group>"; };
+		7B000000000000000000103E /* GeminiCloudService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GeminiCloudService.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -242,7 +244,7 @@
 				7B0000000000000000001006 /* LiveTranscriptionManager.swift */,
 				7B0000000000000000001030 /* AppleTranslationLanguages.swift */,
 				7B0000000000000000001031 /* AppleSpeechTranscriptionSupport.swift */,
-				7B0000000000000000001029 /* OpenAITranscription.swift */,
+				7B0000000000000000001029 /* LiveTranscriptionBackend.swift */,
 				7B000000000000000000102B /* LocalWhisperTranscription.swift */,
 				7B0000000000000000001032 /* LocalSummaryIntelligence.swift */,
 				7B000000000000000000102C /* LocalWhisperBridge.h */,
@@ -264,6 +266,7 @@
 				7B000000000000000000103B /* ReminderExportService.swift */,
 				7B000000000000000000103C /* TranscriptExportService.swift */,
 				7B000000000000000000103D /* RecordingSoundAnalysisService.swift */,
+				7B000000000000000000103E /* GeminiCloudService.swift */,
 				7B000000000000000000102A /* TranscriptLineEditSheet.swift */,
 				7B0000000000000000001018 /* SettingsView.swift */,
 				7B0000000000000000001019 /* TranscriptionActivityAttributes.swift */,
@@ -484,7 +487,7 @@
 				7B0000000000000000000006 /* LiveTranscriptionManager.swift in Sources */,
 				7B000000000000000000002B /* AppleTranslationLanguages.swift in Sources */,
 				7B000000000000000000002C /* AppleSpeechTranscriptionSupport.swift in Sources */,
-				7B0000000000000000000025 /* OpenAITranscription.swift in Sources */,
+				7B0000000000000000000025 /* LiveTranscriptionBackend.swift in Sources */,
 				7B0000000000000000000027 /* LocalWhisperTranscription.swift in Sources */,
 				7B000000000000000000002D /* LocalSummaryIntelligence.swift in Sources */,
 				7B0000000000000000000028 /* LocalWhisperBridge.m in Sources */,
@@ -504,6 +507,7 @@
 				7B0000000000000000000036 /* ReminderExportService.swift in Sources */,
 				7B0000000000000000000037 /* TranscriptExportService.swift in Sources */,
 				7B0000000000000000000038 /* RecordingSoundAnalysisService.swift in Sources */,
+				7B0000000000000000000039 /* GeminiCloudService.swift in Sources */,
 				7B0000000000000000000026 /* TranscriptLineEditSheet.swift in Sources */,
 				7B0000000000000000000014 /* SettingsView.swift in Sources */,
 				7B0000000000000000000015 /* TranscriptionActivityAttributes.swift in Sources */,

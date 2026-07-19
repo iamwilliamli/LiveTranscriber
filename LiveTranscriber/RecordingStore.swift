@@ -36,6 +36,7 @@ struct RecordingItem: Identifiable, Codable, Hashable {
     var location: RecordingLocation?
     var isTranscriptLocked: Bool
     var meetingAnalysis: RecordingMeetingAnalysis?
+    var speakerDiarization: RecordingSpeakerDiarization?
     var audioEventAnalysis: RecordingAudioEventAnalysis?
 
     init(
@@ -57,6 +58,7 @@ struct RecordingItem: Identifiable, Codable, Hashable {
         location: RecordingLocation?,
         isTranscriptLocked: Bool = false,
         meetingAnalysis: RecordingMeetingAnalysis? = nil,
+        speakerDiarization: RecordingSpeakerDiarization? = nil,
         audioEventAnalysis: RecordingAudioEventAnalysis? = nil
     ) {
         self.id = id
@@ -77,6 +79,7 @@ struct RecordingItem: Identifiable, Codable, Hashable {
         self.location = location
         self.isTranscriptLocked = isTranscriptLocked
         self.meetingAnalysis = meetingAnalysis
+        self.speakerDiarization = speakerDiarization
         self.audioEventAnalysis = audioEventAnalysis
     }
 
@@ -99,6 +102,7 @@ struct RecordingItem: Identifiable, Codable, Hashable {
         case location
         case isTranscriptLocked
         case meetingAnalysis
+        case speakerDiarization
         case audioEventAnalysis
     }
 
@@ -122,6 +126,7 @@ struct RecordingItem: Identifiable, Codable, Hashable {
         location = try container.decodeIfPresent(RecordingLocation.self, forKey: .location)
         isTranscriptLocked = try container.decodeIfPresent(Bool.self, forKey: .isTranscriptLocked) ?? false
         meetingAnalysis = try container.decodeIfPresent(RecordingMeetingAnalysis.self, forKey: .meetingAnalysis)
+        speakerDiarization = try container.decodeIfPresent(RecordingSpeakerDiarization.self, forKey: .speakerDiarization)
         audioEventAnalysis = try container.decodeIfPresent(RecordingAudioEventAnalysis.self, forKey: .audioEventAnalysis)
     }
 
@@ -293,9 +298,10 @@ enum RecordingSummaryProvider: String, CaseIterable, Identifiable {
     case automatic
     case appleIntelligence
     case localQwen
+    case geminiCloud
 
     static let selectedDefaultsKey = "recording.summary.provider"
-    static let menuProviders: [RecordingSummaryProvider] = [.automatic, .appleIntelligence, .localQwen]
+    static let menuProviders: [RecordingSummaryProvider] = [.automatic, .appleIntelligence, .localQwen, .geminiCloud]
 
     var id: String {
         rawValue
@@ -309,6 +315,8 @@ enum RecordingSummaryProvider: String, CaseIterable, Identifiable {
             return String(localized: L10n.LocalSummary.providerAppleTitle)
         case .localQwen:
             return String(localized: L10n.LocalSummary.providerLocalQwenTitle)
+        case .geminiCloud:
+            return String(localized: L10n.GeminiCloud.providerTitle)
         }
     }
 
@@ -320,6 +328,8 @@ enum RecordingSummaryProvider: String, CaseIterable, Identifiable {
             return String(localized: L10n.LocalSummary.providerAppleDetail)
         case .localQwen:
             return String(localized: L10n.LocalSummary.providerLocalQwenDetail)
+        case .geminiCloud:
+            return String(localized: L10n.GeminiCloud.providerDetail)
         }
     }
 
@@ -331,6 +341,8 @@ enum RecordingSummaryProvider: String, CaseIterable, Identifiable {
             return "apple.logo"
         case .localQwen:
             return "cpu"
+        case .geminiCloud:
+            return "cloud"
         }
     }
 
@@ -342,6 +354,8 @@ enum RecordingSummaryProvider: String, CaseIterable, Identifiable {
             return Self.isAppleIntelligenceAvailable
         case .localQwen:
             return LocalSummaryModelManager.currentStatus().isAvailable
+        case .geminiCloud:
+            return GeminiCloudConfiguration.isAvailable
         }
     }
 
@@ -373,9 +387,10 @@ enum RecordingSummaryProvider: String, CaseIterable, Identifiable {
 struct RecordingSummaryProviderAvailability: Equatable {
     var appleIntelligence: RecordingIntelligenceAvailability
     var localSummaryStatus: LocalSummaryModelStatus
+    var isGeminiCloudAvailable: Bool
 
     var hasAnyAvailableProvider: Bool {
-        isAppleIntelligenceAvailable || isLocalSummaryAvailable
+        isAutomaticProviderAvailable || isGeminiCloudAvailable
     }
 
     var intelligenceAvailability: RecordingIntelligenceAvailability {
@@ -385,24 +400,30 @@ struct RecordingSummaryProviderAvailability: Equatable {
         if isLocalSummaryAvailable {
             return .localSummaryAvailable
         }
+        if isGeminiCloudAvailable {
+            return .geminiCloudAvailable
+        }
         return appleIntelligence
     }
 
     func isAvailable(_ provider: RecordingSummaryProvider) -> Bool {
         switch provider {
         case .automatic:
-            return hasAnyAvailableProvider
+            return isAutomaticProviderAvailable
         case .appleIntelligence:
             return isAppleIntelligenceAvailable
         case .localQwen:
             return isLocalSummaryAvailable
+        case .geminiCloud:
+            return isGeminiCloudAvailable
         }
     }
 
     static func current() -> RecordingSummaryProviderAvailability {
         RecordingSummaryProviderAvailability(
             appleIntelligence: .currentAppleIntelligence(),
-            localSummaryStatus: LocalSummaryModelManager.currentStatus()
+            localSummaryStatus: LocalSummaryModelManager.currentStatus(),
+            isGeminiCloudAvailable: GeminiCloudConfiguration.isAvailable
         )
     }
 
@@ -413,11 +434,16 @@ struct RecordingSummaryProviderAvailability: Equatable {
     private var isLocalSummaryAvailable: Bool {
         localSummaryStatus.isAvailable
     }
+
+    private var isAutomaticProviderAvailable: Bool {
+        isAppleIntelligenceAvailable || isLocalSummaryAvailable
+    }
 }
 
 enum RecordingIntelligenceAvailability: Equatable {
     case available
     case localSummaryAvailable
+    case geminiCloudAvailable
     case unavailable(UnavailableReason)
 
     enum UnavailableReason: Equatable {
@@ -429,7 +455,7 @@ enum RecordingIntelligenceAvailability: Equatable {
 
     var isAvailable: Bool {
         switch self {
-        case .available, .localSummaryAvailable:
+        case .available, .localSummaryAvailable, .geminiCloudAvailable:
             return true
         case .unavailable:
             return false
@@ -442,6 +468,8 @@ enum RecordingIntelligenceAvailability: Equatable {
             return String(localized: L10n.Intelligence.available)
         case .localSummaryAvailable:
             return String(localized: L10n.LocalSummary.available)
+        case .geminiCloudAvailable:
+            return String(localized: L10n.GeminiCloud.available)
         case .unavailable(.deviceNotEligible):
             return String(localized: L10n.Intelligence.unsupportedDevice)
         case .unavailable(.appleIntelligenceNotEnabled):
@@ -459,6 +487,8 @@ enum RecordingIntelligenceAvailability: Equatable {
             return String(localized: L10n.Intelligence.detailAvailable)
         case .localSummaryAvailable:
             return String(localized: L10n.LocalSummary.availableDetail)
+        case .geminiCloudAvailable:
+            return String(localized: L10n.GeminiCloud.availableDetail)
         case .unavailable(.deviceNotEligible):
             return String(localized: L10n.Intelligence.detailUnsupportedDevice)
         case .unavailable(.appleIntelligenceNotEnabled):
@@ -579,6 +609,7 @@ final class RecordingIndexRecord {
         locationCountry = item.location?.country
         isTranscriptLocked = item.isTranscriptLocked
         meetingAnalysisJSON = Self.encodeCodable(item.meetingAnalysis)
+        speakerDiarizationJSON = Self.encodeCodable(item.speakerDiarization)
         audioEventAnalysisJSON = Self.encodeCodable(item.audioEventAnalysis)
     }
 
@@ -602,6 +633,7 @@ final class RecordingIndexRecord {
             location: location,
             isTranscriptLocked: isTranscriptLocked,
             meetingAnalysis: Self.decodeCodable(RecordingMeetingAnalysis.self, from: meetingAnalysisJSON),
+            speakerDiarization: Self.decodeCodable(RecordingSpeakerDiarization.self, from: speakerDiarizationJSON),
             audioEventAnalysis: Self.decodeCodable(RecordingAudioEventAnalysis.self, from: audioEventAnalysisJSON)
         )
     }
@@ -845,6 +877,7 @@ final class RecordingStore: ObservableObject {
     @Published private(set) var isStorageLocationChanging = false
 
     private static let logger = Logger(subsystem: "com.reddownloader.LiveTranscriber", category: "RecordingStore")
+    nonisolated private static let iCloudLogger = Logger(subsystem: "com.reddownloader.LiveTranscriber", category: "ICloudSync")
 
     private static let iCloudContainerIdentifier = "iCloud.com.iamwilliamli.LiveTranscriber"
     private static let iCloudStorageEnabledDefaultsKey = "RecordingStore.iCloudStorageEnabled"
@@ -1361,6 +1394,9 @@ final class RecordingStore: ObservableObject {
             recordings[index].durationSeconds = (try? Self.durationSeconds(for: targetAudioURL)) ?? recordings[index].durationSeconds
             recordings[index].transcriptPreview = lines.plainTranscriptText
             recordings[index].lineCount = lines.count
+            recordings[index].intelligence = nil
+            recordings[index].meetingAnalysis = nil
+            recordings[index].speakerDiarization = nil
             recordings[index].importStatus = nil
             try persist()
         } catch {
@@ -1406,78 +1442,8 @@ final class RecordingStore: ObservableObject {
             recordings[index].transcriptPreview = lines.plainTranscriptText
             recordings[index].lineCount = lines.count
             recordings[index].intelligence = nil
-            recordings[index].importStatus = nil
-            try persist()
-        } catch {
-            markImportFailed(for: item.id, message: error.localizedDescription)
-            throw error
-        }
-    }
-
-    func retranscribeWithOpenAI(
-        _ item: RecordingItem,
-        language: TranscriptionLanguage,
-        apiKey: String,
-        mode: OpenAIFileTranscriptionMode
-    ) async throws {
-        let trimmedAPIKey = apiKey.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !trimmedAPIKey.isEmpty else {
-            throw OpenAITranscriptionError.missingAPIKey
-        }
-        try ensureTranscriptUnlocked(item)
-
-        let audioURL = audioURL(for: item)
-        let transcriptURL = transcriptURL(for: item)
-        updateImportStatus(for: item.id, progress: 0.04, message: String(localized: L10n.Import.preparingTranscription), shouldPersist: true)
-
-        do {
-            let lines: [TranscriptionLine]
-            if mode == .refinedSegments {
-                let audioDurationSeconds = max(
-                    Double(item.durationSeconds),
-                    Double((try? Self.durationSeconds(for: audioURL)) ?? 0)
-                )
-                let segments = Self.openAIRefinementSegments(
-                    from: transcriptText(for: item),
-                    audioDurationSeconds: audioDurationSeconds
-                )
-                updateImportStatus(for: item.id, progress: 0.12, message: String(localized: L10n.Import.refiningWithOpenAI), shouldPersist: true)
-                lines = try await OpenAIFileTranscriptionService.refineSegments(
-                    audioURL: audioURL,
-                    segments: segments,
-                    language: language,
-                    apiKey: trimmedAPIKey
-                ) { [weak self] progress in
-                    Task { @MainActor in
-                        self?.updateImportStatus(
-                            for: item.id,
-                            progress: 0.12 + progress * 0.8,
-                            message: String(localized: L10n.Import.refiningWithOpenAI)
-                        )
-                    }
-                }
-            } else {
-                updateImportStatus(for: item.id, progress: 0.12, message: String(localized: L10n.Import.uploadingToOpenAI), shouldPersist: true)
-                lines = try await OpenAIFileTranscriptionService.transcribe(
-                    audioURL: audioURL,
-                    language: language,
-                    apiKey: trimmedAPIKey,
-                    mode: mode
-                )
-            }
-            updateImportStatus(for: item.id, progress: 0.92, message: String(localized: L10n.Import.transcribing))
-            guard let index = recordings.firstIndex(where: { $0.id == item.id }) else {
-                throw RecordingImportError.saveFailed
-            }
-            guard !recordings[index].isTranscriptLocked else {
-                throw RecordingTranscriptEditError.transcriptLocked
-            }
-            try lines.timedTranscriptText.write(to: transcriptURL, atomically: true, encoding: .utf8)
-            recordings[index].languageID = language.id
-            recordings[index].languageName = language.displayName
-            recordings[index].transcriptPreview = lines.plainTranscriptText
-            recordings[index].lineCount = lines.count
-            recordings[index].intelligence = nil
+            recordings[index].meetingAnalysis = nil
+            recordings[index].speakerDiarization = nil
             recordings[index].importStatus = nil
             try persist()
         } catch {
@@ -1523,6 +1489,8 @@ final class RecordingStore: ObservableObject {
             recordings[index].transcriptPreview = lines.plainTranscriptText
             recordings[index].lineCount = lines.count
             recordings[index].intelligence = nil
+            recordings[index].meetingAnalysis = nil
+            recordings[index].speakerDiarization = nil
             recordings[index].importStatus = nil
             try persist()
         } catch {
@@ -1531,83 +1499,200 @@ final class RecordingStore: ObservableObject {
         }
     }
 
-    private struct TimedTranscriptSegment {
-        var startSeconds: Double
-        var text: String
-    }
+    func processWithGeminiCloud(_ item: RecordingItem) async throws {
+        try ensureTranscriptUnlocked(item)
+        let apiKey = try GeminiCloudService.configuredAPIKey()
+        guard let currentItem = recording(withID: item.id) else {
+            throw RecordingImportError.saveFailed
+        }
 
-    private static func openAIRefinementSegments(
-        from transcript: String,
-        audioDurationSeconds: Double
-    ) -> [OpenAITranscriptRefinementSegment] {
-        let timedSegments = transcript
-            .split(whereSeparator: \.isNewline)
-            .compactMap { parseTimedTranscriptSegment(String($0)) }
-            .sorted {
-                if $0.startSeconds == $1.startSeconds {
-                    return $0.text < $1.text
+        let sourceAudioURL = audioURL(for: currentItem)
+        let targetTranscriptURL = transcriptURL(for: currentItem)
+        let existingTranscript = transcriptText(for: currentItem)
+        let measuredDuration = (try? Self.durationSeconds(for: sourceAudioURL)) ?? 0
+        let durationSeconds = max(Double(currentItem.durationSeconds), Double(measuredDuration))
+        updateImportStatus(
+            for: currentItem.id,
+            progress: 0.02,
+            message: String(localized: L10n.Import.preparingGemini),
+            shouldPersist: true
+        )
+
+        do {
+            let transcription = try await GeminiCloudService.transcribeRecording(
+                audioURL: sourceAudioURL,
+                languageName: currentItem.localizedLanguageName,
+                durationSeconds: durationSeconds,
+                apiKey: apiKey
+            ) { [weak self] progress in
+                Task { @MainActor in
+                    self?.updateGeminiProgress(for: currentItem.id, progress: progress)
                 }
-                return $0.startSeconds < $1.startSeconds
             }
 
-        guard !timedSegments.isEmpty else {
-            return []
-        }
-
-        let lastStartSeconds = timedSegments.last?.startSeconds ?? 0
-        let safeAudioDurationSeconds = max(audioDurationSeconds, lastStartSeconds + 1)
-        return timedSegments.enumerated().compactMap { index, segment in
-            let nextStartSeconds = timedSegments
-                .dropFirst(index + 1)
-                .first { $0.startSeconds > segment.startSeconds }?
-                .startSeconds
-            let rawEndSeconds = nextStartSeconds ?? safeAudioDurationSeconds
-            let endSeconds = safeAudioDurationSeconds > 0
-                ? min(max(rawEndSeconds, segment.startSeconds), safeAudioDurationSeconds)
-                : max(rawEndSeconds, segment.startSeconds)
-
-            guard endSeconds > segment.startSeconds else {
-                return nil
+            guard let index = recordings.firstIndex(where: { $0.id == currentItem.id }) else {
+                throw RecordingImportError.saveFailed
+            }
+            guard !recordings[index].isTranscriptLocked else {
+                throw RecordingTranscriptEditError.transcriptLocked
             }
 
-            return OpenAITranscriptRefinementSegment(
-                startSeconds: segment.startSeconds,
-                endSeconds: endSeconds,
-                localText: segment.text
+            let backupURL = geminiTranscriptBackupURL(for: recordings[index])
+            if !existingTranscript.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
+               !fileManager.fileExists(atPath: backupURL.path) {
+                try existingTranscript.write(to: backupURL, atomically: true, encoding: .utf8)
+            }
+
+            try transcription.lines.timedTranscriptText.write(
+                to: targetTranscriptURL,
+                atomically: true,
+                encoding: .utf8
             )
+            recordings[index].durationSeconds = max(currentItem.durationSeconds, measuredDuration)
+            recordings[index].transcriptPreview = transcription.lines.plainTranscriptText
+            recordings[index].lineCount = transcription.lines.count
+            recordings[index].intelligence = nil
+            recordings[index].meetingAnalysis = nil
+            recordings[index].speakerDiarization = transcription.diarization
+            recordings[index].importStatus = RecordingImportStatus(
+                progress: 0.78,
+                message: String(localized: L10n.Import.analyzingWithGemini),
+                isFailed: false
+            )
+            searchIndexCache[currentItem.id] = nil
+            try persist()
+
+            let plainTranscript = transcription.lines.plainTranscriptText
+            let intelligenceLanguageName = transcription.detectedLanguage
+                ?? currentItem.localizedLanguageName
+            async let intelligenceResult = try? GeminiCloudService.generateIntelligence(
+                transcript: plainTranscript,
+                languageName: intelligenceLanguageName,
+                apiKey: apiKey
+            )
+            async let meetingResult = try? GeminiCloudService.generateMeetingAnalysis(
+                transcript: plainTranscript,
+                languageName: intelligenceLanguageName,
+                apiKey: apiKey
+            )
+            let (intelligence, meetingAnalysis) = await (intelligenceResult, meetingResult)
+
+            guard let finalIndex = recordings.firstIndex(where: { $0.id == currentItem.id }) else {
+                return
+            }
+            if let intelligence {
+                recordings[finalIndex].intelligence = intelligence
+                recordings[finalIndex].manualTags = RecordingItem.mergedTags(
+                    recordings[finalIndex].manualTags ?? [],
+                    intelligence.tags
+                )
+            }
+            if let meetingAnalysis {
+                recordings[finalIndex].meetingAnalysis = meetingAnalysis
+            }
+            recordings[finalIndex].importStatus = nil
+            searchIndexCache[currentItem.id] = nil
+            try persist()
+        } catch {
+            markImportFailed(for: currentItem.id, message: error.localizedDescription)
+            throw error
         }
     }
 
-    private static func parseTimedTranscriptSegment(_ rawLine: String) -> TimedTranscriptSegment? {
-        let line = rawLine.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard line.hasPrefix("["),
-              let closingBracket = line.firstIndex(of: "]") else {
-            return nil
+    @discardableResult
+    func importManualGeminiTranscriptionJSON(
+        _ json: String,
+        for item: RecordingItem
+    ) throws -> RecordingItem {
+        try ensureTranscriptUnlocked(item)
+        guard let index = recordings.firstIndex(where: { $0.id == item.id }) else {
+            throw RecordingRenameError.itemMissing
         }
 
-        let timeText = String(line[line.index(after: line.startIndex)..<closingBracket])
-        let textStartIndex = line.index(after: closingBracket)
-        let text = String(line[textStartIndex...]).trimmingCharacters(in: .whitespacesAndNewlines)
-        guard let startSeconds = parseTranscriptTimestamp(timeText), !text.isEmpty else {
-            return nil
+        let currentItem = recordings[index]
+        let sourceAudioURL = audioURL(for: currentItem)
+        let measuredDuration = (try? Self.durationSeconds(for: sourceAudioURL)) ?? 0
+        let durationSeconds = max(Double(currentItem.durationSeconds), Double(measuredDuration))
+        let transcription = try GeminiCloudService.parseManualTranscriptionJSON(
+            json,
+            durationSeconds: durationSeconds
+        )
+
+        let targetTranscriptURL = transcriptURL(for: currentItem)
+        let existingTranscript = transcriptText(for: currentItem)
+        let backupURL = geminiTranscriptBackupURL(for: currentItem)
+        if !existingTranscript.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            try existingTranscript.write(to: backupURL, atomically: true, encoding: .utf8)
         }
 
-        return TimedTranscriptSegment(startSeconds: startSeconds, text: text)
+        try transcription.lines.timedTranscriptText.write(
+            to: targetTranscriptURL,
+            atomically: true,
+            encoding: .utf8
+        )
+        recordings[index].durationSeconds = max(currentItem.durationSeconds, measuredDuration)
+        recordings[index].transcriptPreview = transcription.lines.plainTranscriptText
+        recordings[index].lineCount = transcription.lines.count
+        recordings[index].intelligence = nil
+        recordings[index].meetingAnalysis = nil
+        recordings[index].speakerDiarization = transcription.diarization
+        recordings[index].importStatus = nil
+        searchIndexCache[currentItem.id] = nil
+        try persist()
+        return recordings[index]
     }
 
-    private static func parseTranscriptTimestamp(_ text: String) -> Double? {
-        let parts = text.split(separator: ":", omittingEmptySubsequences: false)
-        guard parts.count == 3,
-              let minutes = Int(parts[0]),
-              let seconds = Int(parts[1]),
-              let centiseconds = Int(parts[2]),
-              minutes >= 0,
-              (0..<60).contains(seconds),
-              (0..<100).contains(centiseconds) else {
-            return nil
+    func hasGeminiTranscriptBackup(for item: RecordingItem) -> Bool {
+        fileManager.fileExists(atPath: geminiTranscriptBackupURL(for: item).path)
+    }
+
+    @discardableResult
+    func restoreTranscriptBeforeGemini(for item: RecordingItem) throws -> RecordingItem {
+        try ensureTranscriptUnlocked(item)
+        guard let index = recordings.firstIndex(where: { $0.id == item.id }) else {
+            throw RecordingRenameError.itemMissing
         }
 
-        return Double(minutes * 60 + seconds) + Double(centiseconds) / 100
+        let currentItem = recordings[index]
+        let backupURL = geminiTranscriptBackupURL(for: currentItem)
+        guard fileManager.fileExists(atPath: backupURL.path) else {
+            throw GeminiCloudError.transcriptBackupUnavailable
+        }
+        let restoredTranscript = try String(contentsOf: backupURL, encoding: .utf8)
+        try restoredTranscript.write(
+            to: transcriptURL(for: currentItem),
+            atomically: true,
+            encoding: .utf8
+        )
+
+        recordings[index].transcriptPreview = restoredTranscript.plainTranscriptTextForIntelligence
+        recordings[index].lineCount = restoredTranscript.transcriptLineCount
+        recordings[index].intelligence = nil
+        recordings[index].meetingAnalysis = nil
+        recordings[index].speakerDiarization = nil
+        recordings[index].importStatus = nil
+        searchIndexCache[item.id] = nil
+        try persist()
+        try? fileManager.removeItem(at: backupURL)
+        return recordings[index]
+    }
+
+    private func updateGeminiProgress(
+        for id: RecordingItem.ID,
+        progress: GeminiCloudProcessingProgress
+    ) {
+        let message: String
+        switch progress.stage {
+        case .preparing:
+            message = String(localized: L10n.Import.preparingGemini)
+        case .uploading:
+            message = String(localized: L10n.Import.uploadingToGemini)
+        case .transcribing:
+            message = String(localized: L10n.Import.transcribingWithGemini)
+        case .analyzing:
+            message = String(localized: L10n.Import.analyzingWithGemini)
+        }
+        updateImportStatus(for: id, progress: progress.fraction, message: message)
     }
 
     private func updateImportStatus(
@@ -1702,8 +1787,12 @@ final class RecordingStore: ObservableObject {
 
         let sourceAudioURL = audioURL(for: currentItem)
         let sourceTranscriptURL = transcriptURL(for: currentItem)
+        let sourceBackupURL = geminiTranscriptBackupURL(for: currentItem)
         let targetAudioURL = recordingsDirectory.appendingPathComponent(newAudioFileName)
         let targetTranscriptURL = recordingsDirectory.appendingPathComponent(newTranscriptFileName)
+        let targetBackupURL = recordingsDirectory.appendingPathComponent(
+            Self.geminiTranscriptBackupFileName(for: newTranscriptFileName)
+        )
 
         if sourceAudioURL.path != targetAudioURL.path,
            fileManager.fileExists(atPath: targetAudioURL.path) {
@@ -1713,9 +1802,14 @@ final class RecordingStore: ObservableObject {
            fileManager.fileExists(atPath: targetTranscriptURL.path) {
             throw RecordingRenameError.nameAlreadyExists
         }
+        if sourceBackupURL.path != targetBackupURL.path,
+           fileManager.fileExists(atPath: targetBackupURL.path) {
+            throw RecordingRenameError.nameAlreadyExists
+        }
 
         var movedAudio = false
         var movedTranscript = false
+        var movedBackup = false
         let originalItem = currentItem
 
         do {
@@ -1728,6 +1822,11 @@ final class RecordingStore: ObservableObject {
                 try moveItem(from: sourceTranscriptURL, to: targetTranscriptURL)
                 movedTranscript = true
             }
+            if fileManager.fileExists(atPath: sourceBackupURL.path),
+               sourceBackupURL.path != targetBackupURL.path {
+                try moveItem(from: sourceBackupURL, to: targetBackupURL)
+                movedBackup = true
+            }
 
             var updatedItem = currentItem
             updatedItem.audioFileName = newAudioFileName
@@ -1737,9 +1836,16 @@ final class RecordingStore: ObservableObject {
             updatedRecordings[index] = updatedItem
             recordings = updatedRecordings
             try persist()
-            try? removeRecordingFilesNamed([originalItem.audioFileName, originalItem.transcriptFileName])
+            try? removeRecordingFilesNamed([
+                originalItem.audioFileName,
+                originalItem.transcriptFileName,
+                Self.geminiTranscriptBackupFileName(for: originalItem.transcriptFileName)
+            ])
             return updatedItem
         } catch {
+            if movedBackup {
+                try? moveItem(from: targetBackupURL, to: sourceBackupURL)
+            }
             if movedTranscript {
                 try? moveItem(from: targetTranscriptURL, to: sourceTranscriptURL)
             }
@@ -1887,6 +1993,8 @@ final class RecordingStore: ObservableObject {
         recordings[index].transcriptPreview = updatedTranscript.plainTranscriptTextForIntelligence
         recordings[index].lineCount = updatedTranscript.plainTranscriptTextForIntelligence.transcriptLineCount
         recordings[index].intelligence = nil
+        recordings[index].meetingAnalysis = nil
+        recordings[index].speakerDiarization = nil
         searchIndexCache[item.id] = nil
         try persist()
         return recordings[index]
@@ -1971,6 +2079,17 @@ final class RecordingStore: ObservableObject {
         recordingsDirectory.appendingPathComponent(item.transcriptFileName)
     }
 
+    private func geminiTranscriptBackupURL(for item: RecordingItem) -> URL {
+        recordingsDirectory.appendingPathComponent(
+            Self.geminiTranscriptBackupFileName(for: item.transcriptFileName)
+        )
+    }
+
+    private static func geminiTranscriptBackupFileName(for transcriptFileName: String) -> String {
+        let baseName = (transcriptFileName as NSString).deletingPathExtension
+        return "\(baseName).before-gemini.txt"
+    }
+
     func iCloudSyncStatus(for item: RecordingItem) -> RecordingICloudSyncStatus {
         guard isICloudStorageEnabled else {
             return RecordingICloudSyncStatus(state: .localOnly, uploadedFileCount: 0, totalFileCount: 0)
@@ -1987,7 +2106,11 @@ final class RecordingStore: ObservableObject {
         return RecordingICloudSyncStatus(state: .waiting, uploadedFileCount: 0, totalFileCount: 0)
     }
 
-    private func refreshICloudSyncStatusCache() {
+    func refreshICloudSyncStatus(logDiagnostics: Bool = false) {
+        refreshICloudSyncStatusCache(logDiagnostics: logDiagnostics)
+    }
+
+    private func refreshICloudSyncStatusCache(logDiagnostics: Bool = false) {
         iCloudSyncStatusRefreshTask?.cancel()
 
         guard isICloudStorageEnabled else {
@@ -2020,7 +2143,13 @@ final class RecordingStore: ObservableObject {
             let statuses = await Task.detached(priority: .utility) {
                 Dictionary(
                     uniqueKeysWithValues: workItems.map { workItem in
-                        (workItem.id, Self.iCloudSyncStatus(for: [workItem.audioURL, workItem.transcriptURL]))
+                        (
+                            workItem.id,
+                            Self.iCloudSyncStatus(
+                                for: [workItem.audioURL, workItem.transcriptURL],
+                                diagnosticRecordingID: logDiagnostics ? workItem.id : nil
+                            )
+                        )
                     }
                 )
             }.value
@@ -2051,7 +2180,6 @@ final class RecordingStore: ObservableObject {
             item.transcriptPreview,
             item.combinedTags.joined(separator: " "),
             item.projectName ?? "",
-            item.categoryName ?? "",
             item.keyPoints ?? "",
             item.intelligence?.summary ?? "",
             item.meetingAnalysis?.searchableText ?? "",
@@ -2421,12 +2549,22 @@ final class RecordingStore: ObservableObject {
                 continue
             }
 
-            try? fileManager.copyItem(at: sourceURL, to: destinationURL)
+            do {
+                try fileManager.copyItem(at: sourceURL, to: destinationURL)
+            } catch {
+                Self.iCloudLogger.error(
+                    "migration-copy-failed file=\(sourceURL.lastPathComponent, privacy: .private) ext=\(fileExtension, privacy: .public) error=\(error.localizedDescription, privacy: .public)"
+                )
+            }
         }
     }
 
     private func removeRecordingFilesFromAllManagedDirectories(_ item: RecordingItem) throws {
-        try removeRecordingFilesNamed([item.audioFileName, item.transcriptFileName])
+        try removeRecordingFilesNamed([
+            item.audioFileName,
+            item.transcriptFileName,
+            Self.geminiTranscriptBackupFileName(for: item.transcriptFileName)
+        ])
     }
 
     private func removeRecordingFilesNamed(_ fileNames: [String]) throws {
@@ -2453,63 +2591,141 @@ final class RecordingStore: ObservableObject {
         }
     }
 
-    nonisolated private static func iCloudSyncStatus(for urls: [URL]) -> RecordingICloudSyncStatus {
+    nonisolated private static func iCloudSyncStatus(
+        for urls: [URL],
+        diagnosticRecordingID: RecordingItem.ID? = nil
+    ) -> RecordingICloudSyncStatus {
         let fileManager = FileManager.default
-        let fileURLs = urls.filter { url in
-            fileManager.fileExists(atPath: url.path)
+        let inspections = urls.enumerated().map { offset, url in
+            let exists = fileManager.fileExists(atPath: url.path)
+            return RecordingICloudFileSyncInspection(
+                role: offset == 0 ? "audio" : "transcript",
+                fileExtension: url.pathExtension.lowercased(),
+                status: exists ? iCloudFileSyncStatus(for: url) : nil
+            )
         }
-        guard !fileURLs.isEmpty else {
-            return RecordingICloudSyncStatus(state: .waiting, uploadedFileCount: 0, totalFileCount: 0)
-        }
+        let fileStatuses = inspections.compactMap(\.status)
 
-        let fileStatuses = fileURLs.map(iCloudFileSyncStatus(for:))
-        if let failedStatus = fileStatuses.first(where: { $0.errorDescription != nil }) {
-            return RecordingICloudSyncStatus(
+        let result: RecordingICloudSyncStatus
+        if fileStatuses.isEmpty {
+            result = RecordingICloudSyncStatus(
+                state: .waiting,
+                uploadedFileCount: 0,
+                totalFileCount: 0
+            )
+        } else if let failedStatus = fileStatuses.first(where: { $0.errorDescription != nil }) {
+            result = RecordingICloudSyncStatus(
                 state: .failed,
                 uploadedFileCount: fileStatuses.filter(\.isUploaded).count,
                 totalFileCount: fileStatuses.count,
                 errorDescription: failedStatus.errorDescription
             )
+        } else {
+            let uploadedFileCount = fileStatuses.filter(\.isUploaded).count
+            if uploadedFileCount == fileStatuses.count {
+                result = RecordingICloudSyncStatus(
+                    state: .uploaded,
+                    uploadedFileCount: uploadedFileCount,
+                    totalFileCount: fileStatuses.count
+                )
+            } else if fileStatuses.contains(where: \.isUploading) {
+                result = RecordingICloudSyncStatus(
+                    state: .uploading,
+                    uploadedFileCount: uploadedFileCount,
+                    totalFileCount: fileStatuses.count
+                )
+            } else {
+                result = RecordingICloudSyncStatus(
+                    state: .waiting,
+                    uploadedFileCount: uploadedFileCount,
+                    totalFileCount: fileStatuses.count
+                )
+            }
         }
 
-        let uploadedFileCount = fileStatuses.filter(\.isUploaded).count
-        if uploadedFileCount == fileStatuses.count {
-            return RecordingICloudSyncStatus(
-                state: .uploaded,
-                uploadedFileCount: uploadedFileCount,
-                totalFileCount: fileStatuses.count
+        if let diagnosticRecordingID {
+            logICloudSyncInspection(
+                recordingID: diagnosticRecordingID,
+                inspections: inspections,
+                result: result
             )
         }
 
-        if fileStatuses.contains(where: \.isUploading) {
-            return RecordingICloudSyncStatus(
-                state: .uploading,
-                uploadedFileCount: uploadedFileCount,
-                totalFileCount: fileStatuses.count
-            )
-        }
+        return result
+    }
 
-        return RecordingICloudSyncStatus(
-            state: .waiting,
-            uploadedFileCount: uploadedFileCount,
-            totalFileCount: fileStatuses.count
+    nonisolated private static func logICloudSyncInspection(
+        recordingID: RecordingItem.ID,
+        inspections: [RecordingICloudFileSyncInspection],
+        result: RecordingICloudSyncStatus
+    ) {
+        let recordingIDText = recordingID.uuidString
+        let stateText = iCloudSyncLogName(result.state)
+        iCloudLogger.info(
+            "recording=\(recordingIDText, privacy: .public) state=\(stateText, privacy: .public) uploaded=\(result.uploadedFileCount, privacy: .public)/\(result.totalFileCount, privacy: .public)"
         )
+
+        for inspection in inspections {
+            guard let status = inspection.status else {
+                iCloudLogger.error(
+                    "recording=\(recordingIDText, privacy: .public) role=\(inspection.role, privacy: .public) ext=\(inspection.fileExtension, privacy: .public) exists=false reason=missing-from-active-icloud-container"
+                )
+                continue
+            }
+
+            let errorText = status.errorDescription
+                ?? status.metadataErrorDescription
+                ?? "none"
+            iCloudLogger.info(
+                "recording=\(recordingIDText, privacy: .public) role=\(inspection.role, privacy: .public) ext=\(inspection.fileExtension, privacy: .public) exists=true bytes=\(status.fileSize, privacy: .public) ubiquitous=\(status.isUbiquitous, privacy: .public) excluded=\(status.isExcludedFromSync, privacy: .public) uploaded=\(status.isUploaded, privacy: .public) uploading=\(status.isUploading, privacy: .public) error=\(errorText, privacy: .public)"
+            )
+        }
+    }
+
+    nonisolated private static func iCloudSyncLogName(_ state: RecordingICloudSyncState) -> String {
+        switch state {
+        case .localOnly: return "local-only"
+        case .iCloudUnavailable: return "icloud-unavailable"
+        case .waiting: return "waiting"
+        case .uploading: return "uploading"
+        case .uploaded: return "uploaded"
+        case .failed: return "failed"
+        }
     }
 
     nonisolated private static func iCloudFileSyncStatus(for url: URL) -> RecordingICloudFileSyncStatus {
-        let keys: Set<URLResourceKey> = [
+        let excludedFromSyncKey = URLResourceKey(rawValue: "NSURLUbiquitousItemIsExcludedFromSyncKey")
+        var keys: Set<URLResourceKey> = [
             .isUbiquitousItemKey,
             .ubiquitousItemIsUploadedKey,
             .ubiquitousItemIsUploadingKey,
-            .ubiquitousItemUploadingErrorKey
+            .ubiquitousItemUploadingErrorKey,
+            .fileSizeKey
         ]
-        let values = try? url.resourceValues(forKeys: keys)
-        return RecordingICloudFileSyncStatus(
-            isUbiquitous: values?.isUbiquitousItem == true,
-            isUploaded: values?.ubiquitousItemIsUploaded == true,
-            isUploading: values?.ubiquitousItemIsUploading == true,
-            errorDescription: values?.ubiquitousItemUploadingError?.localizedDescription
-        )
+        keys.insert(excludedFromSyncKey)
+
+        do {
+            let values = try url.resourceValues(forKeys: keys)
+            return RecordingICloudFileSyncStatus(
+                isUbiquitous: values.isUbiquitousItem == true,
+                isExcludedFromSync: (values.allValues[excludedFromSyncKey] as? Bool) == true,
+                isUploaded: values.ubiquitousItemIsUploaded == true,
+                isUploading: values.ubiquitousItemIsUploading == true,
+                fileSize: values.fileSize ?? -1,
+                errorDescription: values.ubiquitousItemUploadingError?.localizedDescription,
+                metadataErrorDescription: nil
+            )
+        } catch {
+            return RecordingICloudFileSyncStatus(
+                isUbiquitous: false,
+                isExcludedFromSync: false,
+                isUploaded: false,
+                isUploading: false,
+                fileSize: -1,
+                errorDescription: nil,
+                metadataErrorDescription: error.localizedDescription
+            )
+        }
     }
 
     private func persist() throws {
@@ -2541,7 +2757,6 @@ final class RecordingStore: ObservableObject {
                     item.transcriptPreview,
                     item.combinedTags.joined(separator: " "),
                     item.projectName ?? "",
-                    item.categoryName ?? "",
                     item.keyPoints ?? "",
                     item.intelligence?.summary ?? "",
                     item.meetingAnalysis?.searchableText ?? ""
@@ -2838,9 +3053,18 @@ private struct RecordingSearchIndexCacheEntry {
 
 private struct RecordingICloudFileSyncStatus {
     var isUbiquitous: Bool
+    var isExcludedFromSync: Bool
     var isUploaded: Bool
     var isUploading: Bool
+    var fileSize: Int
     var errorDescription: String?
+    var metadataErrorDescription: String?
+}
+
+private struct RecordingICloudFileSyncInspection {
+    var role: String
+    var fileExtension: String
+    var status: RecordingICloudFileSyncStatus?
 }
 
 private struct RecordingICloudSyncStatusWorkItem {
@@ -3409,6 +3633,13 @@ private enum RecordingIntelligenceService {
             throw RecordingIntelligenceError.emptyTranscript
         }
 
+        if summaryProvider == .geminiCloud {
+            return try await GeminiCloudService.generateIntelligence(
+                transcript: cleanedTranscript,
+                languageName: languageName
+            )
+        }
+
         let model = SystemLanguageModel(
             useCase: .general,
             guardrails: .permissiveContentTransformations
@@ -3612,6 +3843,13 @@ private enum RecordingIntelligenceService {
         let cleanedTranscript = transcript.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !cleanedTranscript.isEmpty else {
             throw RecordingIntelligenceError.emptyTranscript
+        }
+
+        if summaryProvider == .geminiCloud {
+            return try await GeminiCloudService.generateTitleSuggestion(
+                transcript: cleanedTranscript,
+                languageName: languageName
+            )
         }
 
         let model = SystemLanguageModel(

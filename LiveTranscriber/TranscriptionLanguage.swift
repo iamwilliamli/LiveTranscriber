@@ -79,7 +79,7 @@ enum RecordingAudioFormat: String, CaseIterable, Identifiable, Codable {
     }
 }
 
-struct TranscriptionLine: Identifiable, Codable, Hashable {
+struct TranscriptionLine: Identifiable, Codable, Hashable, Sendable {
     var id = UUID()
     var startSeconds: Double
     var text: String

@@ -16,6 +16,13 @@ enum MeetingAnalysisService {
             throw MeetingAnalysisError.emptyTranscript
         }
 
+        if summaryProvider == .geminiCloud {
+            return try await GeminiCloudService.generateMeetingAnalysis(
+                transcript: cleanedTranscript,
+                languageName: languageName
+            )
+        }
+
         if summaryProvider == .localQwen {
             return try await generateLocal(
                 transcript: cleanedTranscript,

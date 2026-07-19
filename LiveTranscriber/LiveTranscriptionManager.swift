@@ -329,26 +329,10 @@ final class LiveTranscriptionManager: ObservableObject {
             }
         }
     }
-    @Published var isOpenAITranscriptionEnabled: Bool {
-        didSet {
-            UserDefaults.standard.set(isOpenAITranscriptionEnabled, forKey: Self.openAITranscriptionEnabledDefaultsKey)
-        }
-    }
-    @Published var openAIAPIKey: String {
-        didSet {
-            do {
-                try OpenAIAPIKeyStore.save(openAIAPIKey)
-            } catch {
-                errorText = error.localizedDescription
-            }
-        }
-    }
-
     private static let languageDefaultsKey = "transcription.language"
     private static let audioFormatDefaultsKey = "recording.audioFormat"
     private static let speechPipelineModeDefaultsKey = "speech.pipelineMode"
     private static let transcriptionBackendDefaultsKey = "transcription.backend"
-    private static let openAITranscriptionEnabledDefaultsKey = "openai.transcription.enabled"
     private static let analyzerSampleRate: Double = 16_000
     private static let inputLevelHistorySampleInterval: TimeInterval = 1.0 / 6.0
     private static var shouldUseSimulatorRecordingOnlyFallback: Bool {
@@ -439,8 +423,7 @@ final class LiveTranscriptionManager: ObservableObject {
             selectedTranscriptionBackend = .defaultBackend
         }
 
-        isOpenAITranscriptionEnabled = UserDefaults.standard.bool(forKey: Self.openAITranscriptionEnabledDefaultsKey)
-        openAIAPIKey = (try? OpenAIAPIKeyStore.load()) ?? ""
+        LegacyOnlineTranscriptionCleanup.run()
     }
 
     func refreshSupportedLanguages() async {
