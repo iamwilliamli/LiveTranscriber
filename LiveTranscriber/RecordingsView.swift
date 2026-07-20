@@ -515,6 +515,22 @@ private struct LocalWhisperRetranscriptionButton: View {
     }
 }
 
+private struct Qwen3ASRRetranscriptionButton: View {
+    let isAvailable: Bool
+    let isDisabled: Bool
+    let action: () -> Void
+
+    var body: some View {
+        Button {
+            action()
+        } label: {
+            Label(localized(L10n.Recordings.retranscribeWithQwen3ASR), systemImage: "waveform.badge.magnifyingglass")
+        }
+        .disabled(isDisabled || !isAvailable)
+        .accessibilityHint(isAvailable ? "" : localized(L10n.Qwen3ASR.modelRequired))
+    }
+}
+
 private struct LocalWhisperRetranscriptionPicker: View {
     let recordingLanguageID: String
     let downloadedModels: [LocalWhisperModel]
@@ -819,6 +835,7 @@ struct RecordingsView: View {
     @State private var appleSpeechTranscriptionLanguages: [TranscriptionLanguage] = TranscriptionLanguage.fallbackOptions
     @State private var downloadedLocalWhisperModels: [LocalWhisperModel] = []
     @State private var localWhisperLanguageOptionsByModelID: [String: [TranscriptionLanguage]] = [:]
+    @State private var isQwen3ASRAvailable = Qwen3ASRModelManager.currentStatus().isAvailable
     @State private var localWhisperRetranscriptionRequest: LocalWhisperRetranscriptionRequest?
     @State private var searchText = ""
     @State private var navigationPath: [RecordingNavigationDestination] = []
@@ -936,6 +953,9 @@ struct RecordingsView: View {
         .onAppear {
             consumeIncomingImportURLIfNeeded()
             consumePendingOpenRecordingIDIfNeeded()
+            Task {
+                await refreshLocalWhisperMenuOptions()
+            }
         }
         .onChange(of: incomingImportURL) { _, newURL in
             guard let newURL else {
@@ -1192,8 +1212,11 @@ struct RecordingsView: View {
                     player: player,
                     downloadedLocalWhisperModels: downloadedLocalWhisperModels,
                     localWhisperLanguageOptionsByModelID: localWhisperLanguageOptionsByModelID,
+                    isQwen3ASRAvailable: isQwen3ASRAvailable,
                     analyzingRecordingID: analyzingRecordingID,
-                    onOpen: openRecording,
+                    onOpen: { item in
+                        openRecording(item)
+                    },
                     onAnalyze: { item, provider in
                         analyze(item, summaryProvider: provider)
                     },
@@ -1210,6 +1233,7 @@ struct RecordingsView: View {
                     onRetranscribeWithLocalWhisper: { item in
                         localWhisperRetranscriptionRequest = LocalWhisperRetranscriptionRequest(item: item)
                     },
+                    onRetranscribeWithQwen3ASR: retranscribeWithQwen3ASR,
                     onAddRecordings: { folder in
                         addRecordingsCategoryTarget = folder
                     }
@@ -1219,7 +1243,7 @@ struct RecordingsView: View {
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
                     .background(AppTheme.groupedBackground)
             }
-        case .recording(let id):
+        case .recording(let id, let transcriptLineID):
             if let item = store.recording(withID: id) {
                 RecordingDetailView(
                     item: item,
@@ -1227,7 +1251,9 @@ struct RecordingsView: View {
                     transcriber: transcriber,
                     player: player,
                     downloadedLocalWhisperModels: downloadedLocalWhisperModels,
-                    localWhisperLanguageOptionsByModelID: localWhisperLanguageOptionsByModelID
+                    localWhisperLanguageOptionsByModelID: localWhisperLanguageOptionsByModelID,
+                    isQwen3ASRAvailable: isQwen3ASRAvailable,
+                    initialTranscriptLineID: transcriptLineID
                 )
             } else {
                 EmptyStateView(icon: "exclamationmark.triangle", titleResource: L10n.Recordings.noRecordings)
@@ -1414,14 +1440,15 @@ struct RecordingsView: View {
             || isTranscriptionRunning
             || transcriber.isRecording
             || transcriber.isPreparing
+        let searchMatch = transcriptSearchMatch(for: item)
 
         return RecordingRow(
             item: item,
             isAnalyzing: analyzingRecordingID == item.id,
             canGenerateIntelligence: store.intelligenceAvailability.isAvailable,
-            searchMatch: transcriptSearchMatch(for: item)
+            searchMatch: searchMatch
         ) {
-            openRecording(item)
+            openRecording(item, initialTranscriptLineID: searchMatch?.lineID)
         }
         .listRowSeparator(.hidden)
         .listRowBackground(Color.clear)
@@ -1468,6 +1495,13 @@ struct RecordingsView: View {
                 isDisabled: isTranscriptionActionDisabled
             ) {
                 localWhisperRetranscriptionRequest = LocalWhisperRetranscriptionRequest(item: item)
+            }
+
+            Qwen3ASRRetranscriptionButton(
+                isAvailable: isQwen3ASRAvailable,
+                isDisabled: isTranscriptionActionDisabled
+            ) {
+                retranscribeWithQwen3ASR(item)
             }
 
             Button(role: .destructive) {
@@ -1536,6 +1570,7 @@ struct RecordingsView: View {
 
         downloadedLocalWhisperModels = menuOptions.0
         localWhisperLanguageOptionsByModelID = menuOptions.1
+        isQwen3ASRAvailable = Qwen3ASRModelManager.currentStatus().isAvailable
     }
 
     private func queueImport(from url: URL) {
@@ -1708,9 +1743,14 @@ struct RecordingsView: View {
         }
     }
 
-    private func openRecording(_ item: RecordingItem) {
+    private func openRecording(
+        _ item: RecordingItem,
+        initialTranscriptLineID: StoredTranscriptLine.ID? = nil
+    ) {
         HapticFeedback.play(.navigation)
-        navigationPath.append(.recording(item.id))
+        navigationPath.append(
+            .recording(item.id, transcriptLineID: initialTranscriptLineID)
+        )
     }
 
     private func consumePendingOpenRecordingIDIfNeeded() {
@@ -1763,6 +1803,31 @@ struct RecordingsView: View {
         }
     }
 
+    private func retranscribeWithQwen3ASR(_ item: RecordingItem) {
+        guard item.importStatus?.isFailed != false else {
+            HapticFeedback.play(.blocked)
+            return
+        }
+        guard !transcriber.isRecording, !transcriber.isPreparing else {
+            HapticFeedback.play(.blocked)
+            return
+        }
+
+        HapticFeedback.play(.retranscribeStart)
+        Task {
+            do {
+                try await store.retranscribeWithQwen3ASR(
+                    item,
+                    language: TranscriptionLanguage(id: item.languageID)
+                )
+                HapticFeedback.play(.retranscribeComplete)
+            } catch {
+                transcriptionErrorMessage = error.localizedDescription
+                HapticFeedback.play(.failure)
+            }
+        }
+    }
+
     private func requestDelete(_ item: RecordingItem) {
         guard store.recording(withID: item.id) != nil else {
             HapticFeedback.play(.warning)
@@ -1775,7 +1840,7 @@ struct RecordingsView: View {
     private func delete(_ item: RecordingItem) {
         do {
             navigationPath.removeAll { destination in
-                if case .recording(let id) = destination, id == item.id {
+                if case .recording(let id, _) = destination, id == item.id {
                     return true
                 }
                 return false
@@ -1803,16 +1868,14 @@ struct RecordingsView: View {
         }
 
         let transcript = store.transcriptText(for: item)
-        guard let rawLine = transcript
-            .split(whereSeparator: \.isNewline)
-            .lazy
-            .map(String.init)
-            .first(where: { normalizedSearchText($0).contains(normalizedQuery) }),
-              let line = StoredTranscriptLine.parse(rawLine).first else {
+        guard let line = StoredTranscriptLine.parse(transcript).first(where: { line in
+            normalizedSearchText("[\(line.timeText)] \(line.text)").contains(normalizedQuery)
+        }) else {
             return nil
         }
 
         return RecordingTranscriptSearchMatch(
+            lineID: line.id,
             timeText: line.timeText,
             text: line.text,
             query: query
@@ -2227,7 +2290,7 @@ private struct RecordingCategoryFolder: Identifiable, Hashable {
 
 private enum RecordingNavigationDestination: Hashable {
     case category(String)
-    case recording(RecordingItem.ID)
+    case recording(RecordingItem.ID, transcriptLineID: StoredTranscriptLine.ID?)
 }
 
 private extension Array where Element == RecordingNavigationDestination {
@@ -2248,6 +2311,7 @@ private struct RecordingCategoryDetailList: View {
     @ObservedObject var player: RecordingPlaybackController
     let downloadedLocalWhisperModels: [LocalWhisperModel]
     let localWhisperLanguageOptionsByModelID: [String: [TranscriptionLanguage]]
+    let isQwen3ASRAvailable: Bool
     let analyzingRecordingID: RecordingItem.ID?
     let onOpen: (RecordingItem) -> Void
     let onAnalyze: (RecordingItem, RecordingSummaryProvider) -> Void
@@ -2256,6 +2320,7 @@ private struct RecordingCategoryDetailList: View {
     let onRequestNewCategory: (RecordingItem) -> Void
     let onUpdateCategory: (RecordingItem, String?) -> Void
     let onRetranscribeWithLocalWhisper: (RecordingItem) -> Void
+    let onRetranscribeWithQwen3ASR: (RecordingItem) -> Void
     let onAddRecordings: (RecordingCategoryFolder) -> Void
 
     private var categories: [String] {
@@ -2338,6 +2403,13 @@ private struct RecordingCategoryDetailList: View {
                         isDisabled: isTranscriptionActionDisabled
                     ) {
                         onRetranscribeWithLocalWhisper(item)
+                    }
+
+                    Qwen3ASRRetranscriptionButton(
+                        isAvailable: isQwen3ASRAvailable,
+                        isDisabled: isTranscriptionActionDisabled
+                    ) {
+                        onRetranscribeWithQwen3ASR(item)
                     }
 
                         Button(role: .destructive) {
@@ -2825,6 +2897,7 @@ struct RecordingMapView: View {
     @State private var interactiveNavigationPopHasPlayedHaptic = false
     @State private var downloadedLocalWhisperModels: [LocalWhisperModel] = []
     @State private var localWhisperLanguageOptionsByModelID: [String: [TranscriptionLanguage]] = [:]
+    @State private var isQwen3ASRAvailable = Qwen3ASRModelManager.currentStatus().isAvailable
 
     private var points: [RecordingMapPoint] {
         store.recordings.compactMap { item in
@@ -2891,6 +2964,7 @@ struct RecordingMapView: View {
                 }.value
                 downloadedLocalWhisperModels = menuOptions.0
                 localWhisperLanguageOptionsByModelID = menuOptions.1
+                isQwen3ASRAvailable = Qwen3ASRModelManager.currentStatus().isAvailable
             }
             .navigationDestination(item: $selectedRecording) { item in
                 RecordingDetailView(
@@ -2899,7 +2973,8 @@ struct RecordingMapView: View {
                     transcriber: transcriber,
                     player: player,
                     downloadedLocalWhisperModels: downloadedLocalWhisperModels,
-                    localWhisperLanguageOptionsByModelID: localWhisperLanguageOptionsByModelID
+                    localWhisperLanguageOptionsByModelID: localWhisperLanguageOptionsByModelID,
+                    isQwen3ASRAvailable: isQwen3ASRAvailable
                 )
             }
             .onInteractiveNavigationPopGesture(
@@ -3106,17 +3181,19 @@ private final class RecordingLocationNameCache {
 
 private extension Double {
     func rounded(toPlaces places: Int) -> Double {
-        let divisor = pow(10.0, Double(places))
+        let divisor = Foundation.pow(10.0, Double(places))
         return (self * divisor).rounded() / divisor
     }
 }
 
 private struct RecordingTranscriptSearchMatch {
+    let lineID: StoredTranscriptLine.ID
     let timeText: String
     let text: String
     let highlightedText: AttributedString
 
-    init(timeText: String, text: String, query: String) {
+    init(lineID: StoredTranscriptLine.ID, timeText: String, text: String, query: String) {
+        self.lineID = lineID
         self.timeText = timeText
         self.text = text
         highlightedText = Self.highlighted(text, query: query)
@@ -3588,6 +3665,8 @@ struct RecordingDetailView: View {
     @ObservedObject var player: RecordingPlaybackController
     var downloadedLocalWhisperModels: [LocalWhisperModel] = []
     var localWhisperLanguageOptionsByModelID: [String: [TranscriptionLanguage]] = [:]
+    var isQwen3ASRAvailable = Qwen3ASRModelManager.currentStatus().isAvailable
+    var initialTranscriptLineID: String? = nil
     var onClose: (() -> Void)? = nil
     @Environment(\.dismiss) private var dismiss
     @Environment(\.scenePhase) private var scenePhase
@@ -3613,6 +3692,7 @@ struct RecordingDetailView: View {
     @StateObject private var editLocationProvider = RecordingEditLocationProvider()
     @State private var isShowingRecordingEditSheet = false
     @State private var editRecordingName = ""
+    @State private var editRecordingLanguageID = ""
     @State private var editRecordingCategory = ""
     @State private var editRecordingKeyPoints = ""
     @State private var editRecordingTags: [String] = []
@@ -3670,6 +3750,23 @@ struct RecordingDetailView: View {
                 "\($0.schemaVersion)-\($0.segments.count)-\($0.generatedAt.timeIntervalSinceReferenceDate)"
             } ?? "no-speaker-diarization"
         ].joined(separator: "-")
+    }
+
+    private var initialTranscriptScrollTarget: StoredTranscriptLine.ID? {
+        guard let initialTranscriptLineID,
+              cachedTranscriptLines.contains(where: { $0.id == initialTranscriptLineID }) else {
+            return nil
+        }
+        return initialTranscriptLineID
+    }
+
+    private var initialTranscriptPlaybackTarget: StoredTranscriptLine? {
+        guard player.isLoaded,
+              player.currentItem?.id == currentItem.id,
+              let initialTranscriptLineID else {
+            return nil
+        }
+        return cachedTranscriptLines.first { $0.id == initialTranscriptLineID }
     }
 
     private var isTranscriptionRunning: Bool {
@@ -3837,6 +3934,7 @@ struct RecordingDetailView: View {
             RecordingEditSheet(
                 item: currentItem,
                 recordingName: $editRecordingName,
+                languageID: $editRecordingLanguageID,
                 categoryName: $editRecordingCategory,
                 keyPoints: $editRecordingKeyPoints,
                 tags: $editRecordingTags,
@@ -3844,6 +3942,10 @@ struct RecordingDetailView: View {
                 includesLocation: $editRecordingIncludesLocation,
                 locationProvider: editLocationProvider,
                 isSaving: isSavingRecordingEdit,
+                languageOptions: TranscriptionLanguage.baseLanguageOptions(
+                    from: appleSpeechTranscriptionLanguages,
+                    including: editRecordingLanguageID
+                ),
                 availableCategories: RecordingCategoryCatalog.allNames(recordings: store.recordings),
                 showsTitleGeneration: store.summaryProviderAvailability.hasAnyAvailableProvider,
                 onGenerateTitle: {
@@ -4265,6 +4367,13 @@ struct RecordingDetailView: View {
                 isShowingLocalWhisperRetranscriptionPicker = true
             }
 
+            Qwen3ASRRetranscriptionButton(
+                isAvailable: isQwen3ASRAvailable,
+                isDisabled: currentItem.isTranscriptLocked || isTranscriptionRunning || transcriber.isRecording || transcriber.isPreparing
+            ) {
+                retranscribeCurrentItemWithQwen3ASR()
+            }
+
             Button {
                 HapticFeedback.play(.copy)
                 UIPasteboard.general.string = transcriptText
@@ -4338,7 +4447,37 @@ struct RecordingDetailView: View {
                         .contentShape(Rectangle())
                         .onTapGesture {}
                 }
+                .task(id: initialTranscriptScrollTarget) {
+                    guard let lineID = initialTranscriptScrollTarget else {
+                        return
+                    }
+
+                    await Task.yield()
+                    scrollTranscript(to: lineID, using: scrollProxy)
+                }
+                .task(id: initialTranscriptPlaybackTarget) {
+                    guard let line = initialTranscriptPlaybackTarget else {
+                        return
+                    }
+
+                    scrubbedPlaybackTime = nil
+                    player.seek(to: line.startSeconds)
+                }
             }
+        }
+    }
+
+    private func scrollTranscript(
+        to lineID: StoredTranscriptLine.ID,
+        using scrollProxy: ScrollViewProxy
+    ) {
+        guard !accessibilityReduceMotion else {
+            scrollProxy.scrollTo(lineID, anchor: .center)
+            return
+        }
+
+        withAnimation(.snappy(duration: 0.34, extraBounce: 0)) {
+            scrollProxy.scrollTo(lineID, anchor: .center)
         }
     }
 
@@ -5635,6 +5774,32 @@ struct RecordingDetailView: View {
         }
     }
 
+    private func retranscribeCurrentItemWithQwen3ASR() {
+        guard !isTranscriptionRunning else {
+            HapticFeedback.play(.blocked)
+            return
+        }
+        guard !transcriber.isRecording, !transcriber.isPreparing else {
+            HapticFeedback.play(.blocked)
+            return
+        }
+
+        let item = currentItem
+        HapticFeedback.play(.retranscribeStart)
+        Task {
+            do {
+                try await store.retranscribeWithQwen3ASR(
+                    item,
+                    language: TranscriptionLanguage(id: item.languageID)
+                )
+                HapticFeedback.play(.retranscribeComplete)
+            } catch {
+                transcriptionErrorMessage = error.localizedDescription
+                HapticFeedback.play(.failure)
+            }
+        }
+    }
+
     private func refreshAudioFileInfo() async {
         let item = currentItem
         let url = store.audioURL(for: item)
@@ -5855,6 +6020,7 @@ struct RecordingDetailView: View {
     private func prepareRecordingEditSheet() {
         let item = currentItem
         editRecordingName = (item.audioFileName as NSString).deletingPathExtension
+        editRecordingLanguageID = TranscriptionLanguage(id: item.languageID).baseLanguage.id
         editRecordingCategory = item.categoryName ?? ""
         editRecordingKeyPoints = item.keyPoints ?? ""
         editRecordingTags = item.combinedTags
@@ -5893,7 +6059,8 @@ struct RecordingDetailView: View {
                 projectName: currentItem.projectName,
                 categoryName: editRecordingCategory,
                 keyPoints: editRecordingKeyPoints,
-                location: location
+                location: location,
+                language: TranscriptionLanguage(id: editRecordingLanguageID).baseLanguage
             )
             RecordingCategoryCatalog.register(editRecordingCategory)
             HapticFeedback.play(.primaryAction)
@@ -5961,6 +6128,7 @@ struct RecordingDetailView: View {
 private struct RecordingEditSheet: View {
     let item: RecordingItem
     @Binding var recordingName: String
+    @Binding var languageID: String
     @Binding var categoryName: String
     @Binding var keyPoints: String
     @Binding var tags: [String]
@@ -5968,6 +6136,7 @@ private struct RecordingEditSheet: View {
     @Binding var includesLocation: Bool
     @ObservedObject var locationProvider: RecordingEditLocationProvider
     let isSaving: Bool
+    var languageOptions: [TranscriptionLanguage] = []
     var availableCategories: [String] = []
     var showsTitleGeneration = false
     var onGenerateTitle: (() async throws -> RecordingTitleSuggestion)? = nil
@@ -5981,6 +6150,7 @@ private struct RecordingEditSheet: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: 14) {
                     nameSection
+                    languageSection
                     categorySection
                     keyPointsSection
                     summarySection
@@ -6118,6 +6288,59 @@ private struct RecordingEditSheet: View {
                 .contentShape(RoundedRectangle(cornerRadius: AppTheme.compactCornerRadius, style: .continuous))
             }
             .buttonStyle(.plain)
+        }
+        .recordingEditSectionSurface()
+    }
+
+    private var languageSection: some View {
+        let selectedLanguage = languageOptions.first(where: { $0.id == languageID })
+            ?? TranscriptionLanguage(id: languageID).baseLanguage
+
+        return VStack(alignment: .leading, spacing: 8) {
+            Label(localized(L10n.Settings.transcriptionLanguage), systemImage: "globe")
+                .font(.redditSans(.caption, weight: .semibold))
+                .foregroundStyle(.secondary)
+
+            Menu {
+                ForEach(languageOptions) { language in
+                    Button {
+                        languageID = language.id
+                        HapticFeedback.play(.menuSelection)
+                    } label: {
+                        Label(
+                            language.displayName,
+                            systemImage: language.id == languageID ? "checkmark" : "globe"
+                        )
+                    }
+                }
+            } label: {
+                HStack(spacing: 8) {
+                    Image(systemName: "globe")
+                        .font(.system(size: 14, weight: .semibold))
+                        .foregroundStyle(AppTheme.info)
+
+                    Text(selectedLanguage.displayName)
+                        .font(.redditSans(.subheadline, weight: .semibold))
+                        .foregroundStyle(.primary)
+                        .lineLimit(1)
+
+                    Spacer(minLength: 8)
+
+                    Image(systemName: "chevron.up.chevron.down")
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundStyle(.tertiary)
+                }
+                .padding(.horizontal, 12)
+                .frame(height: 44)
+                .frame(maxWidth: .infinity)
+                .background(
+                    AppTheme.elevatedBackground,
+                    in: RoundedRectangle(cornerRadius: AppTheme.compactCornerRadius, style: .continuous)
+                )
+                .contentShape(RoundedRectangle(cornerRadius: AppTheme.compactCornerRadius, style: .continuous))
+            }
+            .buttonStyle(.plain)
+            .disabled(isSaving || languageOptions.isEmpty)
         }
         .recordingEditSectionSurface()
     }

@@ -70,6 +70,10 @@
 		7B0000000000000000000037 /* TranscriptExportService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7B000000000000000000103C /* TranscriptExportService.swift */; };
 		7B0000000000000000000038 /* RecordingSoundAnalysisService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7B000000000000000000103D /* RecordingSoundAnalysisService.swift */; };
 		7B0000000000000000000039 /* GeminiCloudService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7B000000000000000000103E /* GeminiCloudService.swift */; };
+		7B000000000000000000003A /* Qwen3ASRTranscription.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7B000000000000000000103F /* Qwen3ASRTranscription.swift */; };
+		7B000000000000000000003B /* Qwen3ASR in Frameworks */ = {isa = PBXBuildFile; productRef = 7B000000000000000000B002 /* Qwen3ASR */; };
+		7B000000000000000000003C /* SpeechVAD in Frameworks */ = {isa = PBXBuildFile; productRef = 7B000000000000000000B003 /* SpeechVAD */; };
+		7B000000000000000000003D /* AudioCommon in Frameworks */ = {isa = PBXBuildFile; productRef = 7B000000000000000000B004 /* AudioCommon */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -192,6 +196,7 @@
 		7B000000000000000000103C /* TranscriptExportService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TranscriptExportService.swift; sourceTree = "<group>"; };
 		7B000000000000000000103D /* RecordingSoundAnalysisService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecordingSoundAnalysisService.swift; sourceTree = "<group>"; };
 		7B000000000000000000103E /* GeminiCloudService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GeminiCloudService.swift; sourceTree = "<group>"; };
+		7B000000000000000000103F /* Qwen3ASRTranscription.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Qwen3ASRTranscription.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -199,6 +204,9 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				7B000000000000000000003D /* AudioCommon in Frameworks */,
+				7B000000000000000000003B /* Qwen3ASR in Frameworks */,
+				7B000000000000000000003C /* SpeechVAD in Frameworks */,
 				7B0000000000000000000029 /* whisper.xcframework in Frameworks */,
 				7B0000000000000000000030 /* llama.xcframework in Frameworks */,
 			);
@@ -267,6 +275,7 @@
 				7B000000000000000000103C /* TranscriptExportService.swift */,
 				7B000000000000000000103D /* RecordingSoundAnalysisService.swift */,
 				7B000000000000000000103E /* GeminiCloudService.swift */,
+				7B000000000000000000103F /* Qwen3ASRTranscription.swift */,
 				7B000000000000000000102A /* TranscriptLineEditSheet.swift */,
 				7B0000000000000000001018 /* SettingsView.swift */,
 				7B0000000000000000001019 /* TranscriptionActivityAttributes.swift */,
@@ -355,6 +364,11 @@
 				7B000000000000000000A004 /* PBXTargetDependency */,
 			);
 			name = LiveTranscriber;
+			packageProductDependencies = (
+				7B000000000000000000B002 /* Qwen3ASR */,
+				7B000000000000000000B003 /* SpeechVAD */,
+				7B000000000000000000B004 /* AudioCommon */,
+			);
 			productName = LiveTranscriber;
 			productReference = 7B0000000000000000001000 /* LiveTranscriber.app */;
 			productType = "com.apple.product-type.application";
@@ -427,6 +441,9 @@
 					Base,
 				);
 			mainGroup = 7B0000000000000000003001;
+			packageReferences = (
+				7B000000000000000000B001 /* XCRemoteSwiftPackageReference "speech-swift" */,
+			);
 			productRefGroup = 7B0000000000000000003003 /* Products */;
 			projectDirPath = "";
 			projectRoot = "";
@@ -508,6 +525,7 @@
 				7B0000000000000000000037 /* TranscriptExportService.swift in Sources */,
 				7B0000000000000000000038 /* RecordingSoundAnalysisService.swift in Sources */,
 				7B0000000000000000000039 /* GeminiCloudService.swift in Sources */,
+				7B000000000000000000003A /* Qwen3ASRTranscription.swift in Sources */,
 				7B0000000000000000000026 /* TranscriptLineEditSheet.swift in Sources */,
 				7B0000000000000000000014 /* SettingsView.swift in Sources */,
 				7B0000000000000000000015 /* TranscriptionActivityAttributes.swift in Sources */,
@@ -590,6 +608,35 @@
 			sourceTree = "<group>";
 		};
 /* End PBXVariantGroup section */
+
+/* Begin XCRemoteSwiftPackageReference section */
+		7B000000000000000000B001 /* XCRemoteSwiftPackageReference "speech-swift" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/soniqo/speech-swift";
+			requirement = {
+				kind = revision;
+				revision = a7fd06d6f68f167203fb995f7bdb8bc9ed10c179;
+			};
+		};
+/* End XCRemoteSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		7B000000000000000000B002 /* Qwen3ASR */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 7B000000000000000000B001 /* XCRemoteSwiftPackageReference "speech-swift" */;
+			productName = Qwen3ASR;
+		};
+		7B000000000000000000B003 /* SpeechVAD */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 7B000000000000000000B001 /* XCRemoteSwiftPackageReference "speech-swift" */;
+			productName = SpeechVAD;
+		};
+		7B000000000000000000B004 /* AudioCommon */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 7B000000000000000000B001 /* XCRemoteSwiftPackageReference "speech-swift" */;
+			productName = AudioCommon;
+		};
+/* End XCSwiftPackageProductDependency section */
 
 /* Begin XCBuildConfiguration section */
 		7B0000000000000000008001 /* Debug */ = {

@@ -14,6 +14,7 @@ struct SettingsView: View {
         case transcriptionLanguage
         case localWhisperModel
         case liveWhisperModel
+        case qwen3ASRModel
         case recordingFormat
         case speechPipelineMode
     }
@@ -44,6 +45,11 @@ struct SettingsView: View {
     @State private var localWhisperDownloadErrorMessage: String?
     @State private var localWhisperDeleteErrorMessage: String?
     @State private var localWhisperModelRefreshTick = 0
+    @State private var qwen3ASRModelStatus = Qwen3ASRModelManager.currentStatus()
+    @State private var isDownloadingQwen3ASRModel = false
+    @State private var qwen3ASRDownloadProgress: Double = 0
+    @State private var qwen3ASRDownloadErrorMessage: String?
+    @State private var qwen3ASRDeleteErrorMessage: String?
     @State private var selectedLocalSummaryModel = LocalSummaryModelManager.selectedModel
     @State private var localSummaryModelStatus = LocalSummaryModelManager.currentStatus()
     @State private var isDownloadingLocalSummaryModel = false
@@ -55,6 +61,7 @@ struct SettingsView: View {
     @State private var isGeminiCloudEnabled = GeminiCloudConfiguration.isEnabled
     @AppStorage(OnboardingState.completedDefaultsKey) private var hasCompletedOnboarding = true
     @AppStorage(RecordingSummaryProvider.selectedDefaultsKey) private var selectedSummaryProviderRawValue = RecordingSummaryProvider.automatic.rawValue
+    @AppStorage(Qwen3ASRDeveloperConfiguration.streamingLongAudioDefaultsKey) private var isQwen3ASRStreamingLongAudioEnabled = false
     private static let publicBetaFeedbackURL = URL(string: "https://t.me/livetranscriber")!
     private static let privacyPolicyURL = URL(string: "https://iamwilliamli.github.io/LiveTranscriber/privacy/")!
     private static let feedbackRecipient = "lichengqi0805@gmail.com"
@@ -94,6 +101,8 @@ struct SettingsView: View {
             localWhisperModelPage
         case .liveWhisperModel:
             liveWhisperModelPage
+        case .qwen3ASRModel:
+            qwen3ASRModelPage
         case .recordingFormat:
             recordingFormatPage
         case .speechPipelineMode:
@@ -240,6 +249,7 @@ struct SettingsView: View {
             await recordingStore.reload()
             recordingStore.refreshIntelligenceAvailability()
             refreshLocalWhisperModelStatus()
+            refreshQwen3ASRModelStatus()
             refreshLocalSummaryModelStatus()
         }
         .task {
@@ -310,6 +320,36 @@ struct SettingsView: View {
             Button(String(localized: L10n.Common.ok), role: .cancel) {}
         } message: {
             Text(localWhisperDeleteErrorMessage ?? "")
+        }
+        .alert(
+            String(localized: L10n.Qwen3ASR.downloadFailed),
+            isPresented: Binding(
+                get: { qwen3ASRDownloadErrorMessage != nil },
+                set: { isPresented in
+                    if !isPresented {
+                        qwen3ASRDownloadErrorMessage = nil
+                    }
+                }
+            )
+        ) {
+            Button(String(localized: L10n.Common.ok), role: .cancel) {}
+        } message: {
+            Text(qwen3ASRDownloadErrorMessage ?? "")
+        }
+        .alert(
+            String(localized: L10n.Qwen3ASR.deleteFailed),
+            isPresented: Binding(
+                get: { qwen3ASRDeleteErrorMessage != nil },
+                set: { isPresented in
+                    if !isPresented {
+                        qwen3ASRDeleteErrorMessage = nil
+                    }
+                }
+            )
+        ) {
+            Button(String(localized: L10n.Common.ok), role: .cancel) {}
+        } message: {
+            Text(qwen3ASRDeleteErrorMessage ?? "")
         }
         .alert(
             String(localized: L10n.LocalSummary.downloadFailed),
@@ -390,6 +430,19 @@ struct SettingsView: View {
                 .disabled(transcriber.isRecording || transcriber.isPreparing)
 
                 localWhisperModelSettings
+
+                NavigationLink(value: SettingsRoute.qwen3ASRModel) {
+                    SettingsNavigationRow(
+                        icon: "waveform.badge.magnifyingglass",
+                        titleResource: L10n.Qwen3ASR.modelTitle,
+                        value: qwen3ASRModelStatus.statusText,
+                        subtitleResource: L10n.Qwen3ASR.submenuDescription,
+                        tint: AppTheme.brand
+                    )
+                }
+                .buttonStyle(.plain)
+                .settingsNavigationHaptic()
+                .disabled(isDownloadingQwen3ASRModel)
 
                 if transcriber.isRecording || transcriber.isPreparing {
                     SettingsStatusRow(icon: "lock.fill", textResource: L10n.Settings.cannotChangeLanguageWhileRecording, tint: AppTheme.warning)
@@ -782,10 +835,89 @@ struct SettingsView: View {
         }
     }
 
+    private var qwen3ASRModelPage: some View {
+        SettingsDetailPage(titleResource: L10n.Qwen3ASR.modelTitle) {
+            SettingsSection(
+                titleResource: L10n.Qwen3ASR.modelTitle,
+                systemImage: "waveform.badge.magnifyingglass",
+                tint: AppTheme.brand
+            ) {
+                SettingsMetricRow(
+                    icon: "cpu",
+                    titleResource: L10n.Qwen3ASR.modelName,
+                    value: Qwen3ASRModelManager.expectedSizeText,
+                    tint: AppTheme.brand
+                )
+
+                SettingsVerbatimStatusRow(
+                    icon: "iphone",
+                    text: String(localized: L10n.Qwen3ASR.modelDescription),
+                    tint: AppTheme.info
+                )
+
+                SettingsMetricRow(
+                    icon: "internaldrive",
+                    titleResource: L10n.Qwen3ASR.modelStatus,
+                    value: isDownloadingQwen3ASRModel
+                        ? qwen3ASRDownloadProgressText
+                        : qwen3ASRModelStatus.statusText,
+                    tint: qwen3ASRModelStatus.isAvailable ? AppTheme.success : AppTheme.warning
+                )
+
+                SettingsVerbatimStatusRow(
+                    icon: qwen3ASRModelStatus.isAvailable ? "checkmark.circle" : "arrow.down.circle",
+                    text: qwen3ASRModelStatus.detailText,
+                    tint: qwen3ASRModelStatus.isAvailable ? AppTheme.success : AppTheme.info
+                )
+
+                if isDownloadingQwen3ASRModel {
+                    ProgressView(value: qwen3ASRDownloadProgress)
+                        .tint(AppTheme.brand)
+                        .frame(maxWidth: .infinity)
+                }
+
+                if !qwen3ASRModelStatus.isAvailable {
+                    Button {
+                        downloadQwen3ASRModel()
+                    } label: {
+                        SettingsCommandRow(
+                            icon: "arrow.down.circle",
+                            titleResource: L10n.Qwen3ASR.downloadModel,
+                            tint: AppTheme.brand
+                        )
+                    }
+                    .buttonStyle(.plain)
+                    .disabled(isDownloadingQwen3ASRModel)
+                }
+
+                if qwen3ASRModelStatus.hasStoredFiles {
+                    Button(role: .destructive) {
+                        deleteQwen3ASRModel()
+                    } label: {
+                        SettingsCommandRow(
+                            icon: "trash",
+                            titleResource: L10n.Qwen3ASR.deleteModel,
+                            tint: AppTheme.danger
+                        )
+                    }
+                    .buttonStyle(.plain)
+                    .disabled(isDownloadingQwen3ASRModel)
+                }
+            }
+        }
+    }
+
     private var localWhisperDownloadProgressText: String {
         String(
             format: String(localized: L10n.LocalWhisper.downloadingModelFormat),
             localWhisperDownloadProgress * 100
+        )
+    }
+
+    private var qwen3ASRDownloadProgressText: String {
+        String(
+            format: String(localized: L10n.Qwen3ASR.downloadingModelFormat),
+            qwen3ASRDownloadProgress * 100
         )
     }
 
@@ -825,6 +957,10 @@ struct SettingsView: View {
         liveWhisperModelStatus = LocalWhisperModelManager.currentLiveStatus()
         liveWhisperCoreMLEncoderStatus = LocalWhisperModelManager.currentLiveCoreMLEncoderStatus()
         localWhisperModelRefreshTick &+= 1
+    }
+
+    private func refreshQwen3ASRModelStatus() {
+        qwen3ASRModelStatus = Qwen3ASRModelManager.currentStatus()
     }
 
     private func refreshLocalSummaryModelStatus() {
@@ -1182,6 +1318,55 @@ struct SettingsView: View {
             }
         } catch {
             localWhisperDeleteErrorMessage = error.localizedDescription
+            HapticFeedback.play(.failure)
+        }
+    }
+
+    private func downloadQwen3ASRModel() {
+        guard !isDownloadingQwen3ASRModel else {
+            return
+        }
+
+        isDownloadingQwen3ASRModel = true
+        qwen3ASRDownloadProgress = 0
+        HapticFeedback.play(.menuSelection)
+
+        Task {
+            do {
+                let status = try await Qwen3ASRModelManager.download { progress in
+                    Task { @MainActor in
+                        qwen3ASRDownloadProgress = progress
+                    }
+                }
+
+                await MainActor.run {
+                    qwen3ASRModelStatus = status
+                    isDownloadingQwen3ASRModel = false
+                    qwen3ASRDownloadProgress = 1
+                    HapticFeedback.play(.menuSelection)
+                }
+            } catch {
+                await MainActor.run {
+                    qwen3ASRModelStatus = Qwen3ASRModelManager.currentStatus()
+                    isDownloadingQwen3ASRModel = false
+                    qwen3ASRDownloadErrorMessage = error.localizedDescription
+                    HapticFeedback.play(.failure)
+                }
+            }
+        }
+    }
+
+    private func deleteQwen3ASRModel() {
+        guard !isDownloadingQwen3ASRModel else {
+            return
+        }
+
+        HapticFeedback.play(.menuSelection)
+        do {
+            qwen3ASRModelStatus = try Qwen3ASRModelManager.deleteDownloadedModel()
+            qwen3ASRDownloadProgress = 0
+        } catch {
+            qwen3ASRDeleteErrorMessage = error.localizedDescription
             HapticFeedback.play(.failure)
         }
     }
@@ -2013,6 +2198,24 @@ struct SettingsView: View {
                 value: build.buildTime,
                 tint: AppTheme.info
             )
+
+            Toggle(isOn: $isQwen3ASRStreamingLongAudioEnabled) {
+                HStack(alignment: .top, spacing: 10) {
+                    SettingsIcon(systemImage: "waveform.path.ecg.rectangle", tint: AppTheme.purple)
+
+                    VStack(alignment: .leading, spacing: 3) {
+                        Text(L10n.Qwen3ASR.streamingLongAudio)
+                            .font(.redditSans(.subheadline, weight: .semibold))
+                            .foregroundStyle(.primary)
+
+                        Text(L10n.Qwen3ASR.streamingLongAudioDescription)
+                            .font(.redditSans(.caption))
+                            .foregroundStyle(.secondary)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                }
+            }
+            .toggleStyle(.switch)
 
             SettingsMetricRow(
                 icon: "waveform.path.ecg",

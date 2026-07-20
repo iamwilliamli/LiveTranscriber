@@ -294,6 +294,31 @@ enum L10n {
         static let modelLargeV3Detail = L10n.resource("local_whisper.model.large_v3.detail", defaultValue: "Full large multilingual model; very large download and memory use.", comment: "Local Whisper large v3 model detail.")
     }
 
+    enum Qwen3ASR {
+        static let modelTitle = L10n.resource("qwen3_asr.model.title", defaultValue: "Qwen3-ASR", comment: "Settings title for the Qwen3-ASR transcription model.")
+        static let modelName = L10n.resource("qwen3_asr.model.name", defaultValue: "Qwen3-ASR 0.6B 4-bit", comment: "Display name of the on-device Qwen3-ASR model.")
+        static let modelDescription = L10n.resource("qwen3_asr.model.description", defaultValue: "On-device post-recording transcription with multilingual recognition and audio-based timestamps. Speaker separation is not included.", comment: "Description of Qwen3-ASR capabilities in Settings.")
+        static let submenuDescription = L10n.resource("qwen3_asr.settings.submenu_description", defaultValue: "Download and manage the on-device transcription model", comment: "Settings navigation subtitle for Qwen3-ASR.")
+        static let modelStatus = L10n.resource("qwen3_asr.model.status", defaultValue: "Model Status", comment: "Settings metric title for Qwen3-ASR model status.")
+        static let modelReady = L10n.resource("qwen3_asr.model.ready", defaultValue: "Ready", comment: "Qwen3-ASR status when all required model files are available.")
+        static let modelNotInstalled = L10n.resource("qwen3_asr.model.not_installed", defaultValue: "Not Installed", comment: "Qwen3-ASR status when the model has not been downloaded.")
+        static let modelDownloadedDetailFormat = L10n.resource("qwen3_asr.model.downloaded_detail.format", defaultValue: "The model is stored on this iPhone (%@).", comment: "Qwen3-ASR downloaded model detail. Parameter: installed size.")
+        static let modelMissingDetailFormat = L10n.resource("qwen3_asr.model.missing_detail.format", defaultValue: "Download about %@ before using Qwen3-ASR transcription.", comment: "Qwen3-ASR missing model detail. Parameter: expected download size.")
+        static let partialDownloadDetailFormat = L10n.resource("qwen3_asr.model.partial_detail.format", defaultValue: "The model download is incomplete (%@ stored). Resume the download or delete it.", comment: "Qwen3-ASR partial model download detail. Parameter: current stored size.")
+        static let downloadModel = L10n.resource("qwen3_asr.model.download", defaultValue: "Download Qwen3-ASR", comment: "Settings button to download Qwen3-ASR.")
+        static let deleteModel = L10n.resource("qwen3_asr.model.delete", defaultValue: "Delete Model Download", comment: "Settings button to delete Qwen3-ASR model files.")
+        static let downloadingModelFormat = L10n.resource("qwen3_asr.model.downloading.format", defaultValue: "Downloading %.0f%%", comment: "Qwen3-ASR model download progress. Parameter: percent complete.")
+        static let downloadFailed = L10n.resource("qwen3_asr.model.download_failed", defaultValue: "Qwen3-ASR Download Failed", comment: "Alert title when Qwen3-ASR model download fails.")
+        static let deleteFailed = L10n.resource("qwen3_asr.model.delete_failed", defaultValue: "Qwen3-ASR Delete Failed", comment: "Alert title when deleting Qwen3-ASR model files fails.")
+        static let streamingLongAudio = L10n.resource("qwen3_asr.developer.streaming_long_audio", defaultValue: "Qwen3-ASR Long-Recording Streaming", comment: "Developer option title for bounded-memory Qwen3-ASR transcription.")
+        static let streamingLongAudioDescription = L10n.resource("qwen3_asr.developer.streaming_long_audio.description", defaultValue: "Experimental. Read audio in 30-second windows and release PCM as transcription advances. When off, the entire recording is loaded first. Changes apply to new Qwen3-ASR jobs.", comment: "Developer option description for bounded-memory Qwen3-ASR transcription.")
+        static let modelRequired = L10n.resource("qwen3_asr.error.model_required", defaultValue: "Download Qwen3-ASR in Settings before using local Qwen transcription.", comment: "Error when Qwen3-ASR transcription starts without model files.")
+        static let incompleteDownload = L10n.resource("qwen3_asr.error.incomplete_download", defaultValue: "The Qwen3-ASR download is incomplete. Try downloading the model again.", comment: "Error when the downloaded Qwen3-ASR model is incomplete.")
+        static let storageUnavailable = L10n.resource("qwen3_asr.error.storage_unavailable", defaultValue: "The app could not access model storage.", comment: "Error when Qwen3-ASR model storage is unavailable.")
+        static let emptyAudio = L10n.resource("qwen3_asr.error.empty_audio", defaultValue: "The audio file has no samples to transcribe.", comment: "Qwen3-ASR empty audio error.")
+        static let emptyTranscript = L10n.resource("qwen3_asr.error.empty_transcript", defaultValue: "Qwen3-ASR did not detect transcribable speech in this recording.", comment: "Qwen3-ASR empty transcript error.")
+    }
+
     enum SpeechText {
         static let runtimeInputWaitingRecording = L10n.resource("speech.runtime_input.waiting_recording", defaultValue: "Runtime Analyzer input: waiting for recording", comment: "Developer speech pipeline diagnostic.")
         static let runtimeInputWaitingFirstBuffer = L10n.resource("speech.runtime_input.waiting_first_buffer", defaultValue: "Runtime Analyzer input: waiting for first buffer", comment: "Developer speech pipeline diagnostic.")
@@ -372,6 +397,7 @@ enum L10n {
         static let analyzeAgain = L10n.resource("recordings.analyze_again", defaultValue: "Analyze Again", comment: "Action title to analyze a recording again.")
         static let retranscribe = L10n.resource("recordings.retranscribe", defaultValue: "Transcribe with Apple Speech", comment: "Action title to retranscribe a recording using Apple Speech.")
         static let retranscribeWithLocalWhisper = L10n.resource("recordings.retranscribe_local_whisper", defaultValue: "Transcribe with Local Whisper", comment: "Action title to retranscribe a recording with bundled local Whisper.")
+        static let retranscribeWithQwen3ASR = L10n.resource("recordings.retranscribe_qwen3_asr", defaultValue: "Transcribe with Qwen3-ASR", comment: "Action title to retranscribe a recording with the on-device Qwen3-ASR model.")
         static let processWithGemini = L10n.resource("recordings.gemini.process", defaultValue: "Process with Gemini Cloud", comment: "Action and confirmation title for uploading audio to Gemini for transcript and intelligence generation.")
         static let uploadAndProcess = L10n.resource("recordings.gemini.upload_and_process", defaultValue: "Upload and Process", comment: "Confirmation button for Gemini Cloud processing.")
         static let geminiProcessingConfirmation = L10n.resource("recordings.gemini.process_confirmation", defaultValue: "This uploads the recording audio and current transcript draft to Gemini, replaces the transcript only after transcription succeeds, and generates summary and meeting intelligence. A restorable copy of the current transcript is kept.", comment: "Privacy and replacement confirmation before Gemini Cloud processing.")

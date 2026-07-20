@@ -1094,11 +1094,61 @@ private enum LocalWhisperCoreMLEncoderZipExtractor {
     }
 }
 
-private enum LocalWhisperAudioConverter {
+enum LocalWhisperAudioConverter {
     private static let sampleRate: Double = 16_000
     private static let outputFrameCapacity: AVAudioFrameCount = 4096
 
     static func floatPCM16kMonoSamples(from audioURL: URL) throws -> [Float] {
+        var samples: [Float] = []
+        var didReserveCapacity = false
+
+        try convertFloatPCM16kMono(from: audioURL) { buffer, estimatedTotalSampleCount in
+            if !didReserveCapacity {
+                samples.reserveCapacity(max(estimatedTotalSampleCount, 0))
+                didReserveCapacity = true
+            }
+            samples.append(contentsOf: buffer)
+        }
+
+        return samples
+    }
+
+    /// Converts audio incrementally and keeps at most one bounded PCM window
+    /// (plus a converter output buffer) in memory. The callback is synchronous
+    /// so callers can apply backpressure while running on-device inference.
+    static func forEachFloatPCM16kMonoWindow(
+        from audioURL: URL,
+        windowDuration: TimeInterval = 30,
+        _ body: (_ samples: [Float], _ completedSampleCount: Int, _ estimatedTotalSampleCount: Int) throws -> Void
+    ) throws {
+        let windowSampleCount = max(Int((windowDuration * sampleRate).rounded()), Int(outputFrameCapacity))
+        var pendingSamples: [Float] = []
+        pendingSamples.reserveCapacity(windowSampleCount + Int(outputFrameCapacity))
+        var completedSampleCount = 0
+        var estimatedTotalSampleCount = 0
+
+        try convertFloatPCM16kMono(from: audioURL) { buffer, estimate in
+            estimatedTotalSampleCount = estimate
+            pendingSamples.append(contentsOf: buffer)
+
+            while pendingSamples.count >= windowSampleCount {
+                let window = Array(pendingSamples.prefix(windowSampleCount))
+                pendingSamples.removeFirst(windowSampleCount)
+                completedSampleCount += window.count
+                try body(window, completedSampleCount, estimatedTotalSampleCount)
+            }
+        }
+
+        if !pendingSamples.isEmpty {
+            completedSampleCount += pendingSamples.count
+            try body(pendingSamples, completedSampleCount, estimatedTotalSampleCount)
+        }
+    }
+
+    private static func convertFloatPCM16kMono(
+        from audioURL: URL,
+        _ body: (_ buffer: UnsafeBufferPointer<Float>, _ estimatedTotalSampleCount: Int) throws -> Void
+    ) throws {
         let audioFile = try AVAudioFile(forReading: audioURL)
         let inputFormat = audioFile.processingFormat
         guard let outputFormat = AVAudioFormat(
@@ -1111,10 +1161,14 @@ private enum LocalWhisperAudioConverter {
             throw LocalWhisperTranscriptionError.audioConversionFailed
         }
 
-        var samples: [Float] = []
+        let estimatedTotalSampleCount: Int
         if inputFormat.sampleRate > 0 {
-            let estimatedFrameCount = Int((Double(audioFile.length) / inputFormat.sampleRate * sampleRate).rounded(.up))
-            samples.reserveCapacity(max(estimatedFrameCount, 0))
+            estimatedTotalSampleCount = max(
+                Int((Double(audioFile.length) / inputFormat.sampleRate * sampleRate).rounded(.up)),
+                0
+            )
+        } else {
+            estimatedTotalSampleCount = 0
         }
 
         var readError: Error?
@@ -1183,7 +1237,10 @@ private enum LocalWhisperAudioConverter {
             if outputBuffer.frameLength > 0,
                let channelData = outputBuffer.floatChannelData?[0] {
                 let frameCount = Int(outputBuffer.frameLength)
-                samples.append(contentsOf: UnsafeBufferPointer(start: channelData, count: frameCount))
+                try body(
+                    UnsafeBufferPointer(start: channelData, count: frameCount),
+                    estimatedTotalSampleCount
+                )
             }
 
             switch status {
@@ -1199,8 +1256,6 @@ private enum LocalWhisperAudioConverter {
                 throw LocalWhisperTranscriptionError.audioConversionFailed
             }
         }
-
-        return samples
     }
 }
 

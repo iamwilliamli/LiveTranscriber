@@ -1499,6 +1499,56 @@ final class RecordingStore: ObservableObject {
         }
     }
 
+    func retranscribeWithQwen3ASR(
+        _ item: RecordingItem,
+        language: TranscriptionLanguage
+    ) async throws {
+        try ensureTranscriptUnlocked(item)
+
+        let audioURL = audioURL(for: item)
+        let transcriptURL = transcriptURL(for: item)
+        updateImportStatus(
+            for: item.id,
+            progress: 0.04,
+            message: String(localized: L10n.Import.preparingTranscription),
+            shouldPersist: true
+        )
+
+        do {
+            let lines = try await Qwen3ASRTranscriptionService.transcribe(
+                audioURL: audioURL,
+                language: language
+            ) { [weak self] progress in
+                Task { @MainActor in
+                    self?.updateImportStatus(
+                        for: item.id,
+                        progress: 0.04 + progress * 0.9,
+                        message: String(localized: L10n.Import.transcribing)
+                    )
+                }
+            }
+            guard let index = recordings.firstIndex(where: { $0.id == item.id }) else {
+                throw RecordingImportError.saveFailed
+            }
+            guard !recordings[index].isTranscriptLocked else {
+                throw RecordingTranscriptEditError.transcriptLocked
+            }
+            try lines.timedTranscriptText.write(to: transcriptURL, atomically: true, encoding: .utf8)
+            recordings[index].languageID = language.id
+            recordings[index].languageName = language.displayName
+            recordings[index].transcriptPreview = lines.plainTranscriptText
+            recordings[index].lineCount = lines.count
+            recordings[index].intelligence = nil
+            recordings[index].meetingAnalysis = nil
+            recordings[index].speakerDiarization = nil
+            recordings[index].importStatus = nil
+            try persist()
+        } catch {
+            markImportFailed(for: item.id, message: error.localizedDescription)
+            throw error
+        }
+    }
+
     func processWithGeminiCloud(_ item: RecordingItem) async throws {
         try ensureTranscriptUnlocked(item)
         let apiKey = try GeminiCloudService.configuredAPIKey()
@@ -1870,7 +1920,8 @@ final class RecordingStore: ObservableObject {
         projectName: String?,
         categoryName: String?,
         keyPoints: String?,
-        location: RecordingLocation?
+        location: RecordingLocation?,
+        language: TranscriptionLanguage? = nil
     ) throws -> RecordingItem {
         let renamedItem = try rename(item, to: proposedName)
         guard let index = recordings.firstIndex(where: { $0.id == renamedItem.id }) else {
@@ -1886,6 +1937,10 @@ final class RecordingStore: ObservableObject {
             summary: summary
         )
         recordings[index].location = location
+        if let language {
+            recordings[index].languageID = language.id
+            recordings[index].languageName = language.displayName
+        }
         searchIndexCache[renamedItem.id] = nil
         try persist()
         return recordings[index]

@@ -9857,6 +9857,570 @@
         }
       }
     },
+    "qwen3_asr.model.title" : {
+      "comment" : "Settings title for the Qwen3-ASR transcription model.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Qwen3-ASR"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Qwen3-ASR"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Qwen3-ASR"
+          }
+        }
+      }
+    },
+    "qwen3_asr.model.name" : {
+      "comment" : "Display name of the on-device Qwen3-ASR model.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Qwen3-ASR 0.6B 4-bit"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Qwen3-ASR 0.6B 4-bit"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Qwen3-ASR 0.6B 4-bit"
+          }
+        }
+      }
+    },
+    "qwen3_asr.model.description" : {
+      "comment" : "Description of Qwen3-ASR capabilities in Settings.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "On-device post-recording transcription with multilingual recognition and audio-based timestamps. Speaker separation is not included."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "在设备上进行录音后转录，支持多语言识别和基于音频的时间戳；暂不包含说话人分离。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "在裝置上進行錄音後轉錄，支援多語言辨識和基於音訊的時間戳；暫不包含說話人分離。"
+          }
+        }
+      }
+    },
+    "qwen3_asr.settings.submenu_description" : {
+      "comment" : "Settings navigation subtitle for Qwen3-ASR.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Download and manage the on-device transcription model"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "下载和管理设备端转录模型"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "下載和管理裝置端轉錄模型"
+          }
+        }
+      }
+    },
+    "qwen3_asr.model.status" : {
+      "comment" : "Settings metric title for Qwen3-ASR model status.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Model Status"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "模型状态"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "模型狀態"
+          }
+        }
+      }
+    },
+    "qwen3_asr.model.partial_detail.format" : {
+      "comment" : "Qwen3-ASR partial model download detail. Parameter: current stored size.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The model download is incomplete (%@ stored). Resume the download or delete it."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "模型下载不完整（已存储 %@），可以继续下载或将其删除。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "模型下載不完整（已儲存 %@），可以繼續下載或將其刪除。"
+          }
+        }
+      }
+    },
+    "qwen3_asr.model.ready" : {
+      "comment" : "Qwen3-ASR status when all required model files are available.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ready"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "就绪"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "就緒"
+          }
+        }
+      }
+    },
+    "qwen3_asr.model.not_installed" : {
+      "comment" : "Qwen3-ASR status when the model has not been downloaded.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Not Installed"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "未安装"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "未安裝"
+          }
+        }
+      }
+    },
+    "qwen3_asr.model.downloaded_detail.format" : {
+      "comment" : "Qwen3-ASR downloaded model detail. Parameter: installed size.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The model is stored on this iPhone (%@)."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "模型已存储在此 iPhone 上（%@）。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "模型已儲存在此 iPhone 上（%@）。"
+          }
+        }
+      }
+    },
+    "qwen3_asr.model.missing_detail.format" : {
+      "comment" : "Qwen3-ASR missing model detail. Parameter: expected download size.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Download about %@ before using Qwen3-ASR transcription."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "使用 Qwen3-ASR 转录前需下载约 %@。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "使用 Qwen3-ASR 轉錄前需下載約 %@。"
+          }
+        }
+      }
+    },
+    "qwen3_asr.model.download" : {
+      "comment" : "Settings button to download Qwen3-ASR.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Download Qwen3-ASR"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "下载 Qwen3-ASR"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "下載 Qwen3-ASR"
+          }
+        }
+      }
+    },
+    "qwen3_asr.model.delete" : {
+      "comment" : "Settings button to delete Qwen3-ASR model files.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Delete Model Download"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "删除模型下载"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "刪除模型下載"
+          }
+        }
+      }
+    },
+    "qwen3_asr.model.downloading.format" : {
+      "comment" : "Qwen3-ASR model download progress. Parameter: percent complete.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Downloading %.0f%%"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "正在下载 %.0f%%"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "正在下載 %.0f%%"
+          }
+        }
+      }
+    },
+    "qwen3_asr.model.download_failed" : {
+      "comment" : "Alert title when Qwen3-ASR model download fails.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Qwen3-ASR Download Failed"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Qwen3-ASR 下载失败"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Qwen3-ASR 下載失敗"
+          }
+        }
+      }
+    },
+    "qwen3_asr.model.delete_failed" : {
+      "comment" : "Alert title when deleting Qwen3-ASR model files fails.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Qwen3-ASR Delete Failed"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Qwen3-ASR 删除失败"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Qwen3-ASR 刪除失敗"
+          }
+        }
+      }
+    },
+    "qwen3_asr.developer.streaming_long_audio" : {
+      "comment" : "Developer option title for bounded-memory Qwen3-ASR transcription.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Qwen3-ASR: Lange Aufnahmen streamen"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Qwen3-ASR Long-Recording Streaming"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Qwen3-ASR 長時間録音ストリーミング"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Qwen3-ASR: lange opnamen streamen"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Qwen3-ASR 流式处理长录音"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Qwen3-ASR 串流處理長錄音"
+          }
+        }
+      }
+    },
+    "qwen3_asr.developer.streaming_long_audio.description" : {
+      "comment" : "Developer option description for bounded-memory Qwen3-ASR transcription.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Experimentell. Liest Audio in 30-Sekunden-Fenstern und gibt PCM während der Transkription frei. Ist die Option aus, wird zuerst die gesamte Aufnahme geladen. Änderungen gelten für neue Qwen3-ASR-Aufträge."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Experimental. Read audio in 30-second windows and release PCM as transcription advances. When off, the entire recording is loaded first. Changes apply to new Qwen3-ASR jobs."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "試験的機能です。音声を30秒単位で読み込み、文字起こしの進行に合わせてPCMを解放します。オフの場合は録音全体を先に読み込みます。変更は新しいQwen3-ASR処理から適用されます。"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Experimenteel. Leest audio in vensters van 30 seconden en geeft PCM vrij terwijl de transcriptie vordert. Indien uitgeschakeld wordt eerst de volledige opname geladen. Wijzigingen gelden voor nieuwe Qwen3-ASR-taken."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "实验性功能。以30秒窗口读取音频，并随转录进度释放PCM；关闭时会先载入整段录音。修改仅影响之后开始的Qwen3-ASR任务。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "實驗性功能。以30秒視窗讀取音訊，並隨轉錄進度釋放PCM；關閉時會先載入整段錄音。變更僅影響之後開始的Qwen3-ASR工作。"
+          }
+        }
+      }
+    },
+    "qwen3_asr.error.model_required" : {
+      "comment" : "Error when Qwen3-ASR transcription starts without model files.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Download Qwen3-ASR in Settings before using local Qwen transcription."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "请先在设置中下载 Qwen3-ASR，再使用本地 Qwen 转录。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "請先在設定中下載 Qwen3-ASR，再使用本機 Qwen 轉錄。"
+          }
+        }
+      }
+    },
+    "qwen3_asr.error.incomplete_download" : {
+      "comment" : "Error when the downloaded Qwen3-ASR model is incomplete.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The Qwen3-ASR download is incomplete. Try downloading the model again."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Qwen3-ASR 下载不完整，请重新下载模型。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Qwen3-ASR 下載不完整，請重新下載模型。"
+          }
+        }
+      }
+    },
+    "qwen3_asr.error.storage_unavailable" : {
+      "comment" : "Error when Qwen3-ASR model storage is unavailable.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The app could not access model storage."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "App 无法访问模型存储空间。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "App 無法存取模型儲存空間。"
+          }
+        }
+      }
+    },
+    "qwen3_asr.error.empty_audio" : {
+      "comment" : "Qwen3-ASR empty audio error.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The audio file has no samples to transcribe."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "音频文件中没有可转录的采样。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "音訊檔案中沒有可轉錄的取樣。"
+          }
+        }
+      }
+    },
+    "qwen3_asr.error.empty_transcript" : {
+      "comment" : "Qwen3-ASR empty transcript error.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Qwen3-ASR did not detect transcribable speech in this recording."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Qwen3-ASR 未在此录音中检测到可转录的语音。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Qwen3-ASR 未在此錄音中偵測到可轉錄的語音。"
+          }
+        }
+      }
+    },
     "recording.status.checking_permissions" : {
       "comment" : "Recording status while checking existing microphone and speech permissions.",
       "extractionState" : "stale",
@@ -18739,6 +19303,48 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "用本機 Whisper 轉錄"
+          }
+        }
+      }
+    },
+    "recordings.retranscribe_qwen3_asr" : {
+      "comment" : "Action title to retranscribe a recording with the on-device Qwen3-ASR model.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mit Qwen3-ASR transkribieren"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Transcribe with Qwen3-ASR"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Qwen3-ASRで文字起こし"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Transcriberen met Qwen3-ASR"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "用 Qwen3-ASR 转录"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "用 Qwen3-ASR 轉錄"
           }
         }
       }

@@ -17,6 +17,44 @@ struct TranscriptionLanguage: Identifiable, Codable, Hashable {
         locale.language.languageCode?.identifier.uppercased() ?? id
     }
 
+    var baseLanguage: TranscriptionLanguage {
+        guard let languageCode = locale.language.languageCode?.identifier,
+              !languageCode.isEmpty,
+              languageCode != "und" else {
+            return self
+        }
+        return TranscriptionLanguage(id: languageCode)
+    }
+
+    static func baseLanguageOptions(
+        from languages: [TranscriptionLanguage],
+        including languageID: String? = nil
+    ) -> [TranscriptionLanguage] {
+        var candidates = languages
+        if let languageID,
+           !languageID.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            candidates.append(TranscriptionLanguage(id: languageID))
+        }
+
+        var seenLanguageIDs = Set<String>()
+        return candidates
+            .compactMap { language -> TranscriptionLanguage? in
+                let baseLanguage = language.baseLanguage
+                let normalizedID = baseLanguage.id.lowercased()
+                guard seenLanguageIDs.insert(normalizedID).inserted else {
+                    return nil
+                }
+                return baseLanguage
+            }
+            .sorted { first, second in
+                let comparison = first.displayName.localizedStandardCompare(second.displayName)
+                if comparison == .orderedSame {
+                    return first.id < second.id
+                }
+                return comparison == .orderedAscending
+            }
+    }
+
     static let fallbackOptions: [TranscriptionLanguage] = [
         TranscriptionLanguage(id: "en-US"),
         TranscriptionLanguage(id: "zh-Hans"),
