@@ -2703,11 +2703,11 @@ private struct SettingsStatusRow: View {
     }
 
     var body: some View {
-        HStack(alignment: .top, spacing: 8) {
+        HStack(alignment: .top, spacing: 10) {
             Image(systemName: icon)
                 .font(.system(size: 12, weight: .semibold))
                 .foregroundStyle(tint)
-                .frame(width: 18, height: 18)
+                .frame(width: 28, height: 18)
 
             text
                 .font(.redditSans(.caption))
@@ -2723,11 +2723,11 @@ private struct SettingsVerbatimStatusRow: View {
     let tint: Color
 
     var body: some View {
-        HStack(alignment: .top, spacing: 8) {
+        HStack(alignment: .top, spacing: 10) {
             Image(systemName: icon)
                 .font(.system(size: 12, weight: .semibold))
                 .foregroundStyle(tint)
-                .frame(width: 18, height: 18)
+                .frame(width: 28, height: 18)
 
             Text(text)
                 .font(.redditSans(.caption))
