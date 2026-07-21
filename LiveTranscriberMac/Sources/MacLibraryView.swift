@@ -31,7 +31,14 @@ final class MacLibraryViewModel: ObservableObject {
 
         do {
             let location = try await library.location()
-            sourceName = location.kind == .iCloud ? "iCloud Drive" : "Selected Folder"
+            switch location.kind {
+            case .iCloud:
+                sourceName = "iCloud Drive"
+            case .local:
+                sourceName = "On My Mac"
+            case .selectedFolder:
+                sourceName = "Selected Folder"
+            }
             sourcePath = location.directoryURL.path
             let loadedSessions = try await library.recordingSessions()
             sessions = loadedSessions

@@ -48,4 +48,30 @@ final class MacRecordingLibraryTests: XCTestCase {
         let sessions = try await library.recordingSessions()
         XCTAssertTrue(sessions.isEmpty)
     }
+
+    func testFolderScanUsesCaptureManifestMetadata() async throws {
+        let rootURL = FileManager.default.temporaryDirectory
+            .appendingPathComponent("MacRecordingLibraryTests-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: rootURL, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: rootURL) }
+
+        let plan = MacCaptureOutputPlan(
+            directoryURL: rootURL,
+            capturesSystemAudio: false,
+            capturesMicrophone: false
+        )
+        try Data([0x01]).write(to: plan.videoURL)
+        let result = try MacCaptureStorage.makeResult(
+            plan: plan,
+            startedAt: Date(timeIntervalSince1970: 2_000),
+            durationSeconds: 9,
+            sourceTitle: "Design Review"
+        )
+
+        let library = MacRecordingLibrary(initialDirectoryURL: rootURL)
+        let sessions = try await library.recordingSessions()
+
+        XCTAssertEqual(sessions.count, 1)
+        XCTAssertEqual(sessions[0], result.session)
+    }
 }

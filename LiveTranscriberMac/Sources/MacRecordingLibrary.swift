@@ -7,6 +7,7 @@ import TranscriberDomain
 actor MacRecordingLibrary: RecordingLibraryReading {
     enum LocationKind: Equatable, Sendable {
         case iCloud
+        case local
         case selectedFolder
     }
 
@@ -108,7 +109,17 @@ actor MacRecordingLibrary: RecordingLibraryReading {
         guard let containerURL = fileManager.url(
             forUbiquityContainerIdentifier: Self.containerIdentifier
         ) else {
-            throw MacRecordingLibraryError.iCloudContainerUnavailable
+            guard let applicationSupportURL = fileManager.urls(
+                for: .applicationSupportDirectory,
+                in: .userDomainMask
+            ).first else {
+                throw MacRecordingLibraryError.localContainerUnavailable
+            }
+            let recordingsURL = applicationSupportURL
+                .appendingPathComponent("LiveTranscriber", isDirectory: true)
+                .appendingPathComponent("Recordings", isDirectory: true)
+            try fileManager.createDirectory(at: recordingsURL, withIntermediateDirectories: true)
+            return Location(kind: .local, directoryURL: recordingsURL)
         }
         let recordingsURL = containerURL.appendingPathComponent(
             "Data/Recordings",
@@ -134,8 +145,12 @@ actor MacRecordingLibrary: RecordingLibraryReading {
             cloudSessions = []
         }
 
+        let manifestSessions = loadManifestSessions(in: location.directoryURL)
         let scannedFiles = try scanFiles(in: location.directoryURL)
-        let mergedSessions = merge(cloudSessions: cloudSessions, scannedFiles: scannedFiles)
+        let mergedSessions = merge(
+            cloudSessions: cloudSessions + manifestSessions,
+            scannedFiles: scannedFiles
+        )
             .sorted { lhs, rhs in
                 if lhs.createdAt == rhs.createdAt {
                     return lhs.title.localizedStandardCompare(rhs.title) == .orderedAscending
@@ -271,6 +286,27 @@ actor MacRecordingLibrary: RecordingLibraryReading {
             )
         }
         return files
+    }
+
+    private func loadManifestSessions(in directory: URL) -> [RecordingSession] {
+        guard let enumerator = fileManager.enumerator(
+            at: directory,
+            includingPropertiesForKeys: [.isRegularFileKey],
+            options: [.skipsHiddenFiles, .skipsPackageDescendants]
+        ) else {
+            return []
+        }
+
+        var sessions: [RecordingSession] = []
+        for case let fileURL as URL in enumerator {
+            guard fileURL.lastPathComponent.hasSuffix(".session.json"),
+                  let data = try? Data(contentsOf: fileURL),
+                  let session = try? RecordingSessionPayloadDecoder.decode(data) else {
+                continue
+            }
+            sessions.append(session)
+        }
+        return sessions
     }
 
     private func merge(
@@ -467,14 +503,14 @@ private struct ScannedRecordingFile {
 }
 
 private enum MacRecordingLibraryError: LocalizedError {
-    case iCloudContainerUnavailable
+    case localContainerUnavailable
     case folderAccessDenied
     case assetFileMissing(String)
 
     var errorDescription: String? {
         switch self {
-        case .iCloudContainerUnavailable:
-            return "The Live Transcriber iCloud container is unavailable. Sign in to iCloud Drive or choose a recording folder."
+        case .localContainerUnavailable:
+            return "Live Transcriber could not open its local recording library."
         case .folderAccessDenied:
             return "Live Transcriber could not retain access to the selected folder."
         case .assetFileMissing(let path):

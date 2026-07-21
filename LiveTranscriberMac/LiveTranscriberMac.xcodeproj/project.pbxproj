@@ -7,14 +7,19 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		34C98FEE3858CA6C34F2EABD /* MacScreenCaptureController.swift in Sources */ = {isa = PBXBuildFile; fileRef = DA2E04856A869D3335D0E087 /* MacScreenCaptureController.swift */; };
 		4463FB44DC6DB058EA8D6CCB /* MacLibraryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C587152DBE8A22113A9D6AC6 /* MacLibraryView.swift */; };
 		6187837CCBB92F81FD70EDF6 /* MacL10n.swift in Sources */ = {isa = PBXBuildFile; fileRef = 995F7E6F291E47A390D6D53D /* MacL10n.swift */; };
 		876487A8AF883EFBA9059258 /* TranscriberDomain in Frameworks */ = {isa = PBXBuildFile; productRef = E0B2A813EFB2F988E6C1C94A /* TranscriberDomain */; };
 		9DDFF748602DBC53129CFFD0 /* MacRecordingLibrary.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9AE231E53B75AEC0B70FDE28 /* MacRecordingLibrary.swift */; };
 		A48F098CCFCC4C5251695080 /* LiveTranscriberMacApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 92EDB649F0FE3E9F9AC8E2C0 /* LiveTranscriberMacApp.swift */; };
 		B677D5BE189245624DAEC599 /* MacRootView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A3AE257FB6CBB7815E9751D0 /* MacRootView.swift */; };
+		D32FD5FC2FAAE6263FE27042 /* MacCaptureAudioWriter.swift in Sources */ = {isa = PBXBuildFile; fileRef = B3CEF0BB0D8D8128DE026B34 /* MacCaptureAudioWriter.swift */; };
 		D72B66215A305AB9C7E8DDF8 /* MacRecordingLibraryTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8C906EB3C28543FF1A5FB7D0 /* MacRecordingLibraryTests.swift */; };
+		DCFEC4BBB9BBDAF98965CD76 /* MacCaptureModelsTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E06181BD244270B61D14BFD2 /* MacCaptureModelsTests.swift */; };
+		E39D331383A3301F1FA3394F /* MacCaptureModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = FBD26F6213B21E8CA239B87C /* MacCaptureModels.swift */; };
 		EA9CE6280A8B76F7DEFC330E /* TranscriberCore in Frameworks */ = {isa = PBXBuildFile; productRef = B514CD646E50CFF75485A278 /* TranscriberCore */; };
+		EF712175B7EE7E9C18EE5F34 /* MacCaptureView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9155681E6CC50BF8489194DF /* MacCaptureView.swift */; };
 		FE2BA9F312B9689518541239 /* MacRecordingPlayer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 69CE1BEF718507DB921FBF12 /* MacRecordingPlayer.swift */; };
 /* End PBXBuildFile section */
 
@@ -33,12 +38,17 @@
 		3D1E550DDA30966FACB8E7BC /* LiveTranscriberMacTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = LiveTranscriberMacTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		69CE1BEF718507DB921FBF12 /* MacRecordingPlayer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MacRecordingPlayer.swift; sourceTree = "<group>"; };
 		8C906EB3C28543FF1A5FB7D0 /* MacRecordingLibraryTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MacRecordingLibraryTests.swift; sourceTree = "<group>"; };
+		9155681E6CC50BF8489194DF /* MacCaptureView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MacCaptureView.swift; sourceTree = "<group>"; };
 		92EDB649F0FE3E9F9AC8E2C0 /* LiveTranscriberMacApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LiveTranscriberMacApp.swift; sourceTree = "<group>"; };
 		995F7E6F291E47A390D6D53D /* MacL10n.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MacL10n.swift; sourceTree = "<group>"; };
 		9AE231E53B75AEC0B70FDE28 /* MacRecordingLibrary.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MacRecordingLibrary.swift; sourceTree = "<group>"; };
 		A3AE257FB6CBB7815E9751D0 /* MacRootView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MacRootView.swift; sourceTree = "<group>"; };
 		B2E20A2F0A072F466C62C4BF /* TranscriberDomain */ = {isa = PBXFileReference; lastKnownFileType = folder; name = TranscriberDomain; path = ../Packages/TranscriberDomain; sourceTree = SOURCE_ROOT; };
+		B3CEF0BB0D8D8128DE026B34 /* MacCaptureAudioWriter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MacCaptureAudioWriter.swift; sourceTree = "<group>"; };
 		C587152DBE8A22113A9D6AC6 /* MacLibraryView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MacLibraryView.swift; sourceTree = "<group>"; };
+		DA2E04856A869D3335D0E087 /* MacScreenCaptureController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MacScreenCaptureController.swift; sourceTree = "<group>"; };
+		E06181BD244270B61D14BFD2 /* MacCaptureModelsTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MacCaptureModelsTests.swift; sourceTree = "<group>"; };
+		FBD26F6213B21E8CA239B87C /* MacCaptureModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MacCaptureModels.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -74,6 +84,7 @@
 		2F78FB967921AFBE909CDCB7 /* Tests */ = {
 			isa = PBXGroup;
 			children = (
+				E06181BD244270B61D14BFD2 /* MacCaptureModelsTests.swift */,
 				8C906EB3C28543FF1A5FB7D0 /* MacRecordingLibraryTests.swift */,
 			);
 			path = Tests;
@@ -93,11 +104,15 @@
 			isa = PBXGroup;
 			children = (
 				92EDB649F0FE3E9F9AC8E2C0 /* LiveTranscriberMacApp.swift */,
+				B3CEF0BB0D8D8128DE026B34 /* MacCaptureAudioWriter.swift */,
+				FBD26F6213B21E8CA239B87C /* MacCaptureModels.swift */,
+				9155681E6CC50BF8489194DF /* MacCaptureView.swift */,
 				995F7E6F291E47A390D6D53D /* MacL10n.swift */,
 				C587152DBE8A22113A9D6AC6 /* MacLibraryView.swift */,
 				9AE231E53B75AEC0B70FDE28 /* MacRecordingLibrary.swift */,
 				69CE1BEF718507DB921FBF12 /* MacRecordingPlayer.swift */,
 				A3AE257FB6CBB7815E9751D0 /* MacRootView.swift */,
+				DA2E04856A869D3335D0E087 /* MacScreenCaptureController.swift */,
 			);
 			path = Sources;
 			sourceTree = "<group>";
@@ -190,11 +205,15 @@
 			buildActionMask = 2147483647;
 			files = (
 				A48F098CCFCC4C5251695080 /* LiveTranscriberMacApp.swift in Sources */,
+				D32FD5FC2FAAE6263FE27042 /* MacCaptureAudioWriter.swift in Sources */,
+				E39D331383A3301F1FA3394F /* MacCaptureModels.swift in Sources */,
+				EF712175B7EE7E9C18EE5F34 /* MacCaptureView.swift in Sources */,
 				6187837CCBB92F81FD70EDF6 /* MacL10n.swift in Sources */,
 				4463FB44DC6DB058EA8D6CCB /* MacLibraryView.swift in Sources */,
 				9DDFF748602DBC53129CFFD0 /* MacRecordingLibrary.swift in Sources */,
 				FE2BA9F312B9689518541239 /* MacRecordingPlayer.swift in Sources */,
 				B677D5BE189245624DAEC599 /* MacRootView.swift in Sources */,
+				34C98FEE3858CA6C34F2EABD /* MacScreenCaptureController.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -202,6 +221,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				DCFEC4BBB9BBDAF98965CD76 /* MacCaptureModelsTests.swift in Sources */,
 				D72B66215A305AB9C7E8DDF8 /* MacRecordingLibraryTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;

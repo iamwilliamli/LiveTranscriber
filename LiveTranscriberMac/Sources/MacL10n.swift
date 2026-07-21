@@ -118,33 +118,118 @@ enum MacL10n {
     )
     static let captureDetail = resource(
         "mac.capture.detail",
-        defaultValue: "The native capture pipeline will record any selected meeting window, system audio, and an optional microphone track.",
-        comment: "Description of the planned macOS ScreenCaptureKit pipeline."
+        defaultValue: "Record a selected meeting window, system audio, and an optional microphone track with the native macOS capture pipeline.",
+        comment: "Description of the macOS ScreenCaptureKit pipeline."
     )
-    static let screenCapture = resource(
-        "mac.capture.screen",
-        defaultValue: "ScreenCaptureKit",
-        comment: "Title for the macOS screen capture capability."
+    static let captureSource = resource(
+        "mac.capture.source",
+        defaultValue: "Screen or Window",
+        comment: "Heading for the selected ScreenCaptureKit source."
     )
-    static let screenCaptureDetail = resource(
-        "mac.capture.screen_detail",
-        defaultValue: "Choose a display or individual app window without coupling capture to one meeting provider.",
-        comment: "Detail for the macOS screen capture capability."
+    static let noCaptureSource = resource(
+        "mac.capture.no_source",
+        defaultValue: "Nothing selected yet",
+        comment: "Placeholder before the user selects screen content."
     )
-    static let audioCapture = resource(
-        "mac.capture.audio",
-        defaultValue: "Independent audio tracks",
-        comment: "Title for macOS system and microphone audio capture."
+    static let chooseCaptureSource = resource(
+        "mac.capture.choose_source",
+        defaultValue: "Choose…",
+        comment: "Action that opens the system screen-sharing picker."
     )
-    static let audioCaptureDetail = resource(
-        "mac.capture.audio_detail",
-        defaultValue: "Keep system audio and microphone input separate so mixing and transcription remain reversible.",
-        comment: "Detail for macOS system and microphone audio capture."
+    static let captureSourceDetail = resource(
+        "mac.capture.source_detail",
+        defaultValue: "Use the macOS system picker to select a display, an app, or one meeting window.",
+        comment: "Explanation beneath the capture source control."
     )
-    static let foundationStatus = resource(
-        "mac.capture.foundation_status",
-        defaultValue: "Capture engine is the next implementation phase",
-        comment: "Status shown before the macOS capture engine is implemented."
+    static let audioTracks = resource(
+        "mac.capture.audio_tracks",
+        defaultValue: "Audio Tracks",
+        comment: "Heading above system and microphone audio options."
+    )
+    static let systemAudio = resource(
+        "mac.capture.system_audio",
+        defaultValue: "System audio",
+        comment: "Toggle label for system audio capture."
+    )
+    static let systemAudioDetail = resource(
+        "mac.capture.system_audio_detail",
+        defaultValue: "Capture meeting audio and keep a separate AAC track.",
+        comment: "Detail for the system audio capture toggle."
+    )
+    static let microphoneAudio = resource(
+        "mac.capture.microphone_audio",
+        defaultValue: "Microphone",
+        comment: "Toggle label for microphone capture."
+    )
+    static let microphoneAudioDetail = resource(
+        "mac.capture.microphone_audio_detail",
+        defaultValue: "Capture your voice as an independent AAC track.",
+        comment: "Detail for the microphone capture toggle."
+    )
+    static let startCapture = resource(
+        "mac.capture.start",
+        defaultValue: "Start Recording",
+        comment: "Action that starts screen capture."
+    )
+    static let stopCapture = resource(
+        "mac.capture.stop",
+        defaultValue: "Stop Recording",
+        comment: "Action that stops screen capture."
+    )
+    static let startingCapture = resource(
+        "mac.capture.starting",
+        defaultValue: "Starting…",
+        comment: "Status while ScreenCaptureKit starts."
+    )
+    static let savingCapture = resource(
+        "mac.capture.saving",
+        defaultValue: "Saving…",
+        comment: "Status while capture files finish writing."
+    )
+    static let captureIdle = resource(
+        "mac.capture.idle",
+        defaultValue: "Select something to record",
+        comment: "Capture status before a source is selected."
+    )
+    static let captureReady = resource(
+        "mac.capture.ready",
+        defaultValue: "Ready to record",
+        comment: "Capture status after a source is selected."
+    )
+    static let captureRecording = resource(
+        "mac.capture.recording",
+        defaultValue: "Recording",
+        comment: "Capture status while recording is active."
+    )
+    static let captureComplete = resource(
+        "mac.capture.complete",
+        defaultValue: "Recording saved",
+        comment: "Capture status after recording succeeds."
+    )
+    static let captureFailed = resource(
+        "mac.capture.failed",
+        defaultValue: "Recording failed",
+        comment: "Capture status after recording fails."
+    )
+    static let captureSaved = resource(
+        "mac.capture.saved",
+        defaultValue: "Capture saved",
+        comment: "Heading in the successful capture card."
+    )
+    static let savedAssetCount = resource(
+        "mac.capture.saved_asset_count",
+        defaultValue: "%lld assets",
+        comment: "Number of independent files saved for a capture."
+    )
+    static let openLibrary = resource(
+        "mac.capture.open_library",
+        defaultValue: "Open in Library",
+        comment: "Action that opens a completed capture in the library."
+    )
+    static let newCapture = resource(
+        "mac.capture.new",
+        defaultValue: "New Capture",
+        comment: "Action that resets the capture screen for another recording."
     )
     static let settingsTitle = resource(
         "mac.settings.title",

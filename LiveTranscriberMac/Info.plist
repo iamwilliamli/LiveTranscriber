@@ -28,6 +28,8 @@
 	<true/>
 	<key>NSMicrophoneUsageDescription</key>
 	<string>Live Transcriber uses the microphone only when you include your voice in a capture.</string>
+	<key>NSScreenCaptureUsageDescription</key>
+	<string>Live Transcriber records only the screen, app, or window you select for your meeting capture.</string>
 	<key>NSPrincipalClass</key>
 	<string>NSApplication</string>
 	<key>NSSupportsAutomaticTermination</key>
