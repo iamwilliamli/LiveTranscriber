@@ -210,7 +210,7 @@ struct TranscriptExportService {
                 durationSeconds: TimeInterval(item.durationSeconds),
                 languageID: item.languageID,
                 languageName: item.languageName,
-                audioFileName: item.audioFileName,
+                audioFileName: item.displayFileName,
                 tags: item.combinedTags,
                 projectName: item.projectName,
                 categoryName: item.categoryName,
@@ -258,8 +258,7 @@ struct TranscriptExportService {
     }
 
     private static func displayName(for item: RecordingItem) -> String {
-        let name = URL(fileURLWithPath: item.audioFileName).deletingPathExtension().lastPathComponent
-        return name.isEmpty ? item.audioFileName : name
+        item.displayName
     }
 
     private static func safeBaseName(for item: RecordingItem) -> String {

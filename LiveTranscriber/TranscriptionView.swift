@@ -739,7 +739,7 @@ struct TranscriptionView: View {
                 location: location
             ) {
                 RecordingCategoryCatalog.register(pendingRecordingCategory)
-                showSavedRecordingBanner(fileName: saved.audioFileName)
+                showSavedRecordingBanner(fileName: saved.displayFileName)
                 transcriber.clearTranscript()
                 self.pendingRecordingSave = nil
                 pendingRecordingIntelligence = nil

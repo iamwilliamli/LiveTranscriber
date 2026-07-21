@@ -8,6 +8,10 @@
     "moss_local.decoder.section_title" : {"comment":"Settings section title for MOSS Decoder segmentation.","extractionState":"manual","localizations":{"de":{"stringUnit":{"state":"translated","value":"Decoder-Verarbeitung"}},"en":{"stringUnit":{"state":"translated","value":"Decoder Processing"}},"ja":{"stringUnit":{"state":"translated","value":"Decoder処理"}},"nl":{"stringUnit":{"state":"translated","value":"Decoderverwerking"}},"zh-Hans":{"stringUnit":{"state":"translated","value":"Decoder 处理"}},"zh-Hant":{"stringUnit":{"state":"translated","value":"Decoder 處理"}}}},
     "moss_local.decoder.segment_duration" : {"comment":"Settings row title for the amount of audio handled by each MOSS Decoder call.","extractionState":"manual","localizations":{"de":{"stringUnit":{"state":"translated","value":"Decoder-Segmentlänge"}},"en":{"stringUnit":{"state":"translated","value":"Decoder Segment Length"}},"ja":{"stringUnit":{"state":"translated","value":"Decoderの分割時間"}},"nl":{"stringUnit":{"state":"translated","value":"Lengte decodersegment"}},"zh-Hans":{"stringUnit":{"state":"translated","value":"Decoder 分段时长"}},"zh-Hant":{"stringUnit":{"state":"translated","value":"Decoder 分段時長"}}}},
     "moss_local.decoder.segment_duration.seconds.format" : {"comment":"MOSS Decoder segment duration in seconds. Parameter: number of seconds.","extractionState":"manual","localizations":{"de":{"stringUnit":{"state":"translated","value":"%d Sek."}},"en":{"stringUnit":{"state":"translated","value":"%d sec"}},"ja":{"stringUnit":{"state":"translated","value":"%d秒"}},"nl":{"stringUnit":{"state":"translated","value":"%d sec."}},"zh-Hans":{"stringUnit":{"state":"translated","value":"%d 秒"}},"zh-Hant":{"stringUnit":{"state":"translated","value":"%d 秒"}}}},
+    "moss_local.decoder.recommended_choice.format" : {"comment":"MOSS Decoder duration choice marked as recommended. Parameter: duration.","extractionState":"manual","localizations":{"de":{"stringUnit":{"state":"translated","value":"%@ · Empfohlen"}},"en":{"stringUnit":{"state":"translated","value":"%@ · Recommended"}},"ja":{"stringUnit":{"state":"translated","value":"%@ · おすすめ"}},"nl":{"stringUnit":{"state":"translated","value":"%@ · Aanbevolen"}},"zh-Hans":{"stringUnit":{"state":"translated","value":"%@ · 推荐"}},"zh-Hant":{"stringUnit":{"state":"translated","value":"%@ · 推薦"}}}},
+    "moss_local.decoder.recommendation.format" : {"comment":"Device-specific MOSS Decoder duration recommendation. Parameters: recommended duration, physical memory.","extractionState":"manual","localizations":{"de":{"stringUnit":{"state":"translated","value":"Für dieses Gerät empfohlen: %@ (%@ Arbeitsspeicher)."}},"en":{"stringUnit":{"state":"translated","value":"Recommended for this device: %@ (%@ memory)."}},"ja":{"stringUnit":{"state":"translated","value":"このデバイスの推奨値：%@（メモリ %@）"}},"nl":{"stringUnit":{"state":"translated","value":"Aanbevolen voor dit apparaat: %@ (%@ geheugen)."}},"zh-Hans":{"stringUnit":{"state":"translated","value":"此设备推荐：%@（%@ 内存）。"}},"zh-Hant":{"stringUnit":{"state":"translated","value":"此裝置推薦：%@（%@ 記憶體）。"}}}},
+    "moss_local.decoder.use_recommendation.format" : {"comment":"Button that applies the device-specific MOSS Decoder recommendation. Parameter: duration.","extractionState":"manual","localizations":{"de":{"stringUnit":{"state":"translated","value":"Empfehlung verwenden (%@)"}},"en":{"stringUnit":{"state":"translated","value":"Use Recommended (%@)"}},"ja":{"stringUnit":{"state":"translated","value":"推奨設定を使用（%@）"}},"nl":{"stringUnit":{"state":"translated","value":"Aanbevolen instelling gebruiken (%@)"}},"zh-Hans":{"stringUnit":{"state":"translated","value":"使用推荐值（%@）"}},"zh-Hant":{"stringUnit":{"state":"translated","value":"使用推薦值（%@）"}}}},
+    "moss_local.decoder.above_recommendation.format" : {"comment":"Warning shown when the selected MOSS Decoder duration exceeds the device recommendation. Parameter: selected duration.","extractionState":"manual","localizations":{"de":{"stringUnit":{"state":"translated","value":"%@ ist länger als für dieses Gerät empfohlen. Dies kann die Sprecherkontinuität verbessern, aber den Spitzenspeicherbedarf erhöhen oder die Verarbeitung beenden."}},"en":{"stringUnit":{"state":"translated","value":"%@ is longer than recommended for this device. It may improve speaker continuity, but can increase peak memory use or stop processing."}},"ja":{"stringUnit":{"state":"translated","value":"%@ はこのデバイスの推奨値を超えています。話者の一貫性が向上する場合がありますが、ピークメモリ使用量が増えたり、処理が停止したりする可能性があります。"}},"nl":{"stringUnit":{"state":"translated","value":"%@ is langer dan aanbevolen voor dit apparaat. Dit kan de sprekercontinuïteit verbeteren, maar ook het piekgeheugen verhogen of de verwerking stoppen."}},"zh-Hans":{"stringUnit":{"state":"translated","value":"%@ 超出此设备的推荐值。它可能改善说话人连续性，但也可能增加峰值内存占用或导致处理终止。"}},"zh-Hant":{"stringUnit":{"state":"translated","value":"%@ 超出此裝置的推薦值。它可能改善說話者連續性，但也可能增加峰值記憶體用量或導致處理終止。"}}}},
     "moss_local.decoder.segment_duration.description" : {"comment":"Explanation of the MOSS Decoder segment duration setting and its memory tradeoff.","extractionState":"manual","localizations":{"de":{"stringUnit":{"state":"translated","value":"Legt fest, wie viel Audio jeder MOSS-Decoder-Aufruf verarbeitet. Der Whisper-Encoder arbeitet weiterhin in 30-Sekunden-Fenstern. Längere Segmente können die Sprecherkontinuität verbessern, erhöhen aber den Spitzenspeicherbedarf und den Abstand zwischen Fortschrittsmeldungen. Änderungen gelten für neue Transkriptionen."}},"en":{"stringUnit":{"state":"translated","value":"Controls how much audio each MOSS Decoder call handles. The Whisper Encoder still processes 30-second windows. Longer segments may improve speaker continuity, but increase peak memory and the time between progress updates. Changes apply to new transcriptions."}},"ja":{"stringUnit":{"state":"translated","value":"MOSS Decoderの1回の呼び出しで処理する音声の長さを設定します。Whisper Encoderは引き続き30秒のウインドウで処理します。長い分割は話者の一貫性を改善する可能性がありますが、ピークメモリ使用量が増え、進捗更新の間隔も長くなります。変更は新しく開始する文字起こしに適用されます。"}},"nl":{"stringUnit":{"state":"translated","value":"Bepaalt hoeveel audio elke MOSS Decoder-aanroep verwerkt. De Whisper Encoder blijft vensters van 30 seconden verwerken. Langere segmenten kunnen de sprekercontinuïteit verbeteren, maar verhogen het piekgeheugen en de tijd tussen voortgangsupdates. Wijzigingen gelden voor nieuwe transcripties."}},"zh-Hans":{"stringUnit":{"state":"translated","value":"控制每次 MOSS Decoder 调用处理的音频长度。Whisper Encoder 仍按 30 秒窗口运行。更长分段可能改善说话人连续性，但会提高峰值内存并延长进度更新间隔。修改仅影响之后开始的转录。"}},"zh-Hant":{"stringUnit":{"state":"translated","value":"控制每次 MOSS Decoder 呼叫處理的音訊長度。Whisper Encoder 仍以 30 秒視窗運作。較長分段可能改善說話者連續性，但會提高峰值記憶體並延長進度更新間隔。修改僅影響之後開始的轉錄。"}}}},
     "qwen3_asr.model.about" : {"comment":"Settings link title that opens the official Qwen3-ASR model information page.","extractionState":"manual","localizations":{"de":{"stringUnit":{"state":"translated","value":"Über Qwen3-ASR"}},"en":{"stringUnit":{"state":"translated","value":"About Qwen3-ASR"}},"ja":{"stringUnit":{"state":"translated","value":"Qwen3-ASRについて"}},"nl":{"stringUnit":{"state":"translated","value":"Over Qwen3-ASR"}},"zh-Hans":{"stringUnit":{"state":"translated","value":"关于 Qwen3-ASR"}},"zh-Hant":{"stringUnit":{"state":"translated","value":"關於 Qwen3-ASR"}}}},
     "settings.model_information" : {"comment":"Settings section title for external model information links.","extractionState":"manual","localizations":{"de":{"stringUnit":{"state":"translated","value":"Modellinformationen"}},"en":{"stringUnit":{"state":"translated","value":"Model Information"}},"ja":{"stringUnit":{"state":"translated","value":"モデル情報"}},"nl":{"stringUnit":{"state":"translated","value":"Modelinformatie"}},"zh-Hans":{"stringUnit":{"state":"translated","value":"模型信息"}},"zh-Hant":{"stringUnit":{"state":"translated","value":"模型資訊"}}}},
@@ -8909,86 +8913,86 @@
         }
       }
     },
-    "onboarding.carousel.whisper.detail" : {
-      "comment" : "Onboarding splash carousel card detail for Local Whisper.",
+    "onboarding.carousel.moss.detail" : {
+      "comment" : "Onboarding splash carousel card detail for local MOSS.",
       "extractionState" : "manual",
       "localizations" : {
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Offline-Modelle laden"
+            "value" : "Offline-Transkription mit Sprechertrennung"
           }
         },
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Download offline models"
+            "value" : "Offline multi-speaker transcription"
           }
         },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "オフラインモデルをダウンロード"
+            "value" : "オフラインで複数話者を文字起こし"
           }
         },
         "nl" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Offline modellen downloaden"
+            "value" : "Offline transcriptie met meerdere sprekers"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "下载离线模型"
+            "value" : "离线多人语音转录"
           }
         },
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "下載離線模型"
+            "value" : "離線多人語音轉錄"
           }
         }
       }
     },
-    "onboarding.carousel.whisper.title" : {
-      "comment" : "Onboarding splash carousel card title for Local Whisper.",
+    "onboarding.carousel.moss.title" : {
+      "comment" : "Onboarding splash carousel card title for local MOSS.",
       "extractionState" : "manual",
       "localizations" : {
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Lokales Whisper"
+            "value" : "Lokales MOSS"
           }
         },
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Local Whisper"
+            "value" : "Local MOSS"
           }
         },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "ローカル Whisper"
+            "value" : "ローカル MOSS"
           }
         },
         "nl" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Lokaal Whisper"
+            "value" : "Lokale MOSS"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "本地 Whisper"
+            "value" : "本地 MOSS"
           }
         },
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "本機 Whisper"
+            "value" : "本機 MOSS"
           }
         }
       }
@@ -9210,37 +9214,37 @@
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Importiere Audio, transkribiere erneut mit Apple Speech oder Local Whisper, übersetze Transkripte und füge Tags oder Zusammenfassungen hinzu."
+            "value" : "Importiere Audio, transkribiere erneut mit Apple Speech oder lokalem MOSS mit Sprechertrennung, übersetze Transkripte und füge Tags oder Zusammenfassungen hinzu."
           }
         },
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Import audio, retranscribe with Apple Speech or Local Whisper, translate transcripts, and add tags or summaries."
+            "value" : "Import audio, retranscribe with Apple Speech or local MOSS multi-speaker, translate transcripts, and add tags or summaries."
           }
         },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "音声を読み込み、Apple Speech や Local Whisper で再文字起こしし、翻訳、タグ、要約を追加できます。"
+            "value" : "音声を読み込み、Apple Speech やローカル MOSS の話者分離で再文字起こしし、翻訳、タグ、要約を追加できます。"
           }
         },
         "nl" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Importeer audio, transcribeer opnieuw met Apple Speech of Local Whisper, vertaal transcripties en voeg tags of samenvattingen toe."
+            "value" : "Importeer audio, transcribeer opnieuw met Apple Speech of lokale MOSS met sprekerherkenning, vertaal transcripties en voeg tags of samenvattingen toe."
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "导入音频，用 Apple Speech 或本地 Whisper 重新转录，翻译转录稿，并添加标签或摘要。"
+            "value" : "导入音频，用 Apple Speech 或本地 MOSS 多人语音重新转录，翻译转录稿，并添加标签或摘要。"
           }
         },
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "匯入音訊，用 Apple Speech 或本機 Whisper 重新轉錄，翻譯轉錄稿，並加入標籤或摘要。"
+            "value" : "匯入音訊，用 Apple Speech 或本機 MOSS 多人語音重新轉錄，翻譯轉錄稿，並加入標籤或摘要。"
           }
         }
       }
@@ -9413,44 +9417,44 @@
         }
       }
     },
-    "onboarding.hero_chip.whisper" : {
-      "comment" : "Onboarding hero status chip for Local Whisper.",
+    "onboarding.hero_chip.moss" : {
+      "comment" : "Onboarding hero status chip for local MOSS.",
       "extractionState" : "manual",
       "localizations" : {
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Whisper bereit"
+            "value" : "MOSS bereit"
           }
         },
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Whisper ready"
+            "value" : "MOSS ready"
           }
         },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Whisper 対応"
+            "value" : "MOSS 対応"
           }
         },
         "nl" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Whisper gereed"
+            "value" : "MOSS gereed"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Whisper 就绪"
+            "value" : "MOSS 就绪"
           }
         },
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Whisper 就緒"
+            "value" : "MOSS 就緒"
           }
         }
       }
@@ -9462,37 +9466,37 @@
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Live-Untertitel, gespeichertes Audio, Offline-Whisper und private Transkript-Werkzeuge an einem Ort."
+            "value" : "Live-Untertitel, gespeichertes Audio, lokale MOSS-Sprechertrennung und private Transkript-Werkzeuge an einem Ort."
           }
         },
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Live captions, saved audio, offline Whisper, and private transcript tools in one place."
+            "value" : "Live captions, saved audio, offline MOSS multi-speaker, and private transcript tools in one place."
           }
         },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "ライブキャプション、保存済み音声、オフライン Whisper、プライベートな文字起こしツールをひとつに。"
+            "value" : "ライブキャプション、保存済み音声、ローカル MOSS の話者分離、プライベートな文字起こしツールをひとつに。"
           }
         },
         "nl" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Live-ondertitels, opgeslagen audio, offline Whisper en privé transcriptietools op één plek."
+            "value" : "Live-ondertitels, opgeslagen audio, lokale MOSS-sprekerherkenning en privé transcriptietools op één plek."
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "实时字幕、保存音频、离线 Whisper 和私密转录工具都在一处。"
+            "value" : "实时字幕、保存音频、本地 MOSS 多人语音和私密转录工具都在一处。"
           }
         },
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "即時字幕、保存音訊、離線 Whisper 和私密轉錄工具都在一處。"
+            "value" : "即時字幕、保存音訊、本機 MOSS 多人語音和私密轉錄工具都在一處。"
           }
         }
       }
@@ -9539,44 +9543,44 @@
         }
       }
     },
-    "onboarding.setup.download_whisper.format" : {
-      "comment" : "Onboarding Local Whisper download button. Parameter: model download size.",
+    "onboarding.setup.download_moss.format" : {
+      "comment" : "Onboarding recommended MOSS download button. Parameter: model download size.",
       "extractionState" : "manual",
       "localizations" : {
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Whisper-Modell laden (%@)"
+            "value" : "Empfohlenes MOSS-Modell laden (%@)"
           }
         },
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Download Whisper Model (%@)"
+            "value" : "Download Recommended MOSS Model (%@)"
           }
         },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Whisper モデルをダウンロード（%@）"
+            "value" : "おすすめの MOSS モデルをダウンロード（%@）"
           }
         },
         "nl" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Whisper-model downloaden (%@)"
+            "value" : "Aanbevolen MOSS-model downloaden (%@)"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "下载 Whisper 模型（%@）"
+            "value" : "下载推荐的 MOSS 模型（%@）"
           }
         },
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "下載 Whisper 模型（%@）"
+            "value" : "下載推薦的 MOSS 模型（%@）"
           }
         }
       }
@@ -9707,44 +9711,86 @@
         }
       }
     },
-    "onboarding.setup.whisper_model" : {
-      "comment" : "Onboarding Local Whisper model picker title.",
+    "onboarding.setup.moss_model" : {
+      "comment" : "Onboarding local MOSS model title.",
       "extractionState" : "manual",
       "localizations" : {
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Lokales Whisper-Modell"
+            "value" : "Lokales MOSS-Modell"
           }
         },
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Local Whisper Model"
+            "value" : "Local MOSS Model"
           }
         },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "ローカル Whisper モデル"
+            "value" : "ローカル MOSS モデル"
           }
         },
         "nl" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Lokaal Whisper-model"
+            "value" : "Lokaal MOSS-model"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "本地 Whisper 模型"
+            "value" : "本地 MOSS 模型"
           }
         },
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "本機 Whisper 模型"
+            "value" : "本機 MOSS 模型"
+          }
+        }
+      }
+    },
+    "onboarding.setup.recommended" : {
+      "comment" : "Badge marking the recommended onboarding download.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Empfohlen"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Recommended"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "おすすめ"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Aanbevolen"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "推荐"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "推薦"
           }
         }
       }
@@ -20114,37 +20160,37 @@
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Die Änderung gilt nur für diesen Transkriptabschnitt."
+            "value" : "Die Sprecheränderung beginnt bei diesem Abschnitt. Wenn derselbe Sprecher direkt danach fortfährt, kannst du sie beim Speichern auf diesen zusammenhängenden Block anwenden."
           }
         },
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "The speaker change applies only to this transcript segment."
+            "value" : "The speaker change starts with this segment. If the same speaker continues immediately after it, you can apply the change to that continuous block when saving."
           }
         },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "話者の変更は、この文字起こし部分にのみ適用されます。"
+            "value" : "話者の変更はこの部分から始まります。同じ話者が直後も連続する場合、保存時にその連続範囲へ適用できます。"
           }
         },
         "nl" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "De wijziging van spreker geldt alleen voor dit transcriptsegment."
+            "value" : "De sprekerwijziging begint bij dit segment. Als dezelfde spreker direct erna doorgaat, kun je de wijziging bij het opslaan op dat aaneengesloten blok toepassen."
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "发言人修改仅应用于当前转录片段。"
+            "value" : "发言人修改从当前片段开始。如果后面紧邻的片段仍是同一发言人，保存时可以选择应用到这段连续范围。"
           }
         },
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "發言者修改只套用至目前的轉錄片段。"
+            "value" : "發言者修改從目前片段開始。如果後面緊鄰的片段仍是同一發言者，儲存時可以選擇套用到這段連續範圍。"
           }
         }
       }
@@ -20271,6 +20317,174 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "未指定發言者"
+          }
+        }
+      }
+    },
+    "recordings.transcript.speaker.propagation.current_only_action" : {
+      "comment" : "Action that applies a speaker change only to the currently edited transcript segment.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nur diesen ändern"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Change This Only"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "現在の部分のみ変更"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Alleen deze wijzigen"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "仅修改当前片段"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "僅修改目前片段"
+          }
+        }
+      }
+    },
+    "recordings.transcript.speaker.propagation.following_action.format" : {
+      "comment" : "Action that applies a speaker change to the current transcript segment and consecutive following matching segments. Parameter: number of following segments.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Diesen + nächste %d ändern"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Change This + Next %d"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "現在＋次の%d件を変更"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Deze + volgende %d wijzigen"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "修改当前及后续 %d 个"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "修改目前及後續 %d 個"
+          }
+        }
+      }
+    },
+    "recordings.transcript.speaker.propagation.message.format" : {
+      "comment" : "Confirmation message for applying a speaker change to consecutive following transcript segments. Parameter: number of immediately following matching segments.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Die nächsten %d direkt aufeinanderfolgenden Abschnitte haben denselben Sprecher. Die neue Sprecherzuordnung auf diesen zusammenhängenden Block anwenden?"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The next %d immediately following segments use the same speaker. Apply the new speaker to this continuous block?"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "直後の%d個の連続する部分も同じ話者です。新しい話者をこの連続範囲に適用しますか？"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "De volgende %d direct aaneengesloten segmenten hebben dezelfde spreker. De nieuwe spreker op dit aaneengesloten blok toepassen?"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "后面紧邻的 %d 个连续片段仍是同一发言人。要把新的发言人应用到这段连续范围吗？"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "後面緊鄰的 %d 個連續片段仍是同一發言者。要把新的發言者套用到這段連續範圍嗎？"
+          }
+        }
+      }
+    },
+    "recordings.transcript.speaker.propagation.title" : {
+      "comment" : "Confirmation title shown after changing the speaker of a transcript segment when immediately following segments have the same original speaker.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Aufeinanderfolgende Sprechersegmente aktualisieren?"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Update consecutive speaker segments?"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "連続する話者部分も変更しますか？"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Aaneengesloten sprekersegmenten bijwerken?"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "同时修改连续的发言人片段？"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "同時修改連續的發言者片段？"
           }
         }
       }
