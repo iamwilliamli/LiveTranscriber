@@ -3578,7 +3578,7 @@ private struct RecordingRow: View {
                 .padding(.top, 1)
 
                 VStack(alignment: .leading, spacing: 4) {
-                    Text(item.audioFileName)
+                    Text((item.audioFileName as NSString).deletingPathExtension)
                         .font(.redditSans(.headline, weight: .semibold))
                         .foregroundStyle(.primary)
                         .lineLimit(1)

@@ -69,6 +69,7 @@ struct SettingsView: View {
     @AppStorage(OnboardingState.completedDefaultsKey) private var hasCompletedOnboarding = true
     @AppStorage(RecordingSummaryProvider.selectedDefaultsKey) private var selectedSummaryProviderRawValue = RecordingSummaryProvider.automatic.rawValue
     @AppStorage(Qwen3ASRDeveloperConfiguration.streamingLongAudioDefaultsKey) private var isQwen3ASRStreamingLongAudioEnabled = false
+    @AppStorage(MOSSDecoderSegmentDuration.defaultsKey) private var mossDecoderSegmentDurationSeconds = MOSSDecoderSegmentDuration.defaultValue.rawValue
     private static let publicBetaFeedbackURL = URL(string: "https://t.me/livetranscriber")!
     private static let privacyPolicyURL = URL(string: "https://iamwilliamli.github.io/LiveTranscriber/privacy/")!
     private static let whisperModelURL = URL(string: "https://github.com/openai/whisper")!
@@ -84,6 +85,10 @@ struct SettingsView: View {
 
     private var selectedSummaryProvider: RecordingSummaryProvider {
         RecordingSummaryProvider(rawValue: selectedSummaryProviderRawValue) ?? .automatic
+    }
+
+    private var selectedMOSSDecoderSegmentDuration: MOSSDecoderSegmentDuration {
+        MOSSDecoderSegmentDuration(rawValue: mossDecoderSegmentDurationSeconds) ?? .defaultValue
     }
 
     @ViewBuilder
@@ -524,6 +529,24 @@ struct SettingsView: View {
                 .disabled(isDownloadingMOSSLocalModel)
             }
 
+            SettingsSection(
+                titleResource: L10n.Settings.onlineTranscription,
+                systemImage: "cloud",
+                tint: AppTheme.purple
+            ) {
+                NavigationLink(value: SettingsRoute.geminiCloud) {
+                    SettingsNavigationRow(
+                        icon: "cloud",
+                        titleResource: L10n.GeminiCloud.settingsTitle,
+                        value: geminiCloudStatusText,
+                        subtitleResource: L10n.GeminiCloud.submenuDescription,
+                        tint: AppTheme.purple
+                    )
+                }
+                .buttonStyle(.plain)
+                .settingsNavigationHaptic()
+            }
+
             SettingsSection(titleResource: L10n.Settings.betaFeatures, systemImage: "testtube.2", tint: AppTheme.purple) {
                 localWhisperLiveBetaSettings
             }
@@ -578,20 +601,6 @@ struct SettingsView: View {
                     text: appleAvailability.detailText,
                     tint: appleAvailabilityTint
                 )
-            }
-
-            SettingsSection(titleResource: L10n.GeminiCloud.cloudModelTitle, systemImage: "cloud", tint: AppTheme.purple) {
-                NavigationLink(value: SettingsRoute.geminiCloud) {
-                    SettingsNavigationRow(
-                        icon: "cloud",
-                        titleResource: L10n.GeminiCloud.settingsTitle,
-                        value: geminiCloudStatusText,
-                        subtitleResource: L10n.GeminiCloud.submenuDescription,
-                        tint: AppTheme.purple
-                    )
-                }
-                .buttonStyle(.plain)
-                .settingsNavigationHaptic()
             }
 
             SettingsSection(titleResource: L10n.LocalSummary.modelTitle, systemImage: "cpu", tint: AppTheme.purple) {
@@ -1094,6 +1103,42 @@ struct SettingsView: View {
                     .buttonStyle(.plain)
                     .disabled(isDownloadingMOSSLocalModel)
                 }
+            }
+
+            SettingsSection(
+                titleResource: L10n.MOSSLocal.decoderSectionTitle,
+                systemImage: "timer",
+                tint: AppTheme.purple
+            ) {
+                Menu {
+                    ForEach(MOSSDecoderSegmentDuration.allCases) { duration in
+                        Button {
+                            HapticFeedback.play(.menuSelection)
+                            mossDecoderSegmentDurationSeconds = duration.rawValue
+                        } label: {
+                            Label(
+                                duration.displayName,
+                                systemImage: duration == selectedMOSSDecoderSegmentDuration
+                                    ? "checkmark"
+                                    : "timer"
+                            )
+                        }
+                    }
+                } label: {
+                    SettingsPickerRow(
+                        icon: "timer",
+                        titleResource: L10n.MOSSLocal.decoderSegmentDuration,
+                        value: selectedMOSSDecoderSegmentDuration.displayName,
+                        tint: AppTheme.purple
+                    )
+                }
+                .buttonStyle(.plain)
+
+                SettingsVerbatimStatusRow(
+                    icon: "memorychip",
+                    text: String(localized: L10n.MOSSLocal.decoderSegmentDurationDescription),
+                    tint: AppTheme.info
+                )
             }
 
             SettingsSection(

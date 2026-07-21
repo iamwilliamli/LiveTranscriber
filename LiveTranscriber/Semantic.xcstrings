@@ -5,9 +5,14 @@
     "local_whisper.model.about" : {"comment":"Settings link title that opens the official Whisper model information page.","extractionState":"manual","localizations":{"de":{"stringUnit":{"state":"translated","value":"Über Whisper"}},"en":{"stringUnit":{"state":"translated","value":"About Whisper"}},"ja":{"stringUnit":{"state":"translated","value":"Whisperについて"}},"nl":{"stringUnit":{"state":"translated","value":"Over Whisper"}},"zh-Hans":{"stringUnit":{"state":"translated","value":"关于 Whisper"}},"zh-Hant":{"stringUnit":{"state":"translated","value":"關於 Whisper"}}}},
     "local_whisper.settings.submenu_description" : {"comment":"Settings navigation subtitle for the Whisper model submenu.","extractionState":"manual","localizations":{"de":{"stringUnit":{"state":"translated","value":"Whisper-Modelle und Core ML Encoder verwalten"}},"en":{"stringUnit":{"state":"translated","value":"Manage Whisper models and the Core ML encoder"}},"ja":{"stringUnit":{"state":"translated","value":"WhisperモデルとCore ML Encoderを管理"}},"nl":{"stringUnit":{"state":"translated","value":"Whisper-modellen en Core ML Encoder beheren"}},"zh-Hans":{"stringUnit":{"state":"translated","value":"管理 Whisper 模型和 Core ML Encoder"}},"zh-Hant":{"stringUnit":{"state":"translated","value":"管理 Whisper 模型與 Core ML Encoder"}}}},
     "moss_local.model.about" : {"comment":"Settings link title that opens the official MOSS Transcribe Diarize model information page.","extractionState":"manual","localizations":{"de":{"stringUnit":{"state":"translated","value":"Über MOSS"}},"en":{"stringUnit":{"state":"translated","value":"About MOSS"}},"ja":{"stringUnit":{"state":"translated","value":"MOSSについて"}},"nl":{"stringUnit":{"state":"translated","value":"Over MOSS"}},"zh-Hans":{"stringUnit":{"state":"translated","value":"关于 MOSS"}},"zh-Hant":{"stringUnit":{"state":"translated","value":"關於 MOSS"}}}},
+    "moss_local.decoder.section_title" : {"comment":"Settings section title for MOSS Decoder segmentation.","extractionState":"manual","localizations":{"de":{"stringUnit":{"state":"translated","value":"Decoder-Verarbeitung"}},"en":{"stringUnit":{"state":"translated","value":"Decoder Processing"}},"ja":{"stringUnit":{"state":"translated","value":"Decoder処理"}},"nl":{"stringUnit":{"state":"translated","value":"Decoderverwerking"}},"zh-Hans":{"stringUnit":{"state":"translated","value":"Decoder 处理"}},"zh-Hant":{"stringUnit":{"state":"translated","value":"Decoder 處理"}}}},
+    "moss_local.decoder.segment_duration" : {"comment":"Settings row title for the amount of audio handled by each MOSS Decoder call.","extractionState":"manual","localizations":{"de":{"stringUnit":{"state":"translated","value":"Decoder-Segmentlänge"}},"en":{"stringUnit":{"state":"translated","value":"Decoder Segment Length"}},"ja":{"stringUnit":{"state":"translated","value":"Decoderの分割時間"}},"nl":{"stringUnit":{"state":"translated","value":"Lengte decodersegment"}},"zh-Hans":{"stringUnit":{"state":"translated","value":"Decoder 分段时长"}},"zh-Hant":{"stringUnit":{"state":"translated","value":"Decoder 分段時長"}}}},
+    "moss_local.decoder.segment_duration.seconds.format" : {"comment":"MOSS Decoder segment duration in seconds. Parameter: number of seconds.","extractionState":"manual","localizations":{"de":{"stringUnit":{"state":"translated","value":"%d Sek."}},"en":{"stringUnit":{"state":"translated","value":"%d sec"}},"ja":{"stringUnit":{"state":"translated","value":"%d秒"}},"nl":{"stringUnit":{"state":"translated","value":"%d sec."}},"zh-Hans":{"stringUnit":{"state":"translated","value":"%d 秒"}},"zh-Hant":{"stringUnit":{"state":"translated","value":"%d 秒"}}}},
+    "moss_local.decoder.segment_duration.description" : {"comment":"Explanation of the MOSS Decoder segment duration setting and its memory tradeoff.","extractionState":"manual","localizations":{"de":{"stringUnit":{"state":"translated","value":"Legt fest, wie viel Audio jeder MOSS-Decoder-Aufruf verarbeitet. Der Whisper-Encoder arbeitet weiterhin in 30-Sekunden-Fenstern. Längere Segmente können die Sprecherkontinuität verbessern, erhöhen aber den Spitzenspeicherbedarf und den Abstand zwischen Fortschrittsmeldungen. Änderungen gelten für neue Transkriptionen."}},"en":{"stringUnit":{"state":"translated","value":"Controls how much audio each MOSS Decoder call handles. The Whisper Encoder still processes 30-second windows. Longer segments may improve speaker continuity, but increase peak memory and the time between progress updates. Changes apply to new transcriptions."}},"ja":{"stringUnit":{"state":"translated","value":"MOSS Decoderの1回の呼び出しで処理する音声の長さを設定します。Whisper Encoderは引き続き30秒のウインドウで処理します。長い分割は話者の一貫性を改善する可能性がありますが、ピークメモリ使用量が増え、進捗更新の間隔も長くなります。変更は新しく開始する文字起こしに適用されます。"}},"nl":{"stringUnit":{"state":"translated","value":"Bepaalt hoeveel audio elke MOSS Decoder-aanroep verwerkt. De Whisper Encoder blijft vensters van 30 seconden verwerken. Langere segmenten kunnen de sprekercontinuïteit verbeteren, maar verhogen het piekgeheugen en de tijd tussen voortgangsupdates. Wijzigingen gelden voor nieuwe transcripties."}},"zh-Hans":{"stringUnit":{"state":"translated","value":"控制每次 MOSS Decoder 调用处理的音频长度。Whisper Encoder 仍按 30 秒窗口运行。更长分段可能改善说话人连续性，但会提高峰值内存并延长进度更新间隔。修改仅影响之后开始的转录。"}},"zh-Hant":{"stringUnit":{"state":"translated","value":"控制每次 MOSS Decoder 呼叫處理的音訊長度。Whisper Encoder 仍以 30 秒視窗運作。較長分段可能改善說話者連續性，但會提高峰值記憶體並延長進度更新間隔。修改僅影響之後開始的轉錄。"}}}},
     "qwen3_asr.model.about" : {"comment":"Settings link title that opens the official Qwen3-ASR model information page.","extractionState":"manual","localizations":{"de":{"stringUnit":{"state":"translated","value":"Über Qwen3-ASR"}},"en":{"stringUnit":{"state":"translated","value":"About Qwen3-ASR"}},"ja":{"stringUnit":{"state":"translated","value":"Qwen3-ASRについて"}},"nl":{"stringUnit":{"state":"translated","value":"Over Qwen3-ASR"}},"zh-Hans":{"stringUnit":{"state":"translated","value":"关于 Qwen3-ASR"}},"zh-Hant":{"stringUnit":{"state":"translated","value":"關於 Qwen3-ASR"}}}},
     "settings.model_information" : {"comment":"Settings section title for external model information links.","extractionState":"manual","localizations":{"de":{"stringUnit":{"state":"translated","value":"Modellinformationen"}},"en":{"stringUnit":{"state":"translated","value":"Model Information"}},"ja":{"stringUnit":{"state":"translated","value":"モデル情報"}},"nl":{"stringUnit":{"state":"translated","value":"Modelinformatie"}},"zh-Hans":{"stringUnit":{"state":"translated","value":"模型信息"}},"zh-Hant":{"stringUnit":{"state":"translated","value":"模型資訊"}}}},
     "settings.offline_transcription" : {"comment":"Settings section title for offline transcription engines and their models.","extractionState":"manual","localizations":{"de":{"stringUnit":{"state":"translated","value":"Offline-Transkription"}},"en":{"stringUnit":{"state":"translated","value":"Offline Transcription"}},"ja":{"stringUnit":{"state":"translated","value":"オフライン文字起こし"}},"nl":{"stringUnit":{"state":"translated","value":"Offline transcriptie"}},"zh-Hans":{"stringUnit":{"state":"translated","value":"离线转录"}},"zh-Hant":{"stringUnit":{"state":"translated","value":"離線轉錄"}}}},
+    "settings.online_transcription" : {"comment":"Settings section title for online transcription providers.","extractionState":"manual","localizations":{"de":{"stringUnit":{"state":"translated","value":"Online-Transkription"}},"en":{"stringUnit":{"state":"translated","value":"Online Transcription"}},"ja":{"stringUnit":{"state":"translated","value":"オンライン文字起こし"}},"nl":{"stringUnit":{"state":"translated","value":"Online transcriptie"}},"zh-Hans":{"stringUnit":{"state":"translated","value":"在线转录"}},"zh-Hant":{"stringUnit":{"state":"translated","value":"線上轉錄"}}}},
     "app_intents.open_recording.description" : {
       "comment" : "App Intent description for opening a recording.",
       "localizations" : {
@@ -1308,19 +1313,19 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Turn on Gemini Cloud in Settings > Intelligence > Gemini Cloud first."
+            "value" : "Turn on Gemini Cloud in Settings > Transcription > Gemini Cloud first."
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "请先在“设置 > 智能 > Gemini 云端”中开启 Gemini 云端。"
+            "value" : "请先在“设置 > 转录 > Gemini 云端”中开启 Gemini 云端。"
           }
         },
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "請先在「設定 > 智慧 > Gemini 雲端」中開啟 Gemini 雲端。"
+            "value" : "請先在「設定 > 轉錄 > Gemini 雲端」中開啟 Gemini 雲端。"
           }
         }
       }
@@ -1515,19 +1520,19 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Add a Gemini API key in Settings > Intelligence first."
+            "value" : "Add a Gemini API key in Settings > Transcription > Gemini Cloud first."
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "请先在“设置 > 智能”中添加 Gemini API 密钥。"
+            "value" : "请先在“设置 > 转录 > Gemini 云端”中添加 Gemini API 密钥。"
           }
         },
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "請先在「設定 > 智慧」中加入 Gemini API 金鑰。"
+            "value" : "請先在「設定 > 轉錄 > Gemini 雲端」中加入 Gemini API 金鑰。"
           }
         }
       }

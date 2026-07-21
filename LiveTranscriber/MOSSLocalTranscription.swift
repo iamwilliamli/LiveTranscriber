@@ -34,6 +34,34 @@ struct MOSSLocalModelStatus: Equatable {
     }
 }
 
+enum MOSSDecoderSegmentDuration: Int, CaseIterable, Identifiable {
+    static let defaultsKey = "moss_local.decoder_segment_duration_seconds"
+    static let defaultValue: MOSSDecoderSegmentDuration = .seconds30
+
+    case seconds30 = 30
+    case seconds60 = 60
+    case seconds90 = 90
+
+    var id: Int { rawValue }
+
+    var seconds: Float {
+        Float(rawValue)
+    }
+
+    var displayName: String {
+        String.localizedStringWithFormat(
+            String(localized: L10n.MOSSLocal.decoderSegmentDurationSecondsFormat),
+            rawValue
+        )
+    }
+
+    static var selected: MOSSDecoderSegmentDuration {
+        MOSSDecoderSegmentDuration(
+            rawValue: UserDefaults.standard.integer(forKey: defaultsKey)
+        ) ?? defaultValue
+    }
+}
+
 enum MOSSLocalModelManager {
     static let modelID = "vanch007/mlx-MOSS-Transcribe-Diarize-4bit"
 
@@ -202,7 +230,9 @@ private actor MOSSLocalRuntime {
     static let shared = MOSSLocalRuntime()
 
     private static let sampleRate = 16_000
-    private static let chunkDuration: Float = 30
+    // This is an internal runaway-generation guard, not a quality control.
+    // It applies independently to every selectable Decoder segment.
+    private static let maxTokensPerDecoderSegment = 2_048
 
     private var loadedModel: MossTranscribeDiarizeModel?
 
@@ -228,20 +258,25 @@ private actor MOSSLocalRuntime {
         loadedModel = model
         progressHandler(0.28)
 
+        // Capture the preference once so changing Settings cannot alter the
+        // segmentation of a transcription that is already running.
+        let decoderSegmentDuration = MOSSDecoderSegmentDuration.selected
+        let chunkDuration = decoderSegmentDuration.seconds
+
         let parameters = STTGenerateParameters(
-            maxTokens: 2_048,
+            maxTokens: Self.maxTokensPerDecoderSegment,
             temperature: 0,
             topP: 1,
             topK: 0,
             verbose: false,
             language: nil,
-            chunkDuration: Self.chunkDuration,
+            chunkDuration: chunkDuration,
             minChunkDuration: 0,
             repetitionPenalty: 1,
             repetitionContextSize: 100
         )
 
-        let estimatedChunkCount = max(1, Int(ceil(durationSeconds / Double(Self.chunkDuration))))
+        let estimatedChunkCount = max(1, Int(ceil(durationSeconds / Double(chunkDuration))))
         var completedChunkCount = 0
         var finalOutput: STTOutput?
 
