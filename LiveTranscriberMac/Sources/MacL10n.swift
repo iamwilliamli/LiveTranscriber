@@ -26,234 +26,214 @@ enum MacL10n {
         defaultValue: "Workspace",
         comment: "Sidebar section title for primary macOS destinations."
     )
-    static let library = resource(
-        "mac.sidebar.library",
-        defaultValue: "Library",
-        comment: "Sidebar destination for saved recordings."
-    )
-    static let capture = resource(
-        "mac.sidebar.capture",
-        defaultValue: "Capture",
-        comment: "Sidebar destination for screen and window capture."
-    )
-    static let libraryTitle = resource(
-        "mac.library.title",
-        defaultValue: "Recording Library",
-        comment: "Title of the macOS recording library."
-    )
-    static let libraryReady = resource(
-        "mac.library.ready",
-        defaultValue: "Mac library foundation is ready",
-        comment: "Empty-state title before shared recording storage is connected."
-    )
-    static let libraryReadyDetail = resource(
-        "mac.library.ready_detail",
-        defaultValue: "Shared recording access will be connected after the cross-platform domain package is in place.",
-        comment: "Empty-state detail before shared recording storage is connected."
-    )
-    static let loadingLibrary = resource(
-        "mac.library.loading",
-        defaultValue: "Loading recordings…",
-        comment: "Progress label while the macOS recording library loads."
-    )
     static let refreshLibrary = resource(
         "mac.library.refresh",
         defaultValue: "Refresh Library",
         comment: "Action that refreshes the macOS recording library."
-    )
-    static let librarySource = resource(
-        "mac.library.source",
-        defaultValue: "Library Source",
-        comment: "Menu title for choosing the macOS recording library source."
-    )
-    static let chooseFolder = resource(
-        "mac.library.choose_folder",
-        defaultValue: "Choose Recording Folder…",
-        comment: "Action that lets the user choose a recording folder."
-    )
-    static let useICloud = resource(
-        "mac.library.use_icloud",
-        defaultValue: "Use iCloud Library",
-        comment: "Action that switches the macOS library back to iCloud."
-    )
-    static let noRecordings = resource(
-        "mac.library.empty",
-        defaultValue: "No recordings found",
-        comment: "Empty-state title when a recording folder contains no media."
-    )
-    static let noRecordingsDetail = resource(
-        "mac.library.empty_detail",
-        defaultValue: "Recordings synced from iPhone will appear here, or you can choose another recording folder.",
-        comment: "Empty-state explanation for the macOS recording library."
-    )
-    static let libraryUnavailable = resource(
-        "mac.library.unavailable",
-        defaultValue: "Recording library unavailable",
-        comment: "Error-state title when the recording library cannot be opened."
-    )
-    static let preparingPlayback = resource(
-        "mac.library.preparing_playback",
-        defaultValue: "Preparing playback…",
-        comment: "Progress label while a recording downloads or opens."
-    )
-    static let assets = resource(
-        "mac.library.assets",
-        defaultValue: "Assets",
-        comment: "Heading above a recording's asset list."
-    )
-    static let transcript = resource(
-        "mac.library.transcript",
-        defaultValue: "Transcript",
-        comment: "Heading above a recording transcript."
     )
     static let noTranscript = resource(
         "mac.library.no_transcript",
         defaultValue: "No transcript is available for this recording.",
         comment: "Placeholder when a recording has no transcript asset."
     )
-    static let captureTitle = resource(
-        "mac.capture.title",
-        defaultValue: "Screen & Window Capture",
-        comment: "Title of the macOS capture workspace."
+    static let systemAudioRecording = resource(
+        "mac.recording.system_audio",
+        defaultValue: "System Audio",
+        comment: "Title for recording audio played by apps on the Mac."
     )
-    static let captureDetail = resource(
-        "mac.capture.detail",
-        defaultValue: "Record a selected meeting window, system audio, and an optional microphone track with the native macOS capture pipeline.",
-        comment: "Description of the macOS ScreenCaptureKit pipeline."
+    static let microphoneOnly = resource(
+        "mac.recording.microphone_only",
+        defaultValue: "Microphone Only",
+        comment: "Recording input choice that captures only the microphone."
     )
-    static let captureSource = resource(
-        "mac.capture.source",
-        defaultValue: "Screen or Window",
-        comment: "Heading for the selected ScreenCaptureKit source."
+    static let systemAudioOnly = resource(
+        "mac.recording.system_audio_only",
+        defaultValue: "System Audio Only",
+        comment: "Recording input choice that saves only audio from selected Mac content."
     )
-    static let noCaptureSource = resource(
-        "mac.capture.no_source",
-        defaultValue: "Nothing selected yet",
-        comment: "Placeholder before the user selects screen content."
+    static let microphoneAndSystemAudio = resource(
+        "mac.recording.microphone_and_system_audio",
+        defaultValue: "Microphone + System Audio",
+        comment: "Recording input choice that combines microphone and Mac system audio."
     )
-    static let chooseCaptureSource = resource(
-        "mac.capture.choose_source",
-        defaultValue: "Choose…",
-        comment: "Action that opens the system screen-sharing picker."
+    static let chooseSystemAudioSource = resource(
+        "mac.recording.choose_system_audio_source",
+        defaultValue: "Choose App, Window, or Display…",
+        comment: "Action that selects which Mac content supplies system audio."
     )
-    static let captureSourceDetail = resource(
-        "mac.capture.source_detail",
-        defaultValue: "Use the macOS system picker to select a display, an app, or one meeting window.",
-        comment: "Explanation beneath the capture source control."
+    static let systemAudioSource = resource(
+        "mac.recording.system_audio_source",
+        defaultValue: "System audio source",
+        comment: "Label shown beside the selected system-audio source."
     )
-    static let audioTracks = resource(
-        "mac.capture.audio_tracks",
-        defaultValue: "Audio Tracks",
-        comment: "Heading above system and microphone audio options."
+    static let systemAudioLiveCaptionNote = resource(
+        "mac.recording.system_audio_live_caption_note",
+        defaultValue: "The saved audio combines the selected Mac audio with your microphone. Live captions continue to use the microphone.",
+        comment: "Explanation of system-audio recording and live caption behavior."
     )
-    static let systemAudio = resource(
-        "mac.capture.system_audio",
-        defaultValue: "System audio",
-        comment: "Toggle label for system audio capture."
+    static let systemAudioOnlyLiveCaptionNote = resource(
+        "mac.recording.system_audio_only_live_caption_note",
+        defaultValue: "The saved recording contains only audio from the selected Mac content. Live captions still use the microphone, but microphone audio is not included in the saved file.",
+        comment: "Explanation that microphone audio is excluded from a system-audio-only saved recording."
     )
-    static let systemAudioDetail = resource(
-        "mac.capture.system_audio_detail",
-        defaultValue: "Capture meeting audio and keep a separate AAC track.",
-        comment: "Detail for the system audio capture toggle."
+    static let systemAudioSourceSelectionHint = resource(
+        "mac.recording.system_audio_source_selection_hint",
+        defaultValue: "A window captures audio from its owning app. Choose a display when you want all Mac audio.",
+        comment: "Guidance for choosing a ScreenCaptureKit source for system-audio recording."
     )
-    static let microphoneAudio = resource(
-        "mac.capture.microphone_audio",
-        defaultValue: "Microphone",
-        comment: "Toggle label for microphone capture."
+    static let systemAudioUnavailable = resource(
+        "mac.recording.system_audio_unavailable",
+        defaultValue: "System Audio Was Not Recorded",
+        comment: "Alert title when system audio fails but a microphone fallback is available."
     )
-    static let microphoneAudioDetail = resource(
-        "mac.capture.microphone_audio_detail",
-        defaultValue: "Capture your voice as an independent AAC track.",
-        comment: "Detail for the microphone capture toggle."
+    static let saveMicrophoneInstead = resource(
+        "mac.recording.save_microphone_instead",
+        defaultValue: "Save Microphone Recording Instead",
+        comment: "Explicit action that saves the microphone fallback after system audio fails."
     )
-    static let startCapture = resource(
-        "mac.capture.start",
-        defaultValue: "Start Recording",
-        comment: "Action that starts screen capture."
+    static let systemAudioMicrophoneMixFallback = resource(
+        "mac.recording.system_audio_mix_fallback",
+        defaultValue: "The microphone track could not be mixed, so this recording contains system audio only.",
+        comment: "Warning shown when system audio succeeds but mixing the microphone track fails."
     )
-    static let stopCapture = resource(
-        "mac.capture.stop",
-        defaultValue: "Stop Recording",
-        comment: "Action that stops screen capture."
+    static let systemAudioMicrophoneMissing = resource(
+        "mac.recording.system_audio_microphone_missing",
+        defaultValue: "No microphone samples were captured, so this recording contains system audio only.",
+        comment: "Warning shown when a system-audio recording has no microphone samples."
     )
-    static let startingCapture = resource(
-        "mac.capture.starting",
-        defaultValue: "Starting…",
-        comment: "Status while ScreenCaptureKit starts."
+    static let systemAudioNoSamples = resource(
+        "mac.recording.system_audio_no_samples",
+        defaultValue: "No usable system audio was captured. Choose the app, window, or display that is playing audio and try again.",
+        comment: "Error shown when a system-audio recording contains no usable samples."
     )
-    static let savingCapture = resource(
-        "mac.capture.saving",
-        defaultValue: "Saving…",
-        comment: "Status while capture files finish writing."
+    static let systemAudioStorageUnavailable = resource(
+        "mac.recording.system_audio_storage_unavailable",
+        defaultValue: "Live Transcriber could not open temporary storage for the system-audio recording.",
+        comment: "Error shown when temporary system-audio recording storage is unavailable."
     )
-    static let captureIdle = resource(
-        "mac.capture.idle",
-        defaultValue: "Select something to record",
-        comment: "Capture status before a source is selected."
+    static let systemAudioMicrophonePermissionDenied = resource(
+        "mac.recording.system_audio_microphone_permission_denied",
+        defaultValue: "Microphone access is required to combine your voice with system audio.",
+        comment: "Error shown when microphone access is denied for combined system-audio recording."
     )
-    static let captureReady = resource(
-        "mac.capture.ready",
-        defaultValue: "Ready to record",
-        comment: "Capture status after a source is selected."
+    static let systemAudioWriterFailedFormat = resource(
+        "mac.recording.system_audio_writer_failed.format",
+        defaultValue: "The system-audio recording could not be written: %@",
+        comment: "System-audio writer error. Parameter: technical error detail."
     )
-    static let captureRecording = resource(
-        "mac.capture.recording",
-        defaultValue: "Recording",
-        comment: "Capture status while recording is active."
+    static let systemAudioDisplay = resource(
+        "mac.recording.system_audio_display",
+        defaultValue: "Display",
+        comment: "Fallback name for a selected display system-audio source."
     )
-    static let captureComplete = resource(
-        "mac.capture.complete",
-        defaultValue: "Recording saved",
-        comment: "Capture status after recording succeeds."
+    static let systemAudioWindow = resource(
+        "mac.recording.system_audio_window",
+        defaultValue: "Window",
+        comment: "Fallback name for a selected window system-audio source."
     )
-    static let captureFailed = resource(
-        "mac.capture.failed",
-        defaultValue: "Recording failed",
-        comment: "Capture status after recording fails."
+    static let systemAudioApplication = resource(
+        "mac.recording.system_audio_application",
+        defaultValue: "Application",
+        comment: "Fallback name for a selected application system-audio source."
     )
-    static let captureSaved = resource(
-        "mac.capture.saved",
-        defaultValue: "Capture saved",
-        comment: "Heading in the successful capture card."
+    static let systemAudioSelectedContent = resource(
+        "mac.recording.system_audio_selected_content",
+        defaultValue: "Selected Content",
+        comment: "Fallback name for the selected system-audio source."
     )
-    static let savedAssetCount = resource(
-        "mac.capture.saved_asset_count",
-        defaultValue: "%lld assets",
-        comment: "Number of independent files saved for a capture."
+    static let translationUnavailable = resource(
+        "mac.transcription.translation_unavailable",
+        defaultValue: "No additional translation languages are available",
+        comment: "Disabled-state explanation when Apple Translation offers no target languages."
     )
-    static let openLibrary = resource(
-        "mac.capture.open_library",
-        defaultValue: "Open in Library",
-        comment: "Action that opens a completed capture in the library."
+    static let showAudioInFinder = resource(
+        "mac.files.show_audio_in_finder",
+        defaultValue: "Show Audio in Finder",
+        comment: "Action that reveals one recording audio file in Finder."
     )
-    static let newCapture = resource(
-        "mac.capture.new",
-        defaultValue: "New Capture",
-        comment: "Action that resets the capture screen for another recording."
+    static let openRecordingsFolder = resource(
+        "mac.files.open_recordings_folder",
+        defaultValue: "Open Recordings Folder",
+        comment: "Action that opens the current managed recording directory in Finder."
+    )
+    static let helpAndFeedback = resource(
+        "mac.settings.help_and_feedback",
+        defaultValue: "Help",
+        comment: "Settings tab containing feedback and app links."
+    )
+    static let permissionStatus = resource(
+        "mac.permissions.status",
+        defaultValue: "Current Permission Status",
+        comment: "Settings section showing current macOS privacy permission states."
+    )
+    static let permissionAllowed = resource(
+        "mac.permissions.allowed",
+        defaultValue: "Allowed",
+        comment: "A macOS privacy permission is granted."
+    )
+    static let permissionNotRequested = resource(
+        "mac.permissions.not_requested",
+        defaultValue: "Not Requested",
+        comment: "A macOS privacy permission has not been requested."
+    )
+    static let permissionNotGranted = resource(
+        "mac.permissions.not_granted",
+        defaultValue: "Not Granted",
+        comment: "A macOS privacy permission is not currently granted."
+    )
+    static let permissionDenied = resource(
+        "mac.permissions.denied",
+        defaultValue: "Denied",
+        comment: "A macOS privacy permission is denied."
+    )
+    static let openSystemSettings = resource(
+        "mac.permissions.open_system_settings",
+        defaultValue: "Open System Settings",
+        comment: "Action that opens the relevant macOS privacy settings pane."
+    )
+    static let screenRecordingPermission = resource(
+        "mac.permissions.screen_recording",
+        defaultValue: "Screen Recording",
+        comment: "macOS Screen Recording permission name."
+    )
+    static let screenRecordingPermissionUse = resource(
+        "mac.permissions.screen_recording_use",
+        defaultValue: "Screen Recording access is used only to record system audio from the display, app, or window you explicitly select.",
+        comment: "Privacy explanation for macOS Screen Recording access used by system-audio recording."
+    )
+    static let menuBarStatusUse = resource(
+        "mac.permissions.menu_bar_status_use",
+        defaultValue: "The menu-bar item shows transcription status locally and does not send transcript content to a server.",
+        comment: "Privacy explanation for the macOS transcription status menu."
+    )
+    static let remindersPermission = resource(
+        "mac.permissions.reminders",
+        defaultValue: "Reminders",
+        comment: "macOS Reminders permission name."
+    )
+    static let actionFailed = resource(
+        "mac.action.failed",
+        defaultValue: "Operation Failed",
+        comment: "Generic alert title when a library action fails on macOS."
     )
     static let settingsTitle = resource(
         "mac.settings.title",
         defaultValue: "Settings",
         comment: "Title of the macOS settings window."
     )
-    static let foundation = resource(
-        "mac.settings.foundation",
-        defaultValue: "Foundation",
-        comment: "Settings section describing the macOS foundation state."
+    static let transcriptionStatusIdle = resource(
+        "mac.status.transcription.idle",
+        defaultValue: "No transcription in progress",
+        comment: "Menu-bar status shown when live transcription is idle."
     )
-    static let platform = resource(
-        "mac.settings.platform",
-        defaultValue: "Platform",
-        comment: "Settings label for the app platform."
+    static let transcriptionLineCountFormat = resource(
+        "mac.status.transcription.line_count.format",
+        defaultValue: "%lld transcript lines",
+        comment: "Menu-bar live transcription line count. Parameter: line count."
     )
-    static let nativeMacOS = resource(
-        "mac.settings.native_macos",
-        defaultValue: "Native macOS",
-        comment: "Settings value confirming this is a native macOS app."
-    )
-    static let domainSchema = resource(
-        "mac.settings.domain_schema",
-        defaultValue: "Domain Schema",
-        comment: "Settings label for the shared cross-platform domain schema version."
+    static let showApplication = resource(
+        "mac.status.show_application",
+        defaultValue: "Show Live Transcriber",
+        comment: "Menu-bar action that brings the main app window forward."
     )
 }

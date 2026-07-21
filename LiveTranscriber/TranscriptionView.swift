@@ -6,14 +6,6 @@ import TranscriberDomain
 import Translation
 import UIKit
 
-private func localized(_ resource: LocalizedStringResource) -> String {
-    String(localized: resource)
-}
-
-private func localizedFormat(_ resource: LocalizedStringResource, _ arguments: CVarArg...) -> String {
-    String(format: String(localized: resource), arguments: arguments)
-}
-
 struct TranscriptionView: View {
     @Environment(\.colorScheme) private var colorScheme
     @Environment(\.accessibilityReduceMotion) private var reduceMotion

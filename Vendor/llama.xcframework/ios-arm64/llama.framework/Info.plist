@@ -23,8 +23,7 @@
     <key>CFBundleSupportedPlatforms</key>
     <array>
         <string>iPhoneOS</string>
-    </array>
-    <key>UIDeviceFamily</key>
+    </array>    <key>UIDeviceFamily</key>
     <array>
         <integer>1</integer>
         <integer>2</integer>

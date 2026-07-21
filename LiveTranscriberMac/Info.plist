@@ -2,10 +2,28 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
+	<key>ATSApplicationFontsPath</key>
+	<string>.</string>
 	<key>CFBundleDevelopmentRegion</key>
 	<string>$(DEVELOPMENT_LANGUAGE)</string>
 	<key>CFBundleDisplayName</key>
 	<string>Live Transcriber</string>
+	<key>CFBundleDocumentTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleTypeName</key>
+			<string>Audio or Video Recording</string>
+			<key>CFBundleTypeRole</key>
+			<string>Viewer</string>
+			<key>LSHandlerRank</key>
+			<string>Alternate</string>
+			<key>LSItemContentTypes</key>
+			<array>
+				<string>public.audio</string>
+				<string>public.movie</string>
+			</array>
+		</dict>
+	</array>
 	<key>CFBundleExecutable</key>
 	<string>$(EXECUTABLE_NAME)</string>
 	<key>CFBundleIdentifier</key>
@@ -20,18 +38,35 @@
 	<string>$(MARKETING_VERSION)</string>
 	<key>CFBundleVersion</key>
 	<string>$(CURRENT_PROJECT_VERSION)</string>
+	<key>CFBundleURLTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleURLName</key>
+			<string>com.iamwilliamli.LiveTranscriber.mac</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>livetranscriber</string>
+			</array>
+		</dict>
+	</array>
 	<key>LSApplicationCategoryType</key>
 	<string>public.app-category.productivity</string>
 	<key>LSMinimumSystemVersion</key>
 	<string>$(MACOSX_DEPLOYMENT_TARGET)</string>
 	<key>NSHighResolutionCapable</key>
 	<true/>
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>Live Transcriber can attach your current location to a recording when you choose to include it.</string>
 	<key>NSMicrophoneUsageDescription</key>
-	<string>Live Transcriber uses the microphone only when you include your voice in a capture.</string>
-	<key>NSScreenCaptureUsageDescription</key>
-	<string>Live Transcriber records only the screen, app, or window you select for your meeting capture.</string>
+	<string>Live Transcriber uses the microphone for live transcription and when you choose to include your voice in a recording.</string>
 	<key>NSPrincipalClass</key>
 	<string>NSApplication</string>
+	<key>NSRemindersFullAccessUsageDescription</key>
+	<string>Live Transcriber adds the meeting action items you choose to Reminders.</string>
+	<key>NSScreenCaptureUsageDescription</key>
+	<string>Live Transcriber records system audio only from the display, app, or window you select.</string>
+	<key>NSSpeechRecognitionUsageDescription</key>
+	<string>Live Transcriber transcribes your recordings on this Mac with Apple speech recognition.</string>
 	<key>NSSupportsAutomaticTermination</key>
 	<true/>
 	<key>NSSupportsSuddenTermination</key>

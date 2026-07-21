@@ -1,5 +1,0 @@
----
-triple:          'arm64-apple-darwin'
-binary-path:     'Vendor/llama.xcframework/ios-arm64/llama.framework/llama'
-relocations:     []
-...

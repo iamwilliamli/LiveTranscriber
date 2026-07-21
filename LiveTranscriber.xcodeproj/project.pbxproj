@@ -7,6 +7,13 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		7B0000000000000000000051 /* L10nSupport.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7B0000000000000000001051 /* L10nSupport.swift */; };
+		7B0000000000000000000052 /* RecordingCategoryModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7B0000000000000000001052 /* RecordingCategoryModel.swift */; };
+		7B0000000000000000000053 /* TranscriptStorageModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7B0000000000000000001053 /* TranscriptStorageModel.swift */; };
+		7B0000000000000000000054 /* RecordingAudioFileInfo.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7B0000000000000000001054 /* RecordingAudioFileInfo.swift */; };
+		7B0000000000000000000055 /* RecordingPlaybackController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7B0000000000000000001055 /* RecordingPlaybackController.swift */; };
+		7B0000000000000000000056 /* RecordingWaveformSampling.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7B0000000000000000001056 /* RecordingWaveformSampling.swift */; };
+		7B0000000000000000000050 /* AppPasteboard.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7B0000000000000000001050 /* AppPasteboard.swift */; };
 		7B0000000000000000000001 /* LiveTranscriberApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7B0000000000000000001001 /* LiveTranscriberApp.swift */; };
 		7B0000000000000000000002 /* AppTheme.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7B0000000000000000001002 /* AppTheme.swift */; };
 		7B0000000000000000000003 /* AppTypography.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7B0000000000000000001003 /* AppTypography.swift */; };
@@ -127,6 +134,13 @@
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
+		7B0000000000000000001051 /* L10nSupport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = L10nSupport.swift; sourceTree = "<group>"; };
+		7B0000000000000000001052 /* RecordingCategoryModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecordingCategoryModel.swift; sourceTree = "<group>"; };
+		7B0000000000000000001053 /* TranscriptStorageModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TranscriptStorageModel.swift; sourceTree = "<group>"; };
+		7B0000000000000000001054 /* RecordingAudioFileInfo.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecordingAudioFileInfo.swift; sourceTree = "<group>"; };
+		7B0000000000000000001055 /* RecordingPlaybackController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecordingPlaybackController.swift; sourceTree = "<group>"; };
+		7B0000000000000000001056 /* RecordingWaveformSampling.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecordingWaveformSampling.swift; sourceTree = "<group>"; };
+		7B0000000000000000001050 /* AppPasteboard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppPasteboard.swift; sourceTree = "<group>"; };
 		7B0000000000000000001000 /* LiveTranscriber.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = LiveTranscriber.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		7B0000000000000000001001 /* LiveTranscriberApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LiveTranscriberApp.swift; sourceTree = "<group>"; };
 		7B0000000000000000001002 /* AppTheme.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppTheme.swift; sourceTree = "<group>"; };
@@ -246,6 +260,7 @@
 			isa = PBXGroup;
 			children = (
 				7B0000000000000000003002 /* LiveTranscriber */,
+				7B0000000000000000003012 /* SharedApp */,
 				7B0000000000000000003004 /* LiveTranscriberWidget */,
 				7B0000000000000000003005 /* LiveTranscriberStructuredFoundationModels */,
 				7B0000000000000000003011 /* Vendor */,
@@ -257,11 +272,40 @@
 			isa = PBXGroup;
 			children = (
 				7B0000000000000000001001 /* LiveTranscriberApp.swift */,
-				7B0000000000000000001002 /* AppTheme.swift */,
-				7B0000000000000000001003 /* AppTypography.swift */,
 				7B0000000000000000001004 /* ContentView.swift */,
 				7B0000000000000000001033 /* OnboardingIntroView.swift */,
 				7B0000000000000000001005 /* TranscriptionView.swift */,
+				7B0000000000000000001020 /* HapticFeedback.swift */,
+				7B00000000000000000010C1 /* LaunchSplashView.swift */,
+				7B00000000000000000010C2 /* QuickRecordingControlIntent.swift */,
+				7B0000000000000000001017 /* RecordingsView.swift */,
+				7B0000000000000000001018 /* SettingsView.swift */,
+				7B0000000000000000001019 /* TranscriptionActivityAttributes.swift */,
+				7B000000000000000000101A /* TranscriptionLiveActivityCoordinator.swift */,
+				7B0000000000000000001008 /* Assets.xcassets */,
+				7B00000000000000000010C3 /* ControlCenter.xcstrings */,
+				7B0000000000000000003006 /* InfoPlist.strings */,
+				7B00000000000000000030D0 /* AppShortcuts.strings */,
+				7B000000000000000000100A /* Info.plist */,
+				7B000000000000000000101E /* LiveTranscriber.entitlements */,
+				7B0000000000000000001009 /* PrivacyInfo.xcprivacy */,
+			);
+			path = LiveTranscriber;
+			sourceTree = "<group>";
+		};
+		7B0000000000000000003012 /* SharedApp */ = {
+			isa = PBXGroup;
+			children = (
+				7B0000000000000000001050 /* AppPasteboard.swift */,
+				7B0000000000000000001037 /* RecordingSiriIntegration.swift */,
+				7B0000000000000000001051 /* L10nSupport.swift */,
+				7B0000000000000000001052 /* RecordingCategoryModel.swift */,
+				7B0000000000000000001053 /* TranscriptStorageModel.swift */,
+				7B0000000000000000001054 /* RecordingAudioFileInfo.swift */,
+				7B0000000000000000001055 /* RecordingPlaybackController.swift */,
+				7B0000000000000000001056 /* RecordingWaveformSampling.swift */,
+				7B0000000000000000001002 /* AppTheme.swift */,
+				7B0000000000000000001003 /* AppTypography.swift */,
 				7B0000000000000000001006 /* LiveTranscriptionManager.swift */,
 				7B0000000000000000001030 /* AppleTranslationLanguages.swift */,
 				7B0000000000000000001031 /* AppleSpeechTranscriptionSupport.swift */,
@@ -274,13 +318,8 @@
 				7B0000000000000000001035 /* LocalLlamaBridge.mm */,
 				7B000000000000000000102E /* LiveTranscriber-Bridging-Header.h */,
 				7B0000000000000000001015 /* TranscriptionLanguage.swift */,
-				7B0000000000000000001020 /* HapticFeedback.swift */,
 				7B0000000000000000001021 /* L10n.swift */,
-				7B00000000000000000010C1 /* LaunchSplashView.swift */,
-				7B00000000000000000010C2 /* QuickRecordingControlIntent.swift */,
 				7B0000000000000000001016 /* RecordingStore.swift */,
-				7B0000000000000000001037 /* RecordingSiriIntegration.swift */,
-				7B0000000000000000001017 /* RecordingsView.swift */,
 				7B0000000000000000001038 /* RecordingChatView.swift */,
 				7B0000000000000000001039 /* TranscriptContextBuilder.swift */,
 				7B000000000000000000103A /* MeetingAnalysisService.swift */,
@@ -291,22 +330,12 @@
 				7B000000000000000000103F /* Qwen3ASRTranscription.swift */,
 				7B0000000000000000001040 /* MOSSLocalTranscription.swift */,
 				7B000000000000000000102A /* TranscriptLineEditSheet.swift */,
-				7B0000000000000000001018 /* SettingsView.swift */,
-				7B0000000000000000001019 /* TranscriptionActivityAttributes.swift */,
-				7B000000000000000000101A /* TranscriptionLiveActivityCoordinator.swift */,
 				7B0000000000000000001007 /* EmptyStateView.swift */,
-				7B0000000000000000001008 /* Assets.xcassets */,
 				7B0000000000000000003010 /* Fonts */,
 				7B00000000000000000010E0 /* AudioEvents.xcstrings */,
 				7B0000000000000000001022 /* Semantic.xcstrings */,
-				7B00000000000000000010C3 /* ControlCenter.xcstrings */,
-				7B0000000000000000003006 /* InfoPlist.strings */,
-				7B00000000000000000030D0 /* AppShortcuts.strings */,
-				7B000000000000000000100A /* Info.plist */,
-				7B000000000000000000101E /* LiveTranscriber.entitlements */,
-				7B0000000000000000001009 /* PrivacyInfo.xcprivacy */,
 			);
-			path = LiveTranscriber;
+			path = SharedApp;
 			sourceTree = "<group>";
 		};
 		7B0000000000000000003003 /* Products */ = {
@@ -520,6 +549,13 @@
 			buildActionMask = 2147483647;
 			files = (
 				7B0000000000000000000001 /* LiveTranscriberApp.swift in Sources */,
+				7B0000000000000000000050 /* AppPasteboard.swift in Sources */,
+				7B0000000000000000000051 /* L10nSupport.swift in Sources */,
+				7B0000000000000000000052 /* RecordingCategoryModel.swift in Sources */,
+				7B0000000000000000000053 /* TranscriptStorageModel.swift in Sources */,
+				7B0000000000000000000054 /* RecordingAudioFileInfo.swift in Sources */,
+				7B0000000000000000000055 /* RecordingPlaybackController.swift in Sources */,
+				7B0000000000000000000056 /* RecordingWaveformSampling.swift in Sources */,
 				7B0000000000000000000002 /* AppTheme.swift in Sources */,
 				7B0000000000000000000003 /* AppTypography.swift in Sources */,
 				7B0000000000000000000004 /* ContentView.swift in Sources */,
@@ -786,7 +822,7 @@
 				"SWIFT_ACTIVE_COMPILATION_CONDITIONS[sdk=iphoneos27.*]" = "DEBUG HAS_IOS27_SDK";
 				"SWIFT_ACTIVE_COMPILATION_CONDITIONS[sdk=iphonesimulator27.*]" = "DEBUG HAS_IOS27_SDK";
 				SWIFT_EMIT_LOC_STRINGS = YES;
-				SWIFT_OBJC_BRIDGING_HEADER = "LiveTranscriber/LiveTranscriber-Bridging-Header.h";
+				SWIFT_OBJC_BRIDGING_HEADER = "SharedApp/LiveTranscriber-Bridging-Header.h";
 				SWIFT_VERSION = 5.0;
 				TARGETED_DEVICE_FAMILY = "1,2";
 			};
@@ -815,7 +851,7 @@
 				"SWIFT_ACTIVE_COMPILATION_CONDITIONS[sdk=iphoneos27.*]" = HAS_IOS27_SDK;
 				"SWIFT_ACTIVE_COMPILATION_CONDITIONS[sdk=iphonesimulator27.*]" = HAS_IOS27_SDK;
 				SWIFT_EMIT_LOC_STRINGS = YES;
-				SWIFT_OBJC_BRIDGING_HEADER = "LiveTranscriber/LiveTranscriber-Bridging-Header.h";
+				SWIFT_OBJC_BRIDGING_HEADER = "SharedApp/LiveTranscriber-Bridging-Header.h";
 				SWIFT_VERSION = 5.0;
 				TARGETED_DEVICE_FAMILY = "1,2";
 			};

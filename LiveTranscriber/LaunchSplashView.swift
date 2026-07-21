@@ -231,7 +231,9 @@ struct LaunchSplashView: View {
             withAnimation(.easeIn(duration: 0.50)) { boxExited = true }
 
             guard await waitUntil(1.50) else { return }
+#if os(iOS)
             HapticFeedback.softImpact(intensity: 0.55)
+#endif
 
             guard await waitUntil(1.55) else { return }
             ringOpacity = 0.7
@@ -247,7 +249,9 @@ struct LaunchSplashView: View {
 
             guard await waitUntil(1.75) else { return }
             withAnimation(.easeInOut(duration: 0.15)) { antennaAngle = 10 }
+#if os(iOS)
             HapticFeedback.softImpact(intensity: 0.40)
+#endif
 
             guard await waitUntil(1.80) else { return }
             withAnimation(.spring(duration: 0.50, bounce: 0.22)) { pillsVisible[0] = true }

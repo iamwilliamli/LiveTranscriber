@@ -22,7 +22,7 @@ The repository has these main runtime areas:
 4. `RecordingsView` owns the file-library UI: search, import picker, row actions, swipe actions, detail navigation, playback, transcript seek, sharing, copy, delete, re-transcribe, and summary/tag generation.
 5. `AppTheme`, `AppTypography`, `EmptyStateView`, and `HapticFeedback` define the shared visual and tactile design language.
 6. `LiveTranscriberWidget` renders ActivityKit content for Lock Screen and Dynamic Island.
-7. `LiveTranscriberMac` owns the native ScreenCaptureKit capture workspace and shared recording-library playback.
+7. `LiveTranscriberMac` owns the native macOS UI and the ScreenCaptureKit system-audio adapter; recordings and playback use the shared `RecordingStore` stack.
 8. `Packages/TranscriberDomain` owns platform-neutral recording values and service boundaries used by both apps.
 
 ## Build Verification

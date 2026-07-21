@@ -4,54 +4,99 @@ options:
   bundleIdPrefix: com.iamwilliamli
   createIntermediateGroups: true
   deploymentTarget:
-    macOS: "15.0"
+    macOS: "26.0"
   groupSortPosition: top
 
 settings:
   base:
     DEVELOPMENT_TEAM: F8M4T754W4
     SWIFT_VERSION: "5.0"
-    MACOSX_DEPLOYMENT_TARGET: "15.0"
+    MACOSX_DEPLOYMENT_TARGET: "26.0"
 
 packages:
   TranscriberDomain:
     path: ../Packages/TranscriberDomain
+  MLXAudioMOSS:
+    path: ../Vendor/MLXAudioMOSS
+  speech-swift:
+    url: https://github.com/soniqo/speech-swift
+    revision: a7fd06d6f68f167203fb995f7bdb8bc9ed10c179
 
 targets:
   LiveTranscriberMac:
     type: application
     platform: macOS
-    deploymentTarget: "15.0"
+    deploymentTarget: "26.0"
     sources:
       - path: Sources
-    resources:
+      - path: ../LiveTranscriber/LaunchSplashView.swift
+      - path: ../SharedApp
+        excludes:
+          - AudioEvents.xcstrings
+          - Semantic.xcstrings
+          - Fonts
       - path: Resources
+        buildPhase: resources
+      - path: ../SharedApp/AudioEvents.xcstrings
+        buildPhase: resources
+      - path: ../SharedApp/Semantic.xcstrings
+        buildPhase: resources
+      - path: ../SharedApp/Fonts
+        includes:
+          - "*.ttf"
+        buildPhase: resources
+      - path: ../LiveTranscriber/Assets.xcassets
+        buildPhase: resources
     dependencies:
       - package: TranscriberDomain
       - package: TranscriberDomain
         product: TranscriberCore
+      - package: MLXAudioMOSS
+        product: MLXAudioCore
+      - package: MLXAudioMOSS
+        product: MLXAudioSTT
+      - package: speech-swift
+        product: AudioCommon
+      - package: speech-swift
+        product: Qwen3ASR
+      - package: speech-swift
+        product: SpeechVAD
+      - framework: ../Vendor/whisper.xcframework
+        embed: true
+        codeSign: true
+      - framework: ../Vendor/llama.xcframework
+        embed: true
+        codeSign: true
     settings:
       base:
+        ARCHS: arm64
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
         CODE_SIGN_ENTITLEMENTS: LiveTranscriberMac.entitlements
         CODE_SIGN_STYLE: Automatic
         CURRENT_PROJECT_VERSION: 1
         ENABLE_HARDENED_RUNTIME: YES
         GENERATE_INFOPLIST_FILE: NO
         INFOPLIST_FILE: Info.plist
+        LD_RUNPATH_SEARCH_PATHS:
+          - "$(inherited)"
+          - "@executable_path/../Frameworks"
         MARKETING_VERSION: 1.0
         PRODUCT_BUNDLE_IDENTIFIER: com.iamwilliamli.LiveTranscriber.mac
         PRODUCT_MODULE_NAME: LiveTranscriberMac
         PRODUCT_NAME: Live Transcriber
         SWIFT_EMIT_LOC_STRINGS: YES
+        SWIFT_OBJC_BRIDGING_HEADER: ../SharedApp/LiveTranscriber-Bridging-Header.h
+        "SWIFT_ACTIVE_COMPILATION_CONDITIONS[sdk=macosx27.*]": "$(inherited) HAS_IOS27_SDK"
 
   LiveTranscriberMacTests:
     type: bundle.unit-test
     platform: macOS
-    deploymentTarget: "15.0"
+    deploymentTarget: "26.0"
     sources:
       - path: Tests
     dependencies:
       - target: LiveTranscriberMac
+      - package: TranscriberDomain
     settings:
       base:
         BUNDLE_LOADER: "$(TEST_HOST)"

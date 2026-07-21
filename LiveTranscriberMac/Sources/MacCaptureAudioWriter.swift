@@ -3,7 +3,30 @@ import CoreMedia
 import Foundation
 import ScreenCaptureKit
 
-// Every mutable operation is serialized by MacScreenCaptureController.sampleQueue.
+enum MacCaptureError: LocalizedError {
+    case recordingDirectoryUnavailable
+    case microphonePermissionDenied
+    case noAudioSamples
+    case audioWriterFailed(String)
+
+    var errorDescription: String? {
+        switch self {
+        case .recordingDirectoryUnavailable:
+            return String(localized: MacL10n.systemAudioStorageUnavailable)
+        case .microphonePermissionDenied:
+            return String(localized: MacL10n.systemAudioMicrophonePermissionDenied)
+        case .noAudioSamples:
+            return String(localized: MacL10n.systemAudioNoSamples)
+        case .audioWriterFailed(let message):
+            return String(
+                format: String(localized: MacL10n.systemAudioWriterFailedFormat),
+                message
+            )
+        }
+    }
+}
+
+// Every mutable operation is serialized by the system-audio controller's sample queue.
 final class MacCaptureAudioWriter: @unchecked Sendable {
     let outputURL: URL
 
@@ -120,6 +143,8 @@ final class MacCaptureAudioWriter: @unchecked Sendable {
 final class MacCaptureSampleRouter: NSObject, SCStreamOutput, @unchecked Sendable {
     let systemAudioWriter: MacCaptureAudioWriter?
     let microphoneAudioWriter: MacCaptureAudioWriter?
+    private let stateLock = NSLock()
+    private var isPaused = false
 
     init(
         systemAudioWriter: MacCaptureAudioWriter?,
@@ -129,11 +154,24 @@ final class MacCaptureSampleRouter: NSObject, SCStreamOutput, @unchecked Sendabl
         self.microphoneAudioWriter = microphoneAudioWriter
     }
 
+    func setPaused(_ paused: Bool) {
+        stateLock.lock()
+        isPaused = paused
+        stateLock.unlock()
+    }
+
     func stream(
         _ stream: SCStream,
         didOutputSampleBuffer sampleBuffer: CMSampleBuffer,
         of type: SCStreamOutputType
     ) {
+        stateLock.lock()
+        let shouldDropSample = isPaused
+        stateLock.unlock()
+        guard !shouldDropSample else {
+            return
+        }
+
         switch type {
         case .audio:
             systemAudioWriter?.append(sampleBuffer)
