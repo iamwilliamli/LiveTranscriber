@@ -3388,6 +3388,48 @@
         }
       }
     },
+    "import.error.invalid_audio_file" : {
+      "comment" : "Error shown when an imported audio file cannot be validated or normalized for playback.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Die ausgewählte Audiodatei ist unvollständig oder verwendet eine nicht unterstützte Codierung. Exportiere sie als M4A oder MP3 und importiere sie erneut."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The selected audio file is incomplete or uses an unsupported encoding. Try exporting it as M4A or MP3, then import it again."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "選択したオーディオファイルは不完全か、対応していないエンコード形式です。M4AまたはMP3として書き出してから、もう一度読み込んでください。"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Het geselecteerde audiobestand is onvolledig of gebruikt een niet-ondersteunde codering. Exporteer het als M4A of MP3 en importeer het opnieuw."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "所选音频文件不完整或使用了不受支持的编码。请将其导出为 M4A 或 MP3 后重新导入。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "所選音訊檔案不完整或使用了不支援的編碼。請將其輸出為 M4A 或 MP3 後重新匯入。"
+          }
+        }
+      }
+    },
     "import.error.duplicate_recording_name" : {
       "comment" : "Recording detail validation error.",
       "extractionState" : "stale",
