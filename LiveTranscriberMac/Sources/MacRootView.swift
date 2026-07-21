@@ -51,26 +51,11 @@ struct MacRootView: View {
         } detail: {
             switch selection ?? .library {
             case .library:
-                MacLibraryFoundationView()
+                MacLibraryView()
             case .capture:
                 MacCaptureFoundationView()
             }
         }
-    }
-}
-
-private struct MacLibraryFoundationView: View {
-    var body: some View {
-        ContentUnavailableView {
-            Label {
-                Text(MacL10n.libraryReady)
-            } icon: {
-                Image(systemName: "rectangle.stack.badge.plus")
-            }
-        } description: {
-            Text(MacL10n.libraryReadyDetail)
-        }
-        .navigationTitle(Text(MacL10n.libraryTitle))
     }
 }
 

@@ -51,6 +51,66 @@ enum MacL10n {
         defaultValue: "Shared recording access will be connected after the cross-platform domain package is in place.",
         comment: "Empty-state detail before shared recording storage is connected."
     )
+    static let loadingLibrary = resource(
+        "mac.library.loading",
+        defaultValue: "Loading recordings…",
+        comment: "Progress label while the macOS recording library loads."
+    )
+    static let refreshLibrary = resource(
+        "mac.library.refresh",
+        defaultValue: "Refresh Library",
+        comment: "Action that refreshes the macOS recording library."
+    )
+    static let librarySource = resource(
+        "mac.library.source",
+        defaultValue: "Library Source",
+        comment: "Menu title for choosing the macOS recording library source."
+    )
+    static let chooseFolder = resource(
+        "mac.library.choose_folder",
+        defaultValue: "Choose Recording Folder…",
+        comment: "Action that lets the user choose a recording folder."
+    )
+    static let useICloud = resource(
+        "mac.library.use_icloud",
+        defaultValue: "Use iCloud Library",
+        comment: "Action that switches the macOS library back to iCloud."
+    )
+    static let noRecordings = resource(
+        "mac.library.empty",
+        defaultValue: "No recordings found",
+        comment: "Empty-state title when a recording folder contains no media."
+    )
+    static let noRecordingsDetail = resource(
+        "mac.library.empty_detail",
+        defaultValue: "Recordings synced from iPhone will appear here, or you can choose another recording folder.",
+        comment: "Empty-state explanation for the macOS recording library."
+    )
+    static let libraryUnavailable = resource(
+        "mac.library.unavailable",
+        defaultValue: "Recording library unavailable",
+        comment: "Error-state title when the recording library cannot be opened."
+    )
+    static let preparingPlayback = resource(
+        "mac.library.preparing_playback",
+        defaultValue: "Preparing playback…",
+        comment: "Progress label while a recording downloads or opens."
+    )
+    static let assets = resource(
+        "mac.library.assets",
+        defaultValue: "Assets",
+        comment: "Heading above a recording's asset list."
+    )
+    static let transcript = resource(
+        "mac.library.transcript",
+        defaultValue: "Transcript",
+        comment: "Heading above a recording transcript."
+    )
+    static let noTranscript = resource(
+        "mac.library.no_transcript",
+        defaultValue: "No transcript is available for this recording.",
+        comment: "Placeholder when a recording has no transcript asset."
+    )
     static let captureTitle = resource(
         "mac.capture.title",
         defaultValue: "Screen & Window Capture",

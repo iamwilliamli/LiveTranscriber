@@ -44,6 +44,21 @@ targets:
         PRODUCT_NAME: Live Transcriber
         SWIFT_EMIT_LOC_STRINGS: YES
 
+  LiveTranscriberMacTests:
+    type: bundle.unit-test
+    platform: macOS
+    deploymentTarget: "15.0"
+    sources:
+      - path: Tests
+    dependencies:
+      - target: LiveTranscriberMac
+    settings:
+      base:
+        BUNDLE_LOADER: "$(TEST_HOST)"
+        GENERATE_INFOPLIST_FILE: YES
+        PRODUCT_BUNDLE_IDENTIFIER: com.iamwilliamli.LiveTranscriber.mac.tests
+        TEST_HOST: "$(BUILT_PRODUCTS_DIR)/Live Transcriber.app/Contents/MacOS/Live Transcriber"
+
 schemes:
   LiveTranscriberMac:
     build:
@@ -57,3 +72,16 @@ schemes:
       config: Debug
     archive:
       config: Release
+    test:
+      config: Debug
+      targets:
+        - LiveTranscriberMacTests
+
+  LiveTranscriberMacTests:
+    build:
+      targets:
+        LiveTranscriberMacTests: all
+    test:
+      config: Debug
+      targets:
+        - LiveTranscriberMacTests

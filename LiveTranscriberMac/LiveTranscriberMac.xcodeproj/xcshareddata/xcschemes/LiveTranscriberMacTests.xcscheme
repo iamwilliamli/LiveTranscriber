@@ -15,9 +15,9 @@
             buildForAnalyzing = "YES">
             <BuildableReference
                BuildableIdentifier = "primary"
-               BlueprintIdentifier = "785D1AA9E16D037234E434C6"
-               BuildableName = "LiveTranscriberMac.app"
-               BlueprintName = "LiveTranscriberMac"
+               BlueprintIdentifier = "F010A0C149C1874C1983E956"
+               BuildableName = "LiveTranscriberMacTests.xctest"
+               BlueprintName = "LiveTranscriberMacTests"
                ReferencedContainer = "container:LiveTranscriberMac.xcodeproj">
             </BuildableReference>
          </BuildActionEntry>
@@ -32,9 +32,9 @@
       <MacroExpansion>
          <BuildableReference
             BuildableIdentifier = "primary"
-            BlueprintIdentifier = "785D1AA9E16D037234E434C6"
-            BuildableName = "LiveTranscriberMac.app"
-            BlueprintName = "LiveTranscriberMac"
+            BlueprintIdentifier = "F010A0C149C1874C1983E956"
+            BuildableName = "LiveTranscriberMacTests.xctest"
+            BlueprintName = "LiveTranscriberMacTests"
             ReferencedContainer = "container:LiveTranscriberMac.xcodeproj">
          </BuildableReference>
       </MacroExpansion>
@@ -64,18 +64,15 @@
       debugDocumentVersioning = "YES"
       debugServiceExtension = "internal"
       allowLocationSimulation = "YES">
-      <BuildableProductRunnable
-         runnableDebuggingMode = "0">
+      <MacroExpansion>
          <BuildableReference
             BuildableIdentifier = "primary"
-            BlueprintIdentifier = "785D1AA9E16D037234E434C6"
-            BuildableName = "LiveTranscriberMac.app"
-            BlueprintName = "LiveTranscriberMac"
+            BlueprintIdentifier = "F010A0C149C1874C1983E956"
+            BuildableName = "LiveTranscriberMacTests.xctest"
+            BlueprintName = "LiveTranscriberMacTests"
             ReferencedContainer = "container:LiveTranscriberMac.xcodeproj">
          </BuildableReference>
-      </BuildableProductRunnable>
-      <CommandLineArguments>
-      </CommandLineArguments>
+      </MacroExpansion>
    </LaunchAction>
    <ProfileAction
       buildConfiguration = "Release"
@@ -83,18 +80,15 @@
       savedToolIdentifier = ""
       useCustomWorkingDirectory = "NO"
       debugDocumentVersioning = "YES">
-      <BuildableProductRunnable
-         runnableDebuggingMode = "0">
+      <MacroExpansion>
          <BuildableReference
             BuildableIdentifier = "primary"
-            BlueprintIdentifier = "785D1AA9E16D037234E434C6"
-            BuildableName = "LiveTranscriberMac.app"
-            BlueprintName = "LiveTranscriberMac"
+            BlueprintIdentifier = "F010A0C149C1874C1983E956"
+            BuildableName = "LiveTranscriberMacTests.xctest"
+            BlueprintName = "LiveTranscriberMacTests"
             ReferencedContainer = "container:LiveTranscriberMac.xcodeproj">
          </BuildableReference>
-      </BuildableProductRunnable>
-      <CommandLineArguments>
-      </CommandLineArguments>
+      </MacroExpansion>
    </ProfileAction>
    <AnalyzeAction
       buildConfiguration = "Debug">
