@@ -74,6 +74,9 @@
 		7B000000000000000000003B /* Qwen3ASR in Frameworks */ = {isa = PBXBuildFile; productRef = 7B000000000000000000B002 /* Qwen3ASR */; };
 		7B000000000000000000003C /* SpeechVAD in Frameworks */ = {isa = PBXBuildFile; productRef = 7B000000000000000000B003 /* SpeechVAD */; };
 		7B000000000000000000003D /* AudioCommon in Frameworks */ = {isa = PBXBuildFile; productRef = 7B000000000000000000B004 /* AudioCommon */; };
+		7B000000000000000000003E /* MOSSLocalTranscription.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7B0000000000000000001040 /* MOSSLocalTranscription.swift */; };
+		7B000000000000000000003F /* MLXAudioSTT in Frameworks */ = {isa = PBXBuildFile; productRef = 7B000000000000000000B006 /* MLXAudioSTT */; };
+		7B0000000000000000000040 /* MLXAudioCore in Frameworks */ = {isa = PBXBuildFile; productRef = 7B000000000000000000B007 /* MLXAudioCore */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -197,6 +200,7 @@
 		7B000000000000000000103D /* RecordingSoundAnalysisService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecordingSoundAnalysisService.swift; sourceTree = "<group>"; };
 		7B000000000000000000103E /* GeminiCloudService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GeminiCloudService.swift; sourceTree = "<group>"; };
 		7B000000000000000000103F /* Qwen3ASRTranscription.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Qwen3ASRTranscription.swift; sourceTree = "<group>"; };
+		7B0000000000000000001040 /* MOSSLocalTranscription.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MOSSLocalTranscription.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -204,6 +208,8 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				7B0000000000000000000040 /* MLXAudioCore in Frameworks */,
+				7B000000000000000000003F /* MLXAudioSTT in Frameworks */,
 				7B000000000000000000003D /* AudioCommon in Frameworks */,
 				7B000000000000000000003B /* Qwen3ASR in Frameworks */,
 				7B000000000000000000003C /* SpeechVAD in Frameworks */,
@@ -276,6 +282,7 @@
 				7B000000000000000000103D /* RecordingSoundAnalysisService.swift */,
 				7B000000000000000000103E /* GeminiCloudService.swift */,
 				7B000000000000000000103F /* Qwen3ASRTranscription.swift */,
+				7B0000000000000000001040 /* MOSSLocalTranscription.swift */,
 				7B000000000000000000102A /* TranscriptLineEditSheet.swift */,
 				7B0000000000000000001018 /* SettingsView.swift */,
 				7B0000000000000000001019 /* TranscriptionActivityAttributes.swift */,
@@ -368,6 +375,8 @@
 				7B000000000000000000B002 /* Qwen3ASR */,
 				7B000000000000000000B003 /* SpeechVAD */,
 				7B000000000000000000B004 /* AudioCommon */,
+				7B000000000000000000B006 /* MLXAudioSTT */,
+				7B000000000000000000B007 /* MLXAudioCore */,
 			);
 			productName = LiveTranscriber;
 			productReference = 7B0000000000000000001000 /* LiveTranscriber.app */;
@@ -443,6 +452,7 @@
 			mainGroup = 7B0000000000000000003001;
 			packageReferences = (
 				7B000000000000000000B001 /* XCRemoteSwiftPackageReference "speech-swift" */,
+				7B000000000000000000B005 /* XCLocalSwiftPackageReference "MLXAudioMOSS" */,
 			);
 			productRefGroup = 7B0000000000000000003003 /* Products */;
 			projectDirPath = "";
@@ -526,6 +536,7 @@
 				7B0000000000000000000038 /* RecordingSoundAnalysisService.swift in Sources */,
 				7B0000000000000000000039 /* GeminiCloudService.swift in Sources */,
 				7B000000000000000000003A /* Qwen3ASRTranscription.swift in Sources */,
+				7B000000000000000000003E /* MOSSLocalTranscription.swift in Sources */,
 				7B0000000000000000000026 /* TranscriptLineEditSheet.swift in Sources */,
 				7B0000000000000000000014 /* SettingsView.swift in Sources */,
 				7B0000000000000000000015 /* TranscriptionActivityAttributes.swift in Sources */,
@@ -620,6 +631,13 @@
 		};
 /* End XCRemoteSwiftPackageReference section */
 
+/* Begin XCLocalSwiftPackageReference section */
+		7B000000000000000000B005 /* XCLocalSwiftPackageReference "MLXAudioMOSS" */ = {
+			isa = XCLocalSwiftPackageReference;
+			relativePath = Vendor/MLXAudioMOSS;
+		};
+/* End XCLocalSwiftPackageReference section */
+
 /* Begin XCSwiftPackageProductDependency section */
 		7B000000000000000000B002 /* Qwen3ASR */ = {
 			isa = XCSwiftPackageProductDependency;
@@ -635,6 +653,16 @@
 			isa = XCSwiftPackageProductDependency;
 			package = 7B000000000000000000B001 /* XCRemoteSwiftPackageReference "speech-swift" */;
 			productName = AudioCommon;
+		};
+		7B000000000000000000B006 /* MLXAudioSTT */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 7B000000000000000000B005 /* XCLocalSwiftPackageReference "MLXAudioMOSS" */;
+			productName = MLXAudioSTT;
+		};
+		7B000000000000000000B007 /* MLXAudioCore */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 7B000000000000000000B005 /* XCLocalSwiftPackageReference "MLXAudioMOSS" */;
+			productName = MLXAudioCore;
 		};
 /* End XCSwiftPackageProductDependency section */
 

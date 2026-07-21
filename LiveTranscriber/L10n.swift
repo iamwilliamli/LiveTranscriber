@@ -319,6 +319,29 @@ enum L10n {
         static let emptyTranscript = L10n.resource("qwen3_asr.error.empty_transcript", defaultValue: "Qwen3-ASR did not detect transcribable speech in this recording.", comment: "Qwen3-ASR empty transcript error.")
     }
 
+    enum MOSSLocal {
+        static let modelTitle = L10n.resource("moss_local.model.title", defaultValue: "MOSS Multi-Speaker", comment: "Settings title for the local MOSS transcription and speaker diarization model.")
+        static let modelName = L10n.resource("moss_local.model.name", defaultValue: "MOSS Transcribe Diarize 4-bit", comment: "Display name of the on-device MOSS model.")
+        static let modelDescription = L10n.resource("moss_local.model.description", defaultValue: "On-device post-recording transcription with timestamps and multiple-speaker separation. The 4-bit model needs about 1 GB of storage and substantial memory while running.", comment: "Description of local MOSS capabilities and resource usage in Settings.")
+        static let submenuDescription = L10n.resource("moss_local.settings.submenu_description", defaultValue: "Download and manage local multi-speaker transcription", comment: "Settings navigation subtitle for the local MOSS model.")
+        static let modelStatus = L10n.resource("moss_local.model.status", defaultValue: "Model Status", comment: "Settings metric title for local MOSS model status.")
+        static let modelReady = L10n.resource("moss_local.model.ready", defaultValue: "Ready", comment: "Local MOSS status when all required model files are available.")
+        static let modelNotInstalled = L10n.resource("moss_local.model.not_installed", defaultValue: "Not Installed", comment: "Local MOSS status when the model has not been downloaded.")
+        static let modelDownloadedDetailFormat = L10n.resource("moss_local.model.downloaded_detail.format", defaultValue: "The multi-speaker model is stored on this iPhone (%@).", comment: "Local MOSS downloaded model detail. Parameter: installed size.")
+        static let modelMissingDetailFormat = L10n.resource("moss_local.model.missing_detail.format", defaultValue: "Download about %@ before using local multi-speaker transcription.", comment: "Local MOSS missing model detail. Parameter: expected download size.")
+        static let partialDownloadDetailFormat = L10n.resource("moss_local.model.partial_detail.format", defaultValue: "The model download is incomplete (%@ stored). Resume the download or delete it.", comment: "Local MOSS partial model download detail. Parameter: current stored size.")
+        static let downloadModel = L10n.resource("moss_local.model.download", defaultValue: "Download MOSS Model", comment: "Settings button to download the local MOSS model.")
+        static let deleteModel = L10n.resource("moss_local.model.delete", defaultValue: "Delete Model Download", comment: "Settings button to delete local MOSS model files.")
+        static let downloadingModelFormat = L10n.resource("moss_local.model.downloading.format", defaultValue: "Downloading %.0f%%", comment: "Local MOSS model download progress. Parameter: percent complete.")
+        static let downloadFailed = L10n.resource("moss_local.model.download_failed", defaultValue: "MOSS Download Failed", comment: "Alert title when the local MOSS model download fails.")
+        static let deleteFailed = L10n.resource("moss_local.model.delete_failed", defaultValue: "MOSS Delete Failed", comment: "Alert title when deleting local MOSS model files fails.")
+        static let modelRequired = L10n.resource("moss_local.error.model_required", defaultValue: "Download MOSS Multi-Speaker in Settings before using local speaker recognition.", comment: "Error when local MOSS transcription starts without model files.")
+        static let incompleteDownload = L10n.resource("moss_local.error.incomplete_download", defaultValue: "The MOSS model download is incomplete. Try downloading the model again.", comment: "Error when the downloaded local MOSS model is incomplete.")
+        static let storageUnavailable = L10n.resource("moss_local.error.storage_unavailable", defaultValue: "The app could not access MOSS model storage.", comment: "Error when local MOSS model storage is unavailable.")
+        static let emptyAudio = L10n.resource("moss_local.error.empty_audio", defaultValue: "The audio file has no samples to transcribe.", comment: "Local MOSS empty audio error.")
+        static let emptyTranscript = L10n.resource("moss_local.error.empty_transcript", defaultValue: "MOSS did not detect transcribable speech in this recording.", comment: "Local MOSS empty transcript error.")
+    }
+
     enum SpeechText {
         static let runtimeInputWaitingRecording = L10n.resource("speech.runtime_input.waiting_recording", defaultValue: "Runtime Analyzer input: waiting for recording", comment: "Developer speech pipeline diagnostic.")
         static let runtimeInputWaitingFirstBuffer = L10n.resource("speech.runtime_input.waiting_first_buffer", defaultValue: "Runtime Analyzer input: waiting for first buffer", comment: "Developer speech pipeline diagnostic.")
@@ -398,6 +421,7 @@ enum L10n {
         static let retranscribe = L10n.resource("recordings.retranscribe", defaultValue: "Transcribe with Apple Speech", comment: "Action title to retranscribe a recording using Apple Speech.")
         static let retranscribeWithLocalWhisper = L10n.resource("recordings.retranscribe_local_whisper", defaultValue: "Transcribe with Local Whisper", comment: "Action title to retranscribe a recording with bundled local Whisper.")
         static let retranscribeWithQwen3ASR = L10n.resource("recordings.retranscribe_qwen3_asr", defaultValue: "Transcribe with Qwen3-ASR", comment: "Action title to retranscribe a recording with the on-device Qwen3-ASR model.")
+        static let retranscribeWithMOSS = L10n.resource("recordings.retranscribe_moss", defaultValue: "Transcribe with MOSS Multi-Speaker", comment: "Action title to retranscribe a recording with the on-device MOSS speaker diarization model.")
         static let processWithGemini = L10n.resource("recordings.gemini.process", defaultValue: "Process with Gemini Cloud", comment: "Action and confirmation title for uploading audio to Gemini for transcript and intelligence generation.")
         static let uploadAndProcess = L10n.resource("recordings.gemini.upload_and_process", defaultValue: "Upload and Process", comment: "Confirmation button for Gemini Cloud processing.")
         static let geminiProcessingConfirmation = L10n.resource("recordings.gemini.process_confirmation", defaultValue: "This uploads the recording audio and current transcript draft to Gemini, replaces the transcript only after transcription succeeds, and generates summary and meeting intelligence. A restorable copy of the current transcript is kept.", comment: "Privacy and replacement confirmation before Gemini Cloud processing.")
@@ -536,6 +560,10 @@ enum L10n {
         static let syncCurrentTranscript = L10n.resource("recordings.transcript.sync_current", defaultValue: "Sync to Current Transcript", comment: "Accessibility label for the player action that scrolls to the transcript line matching the current playback time.")
         static let editTranscriptLine = L10n.resource("recordings.transcript.edit_line", defaultValue: "Edit Transcript Line", comment: "Action and sheet title for editing one transcript line.")
         static let transcriptLineText = L10n.resource("recordings.transcript.line_text", defaultValue: "Transcript Text", comment: "Field title for one editable transcript line.")
+        static let transcriptSpeaker = L10n.resource("recordings.transcript.speaker", defaultValue: "Change Speaker", comment: "Field title for changing the speaker assigned to one transcript segment.")
+        static let transcriptNoSpeaker = L10n.resource("recordings.transcript.speaker.none", defaultValue: "No Speaker", comment: "Option that removes the speaker assignment from one transcript segment.")
+        static let transcriptNewSpeaker = L10n.resource("recordings.transcript.speaker.new", defaultValue: "New Speaker", comment: "Option that assigns one transcript segment to a newly numbered speaker.")
+        static let transcriptSpeakerCurrentSegmentDetail = L10n.resource("recordings.transcript.speaker.current_segment_detail", defaultValue: "The speaker change applies only to this transcript segment.", comment: "Explanation below the speaker picker in the transcript segment editor.")
         static let lockTranscript = L10n.resource("recordings.transcript.lock", defaultValue: "Lock Transcript", comment: "Menu action to lock transcript text against automatic updates.")
         static let unlockTranscript = L10n.resource("recordings.transcript.unlock", defaultValue: "Unlock Transcript", comment: "Menu action to unlock transcript text.")
         static let transcriptLocked = L10n.resource("recordings.transcript.locked", defaultValue: "Transcript Locked", comment: "Status shown when transcript text is locked.")

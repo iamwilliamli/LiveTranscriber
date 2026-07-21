@@ -531,6 +531,22 @@ private struct Qwen3ASRRetranscriptionButton: View {
     }
 }
 
+private struct MOSSLocalRetranscriptionButton: View {
+    let isAvailable: Bool
+    let isDisabled: Bool
+    let action: () -> Void
+
+    var body: some View {
+        Button {
+            action()
+        } label: {
+            Label(localized(L10n.Recordings.retranscribeWithMOSS), systemImage: "person.2")
+        }
+        .disabled(isDisabled || !isAvailable)
+        .accessibilityHint(isAvailable ? "" : localized(L10n.MOSSLocal.modelRequired))
+    }
+}
+
 private struct LocalWhisperRetranscriptionPicker: View {
     let recordingLanguageID: String
     let downloadedModels: [LocalWhisperModel]
@@ -836,6 +852,7 @@ struct RecordingsView: View {
     @State private var downloadedLocalWhisperModels: [LocalWhisperModel] = []
     @State private var localWhisperLanguageOptionsByModelID: [String: [TranscriptionLanguage]] = [:]
     @State private var isQwen3ASRAvailable = Qwen3ASRModelManager.currentStatus().isAvailable
+    @State private var isMOSSLocalAvailable = MOSSLocalModelManager.currentStatus().isAvailable
     @State private var localWhisperRetranscriptionRequest: LocalWhisperRetranscriptionRequest?
     @State private var searchText = ""
     @State private var navigationPath: [RecordingNavigationDestination] = []
@@ -1213,6 +1230,7 @@ struct RecordingsView: View {
                     downloadedLocalWhisperModels: downloadedLocalWhisperModels,
                     localWhisperLanguageOptionsByModelID: localWhisperLanguageOptionsByModelID,
                     isQwen3ASRAvailable: isQwen3ASRAvailable,
+                    isMOSSLocalAvailable: isMOSSLocalAvailable,
                     analyzingRecordingID: analyzingRecordingID,
                     onOpen: { item in
                         openRecording(item)
@@ -1234,6 +1252,7 @@ struct RecordingsView: View {
                         localWhisperRetranscriptionRequest = LocalWhisperRetranscriptionRequest(item: item)
                     },
                     onRetranscribeWithQwen3ASR: retranscribeWithQwen3ASR,
+                    onRetranscribeWithMOSS: retranscribeWithMOSS,
                     onAddRecordings: { folder in
                         addRecordingsCategoryTarget = folder
                     }
@@ -1253,6 +1272,7 @@ struct RecordingsView: View {
                     downloadedLocalWhisperModels: downloadedLocalWhisperModels,
                     localWhisperLanguageOptionsByModelID: localWhisperLanguageOptionsByModelID,
                     isQwen3ASRAvailable: isQwen3ASRAvailable,
+                    isMOSSLocalAvailable: isMOSSLocalAvailable,
                     initialTranscriptLineID: transcriptLineID
                 )
             } else {
@@ -1504,6 +1524,13 @@ struct RecordingsView: View {
                 retranscribeWithQwen3ASR(item)
             }
 
+            MOSSLocalRetranscriptionButton(
+                isAvailable: isMOSSLocalAvailable,
+                isDisabled: isTranscriptionActionDisabled
+            ) {
+                retranscribeWithMOSS(item)
+            }
+
             Button(role: .destructive) {
                 HapticFeedback.play(.deleteRequested)
                 deleteRequest = RecordingDeleteRequest(item: item)
@@ -1571,6 +1598,7 @@ struct RecordingsView: View {
         downloadedLocalWhisperModels = menuOptions.0
         localWhisperLanguageOptionsByModelID = menuOptions.1
         isQwen3ASRAvailable = Qwen3ASRModelManager.currentStatus().isAvailable
+        isMOSSLocalAvailable = MOSSLocalModelManager.currentStatus().isAvailable
     }
 
     private func queueImport(from url: URL) {
@@ -1820,6 +1848,28 @@ struct RecordingsView: View {
                     item,
                     language: TranscriptionLanguage(id: item.languageID)
                 )
+                HapticFeedback.play(.retranscribeComplete)
+            } catch {
+                transcriptionErrorMessage = error.localizedDescription
+                HapticFeedback.play(.failure)
+            }
+        }
+    }
+
+    private func retranscribeWithMOSS(_ item: RecordingItem) {
+        guard item.importStatus?.isFailed != false else {
+            HapticFeedback.play(.blocked)
+            return
+        }
+        guard !transcriber.isRecording, !transcriber.isPreparing else {
+            HapticFeedback.play(.blocked)
+            return
+        }
+
+        HapticFeedback.play(.retranscribeStart)
+        Task {
+            do {
+                try await store.retranscribeWithMOSS(item)
                 HapticFeedback.play(.retranscribeComplete)
             } catch {
                 transcriptionErrorMessage = error.localizedDescription
@@ -2149,6 +2199,7 @@ enum RecordingCategoryCatalog {
             return
         }
         UserDefaults.standard.set(json, forKey: customCategoriesDefaultsKey)
+        RecordingCategoryCloudSync.shared.localStateDidChange()
     }
 }
 
@@ -2267,6 +2318,219 @@ private enum RecordingCategoryAppearanceCatalog {
             return
         }
         UserDefaults.standard.set(json, forKey: defaultsKey)
+        RecordingCategoryCloudSync.shared.localStateDidChange()
+    }
+}
+
+private struct RecordingCategoryCloudSnapshot: Codable {
+    var schemaVersion: Int
+    var updatedAt: Date
+    var categoryNames: [String]
+    var appearances: [String: RecordingCategoryAppearance]
+}
+
+/// Keeps the small category catalog in iCloud KVS while `@AppStorage` remains
+/// the immediate local source for SwiftUI. Recording assignments continue to
+/// sync through the CloudKit-backed `RecordingIndexRecord`.
+final class RecordingCategoryCloudSync: @unchecked Sendable {
+    static let shared = RecordingCategoryCloudSync()
+
+    private static let snapshotKey = "Recordings.categoryCatalog.cloudSnapshot.v1"
+    private static let localRevisionDefaultsKey = "Recordings.categoryCatalog.localRevision.v1"
+
+    private let cloudStore: NSUbiquitousKeyValueStore
+    private let defaults: UserDefaults
+    private let encoder = JSONEncoder()
+    private let decoder = JSONDecoder()
+    private let logger = Logger(
+        subsystem: "com.reddownloader.LiveTranscriber",
+        category: "CategoryCloudSync"
+    )
+    private var isEnabled = false
+    private var changeObserver: NSObjectProtocol?
+
+    private init(
+        cloudStore: NSUbiquitousKeyValueStore = .default,
+        defaults: UserDefaults = .standard
+    ) {
+        self.cloudStore = cloudStore
+        self.defaults = defaults
+        encoder.outputFormatting = [.sortedKeys]
+    }
+
+    deinit {
+        if let changeObserver {
+            NotificationCenter.default.removeObserver(changeObserver)
+        }
+    }
+
+    func setEnabled(_ enabled: Bool) {
+        guard enabled != isEnabled else {
+            return
+        }
+
+        isEnabled = enabled
+        if enabled {
+            changeObserver = NotificationCenter.default.addObserver(
+                forName: NSUbiquitousKeyValueStore.didChangeExternallyNotification,
+                object: cloudStore,
+                queue: .main
+            ) { [weak self] notification in
+                self?.handleCloudStoreChange(notification)
+            }
+            cloudStore.synchronize()
+            reconcileInitialState()
+        } else if let changeObserver {
+            NotificationCenter.default.removeObserver(changeObserver)
+            self.changeObserver = nil
+        }
+    }
+
+    func localStateDidChange() {
+        let revision = Date()
+        defaults.set(revision.timeIntervalSince1970, forKey: Self.localRevisionDefaultsKey)
+        guard isEnabled else {
+            return
+        }
+        publishLocalState(updatedAt: revision)
+    }
+
+    private func reconcileInitialState() {
+        let remoteSnapshot = cloudSnapshot()
+        let localRevision = localRevisionDate()
+
+        if let remoteSnapshot {
+            if let localRevision,
+               localRevision > remoteSnapshot.updatedAt,
+               hasExplicitLocalState {
+                publishLocalState(updatedAt: localRevision)
+            } else if localRevision == nil, hasLocalCatalogData {
+                let mergedSnapshot = merging(remoteSnapshotWithLocalState: remoteSnapshot)
+                apply(mergedSnapshot)
+                publishLocalState(updatedAt: mergedSnapshot.updatedAt)
+            } else {
+                apply(remoteSnapshot)
+            }
+        } else if hasExplicitLocalState {
+            let revision = localRevision ?? Date()
+            publishLocalState(updatedAt: revision)
+        }
+    }
+
+    private func handleCloudStoreChange(_ notification: Notification) {
+        guard isEnabled else {
+            return
+        }
+        if let changedKeys = notification.userInfo?[NSUbiquitousKeyValueStoreChangedKeysKey] as? [String],
+           !changedKeys.contains(Self.snapshotKey) {
+            return
+        }
+        guard let remoteSnapshot = cloudSnapshot() else {
+            return
+        }
+
+        if localRevisionDate() == nil, hasLocalCatalogData {
+            let mergedSnapshot = merging(remoteSnapshotWithLocalState: remoteSnapshot)
+            apply(mergedSnapshot)
+            publishLocalState(updatedAt: mergedSnapshot.updatedAt)
+            return
+        }
+
+        if let localRevision = localRevisionDate(),
+           localRevision > remoteSnapshot.updatedAt {
+            publishLocalState(updatedAt: localRevision)
+            return
+        }
+        apply(remoteSnapshot)
+    }
+
+    private var hasExplicitLocalState: Bool {
+        localRevisionDate() != nil || hasLocalCatalogData
+    }
+
+    private var hasLocalCatalogData: Bool {
+        !RecordingCategoryCatalog.customNames().isEmpty
+            || !RecordingCategoryAppearanceCatalog.all().isEmpty
+    }
+
+    private func localRevisionDate() -> Date? {
+        let value = defaults.double(forKey: Self.localRevisionDefaultsKey)
+        return value > 0 ? Date(timeIntervalSince1970: value) : nil
+    }
+
+    private func publishLocalState(updatedAt: Date) {
+        let snapshot = RecordingCategoryCloudSnapshot(
+            schemaVersion: 1,
+            updatedAt: updatedAt,
+            categoryNames: RecordingCategoryCatalog.customNames(),
+            appearances: RecordingCategoryAppearanceCatalog.all()
+        )
+        do {
+            let data = try encoder.encode(snapshot)
+            cloudStore.set(data, forKey: Self.snapshotKey)
+            cloudStore.synchronize()
+            logger.debug(
+                "Published category snapshot categories=\(snapshot.categoryNames.count, privacy: .public) appearances=\(snapshot.appearances.count, privacy: .public)"
+            )
+        } catch {
+            logger.error("Failed to encode category snapshot: \(error.localizedDescription, privacy: .public)")
+        }
+    }
+
+    private func merging(
+        remoteSnapshotWithLocalState remoteSnapshot: RecordingCategoryCloudSnapshot
+    ) -> RecordingCategoryCloudSnapshot {
+        var appearances = RecordingCategoryAppearanceCatalog.all()
+        appearances.merge(remoteSnapshot.appearances.mapValues(\.normalized)) { _, remote in
+            remote
+        }
+        return RecordingCategoryCloudSnapshot(
+            schemaVersion: 1,
+            updatedAt: Date(),
+            categoryNames: RecordingCategoryCatalog.normalized(
+                remoteSnapshot.categoryNames + RecordingCategoryCatalog.customNames()
+            ),
+            appearances: appearances
+        )
+    }
+
+    private func cloudSnapshot() -> RecordingCategoryCloudSnapshot? {
+        guard let data = cloudStore.data(forKey: Self.snapshotKey) else {
+            return nil
+        }
+        do {
+            let snapshot = try decoder.decode(RecordingCategoryCloudSnapshot.self, from: data)
+            guard snapshot.schemaVersion == 1 else {
+                return nil
+            }
+            return snapshot
+        } catch {
+            logger.error("Failed to decode category snapshot: \(error.localizedDescription, privacy: .public)")
+            return nil
+        }
+    }
+
+    private func apply(_ snapshot: RecordingCategoryCloudSnapshot) {
+        let categoryNames = RecordingCategoryCatalog.normalized(snapshot.categoryNames)
+        let appearances = snapshot.appearances.mapValues(\.normalized)
+
+        do {
+            let namesData = try encoder.encode(categoryNames)
+            let appearancesData = try encoder.encode(appearances)
+            guard let namesJSON = String(data: namesData, encoding: .utf8),
+                  let appearancesJSON = String(data: appearancesData, encoding: .utf8) else {
+                return
+            }
+
+            defaults.set(namesJSON, forKey: RecordingCategoryCatalog.customCategoriesDefaultsKey)
+            defaults.set(appearancesJSON, forKey: RecordingCategoryAppearanceCatalog.defaultsKey)
+            defaults.set(snapshot.updatedAt.timeIntervalSince1970, forKey: Self.localRevisionDefaultsKey)
+            logger.debug(
+                "Applied category snapshot categories=\(categoryNames.count, privacy: .public) appearances=\(appearances.count, privacy: .public)"
+            )
+        } catch {
+            logger.error("Failed to apply category snapshot: \(error.localizedDescription, privacy: .public)")
+        }
     }
 }
 
@@ -2312,6 +2576,7 @@ private struct RecordingCategoryDetailList: View {
     let downloadedLocalWhisperModels: [LocalWhisperModel]
     let localWhisperLanguageOptionsByModelID: [String: [TranscriptionLanguage]]
     let isQwen3ASRAvailable: Bool
+    let isMOSSLocalAvailable: Bool
     let analyzingRecordingID: RecordingItem.ID?
     let onOpen: (RecordingItem) -> Void
     let onAnalyze: (RecordingItem, RecordingSummaryProvider) -> Void
@@ -2321,6 +2586,7 @@ private struct RecordingCategoryDetailList: View {
     let onUpdateCategory: (RecordingItem, String?) -> Void
     let onRetranscribeWithLocalWhisper: (RecordingItem) -> Void
     let onRetranscribeWithQwen3ASR: (RecordingItem) -> Void
+    let onRetranscribeWithMOSS: (RecordingItem) -> Void
     let onAddRecordings: (RecordingCategoryFolder) -> Void
 
     private var categories: [String] {
@@ -2410,6 +2676,13 @@ private struct RecordingCategoryDetailList: View {
                         isDisabled: isTranscriptionActionDisabled
                     ) {
                         onRetranscribeWithQwen3ASR(item)
+                    }
+
+                    MOSSLocalRetranscriptionButton(
+                        isAvailable: isMOSSLocalAvailable,
+                        isDisabled: isTranscriptionActionDisabled
+                    ) {
+                        onRetranscribeWithMOSS(item)
                     }
 
                         Button(role: .destructive) {
@@ -2898,6 +3171,7 @@ struct RecordingMapView: View {
     @State private var downloadedLocalWhisperModels: [LocalWhisperModel] = []
     @State private var localWhisperLanguageOptionsByModelID: [String: [TranscriptionLanguage]] = [:]
     @State private var isQwen3ASRAvailable = Qwen3ASRModelManager.currentStatus().isAvailable
+    @State private var isMOSSLocalAvailable = MOSSLocalModelManager.currentStatus().isAvailable
 
     private var points: [RecordingMapPoint] {
         store.recordings.compactMap { item in
@@ -2965,6 +3239,7 @@ struct RecordingMapView: View {
                 downloadedLocalWhisperModels = menuOptions.0
                 localWhisperLanguageOptionsByModelID = menuOptions.1
                 isQwen3ASRAvailable = Qwen3ASRModelManager.currentStatus().isAvailable
+                isMOSSLocalAvailable = MOSSLocalModelManager.currentStatus().isAvailable
             }
             .navigationDestination(item: $selectedRecording) { item in
                 RecordingDetailView(
@@ -2974,7 +3249,8 @@ struct RecordingMapView: View {
                     player: player,
                     downloadedLocalWhisperModels: downloadedLocalWhisperModels,
                     localWhisperLanguageOptionsByModelID: localWhisperLanguageOptionsByModelID,
-                    isQwen3ASRAvailable: isQwen3ASRAvailable
+                    isQwen3ASRAvailable: isQwen3ASRAvailable,
+                    isMOSSLocalAvailable: isMOSSLocalAvailable
                 )
             }
             .onInteractiveNavigationPopGesture(
@@ -3666,6 +3942,7 @@ struct RecordingDetailView: View {
     var downloadedLocalWhisperModels: [LocalWhisperModel] = []
     var localWhisperLanguageOptionsByModelID: [String: [TranscriptionLanguage]] = [:]
     var isQwen3ASRAvailable = Qwen3ASRModelManager.currentStatus().isAvailable
+    var isMOSSLocalAvailable = MOSSLocalModelManager.currentStatus().isAvailable
     var initialTranscriptLineID: String? = nil
     var onClose: (() -> Void)? = nil
     @Environment(\.dismiss) private var dismiss
@@ -3705,6 +3982,7 @@ struct RecordingDetailView: View {
     @State private var editErrorMessage: String?
     @State private var transcriptLineEditRequest: TranscriptLineEditRequest?
     @State private var editedTranscriptLineText = ""
+    @State private var editedTranscriptLineSpeakerID: String?
     @State private var isSavingTranscriptLineEdit = false
     @State private var cachedTranscriptLines: [StoredTranscriptLine] = []
     @State private var scrubbedPlaybackTime: TimeInterval?
@@ -3750,6 +4028,48 @@ struct RecordingDetailView: View {
                 "\($0.schemaVersion)-\($0.segments.count)-\($0.generatedAt.timeIntervalSinceReferenceDate)"
             } ?? "no-speaker-diarization"
         ].joined(separator: "-")
+    }
+
+    private var transcriptSpeakerEditOptions: [TranscriptSpeakerEditOption] {
+        TranscriptSpeakerPresentation.makePresentations(for: cachedTranscriptLines).map { speaker in
+            TranscriptSpeakerEditOption(
+                id: speaker.id,
+                displayName: speaker.displayName,
+                tint: speaker.tint
+            )
+        }
+    }
+
+    private var newTranscriptSpeakerEditOption: TranscriptSpeakerEditOption {
+        let presentations = TranscriptSpeakerPresentation.makePresentations(for: cachedTranscriptLines)
+        let comparisonKeys = Set(presentations.map { speaker in
+            speaker.id.folding(
+                options: [.caseInsensitive, .diacriticInsensitive, .widthInsensitive],
+                locale: Locale(identifier: "en_US_POSIX")
+            )
+        })
+        var nextNumber = presentations
+            .compactMap { TranscriptSpeakerNaming.numberedIndex($0.id) }
+            .max()
+            .map { $0 + 1 } ?? 0
+
+        while comparisonKeys.contains(
+            "Speaker \(nextNumber)".folding(
+                options: [.caseInsensitive, .diacriticInsensitive, .widthInsensitive],
+                locale: Locale(identifier: "en_US_POSIX")
+            )
+        ) {
+            nextNumber += 1
+        }
+
+        return TranscriptSpeakerEditOption(
+            id: "Speaker \(nextNumber)",
+            displayName: localizedFormat(
+                L10n.Recordings.transcriptSpeakerFormat,
+                presentations.count + 1
+            ),
+            tint: TranscriptSpeakerPalette.tint(for: presentations.count)
+        )
     }
 
     private var initialTranscriptScrollTarget: StoredTranscriptLine.ID? {
@@ -3997,6 +4317,10 @@ struct RecordingDetailView: View {
             TranscriptLineEditSheet(
                 timeText: request.timeText,
                 text: $editedTranscriptLineText,
+                selectedSpeakerID: $editedTranscriptLineSpeakerID,
+                speakerOptions: transcriptSpeakerEditOptions,
+                newSpeakerOption: newTranscriptSpeakerEditOption,
+                showsSpeakerEditor: true,
                 isSaving: isSavingTranscriptLineEdit,
                 onSave: saveTranscriptLineEdit,
                 onCancel: {
@@ -4372,6 +4696,13 @@ struct RecordingDetailView: View {
                 isDisabled: currentItem.isTranscriptLocked || isTranscriptionRunning || transcriber.isRecording || transcriber.isPreparing
             ) {
                 retranscribeCurrentItemWithQwen3ASR()
+            }
+
+            MOSSLocalRetranscriptionButton(
+                isAvailable: isMOSSLocalAvailable,
+                isDisabled: currentItem.isTranscriptLocked || isTranscriptionRunning || transcriber.isRecording || transcriber.isPreparing
+            ) {
+                retranscribeCurrentItemWithMOSS()
             }
 
             Button {
@@ -5800,6 +6131,29 @@ struct RecordingDetailView: View {
         }
     }
 
+    private func retranscribeCurrentItemWithMOSS() {
+        guard !isTranscriptionRunning else {
+            HapticFeedback.play(.blocked)
+            return
+        }
+        guard !transcriber.isRecording, !transcriber.isPreparing else {
+            HapticFeedback.play(.blocked)
+            return
+        }
+
+        let item = currentItem
+        HapticFeedback.play(.retranscribeStart)
+        Task {
+            do {
+                try await store.retranscribeWithMOSS(item)
+                HapticFeedback.play(.retranscribeComplete)
+            } catch {
+                transcriptionErrorMessage = error.localizedDescription
+                HapticFeedback.play(.failure)
+            }
+        }
+    }
+
     private func refreshAudioFileInfo() async {
         let item = currentItem
         let url = store.audioURL(for: item)
@@ -5842,7 +6196,8 @@ struct RecordingDetailView: View {
 
     private func beginTranscriptLineEdit(_ line: StoredTranscriptLine) {
         HapticFeedback.play(.menuSelection)
-        editedTranscriptLineText = line.text
+        editedTranscriptLineText = line.spokenText
+        editedTranscriptLineSpeakerID = line.speaker
         transcriptLineEditRequest = TranscriptLineEditRequest(line: line)
     }
 
@@ -5857,7 +6212,8 @@ struct RecordingDetailView: View {
             let updatedItem = try store.updateTranscriptLine(
                 for: currentItem,
                 lineID: transcriptLineEditRequest.lineID,
-                text: editedTranscriptLineText
+                text: editedTranscriptLineText,
+                speaker: editedTranscriptLineSpeakerID
             )
             cachedTranscriptLines = StoredTranscriptLine.parse(
                 store.transcriptText(for: updatedItem),

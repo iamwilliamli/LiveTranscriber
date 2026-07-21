@@ -15,6 +15,7 @@ struct SettingsView: View {
         case localWhisperModel
         case liveWhisperModel
         case qwen3ASRModel
+        case mossLocalModel
         case recordingFormat
         case speechPipelineMode
     }
@@ -50,6 +51,11 @@ struct SettingsView: View {
     @State private var qwen3ASRDownloadProgress: Double = 0
     @State private var qwen3ASRDownloadErrorMessage: String?
     @State private var qwen3ASRDeleteErrorMessage: String?
+    @State private var mossLocalModelStatus = MOSSLocalModelManager.currentStatus()
+    @State private var isDownloadingMOSSLocalModel = false
+    @State private var mossLocalDownloadProgress: Double = 0
+    @State private var mossLocalDownloadErrorMessage: String?
+    @State private var mossLocalDeleteErrorMessage: String?
     @State private var selectedLocalSummaryModel = LocalSummaryModelManager.selectedModel
     @State private var localSummaryModelStatus = LocalSummaryModelManager.currentStatus()
     @State private var isDownloadingLocalSummaryModel = false
@@ -103,6 +109,8 @@ struct SettingsView: View {
             liveWhisperModelPage
         case .qwen3ASRModel:
             qwen3ASRModelPage
+        case .mossLocalModel:
+            mossLocalModelPage
         case .recordingFormat:
             recordingFormatPage
         case .speechPipelineMode:
@@ -250,6 +258,7 @@ struct SettingsView: View {
             recordingStore.refreshIntelligenceAvailability()
             refreshLocalWhisperModelStatus()
             refreshQwen3ASRModelStatus()
+            refreshMOSSLocalModelStatus()
             refreshLocalSummaryModelStatus()
         }
         .task {
@@ -352,6 +361,36 @@ struct SettingsView: View {
             Text(qwen3ASRDeleteErrorMessage ?? "")
         }
         .alert(
+            String(localized: L10n.MOSSLocal.downloadFailed),
+            isPresented: Binding(
+                get: { mossLocalDownloadErrorMessage != nil },
+                set: { isPresented in
+                    if !isPresented {
+                        mossLocalDownloadErrorMessage = nil
+                    }
+                }
+            )
+        ) {
+            Button(String(localized: L10n.Common.ok), role: .cancel) {}
+        } message: {
+            Text(mossLocalDownloadErrorMessage ?? "")
+        }
+        .alert(
+            String(localized: L10n.MOSSLocal.deleteFailed),
+            isPresented: Binding(
+                get: { mossLocalDeleteErrorMessage != nil },
+                set: { isPresented in
+                    if !isPresented {
+                        mossLocalDeleteErrorMessage = nil
+                    }
+                }
+            )
+        ) {
+            Button(String(localized: L10n.Common.ok), role: .cancel) {}
+        } message: {
+            Text(mossLocalDeleteErrorMessage ?? "")
+        }
+        .alert(
             String(localized: L10n.LocalSummary.downloadFailed),
             isPresented: Binding(
                 get: { localSummaryDownloadErrorMessage != nil },
@@ -443,6 +482,19 @@ struct SettingsView: View {
                 .buttonStyle(.plain)
                 .settingsNavigationHaptic()
                 .disabled(isDownloadingQwen3ASRModel)
+
+                NavigationLink(value: SettingsRoute.mossLocalModel) {
+                    SettingsNavigationRow(
+                        icon: "person.2",
+                        titleResource: L10n.MOSSLocal.modelTitle,
+                        value: mossLocalModelStatus.statusText,
+                        subtitleResource: L10n.MOSSLocal.submenuDescription,
+                        tint: AppTheme.purple
+                    )
+                }
+                .buttonStyle(.plain)
+                .settingsNavigationHaptic()
+                .disabled(isDownloadingMOSSLocalModel)
 
                 if transcriber.isRecording || transcriber.isPreparing {
                     SettingsStatusRow(icon: "lock.fill", textResource: L10n.Settings.cannotChangeLanguageWhileRecording, tint: AppTheme.warning)
@@ -907,6 +959,78 @@ struct SettingsView: View {
         }
     }
 
+    private var mossLocalModelPage: some View {
+        SettingsDetailPage(titleResource: L10n.MOSSLocal.modelTitle) {
+            SettingsSection(
+                titleResource: L10n.MOSSLocal.modelTitle,
+                systemImage: "person.2",
+                tint: AppTheme.purple
+            ) {
+                SettingsMetricRow(
+                    icon: "cpu",
+                    titleResource: L10n.MOSSLocal.modelName,
+                    value: MOSSLocalModelManager.expectedSizeText,
+                    tint: AppTheme.purple
+                )
+
+                SettingsVerbatimStatusRow(
+                    icon: "iphone",
+                    text: String(localized: L10n.MOSSLocal.modelDescription),
+                    tint: AppTheme.info
+                )
+
+                SettingsMetricRow(
+                    icon: "internaldrive",
+                    titleResource: L10n.MOSSLocal.modelStatus,
+                    value: isDownloadingMOSSLocalModel
+                        ? mossLocalDownloadProgressText
+                        : mossLocalModelStatus.statusText,
+                    tint: mossLocalModelStatus.isAvailable ? AppTheme.success : AppTheme.warning
+                )
+
+                SettingsVerbatimStatusRow(
+                    icon: mossLocalModelStatus.isAvailable ? "checkmark.circle" : "arrow.down.circle",
+                    text: mossLocalModelStatus.detailText,
+                    tint: mossLocalModelStatus.isAvailable ? AppTheme.success : AppTheme.info
+                )
+
+                if isDownloadingMOSSLocalModel {
+                    ProgressView(value: mossLocalDownloadProgress)
+                        .tint(AppTheme.purple)
+                        .frame(maxWidth: .infinity)
+                }
+
+                if !mossLocalModelStatus.isAvailable {
+                    Button {
+                        downloadMOSSLocalModel()
+                    } label: {
+                        SettingsCommandRow(
+                            icon: "arrow.down.circle",
+                            titleResource: L10n.MOSSLocal.downloadModel,
+                            tint: AppTheme.purple
+                        )
+                    }
+                    .buttonStyle(.plain)
+                    .disabled(isDownloadingMOSSLocalModel)
+                }
+
+                if mossLocalModelStatus.hasStoredFiles {
+                    Button(role: .destructive) {
+                        deleteMOSSLocalModel()
+                    } label: {
+                        SettingsCommandRow(
+                            icon: "trash",
+                            titleResource: L10n.MOSSLocal.deleteModel,
+                            tint: AppTheme.danger
+                        )
+                    }
+                    .buttonStyle(.plain)
+                    .disabled(isDownloadingMOSSLocalModel)
+                }
+            }
+        }
+    }
+
     private var localWhisperDownloadProgressText: String {
         String(
             format: String(localized: L10n.LocalWhisper.downloadingModelFormat),
@@ -918,6 +1042,13 @@ struct SettingsView: View {
         String(
             format: String(localized: L10n.Qwen3ASR.downloadingModelFormat),
             qwen3ASRDownloadProgress * 100
+        )
+    }
+
+    private var mossLocalDownloadProgressText: String {
+        String(
+            format: String(localized: L10n.MOSSLocal.downloadingModelFormat),
+            mossLocalDownloadProgress * 100
         )
     }
 
@@ -961,6 +1092,10 @@ struct SettingsView: View {
 
     private func refreshQwen3ASRModelStatus() {
         qwen3ASRModelStatus = Qwen3ASRModelManager.currentStatus()
+    }
+
+    private func refreshMOSSLocalModelStatus() {
+        mossLocalModelStatus = MOSSLocalModelManager.currentStatus()
     }
 
     private func refreshLocalSummaryModelStatus() {
@@ -1367,6 +1502,55 @@ struct SettingsView: View {
             qwen3ASRDownloadProgress = 0
         } catch {
             qwen3ASRDeleteErrorMessage = error.localizedDescription
+            HapticFeedback.play(.failure)
+        }
+    }
+
+    private func downloadMOSSLocalModel() {
+        guard !isDownloadingMOSSLocalModel else {
+            return
+        }
+
+        isDownloadingMOSSLocalModel = true
+        mossLocalDownloadProgress = 0
+        HapticFeedback.play(.menuSelection)
+
+        Task {
+            do {
+                let status = try await MOSSLocalModelManager.download { progress in
+                    Task { @MainActor in
+                        mossLocalDownloadProgress = progress
+                    }
+                }
+
+                await MainActor.run {
+                    mossLocalModelStatus = status
+                    isDownloadingMOSSLocalModel = false
+                    mossLocalDownloadProgress = 1
+                    HapticFeedback.play(.menuSelection)
+                }
+            } catch {
+                await MainActor.run {
+                    mossLocalModelStatus = MOSSLocalModelManager.currentStatus()
+                    isDownloadingMOSSLocalModel = false
+                    mossLocalDownloadErrorMessage = error.localizedDescription
+                    HapticFeedback.play(.failure)
+                }
+            }
+        }
+    }
+
+    private func deleteMOSSLocalModel() {
+        guard !isDownloadingMOSSLocalModel else {
+            return
+        }
+
+        HapticFeedback.play(.menuSelection)
+        do {
+            mossLocalModelStatus = try MOSSLocalModelManager.deleteDownloadedModel()
+            mossLocalDownloadProgress = 0
+        } catch {
+            mossLocalDeleteErrorMessage = error.localizedDescription
             HapticFeedback.play(.failure)
         }
     }

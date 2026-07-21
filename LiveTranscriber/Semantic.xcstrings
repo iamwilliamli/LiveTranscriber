@@ -9857,6 +9857,26 @@
         }
       }
     },
+    "moss_local.model.title" : {"comment":"Settings title for the local MOSS transcription and speaker diarization model.","extractionState":"manual","localizations":{"en":{"stringUnit":{"state":"translated","value":"MOSS Multi-Speaker"}},"zh-Hans":{"stringUnit":{"state":"translated","value":"MOSS 多说话人"}},"zh-Hant":{"stringUnit":{"state":"translated","value":"MOSS 多說話人"}}}},
+    "moss_local.model.name" : {"comment":"Display name of the on-device MOSS model.","extractionState":"manual","localizations":{"en":{"stringUnit":{"state":"translated","value":"MOSS Transcribe Diarize 4-bit"}},"zh-Hans":{"stringUnit":{"state":"translated","value":"MOSS 转录与说话人分离 4-bit"}},"zh-Hant":{"stringUnit":{"state":"translated","value":"MOSS 轉錄與說話人分離 4-bit"}}}},
+    "moss_local.model.description" : {"comment":"Description of local MOSS capabilities and resource usage in Settings.","extractionState":"manual","localizations":{"en":{"stringUnit":{"state":"translated","value":"On-device post-recording transcription with timestamps and multiple-speaker separation. The 4-bit model needs about 1 GB of storage and substantial memory while running."}},"zh-Hans":{"stringUnit":{"state":"translated","value":"在设备上完成录音后转录，包含时间戳和多说话人分离。4-bit 模型约需 1 GB 存储空间，运行时会占用较多内存。"}},"zh-Hant":{"stringUnit":{"state":"translated","value":"在裝置上完成錄音後轉錄，包含時間戳和多說話人分離。4-bit 模型約需 1 GB 儲存空間，執行時會佔用較多記憶體。"}}}},
+    "moss_local.settings.submenu_description" : {"comment":"Settings navigation subtitle for the local MOSS model.","extractionState":"manual","localizations":{"en":{"stringUnit":{"state":"translated","value":"Download and manage local multi-speaker transcription"}},"zh-Hans":{"stringUnit":{"state":"translated","value":"下载并管理本地多说话人转录"}},"zh-Hant":{"stringUnit":{"state":"translated","value":"下載並管理本機多說話人轉錄"}}}},
+    "moss_local.model.status" : {"comment":"Settings metric title for local MOSS model status.","extractionState":"manual","localizations":{"en":{"stringUnit":{"state":"translated","value":"Model Status"}},"zh-Hans":{"stringUnit":{"state":"translated","value":"模型状态"}},"zh-Hant":{"stringUnit":{"state":"translated","value":"模型狀態"}}}},
+    "moss_local.model.ready" : {"comment":"Local MOSS status when all required model files are available.","extractionState":"manual","localizations":{"en":{"stringUnit":{"state":"translated","value":"Ready"}},"zh-Hans":{"stringUnit":{"state":"translated","value":"已就绪"}},"zh-Hant":{"stringUnit":{"state":"translated","value":"已就緒"}}}},
+    "moss_local.model.not_installed" : {"comment":"Local MOSS status when the model has not been downloaded.","extractionState":"manual","localizations":{"en":{"stringUnit":{"state":"translated","value":"Not Installed"}},"zh-Hans":{"stringUnit":{"state":"translated","value":"未安装"}},"zh-Hant":{"stringUnit":{"state":"translated","value":"未安裝"}}}},
+    "moss_local.model.downloaded_detail.format" : {"comment":"Local MOSS downloaded model detail. Parameter: installed size.","extractionState":"manual","localizations":{"en":{"stringUnit":{"state":"translated","value":"The multi-speaker model is stored on this iPhone (%@)."}},"zh-Hans":{"stringUnit":{"state":"translated","value":"多说话人模型已存储在此 iPhone 上（%@）。"}},"zh-Hant":{"stringUnit":{"state":"translated","value":"多說話人模型已儲存在此 iPhone 上（%@）。"}}}},
+    "moss_local.model.missing_detail.format" : {"comment":"Local MOSS missing model detail. Parameter: expected download size.","extractionState":"manual","localizations":{"en":{"stringUnit":{"state":"translated","value":"Download about %@ before using local multi-speaker transcription."}},"zh-Hans":{"stringUnit":{"state":"translated","value":"使用本地多说话人转录前需下载约 %@。"}},"zh-Hant":{"stringUnit":{"state":"translated","value":"使用本機多說話人轉錄前需下載約 %@。"}}}},
+    "moss_local.model.partial_detail.format" : {"comment":"Local MOSS partial model download detail. Parameter: current stored size.","extractionState":"manual","localizations":{"en":{"stringUnit":{"state":"translated","value":"The model download is incomplete (%@ stored). Resume the download or delete it."}},"zh-Hans":{"stringUnit":{"state":"translated","value":"模型下载不完整（已存储 %@）。请继续下载或将其删除。"}},"zh-Hant":{"stringUnit":{"state":"translated","value":"模型下載不完整（已儲存 %@）。請繼續下載或將其刪除。"}}}},
+    "moss_local.model.download" : {"comment":"Settings button to download the local MOSS model.","extractionState":"manual","localizations":{"en":{"stringUnit":{"state":"translated","value":"Download MOSS Model"}},"zh-Hans":{"stringUnit":{"state":"translated","value":"下载 MOSS 模型"}},"zh-Hant":{"stringUnit":{"state":"translated","value":"下載 MOSS 模型"}}}},
+    "moss_local.model.delete" : {"comment":"Settings button to delete local MOSS model files.","extractionState":"manual","localizations":{"en":{"stringUnit":{"state":"translated","value":"Delete Model Download"}},"zh-Hans":{"stringUnit":{"state":"translated","value":"删除已下载模型"}},"zh-Hant":{"stringUnit":{"state":"translated","value":"刪除已下載模型"}}}},
+    "moss_local.model.downloading.format" : {"comment":"Local MOSS model download progress. Parameter: percent complete.","extractionState":"manual","localizations":{"en":{"stringUnit":{"state":"translated","value":"Downloading %.0f%%"}},"zh-Hans":{"stringUnit":{"state":"translated","value":"正在下载 %.0f%%"}},"zh-Hant":{"stringUnit":{"state":"translated","value":"正在下載 %.0f%%"}}}},
+    "moss_local.model.download_failed" : {"comment":"Alert title when the local MOSS model download fails.","extractionState":"manual","localizations":{"en":{"stringUnit":{"state":"translated","value":"MOSS Download Failed"}},"zh-Hans":{"stringUnit":{"state":"translated","value":"MOSS 下载失败"}},"zh-Hant":{"stringUnit":{"state":"translated","value":"MOSS 下載失敗"}}}},
+    "moss_local.model.delete_failed" : {"comment":"Alert title when deleting local MOSS model files fails.","extractionState":"manual","localizations":{"en":{"stringUnit":{"state":"translated","value":"MOSS Delete Failed"}},"zh-Hans":{"stringUnit":{"state":"translated","value":"MOSS 删除失败"}},"zh-Hant":{"stringUnit":{"state":"translated","value":"MOSS 刪除失敗"}}}},
+    "moss_local.error.model_required" : {"comment":"Error when local MOSS transcription starts without model files.","extractionState":"manual","localizations":{"en":{"stringUnit":{"state":"translated","value":"Download MOSS Multi-Speaker in Settings before using local speaker recognition."}},"zh-Hans":{"stringUnit":{"state":"translated","value":"请先在设置中下载 MOSS 多说话人模型，再使用本地说话人识别。"}},"zh-Hant":{"stringUnit":{"state":"translated","value":"請先在設定中下載 MOSS 多說話人模型，再使用本機說話人識別。"}}}},
+    "moss_local.error.incomplete_download" : {"comment":"Error when the downloaded local MOSS model is incomplete.","extractionState":"manual","localizations":{"en":{"stringUnit":{"state":"translated","value":"The MOSS model download is incomplete. Try downloading the model again."}},"zh-Hans":{"stringUnit":{"state":"translated","value":"MOSS 模型下载不完整，请重新下载。"}},"zh-Hant":{"stringUnit":{"state":"translated","value":"MOSS 模型下載不完整，請重新下載。"}}}},
+    "moss_local.error.storage_unavailable" : {"comment":"Error when local MOSS model storage is unavailable.","extractionState":"manual","localizations":{"en":{"stringUnit":{"state":"translated","value":"The app could not access MOSS model storage."}},"zh-Hans":{"stringUnit":{"state":"translated","value":"App 无法访问 MOSS 模型存储空间。"}},"zh-Hant":{"stringUnit":{"state":"translated","value":"App 無法存取 MOSS 模型儲存空間。"}}}},
+    "moss_local.error.empty_audio" : {"comment":"Local MOSS empty audio error.","extractionState":"manual","localizations":{"en":{"stringUnit":{"state":"translated","value":"The audio file has no samples to transcribe."}},"zh-Hans":{"stringUnit":{"state":"translated","value":"音频文件中没有可转录的采样。"}},"zh-Hant":{"stringUnit":{"state":"translated","value":"音訊檔案中沒有可轉錄的取樣。"}}}},
+    "moss_local.error.empty_transcript" : {"comment":"Local MOSS empty transcript error.","extractionState":"manual","localizations":{"en":{"stringUnit":{"state":"translated","value":"MOSS did not detect transcribable speech in this recording."}},"zh-Hans":{"stringUnit":{"state":"translated","value":"MOSS 未在此录音中检测到可转录的语音。"}},"zh-Hant":{"stringUnit":{"state":"translated","value":"MOSS 未在此錄音中偵測到可轉錄的語音。"}}}},
     "qwen3_asr.model.title" : {
       "comment" : "Settings title for the Qwen3-ASR transcription model.",
       "extractionState" : "manual",
@@ -19349,6 +19369,18 @@
         }
       }
     },
+    "recordings.retranscribe_moss" : {
+      "comment" : "Action title to retranscribe a recording with the on-device MOSS speaker diarization model.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {"stringUnit":{"state":"translated","value":"Mit MOSS und Sprechertrennung transkribieren"}},
+        "en" : {"stringUnit":{"state":"translated","value":"Transcribe with MOSS Multi-Speaker"}},
+        "ja" : {"stringUnit":{"state":"translated","value":"MOSS話者分離で文字起こし"}},
+        "nl" : {"stringUnit":{"state":"translated","value":"Transcriberen met MOSS-sprekerscheiding"}},
+        "zh-Hans" : {"stringUnit":{"state":"translated","value":"用 MOSS 多说话人转录"}},
+        "zh-Hant" : {"stringUnit":{"state":"translated","value":"用 MOSS 多說話人轉錄"}}
+      }
+    },
     "recordings.search_prompt" : {
       "comment" : "Search prompt on recordings list.",
       "extractionState" : "stale",
@@ -19937,6 +19969,90 @@
         }
       }
     },
+    "recordings.transcript.speaker" : {
+      "comment" : "Field title for changing the speaker assigned to one transcript segment.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sprecher ändern"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Change Speaker"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "話者を変更"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Spreker wijzigen"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "修改发言人"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "修改發言者"
+          }
+        }
+      }
+    },
+    "recordings.transcript.speaker.current_segment_detail" : {
+      "comment" : "Explanation below the speaker picker in the transcript segment editor.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Die Änderung gilt nur für diesen Transkriptabschnitt."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The speaker change applies only to this transcript segment."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "話者の変更は、この文字起こし部分にのみ適用されます。"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "De wijziging van spreker geldt alleen voor dit transcriptsegment."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "发言人修改仅应用于当前转录片段。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "發言者修改只套用至目前的轉錄片段。"
+          }
+        }
+      }
+    },
     "recordings.transcript.speaker.format" : {
       "comment" : "Display name for a numbered transcript speaker. Parameter: one-based speaker number.",
       "extractionState" : "manual",
@@ -19975,6 +20091,90 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "說話者 %d"
+          }
+        }
+      }
+    },
+    "recordings.transcript.speaker.new" : {
+      "comment" : "Option that assigns one transcript segment to a newly numbered speaker.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Neuer Sprecher"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "New Speaker"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "新しい話者"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nieuwe spreker"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "新增发言人"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "新增發言者"
+          }
+        }
+      }
+    },
+    "recordings.transcript.speaker.none" : {
+      "comment" : "Option that removes the speaker assignment from one transcript segment.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Kein Sprecher"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No Speaker"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "話者なし"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Geen spreker"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "未指定发言人"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "未指定發言者"
           }
         }
       }

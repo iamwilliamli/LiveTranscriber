@@ -1027,6 +1027,7 @@ final class RecordingStore: ObservableObject {
         self.userDefaults = userDefaults
         isICloudStorageEnabled = userDefaults.bool(forKey: Self.iCloudStorageEnabledDefaultsKey)
         configureModelContainer()
+        RecordingCategoryCloudSync.shared.setEnabled(isICloudStorageEnabled)
     }
 
     private func configureModelContainer() {
@@ -1122,6 +1123,7 @@ final class RecordingStore: ObservableObject {
         userDefaults.set(enabled, forKey: Self.iCloudStorageEnabledDefaultsKey)
         isICloudStorageEnabled = enabled
         configureModelContainer()
+        RecordingCategoryCloudSync.shared.setEnabled(enabled)
 
         do {
             try ensureRecordingsDirectory()
@@ -1542,6 +1544,56 @@ final class RecordingStore: ObservableObject {
             recordings[index].meetingAnalysis = nil
             recordings[index].speakerDiarization = nil
             recordings[index].importStatus = nil
+            try persist()
+        } catch {
+            markImportFailed(for: item.id, message: error.localizedDescription)
+            throw error
+        }
+    }
+
+    func retranscribeWithMOSS(_ item: RecordingItem) async throws {
+        try ensureTranscriptUnlocked(item)
+
+        let audioURL = audioURL(for: item)
+        let transcriptURL = transcriptURL(for: item)
+        updateImportStatus(
+            for: item.id,
+            progress: 0.04,
+            message: String(localized: L10n.Import.preparingTranscription),
+            shouldPersist: true
+        )
+
+        do {
+            let result = try await MOSSLocalTranscriptionService.transcribe(
+                audioURL: audioURL
+            ) { [weak self] progress in
+                Task { @MainActor in
+                    self?.updateImportStatus(
+                        for: item.id,
+                        progress: 0.04 + progress * 0.9,
+                        message: String(localized: L10n.Import.transcribing)
+                    )
+                }
+            }
+            guard let index = recordings.firstIndex(where: { $0.id == item.id }) else {
+                throw RecordingImportError.saveFailed
+            }
+            guard !recordings[index].isTranscriptLocked else {
+                throw RecordingTranscriptEditError.transcriptLocked
+            }
+
+            try result.lines.timedTranscriptText.write(
+                to: transcriptURL,
+                atomically: true,
+                encoding: .utf8
+            )
+            recordings[index].transcriptPreview = result.lines.plainTranscriptText
+            recordings[index].lineCount = result.lines.count
+            recordings[index].intelligence = nil
+            recordings[index].meetingAnalysis = nil
+            recordings[index].speakerDiarization = result.diarization
+            recordings[index].importStatus = nil
+            searchIndexCache[item.id] = nil
             try persist()
         } catch {
             markImportFailed(for: item.id, message: error.localizedDescription)
@@ -2028,7 +2080,8 @@ final class RecordingStore: ObservableObject {
     func updateTranscriptLine(
         for item: RecordingItem,
         lineID: String,
-        text: String
+        text: String,
+        speaker: String?
     ) throws -> RecordingItem {
         try ensureRecordingsDirectory()
         guard let index = recordings.firstIndex(where: { $0.id == item.id }) else {
@@ -2038,10 +2091,21 @@ final class RecordingStore: ObservableObject {
         let currentItem = recordings[index]
         let transcriptURL = transcriptURL(for: currentItem)
         let transcript = (try? String(contentsOf: transcriptURL, encoding: .utf8)) ?? ""
+        let spokenText = Self.cleanedTranscriptLineText(text)
+        let speaker = Self.cleanedTranscriptSpeaker(speaker)
+        let replacementText = speaker.map { "\($0): \(spokenText)" } ?? spokenText
         let updatedTranscript = try Self.replacingTranscriptLine(
             in: transcript,
             lineID: lineID,
-            replacementText: text
+            replacementText: replacementText
+        )
+        let updatedSpeakerDiarization = try Self.updatingSpeakerDiarization(
+            currentItem.speakerDiarization,
+            in: transcript,
+            lineID: lineID,
+            speaker: speaker,
+            spokenText: spokenText,
+            recordingDuration: Double(currentItem.durationSeconds)
         )
         try updatedTranscript.write(to: transcriptURL, atomically: true, encoding: .utf8)
 
@@ -2049,7 +2113,7 @@ final class RecordingStore: ObservableObject {
         recordings[index].lineCount = updatedTranscript.plainTranscriptTextForIntelligence.transcriptLineCount
         recordings[index].intelligence = nil
         recordings[index].meetingAnalysis = nil
-        recordings[index].speakerDiarization = nil
+        recordings[index].speakerDiarization = updatedSpeakerDiarization
         searchIndexCache[item.id] = nil
         try persist()
         return recordings[index]
@@ -2096,13 +2160,7 @@ final class RecordingStore: ObservableObject {
             .replacingOccurrences(of: "\r\n", with: "\n")
             .replacingOccurrences(of: "\r", with: "\n")
         var lines = normalizedTranscript.components(separatedBy: "\n")
-        let cleanedReplacementText = replacementText
-            .replacingOccurrences(of: "\r\n", with: "\n")
-            .replacingOccurrences(of: "\r", with: "\n")
-            .components(separatedBy: .newlines)
-            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
-            .filter { !$0.isEmpty }
-            .joined(separator: " ")
+        let cleanedReplacementText = cleanedTranscriptLineText(replacementText)
 
         for offset in lines.indices {
             let line = lines[offset].trimmingCharacters(in: .whitespacesAndNewlines)
@@ -2124,6 +2182,149 @@ final class RecordingStore: ObservableObject {
         }
 
         throw RecordingTranscriptEditError.lineMissing
+    }
+
+    private static func cleanedTranscriptLineText(_ text: String) -> String {
+        text
+            .replacingOccurrences(of: "\r\n", with: "\n")
+            .replacingOccurrences(of: "\r", with: "\n")
+            .components(separatedBy: .newlines)
+            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .filter { !$0.isEmpty }
+            .joined(separator: " ")
+    }
+
+    private static func cleanedTranscriptSpeaker(_ speaker: String?) -> String? {
+        guard let speaker else {
+            return nil
+        }
+        let cleaned = cleanedTranscriptLineText(speaker)
+        return cleaned.isEmpty ? nil : cleaned
+    }
+
+    private static func updatingSpeakerDiarization(
+        _ existing: RecordingSpeakerDiarization?,
+        in transcript: String,
+        lineID: String,
+        speaker: String?,
+        spokenText: String,
+        recordingDuration: Double
+    ) throws -> RecordingSpeakerDiarization? {
+        let locations = transcriptLineLocations(
+            in: transcript,
+            recordingDuration: recordingDuration
+        )
+        guard let targetLineIndex = locations.firstIndex(where: { $0.id == lineID }) else {
+            throw RecordingTranscriptEditError.lineMissing
+        }
+        let target = locations[targetLineIndex]
+
+        guard existing != nil || speaker != nil else {
+            return nil
+        }
+
+        var diarization = existing ?? RecordingSpeakerDiarization(
+            segments: [],
+            generatedAt: Date(),
+            provider: "manualEdit",
+            model: "user",
+            schemaVersion: 1
+        )
+        var segments = diarization.segments
+
+        let closestSegment = segments.indices.min { lhs, rhs in
+            abs(segments[lhs].startSeconds - target.startSeconds)
+                < abs(segments[rhs].startSeconds - target.startSeconds)
+        }
+        let matchingSegmentIndex: Int?
+        if let closestSegment,
+           abs(segments[closestSegment].startSeconds - target.startSeconds) <= 0.75 {
+            matchingSegmentIndex = closestSegment
+        } else if segments.count == locations.count,
+                  segments.indices.contains(targetLineIndex) {
+            matchingSegmentIndex = targetLineIndex
+        } else {
+            matchingSegmentIndex = nil
+        }
+
+        if let matchingSegmentIndex {
+            segments[matchingSegmentIndex].speaker = speaker
+            segments[matchingSegmentIndex].text = spokenText
+        } else {
+            segments.append(
+                RecordingSpeakerSegment(
+                    startSeconds: target.startSeconds,
+                    endSeconds: target.endSeconds,
+                    speaker: speaker,
+                    text: spokenText
+                )
+            )
+        }
+
+        diarization.segments = segments.sorted {
+            if $0.startSeconds == $1.startSeconds {
+                return $0.endSeconds < $1.endSeconds
+            }
+            return $0.startSeconds < $1.startSeconds
+        }
+        diarization.generatedAt = Date()
+        return diarization
+    }
+
+    private static func transcriptLineLocations(
+        in transcript: String,
+        recordingDuration: Double
+    ) -> [TranscriptLineLocation] {
+        let normalizedTranscript = transcript
+            .replacingOccurrences(of: "\r\n", with: "\n")
+            .replacingOccurrences(of: "\r", with: "\n")
+        let lines = normalizedTranscript.components(separatedBy: "\n")
+        var starts: [(id: String, startSeconds: Double)] = []
+
+        for offset in lines.indices {
+            let line = lines[offset].trimmingCharacters(in: .whitespacesAndNewlines)
+            guard line.hasPrefix("["),
+                  let closingBracket = line.firstIndex(of: "]") else {
+                continue
+            }
+            let timeText = String(line[line.index(after: line.startIndex)..<closingBracket])
+            guard let startSeconds = transcriptTimestampSeconds(timeText) else {
+                continue
+            }
+            starts.append((id: "\(offset)-\(timeText)", startSeconds: startSeconds))
+        }
+
+        let safeRecordingEnd = max(recordingDuration, starts.last?.startSeconds ?? 0)
+        return starts.enumerated().map { index, entry in
+            let nextStart = starts.indices.contains(index + 1)
+                ? starts[index + 1].startSeconds
+                : safeRecordingEnd
+            return TranscriptLineLocation(
+                id: entry.id,
+                startSeconds: entry.startSeconds,
+                endSeconds: max(entry.startSeconds, nextStart)
+            )
+        }
+    }
+
+    private static func transcriptTimestampSeconds(_ text: String) -> Double? {
+        let parts = text.split(separator: ":", omittingEmptySubsequences: false)
+        guard parts.count == 3,
+              let minutes = Int(parts[0]),
+              let seconds = Int(parts[1]),
+              let centiseconds = Int(parts[2]),
+              minutes >= 0,
+              (0..<60).contains(seconds),
+              (0..<100).contains(centiseconds) else {
+            return nil
+        }
+        return Double(minutes * 60 + seconds) + Double(centiseconds) / 100
+    }
+
+    private struct TranscriptLineLocation {
+        let id: String
+        let startSeconds: Double
+        let endSeconds: Double
     }
 
     func audioURL(for item: RecordingItem) -> URL {

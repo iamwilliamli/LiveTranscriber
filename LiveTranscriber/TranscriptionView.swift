@@ -110,6 +110,14 @@ struct TranscriptionView: View {
             TranscriptLineEditSheet(
                 timeText: request.timeText,
                 text: $editedLiveTranscriptLineText,
+                selectedSpeakerID: .constant(nil),
+                speakerOptions: [],
+                newSpeakerOption: TranscriptSpeakerEditOption(
+                    id: "Speaker 0",
+                    displayName: String(localized: L10n.Recordings.transcriptNewSpeaker),
+                    tint: AppTheme.info
+                ),
+                showsSpeakerEditor: false,
                 isSaving: isSavingLiveTranscriptLineEdit,
                 onSave: saveLiveTranscriptLineEdit,
                 onCancel: {
