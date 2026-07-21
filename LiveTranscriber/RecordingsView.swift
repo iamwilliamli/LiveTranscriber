@@ -6,6 +6,7 @@ import MediaPlayer
 import OSLog
 import PhotosUI
 import SwiftUI
+import TranscriberDomain
 import Translation
 import UIKit
 import UniformTypeIdentifiers

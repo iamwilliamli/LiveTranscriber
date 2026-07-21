@@ -70,6 +70,7 @@
 		7B000000000000000000003E /* MOSSLocalTranscription.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7B0000000000000000001040 /* MOSSLocalTranscription.swift */; };
 		7B000000000000000000003F /* MLXAudioSTT in Frameworks */ = {isa = PBXBuildFile; productRef = 7B000000000000000000B006 /* MLXAudioSTT */; };
 		7B0000000000000000000040 /* MLXAudioCore in Frameworks */ = {isa = PBXBuildFile; productRef = 7B000000000000000000B007 /* MLXAudioCore */; };
+		7B0000000000000000000041 /* TranscriberDomain in Frameworks */ = {isa = PBXBuildFile; productRef = 7B000000000000000000B009 /* TranscriberDomain */; };
 		7B00000000000000000000C1 /* LaunchSplashView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7B00000000000000000010C1 /* LaunchSplashView.swift */; };
 		7B00000000000000000000C2 /* QuickRecordingControlIntent.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7B00000000000000000010C2 /* QuickRecordingControlIntent.swift */; };
 		7B00000000000000000000C3 /* QuickRecordingControlIntent.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7B00000000000000000010C2 /* QuickRecordingControlIntent.swift */; };
@@ -211,6 +212,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				7B0000000000000000000041 /* TranscriberDomain in Frameworks */,
 				7B0000000000000000000040 /* MLXAudioCore in Frameworks */,
 				7B000000000000000000003F /* MLXAudioSTT in Frameworks */,
 				7B000000000000000000003D /* AudioCommon in Frameworks */,
@@ -377,6 +379,7 @@
 			);
 			name = LiveTranscriber;
 			packageProductDependencies = (
+				7B000000000000000000B009 /* TranscriberDomain */,
 				7B000000000000000000B002 /* Qwen3ASR */,
 				7B000000000000000000B003 /* SpeechVAD */,
 				7B000000000000000000B004 /* AudioCommon */,
@@ -458,6 +461,7 @@
 			packageReferences = (
 				7B000000000000000000B001 /* XCRemoteSwiftPackageReference "speech-swift" */,
 				7B000000000000000000B005 /* XCLocalSwiftPackageReference "Vendor/MLXAudioMOSS" */,
+				7B000000000000000000B008 /* XCLocalSwiftPackageReference "Packages/TranscriberDomain" */,
 			);
 			productRefGroup = 7B0000000000000000003003 /* Products */;
 			projectDirPath = "";
@@ -973,6 +977,10 @@
 			isa = XCLocalSwiftPackageReference;
 			relativePath = Vendor/MLXAudioMOSS;
 		};
+		7B000000000000000000B008 /* XCLocalSwiftPackageReference "Packages/TranscriberDomain" */ = {
+			isa = XCLocalSwiftPackageReference;
+			relativePath = Packages/TranscriberDomain;
+		};
 /* End XCLocalSwiftPackageReference section */
 
 /* Begin XCRemoteSwiftPackageReference section */
@@ -1011,6 +1019,11 @@
 			isa = XCSwiftPackageProductDependency;
 			package = 7B000000000000000000B005 /* XCLocalSwiftPackageReference "Vendor/MLXAudioMOSS" */;
 			productName = MLXAudioCore;
+		};
+		7B000000000000000000B009 /* TranscriberDomain */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 7B000000000000000000B008 /* XCLocalSwiftPackageReference "Packages/TranscriberDomain" */;
+			productName = TranscriberDomain;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};

@@ -1,4 +1,5 @@
 import SwiftUI
+import TranscriberDomain
 
 private enum MacSidebarDestination: String, CaseIterable, Identifiable {
     case library
@@ -153,6 +154,13 @@ struct MacSettingsView: View {
                     Text(MacL10n.nativeMacOS)
                 } label: {
                     Text(MacL10n.platform)
+                }
+
+                LabeledContent {
+                    Text(verbatim: "v\(TranscriberDomainSchema.currentVersion)")
+                        .monospacedDigit()
+                } label: {
+                    Text(MacL10n.domainSchema)
                 }
             } header: {
                 Text(MacL10n.foundation)

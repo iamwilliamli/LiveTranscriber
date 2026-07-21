@@ -13,6 +13,10 @@ settings:
     SWIFT_VERSION: "5.0"
     MACOSX_DEPLOYMENT_TARGET: "15.0"
 
+packages:
+  TranscriberDomain:
+    path: ../Packages/TranscriberDomain
+
 targets:
   LiveTranscriberMac:
     type: application
@@ -22,6 +26,8 @@ targets:
       - path: Sources
     resources:
       - path: Resources
+    dependencies:
+      - package: TranscriberDomain
     settings:
       base:
         CODE_SIGN_ENTITLEMENTS: LiveTranscriberMac.entitlements

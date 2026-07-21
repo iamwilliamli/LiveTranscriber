@@ -106,4 +106,9 @@ enum MacL10n {
         defaultValue: "Native macOS",
         comment: "Settings value confirming this is a native macOS app."
     )
+    static let domainSchema = resource(
+        "mac.settings.domain_schema",
+        defaultValue: "Domain Schema",
+        comment: "Settings label for the shared cross-platform domain schema version."
+    )
 }

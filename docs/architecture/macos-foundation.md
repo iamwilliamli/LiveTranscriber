@@ -5,6 +5,7 @@ Live Transcriber is managed as one repository with two native application projec
 - `LiveTranscriber.xcodeproj` owns the existing iOS and Widget targets.
 - `LiveTranscriberMac/LiveTranscriberMac.xcodeproj` owns the native macOS app.
 - `LiveTranscriber.xcworkspace` is the development entry point for both products.
+- `Packages/TranscriberDomain` owns Foundation-only shared value types; speaker diarization is the first model moved across this boundary.
 
 The macOS app is not a Catalyst target and does not compile the iOS source directory. Platform-independent behavior will move incrementally into local packages under `Packages/`; platform capture and presentation code remain in their respective app targets.
 

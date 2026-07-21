@@ -2,6 +2,7 @@ import AudioCommon
 import Foundation
 import MLXAudioCore
 @preconcurrency import MLXAudioSTT
+import TranscriberDomain
 
 struct MOSSLocalModelStatus: Equatable {
     let isAvailable: Bool

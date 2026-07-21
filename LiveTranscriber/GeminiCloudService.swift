@@ -3,22 +3,7 @@ import Combine
 import Foundation
 import OSLog
 import Security
-
-struct RecordingSpeakerDiarization: Codable, Hashable, Sendable {
-    var segments: [RecordingSpeakerSegment]
-    var generatedAt: Date
-    var provider: String
-    var model: String
-    var schemaVersion: Int
-}
-
-struct RecordingSpeakerSegment: Codable, Hashable, Identifiable, Sendable {
-    var id = UUID()
-    var startSeconds: Double
-    var endSeconds: Double
-    var speaker: String?
-    var text: String
-}
+import TranscriberDomain
 
 struct GeminiCloudTranscriptionResult: Sendable {
     var lines: [TranscriptionLine]

@@ -8,6 +8,7 @@
 
 /* Begin PBXBuildFile section */
 		6187837CCBB92F81FD70EDF6 /* MacL10n.swift in Sources */ = {isa = PBXBuildFile; fileRef = 995F7E6F291E47A390D6D53D /* MacL10n.swift */; };
+		876487A8AF883EFBA9059258 /* TranscriberDomain in Frameworks */ = {isa = PBXBuildFile; productRef = E0B2A813EFB2F988E6C1C94A /* TranscriberDomain */; };
 		A48F098CCFCC4C5251695080 /* LiveTranscriberMacApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 92EDB649F0FE3E9F9AC8E2C0 /* LiveTranscriberMacApp.swift */; };
 		B677D5BE189245624DAEC599 /* MacRootView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A3AE257FB6CBB7815E9751D0 /* MacRootView.swift */; };
 /* End PBXBuildFile section */
@@ -17,9 +18,29 @@
 		92EDB649F0FE3E9F9AC8E2C0 /* LiveTranscriberMacApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LiveTranscriberMacApp.swift; sourceTree = "<group>"; };
 		995F7E6F291E47A390D6D53D /* MacL10n.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MacL10n.swift; sourceTree = "<group>"; };
 		A3AE257FB6CBB7815E9751D0 /* MacRootView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MacRootView.swift; sourceTree = "<group>"; };
+		B2E20A2F0A072F466C62C4BF /* TranscriberDomain */ = {isa = PBXFileReference; lastKnownFileType = folder; name = TranscriberDomain; path = ../Packages/TranscriberDomain; sourceTree = SOURCE_ROOT; };
 /* End PBXFileReference section */
 
+/* Begin PBXFrameworksBuildPhase section */
+		9FCD3D764DF22B25CE99B110 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				876487A8AF883EFBA9059258 /* TranscriberDomain in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXFrameworksBuildPhase section */
+
 /* Begin PBXGroup section */
+		1B5F14B4F66E73881693571D /* Packages */ = {
+			isa = PBXGroup;
+			children = (
+				B2E20A2F0A072F466C62C4BF /* TranscriberDomain */,
+			);
+			name = Packages;
+			sourceTree = "<group>";
+		};
 		26AE504ED635E07D2646A20A /* Products */ = {
 			isa = PBXGroup;
 			children = (
@@ -31,6 +52,7 @@
 		67383329FEB00399BAEF0B60 = {
 			isa = PBXGroup;
 			children = (
+				1B5F14B4F66E73881693571D /* Packages */,
 				AA52ABA7ABC2D9FD92B5C2E6 /* Sources */,
 				26AE504ED635E07D2646A20A /* Products */,
 			);
@@ -54,6 +76,7 @@
 			buildConfigurationList = EBE06B15A61F38E8B6EDE506 /* Build configuration list for PBXNativeTarget "LiveTranscriberMac" */;
 			buildPhases = (
 				5E3432995B199D5F59D913D5 /* Sources */,
+				9FCD3D764DF22B25CE99B110 /* Frameworks */,
 			);
 			buildRules = (
 			);
@@ -61,6 +84,7 @@
 			);
 			name = LiveTranscriberMac;
 			packageProductDependencies = (
+				E0B2A813EFB2F988E6C1C94A /* TranscriberDomain */,
 			);
 			productName = LiveTranscriberMac;
 			productReference = 2470C7C27246AF9E5C609031 /* LiveTranscriberMac.app */;
@@ -90,6 +114,9 @@
 			);
 			mainGroup = 67383329FEB00399BAEF0B60;
 			minimizedProjectReferenceProxies = 1;
+			packageReferences = (
+				8D4C5B570667A664567F54EB /* XCLocalSwiftPackageReference "../Packages/TranscriberDomain" */,
+			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = 26AE504ED635E07D2646A20A /* Products */;
 			projectDirPath = "";
@@ -307,6 +334,20 @@
 			defaultConfigurationName = Debug;
 		};
 /* End XCConfigurationList section */
+
+/* Begin XCLocalSwiftPackageReference section */
+		8D4C5B570667A664567F54EB /* XCLocalSwiftPackageReference "../Packages/TranscriberDomain" */ = {
+			isa = XCLocalSwiftPackageReference;
+			relativePath = ../Packages/TranscriberDomain;
+		};
+/* End XCLocalSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		E0B2A813EFB2F988E6C1C94A /* TranscriberDomain */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = TranscriberDomain;
+		};
+/* End XCSwiftPackageProductDependency section */
 	};
 	rootObject = E67CA6EEF2536957A7550E0F /* Project object */;
 }

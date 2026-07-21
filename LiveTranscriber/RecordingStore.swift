@@ -8,6 +8,7 @@ import FoundationModels
 import Speech
 import OSLog
 import SwiftData
+import TranscriberDomain
 
 struct RecordingDraft {
     var audioURL: URL
