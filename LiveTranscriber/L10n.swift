@@ -40,6 +40,11 @@ enum L10n {
             defaultValue: "Cancel",
             comment: "Generic cancel button title."
         )
+        static let close = L10n.resource(
+            "common.close",
+            defaultValue: "Close",
+            comment: "Accessibility label for a close or dismiss button."
+        )
         static let copy = L10n.resource(
             "common.copy",
             defaultValue: "Copy",
@@ -118,6 +123,8 @@ enum L10n {
     enum Settings {
         static let title = L10n.resource("settings.title", defaultValue: "Settings", comment: "Settings screen title.")
         static let transcription = L10n.resource("settings.transcription", defaultValue: "Transcription", comment: "Settings section title for transcription.")
+        static let offlineTranscription = L10n.resource("settings.offline_transcription", defaultValue: "Offline Transcription", comment: "Settings section title for offline transcription engines and their models.")
+        static let modelInformation = L10n.resource("settings.model_information", defaultValue: "Model Information", comment: "Settings section title for external model information links.")
         static let recording = L10n.resource("settings.recording", defaultValue: "Recording", comment: "Settings section title for recording.")
         static let files = L10n.resource("settings.files", defaultValue: "Files", comment: "Settings section title for files.")
         static let privacy = L10n.resource("settings.privacy", defaultValue: "Privacy", comment: "Settings section title for privacy.")
@@ -234,6 +241,9 @@ enum L10n {
     }
 
     enum LocalWhisper {
+        static let engineTitle = L10n.resource("local_whisper.engine.title", defaultValue: "Whisper", comment: "Short display name for the offline Whisper transcription engine.")
+        static let submenuDescription = L10n.resource("local_whisper.settings.submenu_description", defaultValue: "Manage Whisper models and the Core ML encoder", comment: "Settings navigation subtitle for the Whisper model submenu.")
+        static let aboutModel = L10n.resource("local_whisper.model.about", defaultValue: "About Whisper", comment: "Settings link title that opens the official Whisper model information page.")
         static let modelTitle = L10n.resource("local_whisper.model.title", defaultValue: "Local Whisper Model", comment: "Settings section title for local Whisper model management.")
         static let selectedModel = L10n.resource("local_whisper.model.selected", defaultValue: "Loaded Model", comment: "Settings row title for the selected local Whisper model.")
         static let modelStatus = L10n.resource("local_whisper.model.status", defaultValue: "Model Status", comment: "Settings metric title for local Whisper model status.")
@@ -295,6 +305,7 @@ enum L10n {
     }
 
     enum Qwen3ASR {
+        static let aboutModel = L10n.resource("qwen3_asr.model.about", defaultValue: "About Qwen3-ASR", comment: "Settings link title that opens the official Qwen3-ASR model information page.")
         static let modelTitle = L10n.resource("qwen3_asr.model.title", defaultValue: "Qwen3-ASR", comment: "Settings title for the Qwen3-ASR transcription model.")
         static let modelName = L10n.resource("qwen3_asr.model.name", defaultValue: "Qwen3-ASR 0.6B 4-bit", comment: "Display name of the on-device Qwen3-ASR model.")
         static let modelDescription = L10n.resource("qwen3_asr.model.description", defaultValue: "On-device post-recording transcription with multilingual recognition and audio-based timestamps. Speaker separation is not included.", comment: "Description of Qwen3-ASR capabilities in Settings.")
@@ -320,6 +331,7 @@ enum L10n {
     }
 
     enum MOSSLocal {
+        static let aboutModel = L10n.resource("moss_local.model.about", defaultValue: "About MOSS", comment: "Settings link title that opens the official MOSS Transcribe Diarize model information page.")
         static let modelTitle = L10n.resource("moss_local.model.title", defaultValue: "MOSS Multi-Speaker", comment: "Settings title for the local MOSS transcription and speaker diarization model.")
         static let modelName = L10n.resource("moss_local.model.name", defaultValue: "MOSS Transcribe Diarize 4-bit", comment: "Display name of the on-device MOSS model.")
         static let modelDescription = L10n.resource("moss_local.model.description", defaultValue: "On-device post-recording transcription with timestamps and multiple-speaker separation. The 4-bit model needs about 1 GB of storage and substantial memory while running.", comment: "Description of local MOSS capabilities and resource usage in Settings.")

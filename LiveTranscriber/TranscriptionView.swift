@@ -13,12 +13,6 @@ private func localizedFormat(_ resource: LocalizedStringResource, _ arguments: C
     String(format: String(localized: resource), arguments: arguments)
 }
 
-private enum TranscriptionAmbientState: Equatable {
-    case standby
-    case recording
-    case paused
-}
-
 struct TranscriptionView: View {
     @Environment(\.colorScheme) private var colorScheme
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
@@ -216,44 +210,14 @@ struct TranscriptionView: View {
     }
 
     private var transcriptionBackground: some View {
-        ZStack {
-            AppTheme.groupedBackground
-
-            ambientBackgroundGradient(color: AppTheme.warning)
-                .opacity(transcriptionAmbientState == .standby ? 1 : 0)
-
-            ambientBackgroundGradient(color: AppTheme.danger)
-                .opacity(transcriptionAmbientState == .recording ? 1 : 0)
-
-            ambientBackgroundGradient(color: AppTheme.success)
-                .opacity(transcriptionAmbientState == .paused ? 1 : 0)
-        }
-        .animation(
-            reduceMotion ? nil : .easeInOut(duration: 0.55),
-            value: transcriptionAmbientState
-        )
-        .ignoresSafeArea()
-        .allowsHitTesting(false)
+        AmbientActivityBackground(state: transcriptionAmbientState)
     }
 
-    private var transcriptionAmbientState: TranscriptionAmbientState {
+    private var transcriptionAmbientState: AmbientActivityState {
         guard transcriber.isRecording else {
             return .standby
         }
-        return transcriber.isPaused ? .paused : .recording
-    }
-
-    private func ambientBackgroundGradient(color: Color) -> some View {
-        LinearGradient(
-            stops: [
-                .init(color: color.opacity(colorScheme == .dark ? 0.20 : 0.52), location: 0),
-                .init(color: color.opacity(colorScheme == .dark ? 0.12 : 0.25), location: 0.20),
-                .init(color: color.opacity(colorScheme == .dark ? 0.04 : 0.08), location: 0.42),
-                .init(color: .clear, location: 0.64)
-            ],
-            startPoint: .top,
-            endPoint: .bottom
-        )
+        return transcriber.isPaused ? .paused : .active
     }
 
     private var portraitWorkspace: some View {
@@ -1972,17 +1936,28 @@ private struct RollingRecorderElapsedTimeText: View {
 
     var body: some View {
         let text = TranscriptionLine.formatTimestamp(clock.elapsedTime)
+        let components = text.split(separator: ":", omittingEmptySubsequences: false)
 
-        Text(text)
-            .font(.system(size: 25, weight: .semibold, design: .monospaced))
-            .foregroundStyle(color)
-            .monospacedDigit()
-            .contentTransition(.identity)
-            .transaction { transaction in
-                transaction.animation = nil
-                transaction.disablesAnimations = true
+        HStack(spacing: 0) {
+            ForEach(Array(components.indices), id: \.self) { index in
+                Text(String(components[index]))
+                    .foregroundStyle(color)
+
+                if index < components.index(before: components.endIndex) {
+                    Text(":")
+                        .foregroundStyle(AppTheme.danger)
+                }
             }
-            .accessibilityLabel(text)
+        }
+        .font(.custom(AppTypography.baloo2SemiBoldName, size: 25))
+        .monospacedDigit()
+        .contentTransition(.identity)
+        .transaction { transaction in
+            transaction.animation = nil
+            transaction.disablesAnimations = true
+        }
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(text)
     }
 }
 

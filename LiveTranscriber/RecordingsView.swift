@@ -1466,7 +1466,10 @@ struct RecordingsView: View {
             item: item,
             isAnalyzing: analyzingRecordingID == item.id,
             canGenerateIntelligence: store.intelligenceAvailability.isAvailable,
-            searchMatch: searchMatch
+            searchMatch: searchMatch,
+            onDismissImportStatus: {
+                store.dismissFailedImportStatus(for: item.id)
+            }
         ) {
             openRecording(item, initialTranscriptLineID: searchMatch?.lineID)
         }
@@ -2620,7 +2623,10 @@ private struct RecordingCategoryDetailList: View {
                     RecordingRow(
                         item: item,
                         isAnalyzing: analyzingRecordingID == item.id,
-                        canGenerateIntelligence: store.intelligenceAvailability.isAvailable
+                        canGenerateIntelligence: store.intelligenceAvailability.isAvailable,
+                        onDismissImportStatus: {
+                            store.dismissFailedImportStatus(for: item.id)
+                        }
                     ) {
                         onOpen(item)
                     }
@@ -3551,6 +3557,7 @@ private struct RecordingRow: View {
     let isAnalyzing: Bool
     let canGenerateIntelligence: Bool
     var searchMatch: RecordingTranscriptSearchMatch? = nil
+    let onDismissImportStatus: () -> Void
     let onOpen: () -> Void
 
     private var isTranscriptionRunning: Bool {
@@ -3598,10 +3605,10 @@ private struct RecordingRow: View {
             if let importStatus = item.importStatus {
                 VStack(alignment: .leading, spacing: 6) {
                     if importStatus.isFailed {
-                        Label(importStatus.message, systemImage: "exclamationmark.triangle")
-                            .font(.redditSans(.caption, weight: .semibold))
-                            .foregroundStyle(AppTheme.warning)
-                            .lineLimit(2)
+                        RecordingFailedImportStatusRow(
+                            message: importStatus.message,
+                            onDismiss: onDismissImportStatus
+                        )
                     } else {
                         ProgressView(value: importStatus.progress)
                             .progressViewStyle(.linear)
@@ -4013,6 +4020,11 @@ struct RecordingDetailView: View {
         store.recording(withID: item.id) ?? item
     }
 
+    private var currentItemDisplayTitle: String {
+        let title = (currentItem.audioFileName as NSString).deletingPathExtension
+        return title.isEmpty ? currentItem.audioFileName : title
+    }
+
     private var selectedSummaryProvider: RecordingSummaryProvider {
         RecordingSummaryProvider(rawValue: selectedSummaryProviderRawValue) ?? .automatic
     }
@@ -4097,6 +4109,21 @@ struct RecordingDetailView: View {
         pendingSpeechLocaleReleaseAction?.request.messageText ?? ""
     }
 
+    private var playbackAmbientState: AmbientActivityState {
+        guard player.isLoaded,
+              player.currentItem?.id == currentItem.id else {
+            return .standby
+        }
+        guard !player.isPlaying else {
+            return .active
+        }
+
+        let playbackTime = player.currentTime
+        let isBetweenStartAndEnd = playbackTime > 0.05
+            && (player.duration <= 0 || playbackTime < player.duration - 0.05)
+        return isBetweenStartAndEnd ? .paused : .standby
+    }
+
     @ViewBuilder
     private var reminderAddedBanner: some View {
         if let reminderBannerMessage {
@@ -4131,6 +4158,8 @@ struct RecordingDetailView: View {
         // views in a ZStack extend edge-to-edge like the old single page,
         // and keeping both alive preserves scroll and draft state.
         ZStack {
+            AmbientActivityBackground(state: playbackAmbientState)
+
             transcriptPage
                 .opacity(selectedDetailPage == .transcript ? 1 : 0)
                 .offset(x: selectedDetailPage == .transcript ? 0 : -44)
@@ -4177,11 +4206,10 @@ struct RecordingDetailView: View {
         .onChange(of: selectedDetailPage) {
             HapticFeedback.play(.navigation)
         }
-        .background(AppTheme.groupedBackground.ignoresSafeArea())
         .toolbar(.hidden, for: .tabBar)
         .toolbar(.visible, for: .navigationBar)
         .toolbarBackground(.hidden, for: .navigationBar)
-        .navigationTitle(currentItem.audioFileName)
+        .navigationTitle(currentItemDisplayTitle)
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             if let onClose {
@@ -4731,6 +4759,7 @@ struct RecordingDetailView: View {
         } label: {
             Image(systemName: "ellipsis.circle")
         }
+        .tint(Color.primary)
         .accessibilityLabel(Text(L10n.Common.more))
     }
 
@@ -4753,9 +4782,6 @@ struct RecordingDetailView: View {
     private var transcriptPage: some View {
         ScrollViewReader { scrollProxy in
             ZStack {
-                AppTheme.groupedBackground
-                    .ignoresSafeArea()
-
                 ScrollView {
                     VStack(alignment: .leading, spacing: 16) {
                         header
@@ -5494,7 +5520,12 @@ struct RecordingDetailView: View {
             transcriptTranslationStatus
 
             if let importStatus = item.importStatus {
-                RecordingImportStatusDetail(status: importStatus)
+                RecordingImportStatusDetail(
+                    status: importStatus,
+                    onDismiss: {
+                        store.dismissFailedImportStatus(for: item.id)
+                    }
+                )
             }
 
             if lines.isEmpty {
@@ -7189,14 +7220,15 @@ private extension View {
 
 private struct RecordingImportStatusDetail: View {
     let status: RecordingImportStatus
+    let onDismiss: () -> Void
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             if status.isFailed {
-                Label(status.message, systemImage: "exclamationmark.triangle")
-                    .font(.redditSans(.caption, weight: .semibold))
-                    .foregroundStyle(AppTheme.warning)
-                    .fixedSize(horizontal: false, vertical: true)
+                RecordingFailedImportStatusRow(
+                    message: status.message,
+                    onDismiss: onDismiss
+                )
             } else {
                 ProgressView(value: status.progress)
                     .progressViewStyle(.linear)
@@ -7208,6 +7240,42 @@ private struct RecordingImportStatusDetail: View {
         .padding(10)
         .frame(maxWidth: .infinity, alignment: .leading)
         .background((status.isFailed ? AppTheme.warning : AppTheme.info).opacity(0.1), in: RoundedRectangle(cornerRadius: AppTheme.compactCornerRadius, style: .continuous))
+    }
+}
+
+private struct RecordingFailedImportStatusRow: View {
+    let message: String
+    let onDismiss: () -> Void
+
+    var body: some View {
+        HStack(alignment: .center, spacing: 10) {
+            Label(message, systemImage: "exclamationmark.triangle")
+                .font(.redditSans(.caption, weight: .semibold))
+                .foregroundStyle(AppTheme.warning)
+                .lineLimit(2)
+                .fixedSize(horizontal: false, vertical: true)
+                .frame(maxWidth: .infinity, alignment: .leading)
+
+            RecordingStatusDismissButton(action: onDismiss)
+        }
+        .frame(minHeight: 30)
+    }
+}
+
+private struct RecordingStatusDismissButton: View {
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            Image(systemName: "xmark")
+                .font(.system(size: 11, weight: .bold))
+                .foregroundStyle(AppTheme.warning)
+                .frame(width: 30, height: 30)
+                .background(AppTheme.warning.opacity(0.12), in: Circle())
+                .contentShape(Circle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(Text(L10n.Common.close))
     }
 }
 
@@ -8965,14 +9033,15 @@ private struct RetroRecordingDisplay: View {
                             text: Self.displayTimestamp(currentTime),
                             accessibilityText: "\(TranscriptionLine.formatTimestamp(currentTime)) / \(TranscriptionLine.formatTimestamp(duration))"
                         )
-                        .frame(maxWidth: .infinity, minHeight: 48, maxHeight: 52)
+                        .frame(maxWidth: .infinity)
+                        .frame(height: 40)
                     }
                 }
             }
             .padding(.horizontal, 16)
             .padding(.vertical, 14)
         }
-        .frame(height: 226)
+        .frame(height: 212)
         .clipShape(RoundedRectangle(cornerRadius: 23, style: .continuous))
         .overlay {
             RoundedRectangle(cornerRadius: 23, style: .continuous)

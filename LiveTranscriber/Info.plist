@@ -103,6 +103,7 @@
 		<string>RedditSans-SemiBold.ttf</string>
 		<string>RedditSans-Bold.ttf</string>
 		<string>RedditSans-Italic.ttf</string>
+		<string>Baloo2-Variable.ttf</string>
 	</array>
 	<key>UILaunchScreen</key>
 	<dict>

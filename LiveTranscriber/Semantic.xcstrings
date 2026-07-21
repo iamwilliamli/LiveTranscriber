@@ -1,6 +1,13 @@
 {
   "sourceLanguage" : "en",
   "strings" : {
+    "local_whisper.engine.title" : {"comment":"Short display name for the offline Whisper transcription engine.","extractionState":"manual","localizations":{"de":{"stringUnit":{"state":"translated","value":"Whisper"}},"en":{"stringUnit":{"state":"translated","value":"Whisper"}},"ja":{"stringUnit":{"state":"translated","value":"Whisper"}},"nl":{"stringUnit":{"state":"translated","value":"Whisper"}},"zh-Hans":{"stringUnit":{"state":"translated","value":"Whisper"}},"zh-Hant":{"stringUnit":{"state":"translated","value":"Whisper"}}}},
+    "local_whisper.model.about" : {"comment":"Settings link title that opens the official Whisper model information page.","extractionState":"manual","localizations":{"de":{"stringUnit":{"state":"translated","value":"Über Whisper"}},"en":{"stringUnit":{"state":"translated","value":"About Whisper"}},"ja":{"stringUnit":{"state":"translated","value":"Whisperについて"}},"nl":{"stringUnit":{"state":"translated","value":"Over Whisper"}},"zh-Hans":{"stringUnit":{"state":"translated","value":"关于 Whisper"}},"zh-Hant":{"stringUnit":{"state":"translated","value":"關於 Whisper"}}}},
+    "local_whisper.settings.submenu_description" : {"comment":"Settings navigation subtitle for the Whisper model submenu.","extractionState":"manual","localizations":{"de":{"stringUnit":{"state":"translated","value":"Whisper-Modelle und Core ML Encoder verwalten"}},"en":{"stringUnit":{"state":"translated","value":"Manage Whisper models and the Core ML encoder"}},"ja":{"stringUnit":{"state":"translated","value":"WhisperモデルとCore ML Encoderを管理"}},"nl":{"stringUnit":{"state":"translated","value":"Whisper-modellen en Core ML Encoder beheren"}},"zh-Hans":{"stringUnit":{"state":"translated","value":"管理 Whisper 模型和 Core ML Encoder"}},"zh-Hant":{"stringUnit":{"state":"translated","value":"管理 Whisper 模型與 Core ML Encoder"}}}},
+    "moss_local.model.about" : {"comment":"Settings link title that opens the official MOSS Transcribe Diarize model information page.","extractionState":"manual","localizations":{"de":{"stringUnit":{"state":"translated","value":"Über MOSS"}},"en":{"stringUnit":{"state":"translated","value":"About MOSS"}},"ja":{"stringUnit":{"state":"translated","value":"MOSSについて"}},"nl":{"stringUnit":{"state":"translated","value":"Over MOSS"}},"zh-Hans":{"stringUnit":{"state":"translated","value":"关于 MOSS"}},"zh-Hant":{"stringUnit":{"state":"translated","value":"關於 MOSS"}}}},
+    "qwen3_asr.model.about" : {"comment":"Settings link title that opens the official Qwen3-ASR model information page.","extractionState":"manual","localizations":{"de":{"stringUnit":{"state":"translated","value":"Über Qwen3-ASR"}},"en":{"stringUnit":{"state":"translated","value":"About Qwen3-ASR"}},"ja":{"stringUnit":{"state":"translated","value":"Qwen3-ASRについて"}},"nl":{"stringUnit":{"state":"translated","value":"Over Qwen3-ASR"}},"zh-Hans":{"stringUnit":{"state":"translated","value":"关于 Qwen3-ASR"}},"zh-Hant":{"stringUnit":{"state":"translated","value":"關於 Qwen3-ASR"}}}},
+    "settings.model_information" : {"comment":"Settings section title for external model information links.","extractionState":"manual","localizations":{"de":{"stringUnit":{"state":"translated","value":"Modellinformationen"}},"en":{"stringUnit":{"state":"translated","value":"Model Information"}},"ja":{"stringUnit":{"state":"translated","value":"モデル情報"}},"nl":{"stringUnit":{"state":"translated","value":"Modelinformatie"}},"zh-Hans":{"stringUnit":{"state":"translated","value":"模型信息"}},"zh-Hant":{"stringUnit":{"state":"translated","value":"模型資訊"}}}},
+    "settings.offline_transcription" : {"comment":"Settings section title for offline transcription engines and their models.","extractionState":"manual","localizations":{"de":{"stringUnit":{"state":"translated","value":"Offline-Transkription"}},"en":{"stringUnit":{"state":"translated","value":"Offline Transcription"}},"ja":{"stringUnit":{"state":"translated","value":"オフライン文字起こし"}},"nl":{"stringUnit":{"state":"translated","value":"Offline transcriptie"}},"zh-Hans":{"stringUnit":{"state":"translated","value":"离线转录"}},"zh-Hant":{"stringUnit":{"state":"translated","value":"離線轉錄"}}}},
     "app_intents.open_recording.description" : {
       "comment" : "App Intent description for opening a recording.",
       "localizations" : {
@@ -706,6 +713,48 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "取消"
+          }
+        }
+      }
+    },
+    "common.close" : {
+      "comment" : "Accessibility label for a close or dismiss button.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Schließen"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Close"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "閉じる"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sluiten"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "关闭"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "關閉"
           }
         }
       }
@@ -9904,7 +9953,7 @@
     "moss_local.model.description" : {"comment":"Description of local MOSS capabilities and resource usage in Settings.","extractionState":"manual","localizations":{"en":{"stringUnit":{"state":"translated","value":"On-device post-recording transcription with timestamps and multiple-speaker separation. The 4-bit model needs about 1 GB of storage and substantial memory while running."}},"zh-Hans":{"stringUnit":{"state":"translated","value":"在设备上完成录音后转录，包含时间戳和多说话人分离。4-bit 模型约需 1 GB 存储空间，运行时会占用较多内存。"}},"zh-Hant":{"stringUnit":{"state":"translated","value":"在裝置上完成錄音後轉錄，包含時間戳和多說話人分離。4-bit 模型約需 1 GB 儲存空間，執行時會佔用較多記憶體。"}}}},
     "moss_local.settings.submenu_description" : {"comment":"Settings navigation subtitle for the local MOSS model.","extractionState":"manual","localizations":{"en":{"stringUnit":{"state":"translated","value":"Download and manage local multi-speaker transcription"}},"zh-Hans":{"stringUnit":{"state":"translated","value":"下载并管理本地多说话人转录"}},"zh-Hant":{"stringUnit":{"state":"translated","value":"下載並管理本機多說話人轉錄"}}}},
     "moss_local.model.status" : {"comment":"Settings metric title for local MOSS model status.","extractionState":"manual","localizations":{"en":{"stringUnit":{"state":"translated","value":"Model Status"}},"zh-Hans":{"stringUnit":{"state":"translated","value":"模型状态"}},"zh-Hant":{"stringUnit":{"state":"translated","value":"模型狀態"}}}},
-    "moss_local.model.ready" : {"comment":"Local MOSS status when all required model files are available.","extractionState":"manual","localizations":{"en":{"stringUnit":{"state":"translated","value":"Ready"}},"zh-Hans":{"stringUnit":{"state":"translated","value":"已就绪"}},"zh-Hant":{"stringUnit":{"state":"translated","value":"已就緒"}}}},
+    "moss_local.model.ready" : {"comment":"Local MOSS status when all required model files are available.","extractionState":"manual","localizations":{"en":{"stringUnit":{"state":"translated","value":"Ready"}},"zh-Hans":{"stringUnit":{"state":"translated","value":"就绪"}},"zh-Hant":{"stringUnit":{"state":"translated","value":"就緒"}}}},
     "moss_local.model.not_installed" : {"comment":"Local MOSS status when the model has not been downloaded.","extractionState":"manual","localizations":{"en":{"stringUnit":{"state":"translated","value":"Not Installed"}},"zh-Hans":{"stringUnit":{"state":"translated","value":"未安装"}},"zh-Hant":{"stringUnit":{"state":"translated","value":"未安裝"}}}},
     "moss_local.model.downloaded_detail.format" : {"comment":"Local MOSS downloaded model detail. Parameter: installed size.","extractionState":"manual","localizations":{"en":{"stringUnit":{"state":"translated","value":"The multi-speaker model is stored on this iPhone (%@)."}},"zh-Hans":{"stringUnit":{"state":"translated","value":"多说话人模型已存储在此 iPhone 上（%@）。"}},"zh-Hant":{"stringUnit":{"state":"translated","value":"多說話人模型已儲存在此 iPhone 上（%@）。"}}}},
     "moss_local.model.missing_detail.format" : {"comment":"Local MOSS missing model detail. Parameter: expected download size.","extractionState":"manual","localizations":{"en":{"stringUnit":{"state":"translated","value":"Download about %@ before using local multi-speaker transcription."}},"zh-Hans":{"stringUnit":{"state":"translated","value":"使用本地多说话人转录前需下载约 %@。"}},"zh-Hant":{"stringUnit":{"state":"translated","value":"使用本機多說話人轉錄前需下載約 %@。"}}}},

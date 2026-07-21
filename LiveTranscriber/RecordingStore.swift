@@ -1841,6 +1841,16 @@ final class RecordingStore: ObservableObject {
         try? persist()
     }
 
+    func dismissFailedImportStatus(for id: RecordingItem.ID) {
+        guard let index = recordings.firstIndex(where: { $0.id == id }),
+              recordings[index].importStatus?.isFailed == true else {
+            return
+        }
+
+        recordings[index].importStatus = nil
+        try? persist()
+    }
+
     private func markInterruptedImportStatuses() {
         let interruptedMessage = String(localized: L10n.Import.transcriptionInterrupted)
         var didUpdate = false

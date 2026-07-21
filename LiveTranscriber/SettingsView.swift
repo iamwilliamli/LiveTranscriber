@@ -12,6 +12,7 @@ struct SettingsView: View {
         case privacy
         case developer
         case transcriptionLanguage
+        case localWhisper
         case localWhisperModel
         case liveWhisperModel
         case qwen3ASRModel
@@ -70,6 +71,9 @@ struct SettingsView: View {
     @AppStorage(Qwen3ASRDeveloperConfiguration.streamingLongAudioDefaultsKey) private var isQwen3ASRStreamingLongAudioEnabled = false
     private static let publicBetaFeedbackURL = URL(string: "https://t.me/livetranscriber")!
     private static let privacyPolicyURL = URL(string: "https://iamwilliamli.github.io/LiveTranscriber/privacy/")!
+    private static let whisperModelURL = URL(string: "https://github.com/openai/whisper")!
+    private static let qwen3ASRModelURL = URL(string: "https://github.com/QwenLM/Qwen3-ASR")!
+    private static let mossModelURL = URL(string: "https://github.com/OpenMOSS/MOSS-Transcribe-Diarize#model-architecture")!
     private static let feedbackRecipient = "lichengqi0805@gmail.com"
     private static let mailtoQueryAllowedCharacters: CharacterSet = {
         var allowed = CharacterSet.urlQueryAllowed
@@ -103,6 +107,8 @@ struct SettingsView: View {
             developerSettingsPage
         case .transcriptionLanguage:
             transcriptionLanguagePage
+        case .localWhisper:
+            localWhisperSettingsPage
         case .localWhisperModel:
             localWhisperModelPage
         case .liveWhisperModel:
@@ -468,7 +474,28 @@ struct SettingsView: View {
                 .settingsNavigationHaptic()
                 .disabled(transcriber.isRecording || transcriber.isPreparing)
 
-                localWhisperModelSettings
+                if transcriber.isRecording || transcriber.isPreparing {
+                    SettingsStatusRow(icon: "lock.fill", textResource: L10n.Settings.cannotChangeLanguageWhileRecording, tint: AppTheme.warning)
+                }
+            }
+
+            SettingsSection(
+                titleResource: L10n.Settings.offlineTranscription,
+                systemImage: "cpu",
+                tint: AppTheme.brand
+            ) {
+                NavigationLink(value: SettingsRoute.localWhisper) {
+                    SettingsNavigationRow(
+                        icon: "waveform",
+                        titleResource: L10n.LocalWhisper.engineTitle,
+                        value: localWhisperModelStatus.statusText,
+                        subtitleResource: L10n.LocalWhisper.submenuDescription,
+                        tint: AppTheme.info
+                    )
+                }
+                .buttonStyle(.plain)
+                .settingsNavigationHaptic()
+                .disabled(isDownloadingLocalWhisperModel || isDownloadingLocalWhisperCoreMLEncoder)
 
                 NavigationLink(value: SettingsRoute.qwen3ASRModel) {
                     SettingsNavigationRow(
@@ -495,10 +522,6 @@ struct SettingsView: View {
                 .buttonStyle(.plain)
                 .settingsNavigationHaptic()
                 .disabled(isDownloadingMOSSLocalModel)
-
-                if transcriber.isRecording || transcriber.isPreparing {
-                    SettingsStatusRow(icon: "lock.fill", textResource: L10n.Settings.cannotChangeLanguageWhileRecording, tint: AppTheme.warning)
-                }
             }
 
             SettingsSection(titleResource: L10n.Settings.betaFeatures, systemImage: "testtube.2", tint: AppTheme.purple) {
@@ -833,6 +856,34 @@ struct SettingsView: View {
         }
     }
 
+    private var localWhisperSettingsPage: some View {
+        SettingsDetailPage(titleResource: L10n.LocalWhisper.engineTitle) {
+            SettingsSection(
+                titleResource: L10n.LocalWhisper.engineTitle,
+                systemImage: "waveform",
+                tint: AppTheme.info
+            ) {
+                localWhisperModelSettings
+            }
+
+            SettingsSection(
+                titleResource: L10n.Settings.modelInformation,
+                systemImage: "info.circle",
+                tint: AppTheme.info
+            ) {
+                Link(destination: Self.whisperModelURL) {
+                    SettingsExternalLinkRow(
+                        icon: "safari",
+                        titleResource: L10n.LocalWhisper.aboutModel,
+                        tint: AppTheme.info
+                    )
+                }
+                .buttonStyle(.plain)
+                .settingsNavigationHaptic()
+            }
+        }
+    }
+
     private var localWhisperModelPage: some View {
         let refreshTick = localWhisperModelRefreshTick
         let downloadedStatuses = LocalWhisperModelManager.downloadedStatuses()
@@ -956,6 +1007,22 @@ struct SettingsView: View {
                     .disabled(isDownloadingQwen3ASRModel)
                 }
             }
+
+            SettingsSection(
+                titleResource: L10n.Settings.modelInformation,
+                systemImage: "info.circle",
+                tint: AppTheme.brand
+            ) {
+                Link(destination: Self.qwen3ASRModelURL) {
+                    SettingsExternalLinkRow(
+                        icon: "safari",
+                        titleResource: L10n.Qwen3ASR.aboutModel,
+                        tint: AppTheme.brand
+                    )
+                }
+                .buttonStyle(.plain)
+                .settingsNavigationHaptic()
+            }
         }
     }
 
@@ -1027,6 +1094,22 @@ struct SettingsView: View {
                     .buttonStyle(.plain)
                     .disabled(isDownloadingMOSSLocalModel)
                 }
+            }
+
+            SettingsSection(
+                titleResource: L10n.Settings.modelInformation,
+                systemImage: "info.circle",
+                tint: AppTheme.purple
+            ) {
+                Link(destination: Self.mossModelURL) {
+                    SettingsExternalLinkRow(
+                        icon: "safari",
+                        titleResource: L10n.MOSSLocal.aboutModel,
+                        tint: AppTheme.purple
+                    )
+                }
+                .buttonStyle(.plain)
+                .settingsNavigationHaptic()
             }
         }
     }
