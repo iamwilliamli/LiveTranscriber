@@ -4,6 +4,7 @@ import CoreMedia
 import Foundation
 import OSLog
 import Speech
+import TranscriberDomain
 
 private let liveTranscriptionLogger = Logger(subsystem: "com.reddownloader.LiveTranscriber", category: "LiveTranscription")
 

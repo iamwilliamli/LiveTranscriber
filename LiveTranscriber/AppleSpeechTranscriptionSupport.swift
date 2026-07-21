@@ -1,5 +1,6 @@
 import Foundation
 import Speech
+import TranscriberDomain
 
 enum AppleSpeechTranscriptionSupport {
     static func supportedLanguages() async -> [TranscriptionLanguage] {

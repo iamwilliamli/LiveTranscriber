@@ -1,4 +1,5 @@
 import Foundation
+import TranscriberDomain
 import Translation
 
 enum AppleTranslationLanguages {

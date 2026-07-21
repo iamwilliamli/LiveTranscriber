@@ -2,6 +2,7 @@ import Combine
 import CoreLocation
 import MapKit
 import SwiftUI
+import TranscriberDomain
 import Translation
 import UIKit
 

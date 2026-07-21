@@ -2,6 +2,7 @@ import AudioCommon
 import Foundation
 @preconcurrency import Qwen3ASR
 @preconcurrency import SpeechVAD
+import TranscriberDomain
 
 struct Qwen3ASRModelStatus: Equatable {
     let isAvailable: Bool

@@ -1,4 +1,5 @@
 import SwiftUI
+import TranscriberDomain
 import UIKit
 
 struct SettingsView: View {

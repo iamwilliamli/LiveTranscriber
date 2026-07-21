@@ -1,4 +1,5 @@
 import SwiftUI
+import TranscriberDomain
 
 enum OnboardingState {
     static let completedDefaultsKey = "onboarding.introduction.completed.v1"
