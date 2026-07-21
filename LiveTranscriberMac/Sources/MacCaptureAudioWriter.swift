@@ -143,15 +143,18 @@ final class MacCaptureAudioWriter: @unchecked Sendable {
 final class MacCaptureSampleRouter: NSObject, SCStreamOutput, @unchecked Sendable {
     let systemAudioWriter: MacCaptureAudioWriter?
     let microphoneAudioWriter: MacCaptureAudioWriter?
+    private let systemAudioSampleHandler: (@Sendable (CMSampleBuffer) -> Void)?
     private let stateLock = NSLock()
     private var isPaused = false
 
     init(
         systemAudioWriter: MacCaptureAudioWriter?,
-        microphoneAudioWriter: MacCaptureAudioWriter?
+        microphoneAudioWriter: MacCaptureAudioWriter?,
+        systemAudioSampleHandler: (@Sendable (CMSampleBuffer) -> Void)? = nil
     ) {
         self.systemAudioWriter = systemAudioWriter
         self.microphoneAudioWriter = microphoneAudioWriter
+        self.systemAudioSampleHandler = systemAudioSampleHandler
     }
 
     func setPaused(_ paused: Bool) {
@@ -175,6 +178,7 @@ final class MacCaptureSampleRouter: NSObject, SCStreamOutput, @unchecked Sendabl
         switch type {
         case .audio:
             systemAudioWriter?.append(sampleBuffer)
+            systemAudioSampleHandler?(sampleBuffer)
         case .microphone:
             microphoneAudioWriter?.append(sampleBuffer)
         case .screen:

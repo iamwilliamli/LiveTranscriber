@@ -7,6 +7,108 @@ import Speech
 import SwiftUI
 import TranscriberDomain
 
+// MARK: - General pane
+
+struct MacGeneralSettingsPane: View {
+    @AppStorage(MacAppLanguage.defaultsKey)
+    private var appLanguageRawValue = MacAppLanguage.system.rawValue
+    @State private var isShowingRestartPrompt = false
+
+    private var selectedLanguage: MacAppLanguage {
+        MacAppLanguage(rawValue: appLanguageRawValue) ?? .system
+    }
+
+    private var needsRelaunch: Bool {
+        selectedLanguage != MacAppLanguage.selectionAtLaunch
+    }
+
+    var body: some View {
+        Form {
+            Section {
+                Picker(selection: languageBinding) {
+                    ForEach(MacAppLanguage.allCases) { language in
+                        Text(verbatim: language.displayName)
+                            .tag(language)
+                    }
+                } label: {
+                    Label {
+                        Text(MacL10n.appLanguage)
+                    } icon: {
+                        Image(systemName: "globe")
+                    }
+                }
+
+                Text(MacL10n.appLanguageDescription)
+                    .font(.redditSans(.caption))
+                    .foregroundStyle(.secondary)
+
+                if needsRelaunch {
+                    HStack(spacing: 10) {
+                        Label {
+                            Text(MacL10n.languageRestartRequired)
+                        } icon: {
+                            Image(systemName: "arrow.clockwise.circle.fill")
+                        }
+                        .font(.redditSans(.caption, weight: .semibold))
+                        .foregroundStyle(AppTheme.warning)
+
+                        Spacer()
+
+                        Button {
+                            relaunchApplication()
+                        } label: {
+                            Text(MacL10n.restartNow)
+                        }
+                    }
+                }
+            } header: {
+                Text(MacL10n.generalSettings)
+            }
+        }
+        .formStyle(.grouped)
+        .frame(minHeight: 260)
+        .alert(
+            String(localized: MacL10n.languageRestartTitle),
+            isPresented: $isShowingRestartPrompt
+        ) {
+            Button(String(localized: MacL10n.restartNow)) {
+                relaunchApplication()
+            }
+            Button(String(localized: MacL10n.restartLater), role: .cancel) {}
+        } message: {
+            Text(MacL10n.languageRestartMessage)
+        }
+    }
+
+    private var languageBinding: Binding<MacAppLanguage> {
+        Binding {
+            selectedLanguage
+        } set: { language in
+            appLanguageRawValue = language.rawValue
+            language.applyBundlePreference()
+            isShowingRestartPrompt = language != MacAppLanguage.selectionAtLaunch
+        }
+    }
+
+    @MainActor
+    private func relaunchApplication() {
+        let configuration = NSWorkspace.OpenConfiguration()
+        configuration.activates = true
+        configuration.createsNewApplicationInstance = true
+        NSWorkspace.shared.openApplication(
+            at: Bundle.main.bundleURL,
+            configuration: configuration
+        ) { _, error in
+            guard error == nil else {
+                return
+            }
+            DispatchQueue.main.async {
+                NSApp.terminate(nil)
+            }
+        }
+    }
+}
+
 // MARK: - Transcription pane
 
 struct MacTranscriptionSettingsPane: View {
@@ -32,6 +134,7 @@ struct MacTranscriptionSettingsPane: View {
     @State private var isGeminiEnabled = GeminiCloudConfiguration.isEnabled
     @State private var geminiAPIKey = (try? GeminiAPIKeyStore.load()) ?? ""
     @State private var selectedDecoderDuration = MOSSDecoderSegmentDuration.selected
+    @State private var selectedDecoderMaximumOutputTokens = MOSSDecoderMaximumOutputTokens.selected
     @State private var isConfirmingMOSSDeletion = false
     @State private var errorMessage: String?
 
@@ -436,6 +539,29 @@ struct MacTranscriptionSettingsPane: View {
                     forKey: MOSSDecoderSegmentDuration.defaultsKey
                 )
             }
+
+            Text(L10n.MOSSLocal.decoderSegmentDurationDescription)
+                .font(.callout)
+                .foregroundStyle(.secondary)
+
+            Picker(selection: $selectedDecoderMaximumOutputTokens) {
+                ForEach(MOSSDecoderMaximumOutputTokens.allCases) { maximumOutputTokens in
+                    Text(verbatim: maximumOutputTokens.displayName)
+                        .tag(maximumOutputTokens)
+                }
+            } label: {
+                Text(L10n.MOSSLocal.decoderMaximumOutputTokens)
+            }
+            .onChange(of: selectedDecoderMaximumOutputTokens) { _, newValue in
+                UserDefaults.standard.set(
+                    newValue.rawValue,
+                    forKey: MOSSDecoderMaximumOutputTokens.defaultsKey
+                )
+            }
+
+            Text(L10n.MOSSLocal.decoderMaximumOutputTokensDescription)
+                .font(.callout)
+                .foregroundStyle(.secondary)
 
             Text(
                 verbatim: String(

@@ -3,6 +3,23 @@ import XCTest
 @testable import LiveTranscriberMac
 
 final class MacSystemAudioCaptureTests: XCTestCase {
+    func testSystemAudioLiveInputDoesNotRequireMicrophonePermission() {
+        let inputSource = LiveRecordingInputSource.externalAudio(
+            sampleRate: 48_000,
+            channelCount: 2
+        )
+
+        XCTAssertTrue(inputSource.usesExternalAudio)
+        XCTAssertFalse(inputSource.requiresMicrophonePermission)
+    }
+
+    func testMicrophoneLiveInputRetainsMicrophonePermissionRequirement() {
+        let inputSource = LiveRecordingInputSource.microphone
+
+        XCTAssertFalse(inputSource.usesExternalAudio)
+        XCTAssertTrue(inputSource.requiresMicrophonePermission)
+    }
+
     @MainActor
     func testSystemAudioOnlyConfigurationExcludesMicrophoneTrack() {
         let configuration = MacSystemAudioCaptureController.makeStreamConfiguration(

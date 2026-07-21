@@ -48,6 +48,9 @@ enum MOSSDecoderSegmentDuration: Int, CaseIterable, Identifiable {
     case seconds120 = 120
     case seconds180 = 180
     case seconds300 = 300
+    case seconds600 = 600
+    case seconds900 = 900
+    case seconds1200 = 1_200
 
     var id: Int { rawValue }
 
@@ -67,6 +70,36 @@ enum MOSSDecoderSegmentDuration: Int, CaseIterable, Identifiable {
             return defaultValue
         }
         return MOSSDecoderSegmentDuration(rawValue: storedValue.intValue) ?? defaultValue
+    }
+
+    static var mobileOptions: [MOSSDecoderSegmentDuration] {
+        allCases.filter { $0.rawValue <= MOSSDecoderSegmentDuration.seconds300.rawValue }
+    }
+}
+
+enum MOSSDecoderMaximumOutputTokens: Int, CaseIterable, Identifiable {
+    static let defaultsKey = "moss_local.decoder_maximum_output_tokens"
+    static let defaultValue = MOSSDecoderMaximumOutputTokens.tokens2048
+
+    case tokens1024 = 1_024
+    case tokens2048 = 2_048
+    case tokens4096 = 4_096
+    case tokens8192 = 8_192
+
+    var id: Int { rawValue }
+
+    var displayName: String {
+        String.localizedStringWithFormat(
+            String(localized: L10n.MOSSLocal.decoderMaximumOutputTokensFormat),
+            rawValue
+        )
+    }
+
+    static var selected: MOSSDecoderMaximumOutputTokens {
+        guard let storedValue = UserDefaults.standard.object(forKey: defaultsKey) as? NSNumber else {
+            return defaultValue
+        }
+        return MOSSDecoderMaximumOutputTokens(rawValue: storedValue.intValue) ?? defaultValue
     }
 }
 
@@ -296,9 +329,6 @@ private actor MOSSLocalRuntime {
     static let shared = MOSSLocalRuntime()
 
     private static let sampleRate = 16_000
-    // This is an internal runaway-generation guard, not a quality control.
-    // It applies independently to every selectable Decoder segment.
-    private static let maxTokensPerDecoderSegment = 2_048
 
     private var loadedModel: MossTranscribeDiarizeModel?
 
@@ -327,10 +357,11 @@ private actor MOSSLocalRuntime {
         // Capture the preference once so changing Settings cannot alter the
         // segmentation of a transcription that is already running.
         let decoderSegmentDuration = MOSSDecoderSegmentDuration.selected
+        let decoderMaximumOutputTokens = MOSSDecoderMaximumOutputTokens.selected
         let chunkDuration = decoderSegmentDuration.seconds
 
         let parameters = STTGenerateParameters(
-            maxTokens: Self.maxTokensPerDecoderSegment,
+            maxTokens: decoderMaximumOutputTokens.rawValue,
             temperature: 0,
             topP: 1,
             topK: 0,

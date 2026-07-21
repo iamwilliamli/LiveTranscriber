@@ -50,6 +50,9 @@ struct MacRecordingDetailView: View {
     @State private var isShowingAppleRetranscriptionPicker = false
     @State private var isShowingWhisperRetranscriptionPicker = false
     @State private var pendingSpeechLocaleReleaseRequest: SpeechLocaleReleaseRequest?
+    @State private var scrubbedPlaybackTime: TimeInterval?
+
+    @Environment(\.accessibilityReduceMotion) private var accessibilityReduceMotion
 
     private var currentItem: RecordingItem {
         store.recording(withID: item.id) ?? item
@@ -63,44 +66,82 @@ struct MacRecordingDetailView: View {
         currentItem.importStatus?.isFailed == false
     }
 
+    private var playbackAmbientState: AmbientActivityState {
+        guard player.isLoaded,
+              player.currentItem?.id == currentItem.id else {
+            return .standby
+        }
+        guard !player.isPlaying else {
+            return .active
+        }
+
+        let playbackTime = player.currentTime
+        let isBetweenStartAndEnd = playbackTime > 0.05
+            && (player.duration <= 0 || playbackTime < player.duration - 0.05)
+        return isBetweenStartAndEnd ? .paused : .standby
+    }
+
     var body: some View {
-        VStack(spacing: 0) {
-            Picker(selection: $page) {
-                Text(L10n.Recordings.transcript)
-                    .tag(RecordingDetailPage.transcript)
-                Text(L10n.Recordings.aiAnalysis)
-                    .tag(RecordingDetailPage.aiAnalysis)
-            } label: {
-                EmptyView()
-            }
-            .pickerStyle(.segmented)
-            .frame(maxWidth: 340)
-            .padding(.vertical, 10)
+        ZStack {
+            AmbientActivityBackground(state: playbackAmbientState)
 
-            Divider()
+            VStack(spacing: 0) {
+                HStack {
+                    Picker(selection: $page) {
+                        Text(L10n.Recordings.transcript)
+                            .tag(RecordingDetailPage.transcript)
+                        Text(L10n.Recordings.aiAnalysis)
+                            .tag(RecordingDetailPage.aiAnalysis)
+                    } label: {
+                        EmptyView()
+                    }
+                    .pickerStyle(.segmented)
+                    .frame(maxWidth: 340)
+                }
+                .frame(maxWidth: .infinity)
+                .padding(.horizontal, 20)
+                .padding(.vertical, 10)
+                .background(.ultraThinMaterial)
+                .overlay(alignment: .bottom) {
+                    Divider()
+                }
 
-            switch page {
-            case .transcript:
-                transcriptPage
-            case .aiAnalysis:
-                RecordingAIAnalysisPage(
-                    engine: chatEngine,
-                    isAvailable: store.summaryProviderAvailability.hasAnyAvailableProvider,
-                    makeContext: {
-                        RecordingChatContext(
-                            transcript: store.transcriptText(for: currentItem),
-                            summary: currentItem.intelligence?.summary,
-                            languageName: currentItem.languageName
-                        )
+                ZStack {
+                    transcriptPage
+                        .opacity(page == .transcript ? 1 : 0)
+                        .offset(x: page == .transcript ? 0 : -36)
+                        .allowsHitTesting(page == .transcript)
+                        .accessibilityHidden(page != .transcript)
+
+                    RecordingAIAnalysisPage(
+                        engine: chatEngine,
+                        isAvailable: store.summaryProviderAvailability.hasAnyAvailableProvider,
+                        makeContext: {
+                            RecordingChatContext(
+                                transcript: store.transcriptText(for: currentItem),
+                                summary: currentItem.intelligence?.summary,
+                                languageName: currentItem.languageName
+                            )
+                        }
+                    ) {
+                        VStack(alignment: .leading, spacing: 16) {
+                            intelligenceCard
+                            meetingAnalysisCard
+                        }
                     }
-                ) {
-                    VStack(alignment: .leading, spacing: 16) {
-                        intelligenceCard
-                        meetingAnalysisCard
-                    }
+                    .opacity(page == .aiAnalysis ? 1 : 0)
+                    .offset(x: page == .aiAnalysis ? 0 : 36)
+                    .allowsHitTesting(page == .aiAnalysis)
+                    .accessibilityHidden(page != .aiAnalysis)
+                    .frame(maxWidth: 880)
+                    .frame(maxWidth: .infinity)
                 }
             }
         }
+        .animation(
+            accessibilityReduceMotion ? nil : .easeInOut(duration: 0.22),
+            value: page
+        )
         .toolbar {
             ToolbarItemGroup {
                 detailActionsMenu
@@ -108,6 +149,9 @@ struct MacRecordingDetailView: View {
         }
         .task(id: currentItem.transcriptFileName + "\(currentItem.lineCount)") {
             await loadTranscript()
+        }
+        .task(id: currentItem.id) {
+            preparePlayerIfNeeded()
         }
         .task {
             chatEngine.configure(recordingID: currentItem.id)
@@ -303,255 +347,212 @@ struct MacRecordingDetailView: View {
     // MARK: - Transcript page
 
     private var transcriptPage: some View {
-        ScrollViewReader { proxy in
+        ScrollViewReader { scrollProxy in
             ScrollView {
-                VStack(alignment: .leading, spacing: 18) {
+                VStack(alignment: .leading, spacing: 16) {
                     headerCard
-                    playbackCard
+                    keyPointsCard
                     transcriptCard
                 }
-                .padding(22)
-                .frame(maxWidth: 860, alignment: .leading)
+                .padding(.horizontal, 20)
+                .padding(.top, 20)
+                .padding(.bottom, 14)
+                .frame(maxWidth: 880, alignment: .leading)
+                .frame(maxWidth: .infinity)
             }
-            .onChange(of: player.currentTime) { _, time in
-                guard player.currentItem?.id == currentItem.id, player.isPlaying else {
-                    return
-                }
-                if let lineID = StoredTranscriptLine.currentLineID(in: transcriptLines, time: time) {
-                    proxy.scrollTo(lineID, anchor: .center)
-                }
+            .safeAreaInset(edge: .bottom, spacing: 0) {
+                playbackCard(transcriptScrollProxy: scrollProxy)
+                    .frame(maxWidth: 700)
+                    .frame(maxWidth: .infinity)
+                    .padding(.horizontal, 20)
+                    .padding(.top, 8)
+                    .padding(.bottom, 12)
             }
         }
     }
 
     private var headerCard: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            HStack(alignment: .firstTextBaseline) {
+        let displayDuration = player.currentItem?.id == currentItem.id && player.duration > 0
+            ? player.duration
+            : Double(currentItem.durationSeconds)
+
+        return VStack(alignment: .leading, spacing: 14) {
+            HStack(alignment: .center, spacing: 10) {
                 Text(verbatim: currentItem.displayName)
-                    .font(.title.bold())
+                    .font(.redditSans(.title3, weight: .bold))
+                    .lineLimit(2)
                     .textSelection(.enabled)
+
                 if currentItem.isTranscriptLocked {
                     Image(systemName: "lock.fill")
-                        .foregroundStyle(.secondary)
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundStyle(AppTheme.warning)
+                        .padding(7)
+                        .background(AppTheme.warning.opacity(0.12), in: Circle())
                 }
+
+                Spacer(minLength: 0)
             }
 
-            HStack(spacing: 10) {
-                Text(currentItem.createdAt, format: .dateTime.year().month().day().hour().minute())
-                Text(TranscriptionLine.formatTimestamp(Double(currentItem.durationSeconds)))
-                    .monospacedDigit()
-                Text(verbatim: currentItem.localizedLanguageName)
-                HStack(spacing: 3) {
-                    Text(verbatim: "\(currentItem.lineCount)")
-                        .monospacedDigit()
-                    Text(L10n.Recordings.transcript)
-                }
-            }
-            .font(.callout)
-            .foregroundStyle(.secondary)
+            RetroRecordingDisplay(
+                statusText: String(localized: L10n.Recordings.recordingPlayback),
+                title: currentItem.audioFileName,
+                audioURL: store.audioURL(for: currentItem),
+                player: player,
+                scrubbedTime: scrubbedPlaybackTime,
+                duration: displayDuration
+            )
 
-            if currentItem.categoryName != nil
+            MacRecordingDetailFactsGrid(
+                createdAtText: currentItem.createdAt.formatted(date: .abbreviated, time: .shortened),
+                durationText: TranscriptionLine.formatTimestamp(Double(currentItem.durationSeconds)),
+                languageText: currentItem.localizedLanguageName,
+                iCloudSyncStatus: store.iCloudSyncStatus(for: currentItem)
+            )
+
+            if !currentItem.combinedTags.isEmpty
                 || currentItem.projectName != nil
-                || currentItem.location != nil
-                || !currentItem.combinedTags.isEmpty {
-                HStack(spacing: 6) {
-                    if let categoryName = currentItem.categoryName {
-                        chip(text: categoryName, systemImage: "folder")
-                    }
-                    if let projectName = currentItem.projectName {
-                        chip(text: projectName, systemImage: "briefcase")
-                    }
-                    if let location = currentItem.location {
-                        chip(
-                            text: location.placeName
-                                ?? "\(location.latitude.formatted(.number.precision(.fractionLength(4)))), \(location.longitude.formatted(.number.precision(.fractionLength(4))))",
-                            systemImage: "mappin.and.ellipse"
-                        )
-                    }
-                    ForEach(currentItem.combinedTags.prefix(6), id: \.self) { tag in
-                        chip(text: tag, systemImage: "tag")
-                    }
-                }
-            }
-
-            if let keyPoints = currentItem.keyPoints,
-               !keyPoints.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-                Label {
-                    Text(verbatim: keyPoints)
-                        .textSelection(.enabled)
-                } icon: {
-                    Image(systemName: "list.bullet.clipboard")
-                }
-                .font(.callout)
-                .foregroundStyle(.secondary)
-            }
-
-            if let importStatus = currentItem.importStatus {
-                Group {
-                    if importStatus.isFailed {
-                        HStack(spacing: 8) {
-                            Label {
-                                Text(verbatim: importStatus.message)
-                            } icon: {
-                                Image(systemName: "exclamationmark.triangle")
-                            }
-                            .foregroundStyle(AppTheme.warning)
-                            .frame(maxWidth: .infinity, alignment: .leading)
-
-                            Button {
-                                store.dismissFailedImportStatus(for: currentItem.id)
-                            } label: {
-                                Image(systemName: "xmark.circle.fill")
-                            }
-                            .buttonStyle(.plain)
-                            .help(String(localized: L10n.Common.close))
-                        }
-                        .font(.caption)
-                    } else {
-                        VStack(alignment: .leading, spacing: 4) {
-                            ProgressView(value: importStatus.progress)
-                            Text(verbatim: importStatus.message)
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
-                        }
-                    }
-                }
-                .padding(.top, 4)
+                || currentItem.categoryName != nil
+                || currentItem.location != nil {
+                MacRecordingDetailContextStrip(
+                    tags: currentItem.combinedTags,
+                    projectName: currentItem.projectName,
+                    categoryName: currentItem.categoryName,
+                    location: currentItem.location
+                )
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
     }
 
-    private func chip(text: String, systemImage: String) -> some View {
-        Label {
-            Text(verbatim: text)
-        } icon: {
-            Image(systemName: systemImage)
+    @ViewBuilder
+    private var keyPointsCard: some View {
+        if let keyPoints = currentItem.keyPoints?.trimmingCharacters(in: .whitespacesAndNewlines),
+           !keyPoints.isEmpty {
+            VStack(alignment: .leading, spacing: 10) {
+                Label {
+                    Text(L10n.Recordings.keyPoints)
+                } icon: {
+                    Image(systemName: "list.bullet.clipboard")
+                }
+                .font(.redditSans(.subheadline, weight: .semibold))
+
+                Text(verbatim: keyPoints)
+                    .font(.redditSans(.subheadline))
+                    .lineSpacing(3)
+                    .textSelection(.enabled)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .contextMenu {
+                        Button {
+                            AppPasteboard.copy(keyPoints)
+                        } label: {
+                            Label {
+                                Text(L10n.Common.copy)
+                            } icon: {
+                                Image(systemName: "doc.on.doc")
+                            }
+                        }
+                    }
+            }
+            .padding(16)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(AppTheme.cardBackground)
+            .overlay {
+                RoundedRectangle(cornerRadius: AppTheme.cornerRadius, style: .continuous)
+                    .stroke(AppTheme.cardBorder, lineWidth: 1)
+            }
+            .clipShape(RoundedRectangle(cornerRadius: AppTheme.cornerRadius, style: .continuous))
         }
-        .font(.caption.weight(.medium))
-        .padding(.horizontal, 9)
-        .padding(.vertical, 4)
-        .background(.quaternary, in: Capsule())
     }
 
-    private var playbackCard: some View {
-        VStack(spacing: 12) {
-            HStack(spacing: 12) {
-                Button {
-                    preparePlayerIfNeeded()
-                    player.togglePlayback()
-                } label: {
-                    Image(
-                        systemName: player.currentItem?.id == currentItem.id && player.isPlaying
-                            ? "pause.fill"
-                            : "play.fill"
-                    )
-                    .font(.title3)
-                    .frame(width: 22, height: 22)
-                }
-                .buttonStyle(.borderedProminent)
-                .buttonBorderShape(.circle)
+    private func playbackCard(transcriptScrollProxy: ScrollViewProxy) -> some View {
+        let shape = RoundedRectangle(cornerRadius: 26, style: .continuous)
+        let isCurrentPlayerItem = player.isLoaded && player.currentItem?.id == currentItem.id
+        let displayDuration = isCurrentPlayerItem && player.duration > 0
+            ? player.duration
+            : Double(max(currentItem.durationSeconds, 1))
+        let timeLabelWidth: CGFloat = 62
 
-                Button {
-                    preparePlayerIfNeeded()
-                    player.skip(by: -5)
-                } label: {
-                    Image(systemName: "gobackward.5")
-                }
+        return VStack(spacing: 5) {
+            TimelineView(
+                .animation(
+                    minimumInterval: 1.0 / 60.0,
+                    paused: !player.isPlaying || scrubbedPlaybackTime != nil
+                )
+            ) { _ in
+                let rawTime = isCurrentPlayerItem ? player.presentationTime() : 0
+                let displayedTime = min(
+                    max(scrubbedPlaybackTime ?? rawTime, 0),
+                    displayDuration
+                )
 
-                Button {
-                    preparePlayerIfNeeded()
-                    player.skip(by: 5)
-                } label: {
-                    Image(systemName: "goforward.5")
-                }
+                HStack(alignment: .center, spacing: 10) {
+                    Text(verbatim: TranscriptionLine.formatTimestamp(displayedTime))
+                        .font(.redditSans(.caption2, weight: .semibold).monospacedDigit())
+                        .frame(width: timeLabelWidth, alignment: .leading)
 
-                Slider(
-                    value: Binding(
-                        get: {
-                            player.currentItem?.id == currentItem.id
-                                ? min(player.currentTime, max(player.duration, 0))
-                                : 0
-                        },
-                        set: { newValue in
+                    MacRecordingTimelineScrubber(
+                        currentTime: displayedTime,
+                        duration: displayDuration,
+                        scrubbedTime: $scrubbedPlaybackTime,
+                        audioEvents: currentItem.audioEventAnalysis?.events ?? [],
+                        isEnabled: isCurrentPlayerItem,
+                        onSeek: { time in
                             preparePlayerIfNeeded()
-                            player.seek(to: newValue)
+                            player.seek(to: time)
+                        },
+                        onEventTap: { event in
+                            preparePlayerIfNeeded()
+                            scrubbedPlaybackTime = nil
+                            player.seek(to: event.startTime)
                         }
-                    ),
-                    in: 0...max(
-                        player.currentItem?.id == currentItem.id && player.duration > 0
-                            ? player.duration
-                            : Double(max(currentItem.durationSeconds, 1)),
-                        1
                     )
-                )
+                    .frame(maxWidth: .infinity)
 
-                Text(
-                    verbatim: "\(TranscriptionLine.formatTimestamp(player.currentItem?.id == currentItem.id ? player.currentTime : 0)) / \(TranscriptionLine.formatTimestamp(player.currentItem?.id == currentItem.id && player.duration > 0 ? player.duration : Double(currentItem.durationSeconds)))"
-                )
-                .font(.callout.monospacedDigit())
-                .foregroundStyle(.secondary)
-
-                Menu {
-                    ForEach(RecordingPlaybackController.availablePlaybackRates, id: \.self) { rate in
-                        Button {
-                            player.setPlaybackRate(rate)
-                        } label: {
-                            if player.playbackRate == rate {
-                                Label(
-                                    RecordingPlaybackController.playbackRateLabel(rate),
-                                    systemImage: "checkmark"
-                                )
-                            } else {
-                                Text(verbatim: RecordingPlaybackController.playbackRateLabel(rate))
-                            }
-                        }
-                    }
-                } label: {
-                    Text(verbatim: RecordingPlaybackController.playbackRateLabel(player.playbackRate))
-                        .monospacedDigit()
+                    Text(verbatim: TranscriptionLine.formatTimestamp(displayDuration))
+                        .font(.redditSans(.caption2, weight: .semibold).monospacedDigit())
+                        .foregroundStyle(.secondary)
+                        .frame(width: timeLabelWidth, alignment: .trailing)
                 }
-                .frame(width: 72)
-
-                Button {
-                    if currentItem.audioEventAnalysis == nil {
-                        analyzeAudioEvents()
-                    } else {
-                        isShowingAudioEvents = true
-                    }
-                } label: {
-                    if isAnalyzingAudioEvents {
-                        ProgressView()
-                            .controlSize(.small)
-                    } else {
-                        Image(systemName: "waveform.badge.magnifyingglass")
-                    }
-                }
-                .help(String(localized: L10n.Recordings.audioEvents))
-                .disabled(isAnalyzingAudioEvents)
             }
 
-            if let events = currentItem.audioEventAnalysis?.events, !events.isEmpty {
-                ScrollView(.horizontal) {
-                    HStack(spacing: 8) {
-                        ForEach(events) { event in
-                            Button {
-                                preparePlayerIfNeeded()
-                                player.seek(to: event.startTime)
-                            } label: {
-                                Label {
-                                    Text(verbatim: event.localizedLabel)
-                                } icon: {
-                                    Text(verbatim: TranscriptionLine.formatTimestamp(event.startTime))
-                                        .monospacedDigit()
-                                }
-                            }
-                            .buttonStyle(.bordered)
-                            .controlSize(.small)
-                        }
-                    }
+            HStack(spacing: 22) {
+                MacPlaybackRoundButton(systemImage: "gobackward.5", title: "-5s") {
+                    preparePlayerIfNeeded()
+                    scrubbedPlaybackTime = nil
+                    player.skip(by: -5)
                 }
-                .scrollIndicators(.hidden)
+                .disabled(!isCurrentPlayerItem)
+
+                MacPlaybackRoundButton(
+                    systemImage: player.isPlaying && isCurrentPlayerItem ? "pause.fill" : "play.fill",
+                    titleResource: player.isPlaying && isCurrentPlayerItem
+                        ? L10n.Recordings.pause
+                        : L10n.Recordings.play,
+                    isPrimary: true
+                ) {
+                    preparePlayerIfNeeded()
+                    player.togglePlayback()
+                }
+                .disabled(!isCurrentPlayerItem)
+
+                MacPlaybackRoundButton(systemImage: "goforward.5", title: "+5s") {
+                    preparePlayerIfNeeded()
+                    scrubbedPlaybackTime = nil
+                    player.skip(by: 5)
+                }
+                .disabled(!isCurrentPlayerItem)
+            }
+            .frame(maxWidth: .infinity)
+            .frame(height: 58)
+
+            HStack(spacing: 8) {
+                audioEventsTimelineControl(isPlayerLoaded: isCurrentPlayerItem)
+                transcriptSyncControl(
+                    scrollProxy: transcriptScrollProxy,
+                    isPlayerLoaded: isCurrentPlayerItem
+                )
+                playbackSpeedMenu(isPlayerLoaded: isCurrentPlayerItem)
             }
 
             if let errorText = player.errorText {
@@ -560,62 +561,218 @@ struct MacRecordingDetailView: View {
                 } icon: {
                     Image(systemName: "exclamationmark.triangle")
                 }
-                .font(.callout)
-                .foregroundStyle(.red)
+                .font(.redditSans(.caption))
+                .foregroundStyle(AppTheme.warning)
                 .frame(maxWidth: .infinity, alignment: .leading)
             }
         }
-        .padding(16)
-        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+        .padding(.horizontal, 14)
+        .padding(.vertical, 8)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .glassEffect(.regular.tint(AppTheme.playbackGlassTint), in: shape)
+        .shadow(color: AppTheme.cardShadow, radius: 18, y: 8)
     }
 
-    private var transcriptCard: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            HStack {
-                Text(L10n.Recordings.transcript)
-                    .font(.title3.bold())
-                Spacer()
-                if speakerPresentations.count > 1 {
-                    HStack(spacing: 8) {
-                        ForEach(speakerPresentations) { speaker in
-                            Label {
-                                Text(verbatim: speaker.displayName)
-                            } icon: {
-                                Circle()
-                                    .fill(speaker.tint)
-                                    .frame(width: 8, height: 8)
-                            }
-                            .font(.caption)
+    private func transcriptSyncControl(
+        scrollProxy: ScrollViewProxy,
+        isPlayerLoaded: Bool
+    ) -> some View {
+        Button {
+            syncTranscriptToPlayback(using: scrollProxy)
+        } label: {
+            MacPlaybackUtilityControlLabel(tint: AppTheme.info) {
+                Image(systemName: "scope")
+                    .font(.system(size: 13, weight: .semibold))
+            }
+        }
+        .buttonStyle(MacPlaybackUtilityButtonStyle())
+        .frame(maxWidth: .infinity)
+        .disabled(!isPlayerLoaded || transcriptLines.isEmpty)
+        .help(String(localized: L10n.Recordings.syncCurrentTranscript))
+        .accessibilityLabel(Text(L10n.Recordings.syncCurrentTranscript))
+    }
+
+    private func syncTranscriptToPlayback(using scrollProxy: ScrollViewProxy) {
+        preparePlayerIfNeeded()
+        let playbackTime = scrubbedPlaybackTime ?? player.presentationTime()
+        let lineID = StoredTranscriptLine.currentLineID(
+            in: transcriptLines,
+            time: playbackTime
+        ) ?? transcriptLines.first?.id
+
+        guard let lineID else {
+            return
+        }
+
+        guard !accessibilityReduceMotion else {
+            scrollProxy.scrollTo(lineID, anchor: .center)
+            return
+        }
+
+        withAnimation(.snappy(duration: 0.34, extraBounce: 0)) {
+            scrollProxy.scrollTo(lineID, anchor: .center)
+        }
+    }
+
+    private func audioEventsTimelineControl(isPlayerLoaded: Bool) -> some View {
+        Button {
+            if currentItem.audioEventAnalysis == nil {
+                analyzeAudioEvents()
+            } else {
+                isShowingAudioEvents = true
+            }
+        } label: {
+            MacPlaybackUtilityControlLabel(tint: AppTheme.info) {
+                HStack(spacing: 6) {
+                    if isAnalyzingAudioEvents {
+                        ProgressView()
+                            .controlSize(.small)
+                    } else {
+                        Image(systemName: "waveform.badge.magnifyingglass")
+                            .font(.system(size: 13, weight: .semibold))
+
+                        if let eventCount = currentItem.audioEventAnalysis?.events.count {
+                            Text(verbatim: eventCount.formatted(.number.notation(.compactName)))
+                                .font(.redditSans(.caption2, weight: .bold))
                         }
                     }
                 }
+            }
+        }
+        .buttonStyle(MacPlaybackUtilityButtonStyle())
+        .frame(maxWidth: .infinity)
+        .disabled(!isPlayerLoaded || isAnalyzingAudioEvents)
+        .help(String(localized: L10n.Recordings.audioEvents))
+        .accessibilityLabel(Text(L10n.Recordings.audioEvents))
+    }
+
+    private func playbackSpeedMenu(isPlayerLoaded: Bool) -> some View {
+        Menu {
+            ForEach(RecordingPlaybackController.availablePlaybackRates, id: \.self) { rate in
+                Button {
+                    player.setPlaybackRate(rate)
+                } label: {
+                    Label(
+                        RecordingPlaybackController.playbackRateLabel(rate),
+                        systemImage: player.playbackRate == rate ? "checkmark" : "speedometer"
+                    )
+                }
+            }
+        } label: {
+            MacPlaybackUtilityControlLabel(tint: AppTheme.info) {
+                Text(verbatim: RecordingPlaybackController.playbackRateLabel(player.playbackRate))
+                    .font(.redditSans(.caption2, weight: .bold).monospacedDigit())
+            }
+        }
+        .menuStyle(.borderlessButton)
+        .frame(maxWidth: .infinity)
+        .disabled(!isPlayerLoaded)
+    }
+
+    private var transcriptCard: some View {
+        let showsSpeakerDistinction = speakerPresentations.count > 1
+
+        return VStack(alignment: .leading, spacing: 12) {
+            HStack(alignment: .center, spacing: 12) {
+                Label {
+                    Text(L10n.Recordings.transcript)
+                } icon: {
+                    Image(systemName: "text.alignleft")
+                }
+                .font(.redditSans(.subheadline, weight: .semibold))
+
+                if currentItem.isTranscriptLocked {
+                    Label {
+                        Text(L10n.Recordings.transcriptLocked)
+                    } icon: {
+                        Image(systemName: "lock.fill")
+                    }
+                    .font(.redditSans(.caption, weight: .semibold))
+                    .foregroundStyle(AppTheme.warning)
+                    .padding(.horizontal, 9)
+                    .frame(height: 26)
+                    .background(AppTheme.warning.opacity(0.12), in: Capsule())
+                }
+
+                Spacer(minLength: 8)
 
                 transcriptTranslationMenu
             }
 
+            if showsSpeakerDistinction {
+                MacTranscriptSpeakerLegend(speakers: speakerPresentations)
+            }
+
             transcriptTranslationStatus
+
+            if let importStatus = currentItem.importStatus {
+                Group {
+                    if importStatus.isFailed {
+                        HStack(spacing: 10) {
+                            Label {
+                                Text(verbatim: importStatus.message)
+                            } icon: {
+                                Image(systemName: "exclamationmark.triangle.fill")
+                            }
+                            .foregroundStyle(AppTheme.warning)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+
+                            Button {
+                                store.dismissFailedImportStatus(for: currentItem.id)
+                            } label: {
+                                Image(systemName: "xmark")
+                                    .font(.system(size: 10, weight: .bold))
+                                    .frame(width: 26, height: 26)
+                                    .background(AppTheme.warning.opacity(0.12), in: Circle())
+                            }
+                            .buttonStyle(.plain)
+                            .help(String(localized: L10n.Common.close))
+                        }
+                        .font(.redditSans(.caption, weight: .semibold))
+                    } else {
+                        VStack(alignment: .leading, spacing: 6) {
+                            ProgressView(value: importStatus.progress)
+                                .tint(AppTheme.brand)
+                            Text(verbatim: importStatus.message)
+                                .font(.redditSans(.caption, weight: .semibold))
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+                }
+                .padding(12)
+                .background(AppTheme.elevatedBackground, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+            }
 
             if isLoadingTranscript {
                 ProgressView()
-                    .frame(maxWidth: .infinity, minHeight: 100)
+                    .controlSize(.large)
+                    .frame(maxWidth: .infinity, minHeight: 150)
             } else if transcriptLines.isEmpty {
-                Text(MacL10n.noTranscript)
-                    .foregroundStyle(.secondary)
-                    .frame(maxWidth: .infinity, minHeight: 90, alignment: .center)
+                ContentUnavailableView {
+                    Label {
+                        Text(MacL10n.noTranscript)
+                    } icon: {
+                        Image(systemName: "text.badge.xmark")
+                    }
+                }
+                .frame(maxWidth: .infinity, minHeight: 170)
             } else {
                 let currentLineID = player.currentItem?.id == currentItem.id
                     ? StoredTranscriptLine.currentLineID(in: transcriptLines, time: player.currentTime)
                     : nil
-                LazyVStack(alignment: .leading, spacing: 4) {
+                LazyVStack(alignment: .leading, spacing: 8) {
                     ForEach(transcriptLines) { line in
                         MacTranscriptLineRow(
                             line: line,
-                            speaker: speakerPresentations.first {
-                                $0.id == TranscriptSpeakerNaming.normalizedID(line.speaker)
-                            },
+                            speaker: showsSpeakerDistinction
+                                ? speakerPresentations.first {
+                                    $0.id == TranscriptSpeakerNaming.normalizedID(line.speaker)
+                                }
+                                : nil,
                             isCurrent: line.id == currentLineID,
                             onSeek: {
                                 preparePlayerIfNeeded()
+                                scrubbedPlaybackTime = nil
                                 player.seek(to: line.startSeconds)
                             },
                             onCopy: {
@@ -640,7 +797,13 @@ struct MacRecordingDetailView: View {
             }
         }
         .padding(16)
-        .background(AppTheme.cardBackground, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(AppTheme.cardBackground)
+        .overlay {
+            RoundedRectangle(cornerRadius: AppTheme.cornerRadius, style: .continuous)
+                .stroke(AppTheme.cardBorder, lineWidth: 1)
+        }
+        .clipShape(RoundedRectangle(cornerRadius: AppTheme.cornerRadius, style: .continuous))
     }
 
     private var transcriptTranslationMenu: some View {
@@ -669,12 +832,21 @@ struct MacRecordingDetailView: View {
                 }
             }
         } label: {
-            Label {
-                Text(verbatim: selectedTranslationLanguage?.shortName ?? String(localized: L10n.Recordings.translate))
-            } icon: {
+            HStack(spacing: 6) {
                 Image(systemName: "translate")
+                    .font(.system(size: 12, weight: .semibold))
+                Text(verbatim: selectedTranslationLanguage?.shortName ?? String(localized: L10n.Recordings.translate))
+                    .font(.redditSans(.caption, weight: .bold))
             }
+            .foregroundStyle(selectedTranslationLanguage == nil ? AppTheme.info : AppTheme.brand)
+            .padding(.horizontal, 10)
+            .frame(height: 30)
+            .background(
+                (selectedTranslationLanguage == nil ? AppTheme.info : AppTheme.brand).opacity(0.11),
+                in: Capsule()
+            )
         }
+        .menuStyle(.borderlessButton)
         .disabled(transcriptLines.isEmpty || isBusyTranscribing)
         .fixedSize()
     }
@@ -715,7 +887,7 @@ struct MacRecordingDetailView: View {
         VStack(alignment: .leading, spacing: 10) {
             HStack {
                 Text(L10n.Recordings.intelligenceSummary)
-                    .font(.title3.bold())
+                    .font(.redditSans(.headline, weight: .semibold))
                 Spacer()
                 analyzeMenu(
                     isRunning: isAnalyzingSummary,
@@ -742,6 +914,8 @@ struct MacRecordingDetailView: View {
                     .controlSize(.small)
                 }
                 Text(verbatim: intelligence.summary)
+                    .font(.redditSans(.subheadline))
+                    .lineSpacing(3)
                     .textSelection(.enabled)
                     .frame(maxWidth: .infinity, alignment: .leading)
                 Text(intelligence.generatedAt, format: .dateTime.year().month().day().hour().minute())
@@ -763,7 +937,7 @@ struct MacRecordingDetailView: View {
         VStack(alignment: .leading, spacing: 12) {
             HStack {
                 Text(L10n.Recordings.analyzeMeeting)
-                    .font(.title3.bold())
+                    .font(.redditSans(.headline, weight: .semibold))
                 Spacer()
                 analyzeMenu(
                     isRunning: isAnalyzingMeeting,
@@ -778,6 +952,8 @@ struct MacRecordingDetailView: View {
             if let analysis = currentItem.meetingAnalysis {
                 if let summary = analysis.summary, !summary.isEmpty {
                     Text(verbatim: summary)
+                        .font(.redditSans(.subheadline))
+                        .lineSpacing(3)
                         .textSelection(.enabled)
                 }
 
@@ -785,7 +961,7 @@ struct MacRecordingDetailView: View {
                     VStack(alignment: .leading, spacing: 6) {
                         HStack {
                             Text(L10n.Recordings.actionItems)
-                                .font(.headline)
+                                .font(.redditSans(.subheadline, weight: .semibold))
                             Spacer()
                             Button {
                                 addAllActionItemsToReminders(analysis)
@@ -805,6 +981,7 @@ struct MacRecordingDetailView: View {
                                     .foregroundStyle(.secondary)
                                 VStack(alignment: .leading, spacing: 2) {
                                     Text(verbatim: actionItem.task)
+                                        .font(.redditSans(.subheadline))
                                     if let owner = actionItem.owner, !owner.isEmpty {
                                         Text(verbatim: owner)
                                             .font(.caption)
@@ -820,10 +997,11 @@ struct MacRecordingDetailView: View {
                 if !analysis.decisions.isEmpty {
                     VStack(alignment: .leading, spacing: 6) {
                         Text(L10n.Recordings.decisions)
-                            .font(.headline)
+                            .font(.redditSans(.subheadline, weight: .semibold))
                         ForEach(analysis.decisions) { decision in
                             VStack(alignment: .leading, spacing: 2) {
                                 Text(verbatim: decision.decision)
+                                    .font(.redditSans(.subheadline))
                                 if let rationale = decision.rationale, !rationale.isEmpty {
                                     Text(verbatim: rationale)
                                         .font(.caption)
@@ -837,9 +1015,10 @@ struct MacRecordingDetailView: View {
                 if !analysis.openQuestions.isEmpty {
                     VStack(alignment: .leading, spacing: 6) {
                         Text(L10n.Recordings.openQuestions)
-                            .font(.headline)
+                            .font(.redditSans(.subheadline, weight: .semibold))
                         ForEach(analysis.openQuestions) { question in
                             Text(verbatim: question.question)
+                                .font(.redditSans(.subheadline))
                         }
                     }
                 }
@@ -1156,10 +1335,23 @@ struct MacRecordingDetailView: View {
     // MARK: - Actions
 
     private func preparePlayerIfNeeded() {
-        guard player.currentItem?.id != currentItem.id || !player.isLoaded else {
+        if player.currentItem?.id != currentItem.id || !player.isLoaded {
+            scrubbedPlaybackTime = nil
+            player.load(item: currentItem, url: store.audioURL(for: currentItem))
+        }
+        updatePlayerNowPlayingTranscript()
+    }
+
+    private func updatePlayerNowPlayingTranscript() {
+        guard player.currentItem?.id == currentItem.id else {
             return
         }
-        player.load(item: currentItem, url: store.audioURL(for: currentItem))
+        player.setNowPlayingTranscript(
+            for: currentItem.id,
+            cues: transcriptLines.map { line in
+                (startTime: line.startSeconds, text: line.spokenText)
+            }
+        )
     }
 
     private func loadTranscript() async {
@@ -1175,6 +1367,7 @@ struct MacRecordingDetailView: View {
             return StoredTranscriptLine.parse(text, speakerDiarization: diarization)
         }.value
         transcriptLines = lines
+        updatePlayerNowPlayingTranscript()
         translatedTranscriptByLineID = [:]
         translatedTranscriptCache = translatedTranscriptCache.filter { key, _ in
             key.hasPrefix(transcriptTranslationCachePrefix)
@@ -1958,42 +2151,75 @@ private struct MacTranscriptLineRow: View {
     let isShowingTranslation: Bool
 
     var body: some View {
-        HStack(alignment: .firstTextBaseline, spacing: 10) {
+        HStack(alignment: .top, spacing: 10) {
             Text(verbatim: line.timeText)
-                .font(.caption.monospacedDigit())
-                .foregroundStyle(isCurrent ? AppTheme.brand : Color.secondary)
-                .frame(width: 66, alignment: .leading)
+                .font(.redditSans(.caption2, weight: .semibold).monospacedDigit())
+                .foregroundStyle(isCurrent ? .white : (speaker?.tint ?? AppTheme.brand))
+                .padding(.horizontal, 8)
+                .frame(height: 24)
+                .background(
+                    isCurrent ? AppTheme.brand : (speaker?.tint ?? AppTheme.brand).opacity(0.12),
+                    in: Capsule()
+                )
 
-            if let speaker {
-                Text(verbatim: speaker.displayName)
-                    .font(.caption.weight(.semibold))
-                    .foregroundStyle(speaker.tint)
-                    .frame(width: 82, alignment: .leading)
-                    .lineLimit(1)
-            }
+            VStack(alignment: .leading, spacing: speaker == nil ? 4 : 6) {
+                if let speaker {
+                    HStack(spacing: 5) {
+                        Circle()
+                            .fill(speaker.tint)
+                            .frame(width: 7, height: 7)
 
-            VStack(alignment: .leading, spacing: 4) {
+                        Text(verbatim: speaker.displayName)
+                            .font(.redditSans(.caption2, weight: .bold))
+                            .foregroundStyle(speaker.tint)
+                            .lineLimit(1)
+                    }
+                    .padding(.horizontal, 7)
+                    .frame(height: 22)
+                    .background(speaker.tint.opacity(0.10), in: Capsule())
+                    .accessibilityHidden(true)
+                }
+
                 Text(verbatim: translatedText ?? line.spokenText)
+                    .font(.redditSans(.subheadline))
+                    .lineSpacing(3)
                     .textSelection(.enabled)
+                    .fixedSize(horizontal: false, vertical: true)
                     .frame(maxWidth: .infinity, alignment: .leading)
 
                 if translatedText != nil {
                     Text(verbatim: line.spokenText)
-                        .font(.caption)
+                        .font(.redditSans(.caption))
                         .foregroundStyle(.secondary)
+                        .lineSpacing(3)
                         .textSelection(.enabled)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .frame(maxWidth: .infinity, alignment: .leading)
                 } else if isShowingTranslation {
-                    ProgressView()
-                        .controlSize(.mini)
+                    Text(L10n.Recordings.translating)
+                        .font(.redditSans(.caption, weight: .semibold))
+                        .foregroundStyle(.secondary)
                 }
             }
         }
-        .padding(.vertical, 4)
-        .padding(.horizontal, 6)
+        .padding(.vertical, speaker == nil ? 5 : 8)
+        .padding(.leading, speaker == nil ? 7 : 11)
+        .padding(.trailing, 8)
         .background(
-            isCurrent ? AppTheme.brand.opacity(0.10) : Color.clear,
-            in: RoundedRectangle(cornerRadius: 6)
+            isCurrent
+                ? AppTheme.brand.opacity(0.08)
+                : speaker?.tint.opacity(0.055) ?? Color.clear,
+            in: RoundedRectangle(cornerRadius: AppTheme.compactCornerRadius, style: .continuous)
         )
+        .overlay(alignment: .leading) {
+            if let speaker {
+                Capsule()
+                    .fill(speaker.tint)
+                    .frame(width: 3)
+                    .padding(.vertical, 7)
+                    .padding(.leading, 3)
+            }
+        }
         .contentShape(Rectangle())
         .onTapGesture(perform: onSeek)
         .contextMenu {
@@ -2018,6 +2244,589 @@ private struct MacTranscriptLineRow: View {
                 }
             }
         }
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel(Text(verbatim: accessibilityText))
+    }
+
+    private var accessibilityText: String {
+        let speakerText = speaker.map { "\($0.displayName) " } ?? ""
+        if let translatedText {
+            return "\(speakerText)\(line.timeText) \(translatedText) \(line.spokenText)"
+        }
+        return "\(speakerText)\(line.timeText) \(line.spokenText)"
+    }
+}
+
+// MARK: - Playback presentation
+
+private struct MacRecordingTimelineScrubber: View {
+    let currentTime: TimeInterval
+    let duration: TimeInterval
+    @Binding var scrubbedTime: TimeInterval?
+    let audioEvents: [RecordingAudioEvent]
+    let isEnabled: Bool
+    let onSeek: (TimeInterval) -> Void
+    let onEventTap: (RecordingAudioEvent) -> Void
+
+    @State private var isScrubbing = false
+
+    private var effectiveDuration: TimeInterval {
+        max(duration, 1)
+    }
+
+    private var displayedTime: TimeInterval {
+        min(max(scrubbedTime ?? currentTime, 0), effectiveDuration)
+    }
+
+    var body: some View {
+        GeometryReader { proxy in
+            if proxy.size.width > 1, proxy.size.height > 1 {
+                let width = proxy.size.width
+                let progress = CGFloat(displayedTime / effectiveDuration)
+                let thumbX = min(max(progress * width, 0), width)
+                let thumbSize: CGFloat = isScrubbing ? 18 : 14
+                let trackCenterY: CGFloat = 27
+                let trackHeight: CGFloat = 6
+                let markerHeight: CGFloat = 16
+
+                ZStack(alignment: .topLeading) {
+                    if isScrubbing, let event = activeAudioEvent(at: displayedTime) {
+                        audioEventCallout(event, thumbX: thumbX, trackWidth: width)
+                            .transition(.opacity.combined(with: .scale(scale: 0.96, anchor: .bottom)))
+                    }
+
+                    Capsule()
+                        .fill(Color.secondary.opacity(0.18))
+                        .frame(height: trackHeight)
+                        .offset(y: trackCenterY - trackHeight / 2)
+
+                    Canvas(opaque: false, rendersAsynchronously: false) { context, _ in
+                        for event in audioEvents {
+                            let rect = markerRect(
+                                for: event,
+                                trackWidth: width,
+                                markerHeight: markerHeight
+                            )
+                            context.fill(
+                                Path(roundedRect: rect, cornerRadius: 3),
+                                with: .color(AppTheme.info.opacity(markerOpacity(for: event)))
+                            )
+                            context.fill(
+                                Path(
+                                    roundedRect: CGRect(
+                                        x: rect.minX,
+                                        y: rect.minY,
+                                        width: rect.width,
+                                        height: 1
+                                    ),
+                                    cornerRadius: 0.5
+                                ),
+                                with: .color(Color.white.opacity(0.26))
+                            )
+                        }
+                    }
+                    .frame(width: width, height: markerHeight)
+                    .offset(y: trackCenterY - markerHeight / 2)
+                    .allowsHitTesting(false)
+
+                    Capsule()
+                        .fill(AppTheme.brand.opacity(isEnabled ? 0.88 : 0.34))
+                        .frame(width: max(thumbX, 0), height: trackHeight)
+                        .offset(y: trackCenterY - trackHeight / 2)
+
+                    Circle()
+                        .fill(isEnabled ? AppTheme.brand : Color.secondary.opacity(0.55))
+                        .frame(width: thumbSize, height: thumbSize)
+                        .shadow(
+                            color: AppTheme.brand.opacity(isScrubbing ? 0.24 : 0.14),
+                            radius: isScrubbing ? 8 : 4,
+                            y: isScrubbing ? 4 : 2
+                        )
+                        .offset(
+                            x: thumbX - thumbSize / 2,
+                            y: trackCenterY - thumbSize / 2
+                        )
+                        .animation(.snappy(duration: 0.16, extraBounce: 0), value: isScrubbing)
+                }
+                .frame(width: width, height: 48, alignment: .topLeading)
+                .contentShape(Rectangle())
+                .gesture(timelineGesture(trackWidth: width))
+            }
+        }
+        .frame(height: 48)
+        .opacity(isEnabled ? 1 : 0.55)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(Text(L10n.Recordings.recordingPlayback))
+        .accessibilityValue(Text(verbatim: TranscriptionLine.formatTimestamp(displayedTime)))
+        .accessibilityAdjustableAction { direction in
+            guard isEnabled else {
+                return
+            }
+            switch direction {
+            case .increment:
+                onSeek(min(displayedTime + 5, duration))
+            case .decrement:
+                onSeek(max(displayedTime - 5, 0))
+            @unknown default:
+                break
+            }
+        }
+    }
+
+    private func audioEventCallout(
+        _ event: RecordingAudioEvent,
+        thumbX: CGFloat,
+        trackWidth: CGFloat
+    ) -> some View {
+        let width = min(trackWidth, 190)
+        let x = min(max(thumbX - width / 2, 0), max(trackWidth - width, 0))
+
+        return HStack(spacing: 6) {
+            Text(verbatim: event.localizedLabel)
+                .font(.redditSans(.caption2, weight: .bold))
+                .lineLimit(1)
+
+            Text(verbatim: audioEventTimeRangeText(event))
+                .font(.redditSans(.caption2, weight: .semibold).monospacedDigit())
+                .foregroundStyle(.secondary)
+                .lineLimit(1)
+        }
+        .padding(.horizontal, 9)
+        .frame(width: width, height: 24)
+        .background(.ultraThinMaterial, in: Capsule())
+        .overlay {
+            Capsule()
+                .stroke(Color.white.opacity(0.18), lineWidth: 1)
+        }
+        .offset(x: x)
+    }
+
+    private func timelineGesture(trackWidth: CGFloat) -> some Gesture {
+        DragGesture(minimumDistance: 0)
+            .onChanged { value in
+                guard isEnabled else {
+                    return
+                }
+                if !isScrubbing {
+                    withAnimation(.snappy(duration: 0.16, extraBounce: 0)) {
+                        isScrubbing = true
+                    }
+                }
+                scrubbedTime = time(for: value.location.x, trackWidth: trackWidth)
+            }
+            .onEnded { value in
+                guard isEnabled else {
+                    return
+                }
+                let targetTime = time(for: value.location.x, trackWidth: trackWidth)
+                let tapDistance = hypot(value.translation.width, value.translation.height)
+                scrubbedTime = nil
+                withAnimation(.snappy(duration: 0.18, extraBounce: 0)) {
+                    isScrubbing = false
+                }
+                if tapDistance < 4, let event = activeAudioEvent(at: targetTime) {
+                    onEventTap(event)
+                    return
+                }
+                onSeek(targetTime)
+            }
+    }
+
+    private func activeAudioEvent(at time: TimeInterval) -> RecordingAudioEvent? {
+        var closestEvent: RecordingAudioEvent?
+        var closestDistance = TimeInterval.infinity
+
+        for event in audioEvents where time >= event.startTime - 0.45 && time <= event.endTime + 0.45 {
+            let eventDistance = distance(from: time, to: event)
+            if eventDistance < closestDistance
+                || (eventDistance == closestDistance
+                    && event.confidence > (closestEvent?.confidence ?? 0)) {
+                closestEvent = event
+                closestDistance = eventDistance
+            }
+        }
+
+        return closestEvent
+    }
+
+    private func distance(from time: TimeInterval, to event: RecordingAudioEvent) -> TimeInterval {
+        if time >= event.startTime, time <= event.endTime {
+            return 0
+        }
+        return min(abs(time - event.startTime), abs(time - event.endTime))
+    }
+
+    private func time(for xPosition: CGFloat, trackWidth: CGFloat) -> TimeInterval {
+        let normalized = min(max(xPosition / max(trackWidth, 1), 0), 1)
+        return TimeInterval(normalized) * effectiveDuration
+    }
+
+    private func markerRect(
+        for event: RecordingAudioEvent,
+        trackWidth: CGFloat,
+        markerHeight: CGFloat
+    ) -> CGRect {
+        let markerX = min(
+            max(CGFloat(event.startTime / effectiveDuration) * trackWidth, 0),
+            trackWidth
+        )
+        let rawWidth = CGFloat(max(event.duration, 0.1) / effectiveDuration) * trackWidth
+        let remainingWidth = max(trackWidth - markerX, 3)
+        let markerWidth = min(max(rawWidth, 4), remainingWidth)
+        return CGRect(x: markerX, y: 0, width: markerWidth, height: markerHeight)
+    }
+
+    private func markerOpacity(for event: RecordingAudioEvent) -> Double {
+        min(max(0.28 + event.confidence * 0.58, 0.34), 0.88)
+    }
+
+    private func audioEventTimeRangeText(_ event: RecordingAudioEvent) -> String {
+        "\(TranscriptionLine.formatTimestamp(event.startTime))-\(TranscriptionLine.formatTimestamp(event.endTime))"
+    }
+}
+
+private struct MacPlaybackUtilityControlLabel<Content: View>: View {
+    @Environment(\.colorScheme) private var colorScheme
+
+    let tint: Color
+    let content: Content
+
+    init(tint: Color, @ViewBuilder content: () -> Content) {
+        self.tint = tint
+        self.content = content()
+    }
+
+    var body: some View {
+        content
+            .foregroundStyle(tint)
+            .frame(maxWidth: .infinity)
+            .frame(height: 34)
+            .background {
+                Capsule()
+                    .fill(AppTheme.raisedControlBackground)
+                    .opacity(colorScheme == .dark ? 0.58 : 0.82)
+            }
+            .overlay {
+                Capsule()
+                    .stroke(tint.opacity(colorScheme == .dark ? 0.22 : 0.14), lineWidth: 1)
+            }
+            .contentShape(Capsule())
+    }
+}
+
+private struct MacPlaybackUtilityButtonStyle: ButtonStyle {
+    @Environment(\.isEnabled) private var isEnabled
+    @Environment(\.accessibilityReduceMotion) private var accessibilityReduceMotion
+
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .opacity(isEnabled ? (configuration.isPressed ? 0.72 : 1) : 0.42)
+            .scaleEffect(accessibilityReduceMotion ? 1 : (configuration.isPressed ? 0.97 : 1))
+            .animation(
+                accessibilityReduceMotion ? nil : .snappy(duration: 0.11, extraBounce: 0),
+                value: configuration.isPressed
+            )
+    }
+}
+
+private struct MacPlaybackRoundButton: View {
+    @Environment(\.colorScheme) private var colorScheme
+
+    let systemImage: String
+    let title: Text
+    var isPrimary = false
+    let action: () -> Void
+
+    init(
+        systemImage: String,
+        title: String,
+        isPrimary: Bool = false,
+        action: @escaping () -> Void
+    ) {
+        self.systemImage = systemImage
+        self.title = Text(verbatim: title)
+        self.isPrimary = isPrimary
+        self.action = action
+    }
+
+    init(
+        systemImage: String,
+        titleResource: LocalizedStringResource,
+        isPrimary: Bool = false,
+        action: @escaping () -> Void
+    ) {
+        self.systemImage = systemImage
+        self.title = Text(titleResource)
+        self.isPrimary = isPrimary
+        self.action = action
+    }
+
+    var body: some View {
+        Button(action: action) {
+            Image(systemName: systemImage)
+                .font(.system(size: isPrimary ? 22 : 18, weight: .semibold))
+                .frame(width: isPrimary ? 58 : 46, height: isPrimary ? 58 : 46)
+                .foregroundStyle(isPrimary ? .white : AppTheme.brand)
+                .background {
+                    if isPrimary {
+                        Circle()
+                            .fill(
+                                LinearGradient(
+                                    colors: [AppTheme.brandSoft, AppTheme.brand],
+                                    startPoint: .topLeading,
+                                    endPoint: .bottomTrailing
+                                )
+                            )
+                            .opacity(colorScheme == .dark ? 0.72 : 1)
+                    } else {
+                        Circle()
+                            .fill(AppTheme.raisedControlBackground)
+                            .opacity(colorScheme == .dark ? 0.58 : 1)
+                    }
+                }
+                .overlay {
+                    Circle()
+                        .stroke(Color.white.opacity(colorScheme == .dark ? 0.12 : 0.18), lineWidth: 1)
+                }
+        }
+        .buttonStyle(MacPlaybackRoundButtonStyle(isPrimary: isPrimary, colorScheme: colorScheme))
+        .accessibilityLabel(title)
+    }
+}
+
+private struct MacPlaybackRoundButtonStyle: ButtonStyle {
+    @Environment(\.accessibilityReduceMotion) private var accessibilityReduceMotion
+
+    let isPrimary: Bool
+    let colorScheme: ColorScheme
+
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .compositingGroup()
+            .scaleEffect(accessibilityReduceMotion ? 1 : (configuration.isPressed ? 0.91 : 1))
+            .offset(y: accessibilityReduceMotion ? 0 : (configuration.isPressed ? 3 : 0))
+            .shadow(
+                color: shadowColor(isPressed: configuration.isPressed),
+                radius: configuration.isPressed ? (isPrimary ? 7 : 5) : (isPrimary ? 18 : 10),
+                y: configuration.isPressed ? (isPrimary ? 3 : 2) : (isPrimary ? 11 : 6)
+            )
+            .animation(
+                accessibilityReduceMotion ? nil : .snappy(duration: 0.11, extraBounce: 0),
+                value: configuration.isPressed
+            )
+    }
+
+    private func shadowColor(isPressed: Bool) -> Color {
+        if isPrimary {
+            return AppTheme.brand.opacity(
+                colorScheme == .dark
+                    ? (isPressed ? 0.14 : 0.24)
+                    : (isPressed ? 0.24 : 0.46)
+            )
+        }
+        return Color.black.opacity(
+            colorScheme == .dark
+                ? (isPressed ? 0.05 : 0.09)
+                : (isPressed ? 0.08 : 0.16)
+        )
+    }
+}
+
+// MARK: - Recording detail presentation
+
+private struct MacRecordingDetailFactsGrid: View {
+    let createdAtText: String
+    let durationText: String
+    let languageText: String
+    let iCloudSyncStatus: RecordingICloudSyncStatus
+
+    private let columns = [
+        GridItem(.adaptive(minimum: 150, maximum: 280), spacing: 8, alignment: .leading)
+    ]
+
+    private var iCloudTint: Color {
+        switch iCloudSyncStatus.state {
+        case .uploaded:
+            return AppTheme.success
+        case .uploading:
+            return AppTheme.info
+        case .waiting, .iCloudUnavailable:
+            return AppTheme.warning
+        case .failed:
+            return AppTheme.danger
+        case .localOnly:
+            return .secondary
+        }
+    }
+
+    var body: some View {
+        LazyVGrid(columns: columns, alignment: .leading, spacing: 8) {
+            MacRecordingDetailFactCell(
+                systemImage: "calendar",
+                text: createdAtText,
+                tint: .secondary
+            )
+            MacRecordingDetailFactCell(
+                systemImage: "clock",
+                text: durationText,
+                tint: .secondary
+            )
+            MacRecordingDetailFactCell(
+                systemImage: "globe",
+                text: languageText,
+                tint: AppTheme.info
+            )
+            MacRecordingDetailFactCell(
+                systemImage: iCloudSyncStatus.systemImage,
+                text: iCloudSyncStatus.displayName,
+                tint: iCloudTint
+            )
+        }
+    }
+}
+
+private struct MacRecordingDetailFactCell: View {
+    let systemImage: String
+    let text: String
+    let tint: Color
+
+    var body: some View {
+        HStack(spacing: 7) {
+            Image(systemName: systemImage)
+                .font(.system(size: 12, weight: .semibold))
+                .foregroundStyle(tint)
+                .frame(width: 15)
+
+            Text(verbatim: text)
+                .font(.redditSans(.caption, weight: .semibold))
+                .foregroundStyle(.secondary)
+                .lineLimit(1)
+                .minimumScaleFactor(0.72)
+        }
+        .padding(.horizontal, 10)
+        .frame(maxWidth: .infinity, minHeight: 34, alignment: .leading)
+        .background(AppTheme.cardBackground, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+        .overlay {
+            RoundedRectangle(cornerRadius: 10, style: .continuous)
+                .stroke(AppTheme.cardBorder.opacity(0.72), lineWidth: 1)
+        }
+    }
+}
+
+private struct MacRecordingDetailContextStrip: View {
+    let tags: [String]
+    let projectName: String?
+    let categoryName: String?
+    let location: RecordingLocation?
+
+    var body: some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: 7) {
+                if let projectName {
+                    MacRecordingDetailContextChip(
+                        systemImage: "briefcase.fill",
+                        text: projectName,
+                        tint: AppTheme.brand
+                    )
+                }
+                if let categoryName {
+                    MacRecordingDetailContextChip(
+                        systemImage: "folder.fill",
+                        text: categoryName,
+                        tint: AppTheme.purple
+                    )
+                }
+                ForEach(tags, id: \.self) { tag in
+                    MacRecordingDetailContextChip(
+                        systemImage: "tag.fill",
+                        text: tag,
+                        tint: AppTheme.info
+                    )
+                }
+                if let location {
+                    MacRecordingDetailContextChip(
+                        systemImage: "mappin.and.ellipse",
+                        text: location.placeName
+                            ?? "\(location.latitude.formatted(.number.precision(.fractionLength(4)))), \(location.longitude.formatted(.number.precision(.fractionLength(4))))",
+                        tint: AppTheme.success
+                    )
+                }
+            }
+            .padding(.vertical, 1)
+        }
+    }
+}
+
+private struct MacRecordingDetailContextChip: View {
+    @Environment(\.colorScheme) private var colorScheme
+
+    let systemImage: String
+    let text: String
+    let tint: Color
+
+    var body: some View {
+        Label {
+            Text(verbatim: text)
+                .lineLimit(1)
+        } icon: {
+            Image(systemName: systemImage)
+                .font(.system(size: 10, weight: .semibold))
+        }
+        .font(.redditSans(.caption2, weight: .semibold))
+        .foregroundStyle(tint)
+        .padding(.horizontal, 9)
+        .frame(height: 28)
+        .background(tint.opacity(colorScheme == .dark ? 0.15 : 0.10), in: Capsule())
+        .overlay {
+            Capsule()
+                .stroke(tint.opacity(colorScheme == .dark ? 0.42 : 0.12), lineWidth: 0.8)
+        }
+    }
+}
+
+private struct MacTranscriptSpeakerLegend: View {
+    let speakers: [TranscriptSpeakerPresentation]
+
+    var body: some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: 8) {
+                Label {
+                    Text(
+                        verbatim: String(
+                            format: String(localized: L10n.Recordings.transcriptSpeakersDetectedFormat),
+                            speakers.count
+                        )
+                    )
+                } icon: {
+                    Image(systemName: "person.2.fill")
+                }
+                .font(.redditSans(.caption, weight: .semibold))
+                .foregroundStyle(.secondary)
+                .padding(.horizontal, 9)
+                .frame(height: 28)
+                .background(AppTheme.elevatedBackground, in: Capsule())
+
+                ForEach(speakers) { speaker in
+                    HStack(spacing: 6) {
+                        Circle()
+                            .fill(speaker.tint)
+                            .frame(width: 8, height: 8)
+                        Text(verbatim: speaker.displayName)
+                            .font(.redditSans(.caption, weight: .semibold))
+                            .lineLimit(1)
+                    }
+                    .padding(.horizontal, 9)
+                    .frame(height: 28)
+                    .background(speaker.tint.opacity(0.10), in: Capsule())
+                    .overlay {
+                        Capsule()
+                            .stroke(speaker.tint.opacity(0.20), lineWidth: 1)
+                    }
+                }
+            }
+            .padding(.horizontal, 1)
+        }
+        .accessibilityElement(children: .contain)
     }
 }
 

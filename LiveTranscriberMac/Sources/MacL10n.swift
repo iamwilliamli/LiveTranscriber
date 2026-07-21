@@ -68,13 +68,13 @@ enum MacL10n {
     )
     static let systemAudioLiveCaptionNote = resource(
         "mac.recording.system_audio_live_caption_note",
-        defaultValue: "The saved audio combines the selected Mac audio with your microphone. Live captions continue to use the microphone.",
+        defaultValue: "The saved audio combines the selected Mac audio with your microphone. Live captions and the waveform follow the selected Mac audio.",
         comment: "Explanation of system-audio recording and live caption behavior."
     )
     static let systemAudioOnlyLiveCaptionNote = resource(
         "mac.recording.system_audio_only_live_caption_note",
-        defaultValue: "The saved recording contains only audio from the selected Mac content. Live captions still use the microphone, but microphone audio is not included in the saved file.",
-        comment: "Explanation that microphone audio is excluded from a system-audio-only saved recording."
+        defaultValue: "The recording, live captions, and waveform all use only the selected Mac audio. The microphone is not accessed.",
+        comment: "Explanation that system-audio-only mode does not use the microphone."
     )
     static let systemAudioSourceSelectionHint = resource(
         "mac.recording.system_audio_source_selection_hint",
@@ -86,10 +86,10 @@ enum MacL10n {
         defaultValue: "System Audio Was Not Recorded",
         comment: "Alert title when system audio fails but a microphone fallback is available."
     )
-    static let saveMicrophoneInstead = resource(
-        "mac.recording.save_microphone_instead",
-        defaultValue: "Save Microphone Recording Instead",
-        comment: "Explicit action that saves the microphone fallback after system audio fails."
+    static let saveRecoveredSystemAudio = resource(
+        "mac.recording.save_recovered_system_audio",
+        defaultValue: "Save Recovered System Audio",
+        comment: "Action that saves the duplicate system-audio transcription track if the primary system-audio writer fails."
     )
     static let systemAudioMicrophoneMixFallback = resource(
         "mac.recording.system_audio_mix_fallback",
@@ -220,6 +220,56 @@ enum MacL10n {
         "mac.settings.title",
         defaultValue: "Settings",
         comment: "Title of the macOS settings window."
+    )
+    static let generalSettings = resource(
+        "mac.settings.general",
+        defaultValue: "General",
+        comment: "General macOS app settings title."
+    )
+    static let generalSettingsSubtitle = resource(
+        "mac.settings.general.subtitle",
+        defaultValue: "App language and interface behavior",
+        comment: "Subtitle for general macOS app settings."
+    )
+    static let appLanguage = resource(
+        "mac.settings.app_language",
+        defaultValue: "App Language",
+        comment: "Setting used to choose the app interface language."
+    )
+    static let appLanguageDescription = resource(
+        "mac.settings.app_language.description",
+        defaultValue: "Choose the language used by Live Transcriber. This does not change the transcription language.",
+        comment: "Explanation of the app interface language setting."
+    )
+    static let followSystemLanguage = resource(
+        "mac.settings.app_language.system",
+        defaultValue: "Follow System",
+        comment: "App language option that follows the macOS language."
+    )
+    static let languageRestartTitle = resource(
+        "mac.settings.app_language.restart.title",
+        defaultValue: "Restart Live Transcriber?",
+        comment: "Alert title after changing the app interface language."
+    )
+    static let languageRestartMessage = resource(
+        "mac.settings.app_language.restart.message",
+        defaultValue: "Restart the app to apply the selected language everywhere.",
+        comment: "Alert message after changing the app interface language."
+    )
+    static let languageRestartRequired = resource(
+        "mac.settings.app_language.restart.required",
+        defaultValue: "Restart required to finish applying this language",
+        comment: "Status shown when the selected app language needs an app restart."
+    )
+    static let restartNow = resource(
+        "mac.settings.app_language.restart.now",
+        defaultValue: "Restart Now",
+        comment: "Action that restarts the app after changing its language."
+    )
+    static let restartLater = resource(
+        "mac.settings.app_language.restart.later",
+        defaultValue: "Later",
+        comment: "Action that postpones restarting the app after changing its language."
     )
     static let transcriptionStatusIdle = resource(
         "mac.status.transcription.idle",

@@ -5,6 +5,72 @@ enum MacOnboardingState {
     static let completedDefaultsKey = "onboarding.introduction.completed.v1"
 }
 
+enum MacAppLanguage: String, CaseIterable, Identifiable {
+    static let defaultsKey = "app.interfaceLanguage"
+    static let selectionAtLaunch = selected
+
+    case system
+    case english = "en"
+    case simplifiedChinese = "zh-Hans"
+    case traditionalChinese = "zh-Hant"
+    case japanese = "ja"
+    case german = "de"
+    case dutch = "nl"
+
+    var id: Self { self }
+
+    static var selected: MacAppLanguage {
+        guard let rawValue = UserDefaults.standard.string(forKey: defaultsKey),
+              let language = MacAppLanguage(rawValue: rawValue) else {
+            return .system
+        }
+        return language
+    }
+
+    var locale: Locale {
+        guard let localeIdentifier else {
+            return .autoupdatingCurrent
+        }
+        return Locale(identifier: localeIdentifier)
+    }
+
+    var localeIdentifier: String? {
+        switch self {
+        case .system:
+            return nil
+        case .english, .simplifiedChinese, .traditionalChinese, .japanese, .german, .dutch:
+            return rawValue
+        }
+    }
+
+    var displayName: String {
+        switch self {
+        case .system:
+            return String(localized: MacL10n.followSystemLanguage)
+        case .english:
+            return "English"
+        case .simplifiedChinese:
+            return "简体中文"
+        case .traditionalChinese:
+            return "繁體中文"
+        case .japanese:
+            return "日本語"
+        case .german:
+            return "Deutsch"
+        case .dutch:
+            return "Nederlands"
+        }
+    }
+
+    func applyBundlePreference() {
+        if let localeIdentifier {
+            UserDefaults.standard.set([localeIdentifier], forKey: "AppleLanguages")
+        } else {
+            UserDefaults.standard.removeObject(forKey: "AppleLanguages")
+        }
+    }
+}
+
 enum MacSidebarDestination: String, CaseIterable, Identifiable {
     case transcribe
     case recordings
@@ -158,73 +224,274 @@ struct MacRootView: View {
 }
 
 struct MacSettingsView: View {
+    @EnvironmentObject private var recordingStore: RecordingStore
+    @EnvironmentObject private var transcriber: LiveTranscriptionManager
+    @AppStorage(MacAppLanguage.defaultsKey) private var appLanguageRawValue = MacAppLanguage.system.rawValue
+    @State private var selection: MacSettingsDestination = .general
+
     var body: some View {
-        TabView {
-            MacTranscriptionSettingsPane()
-                .tabItem {
-                    Label {
-                        Text(L10n.Settings.transcription)
-                    } icon: {
-                        Image(systemName: "waveform")
-                    }
-                }
+        HSplitView {
+            settingsNavigation
+                .frame(minWidth: 270, idealWidth: 305, maxWidth: 350)
 
-            MacIntelligenceSettingsPane()
-                .tabItem {
-                    Label {
-                        Text(L10n.Settings.intelligence)
-                    } icon: {
-                        Image(systemName: "sparkles")
-                    }
-                }
-
-            MacRecordingSettingsPane()
-                .tabItem {
-                    Label {
-                        Text(L10n.Settings.recording)
-                    } icon: {
-                        Image(systemName: "mic")
-                    }
-                }
-
-            MacFilesSettingsPane()
-                .tabItem {
-                    Label {
-                        Text(L10n.Settings.files)
-                    } icon: {
-                        Image(systemName: "externaldrive")
-                    }
-                }
-
-            MacPrivacySettingsPane()
-                .tabItem {
-                    Label {
-                        Text(L10n.Settings.privacy)
-                    } icon: {
-                        Image(systemName: "hand.raised")
-                    }
-                }
-
-            MacHelpSettingsPane()
-                .tabItem {
-                    Label {
-                        Text(MacL10n.helpAndFeedback)
-                    } icon: {
-                        Image(systemName: "questionmark.circle")
-                    }
-                }
-
-            MacDeveloperSettingsPane()
-                .tabItem {
-                    Label {
-                        Text(L10n.Settings.developerOptions)
-                    } icon: {
-                        Image(systemName: "hammer")
-                    }
-                }
+            VStack(spacing: 0) {
+                settingsDetailHeader
+                Divider()
+                selectedPane
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+            }
+            .frame(minWidth: 500, maxWidth: .infinity, maxHeight: .infinity)
+            .background(AppTheme.groupedBackground)
         }
-        .frame(minWidth: 640, minHeight: 520)
+        .frame(minWidth: 800, minHeight: 560)
         .navigationTitle(Text(MacL10n.settingsTitle))
+    }
+
+    private var settingsNavigation: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 12) {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(L10n.Settings.title)
+                        .font(.redditSans(.title2, weight: .bold))
+                    Label {
+                        Text(L10n.Settings.localProcessing)
+                    } icon: {
+                        Image(systemName: "lock.shield.fill")
+                    }
+                    .font(.redditSans(.caption, weight: .semibold))
+                    .foregroundStyle(AppTheme.success)
+                }
+                .padding(.horizontal, 2)
+                .padding(.bottom, 2)
+
+                ForEach(MacSettingsDestination.allCases) { destination in
+                    Button {
+                        selection = destination
+                    } label: {
+                        MacSettingsNavigationRow(
+                            destination: destination,
+                            value: value(for: destination),
+                            isSelected: selection == destination
+                        )
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+            .padding(16)
+        }
+        .background(AppTheme.groupedBackground)
+    }
+
+    private var settingsDetailHeader: some View {
+        HStack(spacing: 14) {
+            Image(systemName: selection.systemImage)
+                .font(.system(size: 20, weight: .semibold))
+                .foregroundStyle(selection.tint)
+                .frame(width: 44, height: 44)
+                .background(
+                    selection.tint.opacity(0.12),
+                    in: RoundedRectangle(cornerRadius: AppTheme.compactCornerRadius, style: .continuous)
+                )
+
+            VStack(alignment: .leading, spacing: 3) {
+                Text(selection.title)
+                    .font(.redditSans(.title3, weight: .bold))
+                Text(selection.subtitle)
+                    .font(.redditSans(.caption))
+                    .foregroundStyle(.secondary)
+            }
+
+            Spacer(minLength: 16)
+
+            let currentValue = value(for: selection)
+            if !currentValue.isEmpty {
+                Text(verbatim: currentValue)
+                    .font(.redditSans(.caption, weight: .semibold))
+                    .foregroundStyle(selection.tint)
+                    .lineLimit(1)
+                    .padding(.horizontal, 10)
+                    .frame(height: 28)
+                    .background(selection.tint.opacity(0.10), in: Capsule())
+            }
+        }
+        .padding(.horizontal, 22)
+        .padding(.vertical, 15)
+        .background(AppTheme.cardBackground)
+    }
+
+    @ViewBuilder
+    private var selectedPane: some View {
+        switch selection {
+        case .general:
+            MacGeneralSettingsPane()
+        case .transcription:
+            MacTranscriptionSettingsPane()
+        case .recording:
+            MacRecordingSettingsPane()
+        case .intelligence:
+            MacIntelligenceSettingsPane()
+        case .files:
+            MacFilesSettingsPane()
+        case .privacy:
+            MacPrivacySettingsPane()
+        case .developer:
+            MacDeveloperSettingsPane()
+        case .help:
+            MacHelpSettingsPane()
+        }
+    }
+
+    private func value(for destination: MacSettingsDestination) -> String {
+        switch destination {
+        case .general:
+            return (MacAppLanguage(rawValue: appLanguageRawValue) ?? .system).displayName
+        case .transcription:
+            return transcriber.selectedLanguage.displayName
+        case .recording:
+            return transcriber.selectedAudioFormat.title
+        case .intelligence:
+            return recordingStore.intelligenceAvailability.statusText
+        case .files:
+            return recordingStore.storageDisplayName
+        case .privacy:
+            return String(localized: L10n.Settings.localProcessing)
+        case .developer:
+            return transcriber.speechPipelineDiagnostics.activePipelineName
+        case .help:
+            let version = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String
+            return version.map { "v\($0)" } ?? ""
+        }
+    }
+}
+
+private enum MacSettingsDestination: String, CaseIterable, Identifiable {
+    case general
+    case transcription
+    case recording
+    case intelligence
+    case files
+    case privacy
+    case developer
+    case help
+
+    var id: Self { self }
+
+    var title: LocalizedStringResource {
+        switch self {
+        case .general: MacL10n.generalSettings
+        case .transcription: L10n.Settings.transcription
+        case .recording: L10n.Settings.recording
+        case .intelligence: L10n.Settings.intelligence
+        case .files: L10n.Settings.files
+        case .privacy: L10n.Settings.privacy
+        case .developer: L10n.Settings.developerOptions
+        case .help: MacL10n.helpAndFeedback
+        }
+    }
+
+    var subtitle: LocalizedStringResource {
+        switch self {
+        case .general: MacL10n.generalSettingsSubtitle
+        case .transcription: L10n.Settings.languageAndModel
+        case .recording: L10n.Settings.audioFormatAndBehavior
+        case .intelligence: L10n.Settings.summariesAndLocalModels
+        case .files: L10n.Settings.storageLocationAndCount
+        case .privacy: L10n.Settings.dataBoundariesAndPermissions
+        case .developer: L10n.Settings.deviceAndPipelineDiagnostics
+        case .help: L10n.Settings.feedback
+        }
+    }
+
+    var systemImage: String {
+        switch self {
+        case .general: "globe"
+        case .transcription: "captions.bubble"
+        case .recording: "waveform.badge.mic"
+        case .intelligence: "sparkles"
+        case .files: "folder"
+        case .privacy: "lock.shield"
+        case .developer: "wrench.and.screwdriver"
+        case .help: "questionmark.bubble"
+        }
+    }
+
+    var tint: Color {
+        switch self {
+        case .general: AppTheme.brand
+        case .transcription: AppTheme.info
+        case .recording: AppTheme.brand
+        case .intelligence: AppTheme.purple
+        case .files: AppTheme.success
+        case .privacy: AppTheme.success
+        case .developer: AppTheme.purple
+        case .help: AppTheme.info
+        }
+    }
+}
+
+private struct MacSettingsNavigationRow: View {
+    let destination: MacSettingsDestination
+    let value: String
+    let isSelected: Bool
+
+    var body: some View {
+        HStack(spacing: 11) {
+            Image(systemName: destination.systemImage)
+                .font(.system(size: 14, weight: .semibold))
+                .foregroundStyle(destination.tint)
+                .frame(width: 30, height: 30)
+                .background(
+                    destination.tint.opacity(0.12),
+                    in: RoundedRectangle(cornerRadius: AppTheme.compactCornerRadius, style: .continuous)
+                )
+
+            VStack(alignment: .leading, spacing: 3) {
+                Text(destination.title)
+                    .font(.redditSans(.subheadline, weight: .semibold))
+                    .foregroundStyle(.primary)
+                    .lineLimit(1)
+
+                Text(destination.subtitle)
+                    .font(.redditSans(.caption2))
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+            }
+
+            Spacer(minLength: 8)
+
+            if !value.isEmpty {
+                Text(verbatim: value)
+                    .font(.redditSans(.caption2))
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+                    .frame(maxWidth: 82, alignment: .trailing)
+            }
+
+            Image(systemName: "chevron.right")
+                .font(.system(size: 10, weight: .semibold))
+                .foregroundStyle(isSelected ? destination.tint : Color.secondary.opacity(0.7))
+                .accessibilityHidden(true)
+        }
+        .padding(12)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(
+            isSelected ? destination.tint.opacity(0.11) : AppTheme.cardBackground,
+            in: RoundedRectangle(cornerRadius: AppTheme.cornerRadius, style: .continuous)
+        )
+        .overlay {
+            RoundedRectangle(cornerRadius: AppTheme.cornerRadius, style: .continuous)
+                .stroke(
+                    isSelected ? destination.tint.opacity(0.55) : AppTheme.cardBorder,
+                    lineWidth: isSelected ? 1.5 : 1
+                )
+        }
+        .shadow(
+            color: isSelected ? destination.tint.opacity(0.07) : AppTheme.cardShadow,
+            radius: isSelected ? 5 : AppTheme.cardShadowRadius,
+            y: AppTheme.cardShadowYOffset
+        )
+        .contentShape(RoundedRectangle(cornerRadius: AppTheme.cornerRadius, style: .continuous))
+        .accessibilityAddTraits(isSelected ? .isSelected : [])
     }
 }
 

@@ -7,6 +7,25 @@ import XCTest
 /// pipeline. Gated behind LT_MOSS_SMOKE=1 (pass TEST_RUNNER_LT_MOSS_SMOKE=1 to
 /// xcodebuild) so CI and regular test runs skip it.
 final class MacMOSSSmokeTests: XCTestCase {
+    func testMacMOSSDecoderExposesExtendedSegmentLengths() {
+        XCTAssertEqual(
+            MOSSDecoderSegmentDuration.allCases.map(\.rawValue),
+            [30, 60, 90, 120, 180, 300, 600, 900, 1_200]
+        )
+        XCTAssertEqual(
+            MOSSDecoderSegmentDuration.mobileOptions.map(\.rawValue),
+            [30, 60, 90, 120, 180, 300]
+        )
+    }
+
+    func testMOSSDecoderExposesConfigurableOutputTokenLimits() {
+        XCTAssertEqual(
+            MOSSDecoderMaximumOutputTokens.allCases.map(\.rawValue),
+            [1_024, 2_048, 4_096, 8_192]
+        )
+        XCTAssertEqual(MOSSDecoderMaximumOutputTokens.defaultValue.rawValue, 2_048)
+    }
+
     func testMOSSDownloadsModelAndTranscribesSpeech() async throws {
         try XCTSkipUnless(
             ProcessInfo.processInfo.environment["LT_MOSS_SMOKE"] == "1",
@@ -105,5 +124,17 @@ final class MacMOSSSmokeTests: XCTestCase {
                 }
             }
         }
+    }
+}
+
+final class MacAppLanguageTests: XCTestCase {
+    func testSupportedInterfaceLanguagesMatchBundledLocalizations() {
+        XCTAssertEqual(
+            MacAppLanguage.allCases.map(\.rawValue),
+            ["system", "en", "zh-Hans", "zh-Hant", "ja", "de", "nl"]
+        )
+        XCTAssertNil(MacAppLanguage.system.localeIdentifier)
+        XCTAssertEqual(MacAppLanguage.simplifiedChinese.localeIdentifier, "zh-Hans")
+        XCTAssertEqual(MacAppLanguage.traditionalChinese.localeIdentifier, "zh-Hant")
     }
 }

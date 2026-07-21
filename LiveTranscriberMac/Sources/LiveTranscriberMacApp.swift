@@ -10,9 +10,14 @@ struct LiveTranscriberMacApp: App {
     @StateObject private var router = MacAppRouter()
     @StateObject private var systemAudioCapture = MacSystemAudioCaptureController()
     @AppStorage(MacOnboardingState.completedDefaultsKey) private var hasCompletedOnboarding = false
+    @AppStorage(MacAppLanguage.defaultsKey) private var appLanguageRawValue = MacAppLanguage.system.rawValue
     @State private var isShowingLaunchSplash = UserDefaults.standard.bool(
         forKey: MacOnboardingState.completedDefaultsKey
     )
+
+    private var appLanguage: MacAppLanguage {
+        MacAppLanguage(rawValue: appLanguageRawValue) ?? .system
+    }
 
     var body: some Scene {
         WindowGroup {
@@ -43,6 +48,7 @@ struct LiveTranscriberMacApp: App {
             .environmentObject(transcriber)
             .environmentObject(router)
             .environmentObject(systemAudioCapture)
+            .environment(\.locale, appLanguage.locale)
             .frame(minWidth: 820, minHeight: 560)
             .onOpenURL { url in
                 dismissLaunchSplash()
@@ -68,6 +74,7 @@ struct LiveTranscriberMacApp: App {
             MacSettingsView()
                 .environmentObject(recordingStore)
                 .environmentObject(transcriber)
+                .environment(\.locale, appLanguage.locale)
         }
 
         MenuBarExtra {
@@ -85,6 +92,7 @@ struct LiveTranscriberMacApp: App {
                     activateMainWindow()
                 }
             )
+            .environment(\.locale, appLanguage.locale)
         } label: {
             Image(
                 systemName: transcriptionStatus.snapshot?.isRecording == true

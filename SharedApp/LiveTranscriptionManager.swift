@@ -134,6 +134,22 @@ private struct RecordingInputLevelObservation: Sendable {
     let recordedDuration: TimeInterval
 }
 
+enum LiveRecordingInputSource: Sendable {
+    case microphone
+    case externalAudio(sampleRate: Double, channelCount: AVAudioChannelCount)
+
+    var usesExternalAudio: Bool {
+        if case .externalAudio = self {
+            return true
+        }
+        return false
+    }
+
+    var requiresMicrophonePermission: Bool {
+        !usesExternalAudio
+    }
+}
+
 private func liveAudioFormatSummary(_ format: AVAudioFormat) -> String {
     let channels = format.channelCount == 1 ? "mono" : "\(format.channelCount) ch"
     let interleaving = format.isInterleaved ? "interleaved" : "non-interleaved"
@@ -376,6 +392,7 @@ final class LiveTranscriptionManager: ObservableObject {
     private var pendingLiveActivitySnapshot: LiveActivitySnapshot?
     private var liveActivityUpdateTask: Task<Void, Never>?
     private var lastSpeechPipelineRuntimeFormat: SpeechPipelineRuntimeFormat?
+    private var recordingInputSource: LiveRecordingInputSource = .microphone
 
     private static let liveActivityTextCharacterLimit = 700
     private static let liveActivityUpdateDelay = Duration.milliseconds(300)
@@ -574,7 +591,7 @@ final class LiveTranscriptionManager: ObservableObject {
         return nil
     }
 
-    func startRecording() async {
+    func startRecording(inputSource: LiveRecordingInputSource = .microphone) async {
         guard !isRecording, !isPreparing else {
             return
         }
@@ -589,14 +606,18 @@ final class LiveTranscriptionManager: ObservableObject {
         resetTranscriptStorage()
         statusText = String(localized: L10n.RecordingStatus.checkingPermissions)
 
-        guard await requestPermissions() else {
+        guard await requestPermissions(inputSource: inputSource) else {
             isPreparing = false
             return
         }
 
         do {
             let language = selectedLanguage
-            try await startCaptureSessionRecording(language: language)
+            recordingInputSource = inputSource
+            try await startCaptureSessionRecording(
+                language: language,
+                inputSource: inputSource
+            )
             recordingStartedAt = Date().addingTimeInterval(-elapsedClock.elapsedTime)
 
             isPreparing = false
@@ -620,22 +641,37 @@ final class LiveTranscriptionManager: ObservableObject {
         }
     }
 
-    private func startCaptureSessionRecording(language: TranscriptionLanguage) async throws {
+    private func startCaptureSessionRecording(
+        language: TranscriptionLanguage,
+        inputSource: LiveRecordingInputSource
+    ) async throws {
         if selectedTranscriptionBackend.usesLocalWhisper {
-            try await startLocalWhisperCaptureSessionRecording(language: language)
+            try await startLocalWhisperCaptureSessionRecording(
+                language: language,
+                inputSource: inputSource
+            )
         } else if Self.shouldUseSimulatorRecordingOnlyFallback {
-            try await startRecordingOnlyCaptureSessionRecording(language: language)
+            try await startRecordingOnlyCaptureSessionRecording(
+                language: language,
+                inputSource: inputSource
+            )
         } else {
-            try await startAppleSpeechCaptureSessionRecording(language: language)
+            try await startAppleSpeechCaptureSessionRecording(
+                language: language,
+                inputSource: inputSource
+            )
         }
     }
 
-    private func startAppleSpeechCaptureSessionRecording(language: TranscriptionLanguage) async throws {
+    private func startAppleSpeechCaptureSessionRecording(
+        language: TranscriptionLanguage,
+        inputSource: LiveRecordingInputSource
+    ) async throws {
         statusText = String(localized: L10n.RecordingStatus.configuringAudioInput)
-        try await configureAudioSession()
+        try await configureAudioSessionIfNeeded(for: inputSource)
 
         let audioFormat = selectedAudioFormat
-        let recordingFormat = try Self.makeCaptureSessionRecordingFormat()
+        let recordingFormat = try Self.makeCaptureSessionRecordingFormat(for: inputSource)
         let analyzerSourceFormat = try Self.makeCaptureSessionAnalyzerSourceFormat(sampleRate: recordingFormat.sampleRate)
         let prepared = try await prepareSpeechPipeline(language: language, audioInputFormat: analyzerSourceFormat)
         statusText = String(localized: L10n.RecordingStatus.startingRecorder)
@@ -646,6 +682,7 @@ final class LiveTranscriptionManager: ObservableObject {
             analyzerSourceFormat: analyzerSourceFormat,
             writer: writer,
             analyzerPipeline: prepared.pipeline,
+            inputMode: inputSource.usesExternalAudio ? .externalSampleBuffers : .microphone,
             inputLevelObserver: makeInputLevelObserver()
         )
 
@@ -662,12 +699,15 @@ final class LiveTranscriptionManager: ObservableObject {
         try await capturePipeline.start()
     }
 
-    private func startRecordingOnlyCaptureSessionRecording(language _: TranscriptionLanguage) async throws {
+    private func startRecordingOnlyCaptureSessionRecording(
+        language _: TranscriptionLanguage,
+        inputSource: LiveRecordingInputSource
+    ) async throws {
         statusText = String(localized: L10n.RecordingStatus.configuringAudioInput)
-        try await configureAudioSession()
+        try await configureAudioSessionIfNeeded(for: inputSource)
 
         let audioFormat = selectedAudioFormat
-        let recordingFormat = try Self.makeCaptureSessionRecordingFormat()
+        let recordingFormat = try Self.makeCaptureSessionRecordingFormat(for: inputSource)
         let analyzerSourceFormat = try Self.makeCaptureSessionAnalyzerSourceFormat(sampleRate: recordingFormat.sampleRate)
         statusText = String(localized: L10n.RecordingStatus.startingRecorder)
 
@@ -678,6 +718,7 @@ final class LiveTranscriptionManager: ObservableObject {
             analyzerSourceFormat: analyzerSourceFormat,
             writer: writer,
             analyzerPipeline: nil,
+            inputMode: inputSource.usesExternalAudio ? .externalSampleBuffers : .microphone,
             inputLevelObserver: makeInputLevelObserver()
         )
 
@@ -690,7 +731,10 @@ final class LiveTranscriptionManager: ObservableObject {
         try await capturePipeline.start()
     }
 
-    private func startLocalWhisperCaptureSessionRecording(language: TranscriptionLanguage) async throws {
+    private func startLocalWhisperCaptureSessionRecording(
+        language: TranscriptionLanguage,
+        inputSource: LiveRecordingInputSource
+    ) async throws {
         statusText = String(localized: L10n.RecordingStatus.preparingLanguageModel)
         guard let liveModel = LocalWhisperModelManager.selectedLiveModel else {
             throw LocalWhisperTranscriptionError.missingLiveModel
@@ -699,10 +743,10 @@ final class LiveTranscriptionManager: ObservableObject {
         let languageCode = LocalWhisperTranscriptionService.languageCode(for: language)
 
         statusText = String(localized: L10n.RecordingStatus.configuringAudioInput)
-        try await configureAudioSession()
+        try await configureAudioSessionIfNeeded(for: inputSource)
 
         let audioFormat = selectedAudioFormat
-        let recordingFormat = try Self.makeCaptureSessionRecordingFormat()
+        let recordingFormat = try Self.makeCaptureSessionRecordingFormat(for: inputSource)
         let localWhisperFormat = try Self.makeLocalWhisperInputFormat()
         statusText = String(localized: L10n.RecordingStatus.startingRecorder)
 
@@ -730,6 +774,7 @@ final class LiveTranscriptionManager: ObservableObject {
             writer: writer,
             analyzerPipeline: nil,
             localWhisperPipeline: localWhisperPipeline,
+            inputMode: inputSource.usesExternalAudio ? .externalSampleBuffers : .microphone,
             inputLevelObserver: makeInputLevelObserver()
         )
 
@@ -747,6 +792,17 @@ final class LiveTranscriptionManager: ObservableObject {
             Task { @MainActor [weak self] in
                 self?.handleInputLevel(observation)
             }
+        }
+    }
+
+    func externalAudioSampleHandler() -> (@Sendable (CMSampleBuffer) -> Void)? {
+        guard recordingInputSource.usesExternalAudio,
+              let captureRecordingPipeline else {
+            return nil
+        }
+
+        return { [weak captureRecordingPipeline] sampleBuffer in
+            captureRecordingPipeline?.appendExternalSampleBuffer(sampleBuffer)
         }
     }
 
@@ -774,7 +830,7 @@ final class LiveTranscriptionManager: ObservableObject {
         }
 
         do {
-            try await configureAudioSession()
+            try await configureAudioSessionIfNeeded(for: recordingInputSource)
             isPaused = false
             try await captureRecordingPipeline.start()
             statusText = String(localized: L10n.RecordingStatus.recording)
@@ -842,6 +898,7 @@ final class LiveTranscriptionManager: ObservableObject {
         captureRecordingPipeline = nil
         audioWriter = nil
         currentRecordingFormat = nil
+        recordingInputSource = .microphone
 
         let finishedLines = transcriptLines
         let recordingURL = currentAudioURL
@@ -1070,7 +1127,24 @@ final class LiveTranscriptionManager: ObservableObject {
         return format
     }
 
-    private static func makeCaptureSessionRecordingFormat() throws -> AVAudioFormat {
+    private static func makeCaptureSessionRecordingFormat(
+        for inputSource: LiveRecordingInputSource
+    ) throws -> AVAudioFormat {
+        if case .externalAudio(let sampleRate, let channelCount) = inputSource {
+            guard sampleRate.isFinite,
+                  sampleRate > 0,
+                  channelCount > 0,
+                  let format = AVAudioFormat(
+                    commonFormat: .pcmFormatFloat32,
+                    sampleRate: sampleRate,
+                    channels: channelCount,
+                    interleaved: false
+                  ) else {
+                throw LiveTranscriptionError.invalidAudioInput
+            }
+            return format
+        }
+
         #if os(iOS)
         let sessionSampleRate = AVAudioSession.sharedInstance().sampleRate
         #else
@@ -1171,7 +1245,7 @@ final class LiveTranscriptionManager: ObservableObject {
         }
     }
 
-    private func requestPermissions() async -> Bool {
+    private func requestPermissions(inputSource: LiveRecordingInputSource) async -> Bool {
         if selectedTranscriptionBackend.requiresAppleSpeech {
             let speechStatus = await resolvedSpeechAuthorization()
             guard speechStatus == .authorized else {
@@ -1183,9 +1257,11 @@ final class LiveTranscriptionManager: ObservableObject {
             }
         }
 
-        guard await requestMicrophoneAuthorization() else {
-            fail(with: String(localized: L10n.SpeechText.microphoneDenied))
-            return false
+        if inputSource.requiresMicrophonePermission {
+            guard await requestMicrophoneAuthorization() else {
+                fail(with: String(localized: L10n.SpeechText.microphoneDenied))
+                return false
+            }
         }
 
         return true
@@ -1266,6 +1342,15 @@ final class LiveTranscriptionManager: ObservableObject {
 
     private func configureAudioSession() async throws {
         try await AppAudioSessionCoordinator.shared.activateRecording(owner: audioSessionOwner)
+    }
+
+    private func configureAudioSessionIfNeeded(
+        for inputSource: LiveRecordingInputSource
+    ) async throws {
+        guard inputSource.requiresMicrophonePermission else {
+            return
+        }
+        try await configureAudioSession()
     }
 
     private func deactivateAudioSession() async {
@@ -1954,6 +2039,11 @@ private final class AnalyzerInputPipeline: @unchecked Sendable {
 }
 
 private final class CaptureSessionRecordingPipeline: NSObject, AVCaptureAudioDataOutputSampleBufferDelegate, @unchecked Sendable {
+    enum InputMode: Sendable {
+        case microphone
+        case externalSampleBuffers
+    }
+
     struct FinishSummary: Sendable {
         let writtenFrameCount: AVAudioFramePosition
         let maximumInputLevel: Float
@@ -1969,6 +2059,7 @@ private final class CaptureSessionRecordingPipeline: NSObject, AVCaptureAudioDat
     private let writer: AudioFileWriter
     private let analyzerPipeline: AnalyzerInputPipeline?
     private let localWhisperPipeline: LiveLocalWhisperPipeline?
+    private let inputMode: InputMode
     private let inputLevelObserver: (@Sendable (RecordingInputLevelObservation) -> Void)?
     private let recordingConverter: CaptureSampleBufferAudioConverter
     private let analyzerConverter: CaptureSampleBufferAudioConverter
@@ -1980,6 +2071,8 @@ private final class CaptureSessionRecordingPipeline: NSObject, AVCaptureAudioDat
     private var reportedFailureStages = Set<String>()
     private var lastInputLevelReportFrame: AVAudioFramePosition?
     private var maximumInputLevel: Float = 0
+    private var acceptsExternalSampleBuffers = false
+    private var didFinish = false
 
     init(
         recordingFormat: AVAudioFormat,
@@ -1987,6 +2080,7 @@ private final class CaptureSessionRecordingPipeline: NSObject, AVCaptureAudioDat
         writer: AudioFileWriter,
         analyzerPipeline: AnalyzerInputPipeline?,
         localWhisperPipeline: LiveLocalWhisperPipeline? = nil,
+        inputMode: InputMode,
         inputLevelObserver: (@Sendable (RecordingInputLevelObservation) -> Void)? = nil
     ) {
         self.recordingFormat = recordingFormat
@@ -1994,13 +2088,27 @@ private final class CaptureSessionRecordingPipeline: NSObject, AVCaptureAudioDat
         self.writer = writer
         self.analyzerPipeline = analyzerPipeline
         self.localWhisperPipeline = localWhisperPipeline
+        self.inputMode = inputMode
         self.inputLevelObserver = inputLevelObserver
         recordingConverter = CaptureSampleBufferAudioConverter(targetFormat: recordingFormat)
         analyzerConverter = CaptureSampleBufferAudioConverter(targetFormat: analyzerSourceFormat)
         super.init()
+        if inputMode == .externalSampleBuffers {
+            deviceName = "ScreenCaptureKit System Audio"
+        }
     }
 
     func start() async throws {
+        if inputMode == .externalSampleBuffers {
+            await withCheckedContinuation { continuation in
+                sampleQueue.async {
+                    self.acceptsExternalSampleBuffers = !self.didFinish
+                    continuation.resume()
+                }
+            }
+            return
+        }
+
         try await withCheckedThrowingContinuation { continuation in
             sessionQueue.async {
                 do {
@@ -2023,12 +2131,22 @@ private final class CaptureSessionRecordingPipeline: NSObject, AVCaptureAudioDat
     }
 
     func stop() async -> TimeInterval {
-        await withCheckedContinuation { continuation in
-            sessionQueue.async {
-                if self.session.isRunning {
-                    self.session.stopRunning()
+        if inputMode == .externalSampleBuffers {
+            await withCheckedContinuation { continuation in
+                sampleQueue.async {
+                    self.acceptsExternalSampleBuffers = false
+                    self.lastInputLevelReportFrame = nil
+                    continuation.resume()
                 }
-                continuation.resume(returning: ())
+            }
+        } else {
+            await withCheckedContinuation { continuation in
+                sessionQueue.async {
+                    if self.session.isRunning {
+                        self.session.stopRunning()
+                    }
+                    continuation.resume()
+                }
             }
         }
 
@@ -2047,16 +2165,20 @@ private final class CaptureSessionRecordingPipeline: NSObject, AVCaptureAudioDat
     func finish() async -> FinishSummary {
         _ = await stop()
 
-        await withCheckedContinuation { continuation in
-            sessionQueue.async {
-                self.output.setSampleBufferDelegate(nil, queue: nil)
-                continuation.resume(returning: ())
+        if inputMode == .microphone {
+            await withCheckedContinuation { continuation in
+                sessionQueue.async {
+                    self.output.setSampleBufferDelegate(nil, queue: nil)
+                    continuation.resume()
+                }
             }
         }
 
         await withCheckedContinuation { continuation in
             sampleQueue.async {
-                continuation.resume(returning: ())
+                self.acceptsExternalSampleBuffers = false
+                self.didFinish = true
+                continuation.resume()
             }
         }
 
@@ -2069,6 +2191,19 @@ private final class CaptureSessionRecordingPipeline: NSObject, AVCaptureAudioDat
                 sampleRate: recordingFormat.sampleRate
             )
         )
+    }
+
+    func appendExternalSampleBuffer(_ sampleBuffer: CMSampleBuffer) {
+        guard inputMode == .externalSampleBuffers else {
+            return
+        }
+
+        sampleQueue.async {
+            guard self.acceptsExternalSampleBuffers, !self.didFinish else {
+                return
+            }
+            self.processSampleBuffer(sampleBuffer)
+        }
     }
 
     private func configureIfNeeded() throws {
@@ -2123,6 +2258,10 @@ private final class CaptureSessionRecordingPipeline: NSObject, AVCaptureAudioDat
         didOutput sampleBuffer: CMSampleBuffer,
         from connection: AVCaptureConnection
     ) {
+        processSampleBuffer(sampleBuffer)
+    }
+
+    private func processSampleBuffer(_ sampleBuffer: CMSampleBuffer) {
         guard CMSampleBufferDataIsReady(sampleBuffer) else {
             return
         }

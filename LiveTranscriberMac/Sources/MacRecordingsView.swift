@@ -55,10 +55,25 @@ struct MacRecordingsView: View {
         return RecordingCategoryCatalog.allNames(recordings: store.recordings)
     }
 
+    private var uncategorizedCount: Int {
+        store.recordings.filter { $0.categoryName == nil }.count
+    }
+
+    private var selectedCategoryTitle: String {
+        switch categoryFilter {
+        case .all:
+            return String(localized: L10n.Recordings.allRecordings)
+        case .uncategorized:
+            return String(localized: L10n.Recordings.uncategorized)
+        case .named(let name):
+            return name
+        }
+    }
+
     var body: some View {
         HSplitView {
             listPane
-                .frame(minWidth: 300, idealWidth: 340, maxWidth: 460)
+                .frame(minWidth: 340, idealWidth: 370, maxWidth: 440)
 
             Group {
                 if let item = selectedRecording {
@@ -79,7 +94,8 @@ struct MacRecordingsView: View {
                     }
                 }
             }
-            .frame(minWidth: 480, maxWidth: .infinity, maxHeight: .infinity)
+            .frame(minWidth: 500, idealWidth: 760, maxWidth: .infinity, maxHeight: .infinity)
+            .layoutPriority(1)
         }
         .navigationTitle(Text(L10n.App.recordingsTab))
         .searchable(text: $searchText, placement: .toolbar)
@@ -199,23 +215,152 @@ struct MacRecordingsView: View {
     }
 
     private var listPane: some View {
-        List(selection: $selectedRecordingID) {
-            ForEach(filteredRecordings) { item in
-                MacRecordingListRow(item: item)
-                    .tag(item.id)
-            }
-        }
-        .overlay {
-            if filteredRecordings.isEmpty {
-                ContentUnavailableView {
-                    Label {
-                        Text(L10n.Recordings.noRecordings)
-                    } icon: {
-                        Image(systemName: "waveform.slash")
+        VStack(spacing: 0) {
+            VStack(alignment: .leading, spacing: 13) {
+                HStack(alignment: .firstTextBaseline) {
+                    VStack(alignment: .leading, spacing: 3) {
+                        Text(L10n.Recordings.title)
+                            .font(.redditSans(.title3, weight: .bold))
+                        Text(
+                            String(
+                                format: String(localized: L10n.Recordings.categoryCountFormat),
+                                store.recordings.count
+                            )
+                        )
+                        .font(.redditSans(.caption))
+                        .foregroundStyle(.secondary)
                     }
+
+                    Spacer(minLength: 10)
+
+                    Button {
+                        isShowingCategoryOrganizer = true
+                    } label: {
+                        Image(systemName: "slider.horizontal.3")
+                            .font(.system(size: 13, weight: .semibold))
+                            .frame(width: 28, height: 28)
+                    }
+                    .buttonStyle(.borderless)
+                    .help(String(localized: L10n.Recordings.organize))
+                }
+
+                categoryBrowser
+            }
+            .padding(.horizontal, 14)
+            .padding(.top, 14)
+            .padding(.bottom, 12)
+
+            Divider()
+
+            HStack {
+                Text(verbatim: selectedCategoryTitle)
+                    .font(.redditSans(.caption, weight: .semibold))
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+                Spacer()
+                Text(verbatim: "\(filteredRecordings.count)")
+                    .font(.redditSans(.caption2, weight: .bold).monospacedDigit())
+                    .foregroundStyle(.secondary)
+                    .padding(.horizontal, 8)
+                    .frame(height: 22)
+                    .background(Color.secondary.opacity(0.10), in: Capsule())
+            }
+            .padding(.horizontal, 16)
+            .padding(.top, 12)
+            .padding(.bottom, 4)
+
+            ScrollView {
+                LazyVStack(spacing: 10) {
+                    ForEach(filteredRecordings) { item in
+                        Button {
+                            selectedRecordingID = item.id
+                        } label: {
+                            MacRecordingListRow(
+                                item: item,
+                                isSelected: selectedRecordingID == item.id
+                            )
+                        }
+                        .buttonStyle(MacRecordingCardButtonStyle())
+                        .accessibilityAddTraits(
+                            selectedRecordingID == item.id ? .isSelected : []
+                        )
+                    }
+                }
+                .padding(.horizontal, 12)
+                .padding(.vertical, 8)
+            }
+            .overlay {
+                if filteredRecordings.isEmpty {
+                    ContentUnavailableView {
+                        Label {
+                            Text(
+                                searchText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+                                    ? L10n.Recordings.noRecordings
+                                    : L10n.Recordings.noSearchResults
+                            )
+                        } icon: {
+                            Image(
+                                systemName: searchText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+                                    ? "waveform.slash"
+                                    : "magnifyingglass"
+                            )
+                        }
+                    }
+                    .padding(24)
                 }
             }
         }
+        .background(AppTheme.groupedBackground)
+    }
+
+    private var categoryBrowser: some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: 8) {
+                MacRecordingCategoryButton(
+                    title: String(localized: L10n.Recordings.allRecordings),
+                    count: store.recordings.count,
+                    systemImage: "square.grid.2x2",
+                    tint: AppTheme.brand,
+                    isSelected: categoryFilter == .all
+                ) {
+                    categoryFilter = .all
+                }
+
+                if uncategorizedCount > 0 {
+                    MacRecordingCategoryButton(
+                        title: String(localized: L10n.Recordings.uncategorized),
+                        count: uncategorizedCount,
+                        systemImage: "tray",
+                        tint: .secondary,
+                        isSelected: categoryFilter == .uncategorized
+                    ) {
+                        categoryFilter = .uncategorized
+                    }
+                }
+
+                ForEach(categoryNames, id: \.self) { name in
+                    let appearance = RecordingCategoryAppearanceCatalog.appearance(for: name)
+                    MacRecordingCategoryButton(
+                        title: name,
+                        count: recordingCount(in: name),
+                        systemImage: appearance.iconName,
+                        tint: appearance.color,
+                        isSelected: categoryFilter == .named(name)
+                    ) {
+                        categoryFilter = .named(name)
+                    }
+                }
+            }
+            .padding(.vertical, 1)
+        }
+        .scrollClipDisabled()
+    }
+
+    private func recordingCount(in categoryName: String) -> Int {
+        let key = categoryName.normalizedForRecordingSearch
+        return store.recordings.filter {
+            $0.categoryName?.normalizedForRecordingSearch == key
+        }.count
     }
 
     private func consumePendingImportURLs() {
@@ -517,38 +662,118 @@ enum MacRecordingCategoryFilter: Hashable {
     case named(String)
 }
 
-private struct MacRecordingListRow: View {
-    let item: RecordingItem
+private struct MacRecordingCategoryButton: View {
+    let title: String
+    let count: Int
+    let systemImage: String
+    let tint: Color
+    let isSelected: Bool
+    let action: () -> Void
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 5) {
-            HStack(alignment: .firstTextBaseline) {
-                Text(verbatim: item.displayName)
-                    .font(.headline)
-                    .lineLimit(1)
-                Spacer()
-                if item.isTranscriptLocked {
-                    Image(systemName: "lock.fill")
-                        .font(.caption2)
+        Button(action: action) {
+            HStack(spacing: 8) {
+                Image(systemName: systemImage)
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundStyle(tint)
+                    .frame(width: 26, height: 26)
+                    .background(tint.opacity(0.12), in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+
+                VStack(alignment: .leading, spacing: 1) {
+                    Text(verbatim: title)
+                        .font(.redditSans(.caption, weight: .semibold))
+                        .foregroundStyle(.primary)
+                        .lineLimit(1)
+                    Text(verbatim: "\(count)")
+                        .font(.redditSans(.caption2).monospacedDigit())
                         .foregroundStyle(.secondary)
                 }
             }
-
-            HStack(spacing: 8) {
-                Text(item.createdAt, format: .dateTime.month(.abbreviated).day().hour().minute())
-                Text(TranscriptionLine.formatTimestamp(Double(item.durationSeconds)))
-                    .monospacedDigit()
-                if let categoryName = item.categoryName {
-                    Label {
-                        Text(verbatim: categoryName)
-                    } icon: {
-                        Image(systemName: "folder")
-                    }
-                    .lineLimit(1)
-                }
+            .padding(.horizontal, 9)
+            .frame(height: 42)
+            .background(
+                isSelected ? tint.opacity(0.13) : AppTheme.cardBackground,
+                in: RoundedRectangle(cornerRadius: AppTheme.compactCornerRadius, style: .continuous)
+            )
+            .overlay {
+                RoundedRectangle(cornerRadius: AppTheme.compactCornerRadius, style: .continuous)
+                    .stroke(isSelected ? tint.opacity(0.55) : AppTheme.cardBorder, lineWidth: 1)
             }
-            .font(.caption)
-            .foregroundStyle(.secondary)
+            .contentShape(RoundedRectangle(cornerRadius: AppTheme.compactCornerRadius, style: .continuous))
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("\(title), \(count)")
+        .accessibilityAddTraits(isSelected ? .isSelected : [])
+    }
+}
+
+private struct MacRecordingCardButtonStyle: ButtonStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .contentShape(
+                RoundedRectangle(cornerRadius: AppTheme.cornerRadius, style: .continuous)
+            )
+    }
+}
+
+private struct MacRecordingListRow: View {
+    let item: RecordingItem
+    let isSelected: Bool
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 9) {
+            HStack(alignment: .top, spacing: 9) {
+                ZStack {
+                    RoundedRectangle(cornerRadius: AppTheme.compactCornerRadius, style: .continuous)
+                        .fill(AppTheme.brand.opacity(0.12))
+                    Image(systemName: "waveform")
+                        .font(.system(size: 15, weight: .semibold))
+                        .foregroundStyle(AppTheme.brand)
+                }
+                .frame(width: 34, height: 34)
+
+                VStack(alignment: .leading, spacing: 3) {
+                    HStack(spacing: 5) {
+                        Text(verbatim: item.displayName)
+                            .font(.redditSans(.subheadline, weight: .semibold))
+                            .lineLimit(1)
+                            .truncationMode(.middle)
+
+                        if item.isTranscriptLocked {
+                            Image(systemName: "lock.fill")
+                                .font(.system(size: 9, weight: .semibold))
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+
+                    Text(item.createdAt, format: .dateTime.year().month(.abbreviated).day().hour().minute())
+                        .font(.redditSans(.caption2))
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+
+                trailingStatus
+            }
+
+            MacRecordingMetadataStrip(item: item)
+
+            if !item.combinedTags.isEmpty {
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 5) {
+                        ForEach(Array(item.combinedTags.prefix(4)), id: \.self) { tag in
+                            Text(verbatim: tag)
+                                .font(.redditSans(.caption2, weight: .semibold))
+                                .foregroundStyle(AppTheme.info)
+                                .lineLimit(1)
+                                .padding(.horizontal, 7)
+                                .frame(height: 20)
+                                .background(AppTheme.info.opacity(0.11), in: Capsule())
+                        }
+                    }
+                }
+                .scrollClipDisabled()
+            }
 
             if let importStatus = item.importStatus {
                 if importStatus.isFailed {
@@ -557,31 +782,129 @@ private struct MacRecordingListRow: View {
                     } icon: {
                         Image(systemName: "exclamationmark.triangle")
                     }
-                    .font(.caption)
-                    .foregroundStyle(.red)
+                    .font(.redditSans(.caption))
+                    .foregroundStyle(AppTheme.danger)
                     .lineLimit(2)
                 } else {
                     VStack(alignment: .leading, spacing: 3) {
                         ProgressView(value: importStatus.progress)
                         Text(verbatim: importStatus.message)
-                            .font(.caption2)
-                            .foregroundStyle(.secondary)
+                            .font(.redditSans(.caption2, weight: .semibold))
+                            .foregroundStyle(AppTheme.info)
                             .lineLimit(1)
                     }
                 }
             } else if let summary = item.intelligence?.summary, !summary.isEmpty {
                 Text(verbatim: summary)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+                    .font(.redditSans(.caption))
+                    .foregroundStyle(.primary)
                     .lineLimit(2)
+                    .fixedSize(horizontal: false, vertical: true)
             } else if !item.transcriptPreview.isEmpty {
                 Text(verbatim: item.transcriptPreview)
-                    .font(.caption)
+                    .font(.redditSans(.caption))
                     .foregroundStyle(.secondary)
                     .lineLimit(2)
+                    .fixedSize(horizontal: false, vertical: true)
             }
         }
-        .padding(.vertical, 4)
+        .padding(12)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(
+            isSelected ? AppTheme.brand.opacity(0.10) : AppTheme.cardBackground,
+            in: RoundedRectangle(cornerRadius: AppTheme.cornerRadius, style: .continuous)
+        )
+        .overlay {
+            RoundedRectangle(cornerRadius: AppTheme.cornerRadius, style: .continuous)
+                .stroke(
+                    isSelected ? AppTheme.brand.opacity(0.62) : AppTheme.cardBorder,
+                    lineWidth: isSelected ? 1.5 : 1
+                )
+        }
+        .shadow(
+            color: isSelected ? AppTheme.brand.opacity(0.08) : AppTheme.cardShadow,
+            radius: isSelected ? 5 : AppTheme.cardShadowRadius,
+            y: AppTheme.cardShadowYOffset
+        )
+        .contentShape(RoundedRectangle(cornerRadius: AppTheme.cornerRadius, style: .continuous))
+    }
+
+    @ViewBuilder
+    private var trailingStatus: some View {
+        if item.importStatus?.isFailed == true {
+            Image(systemName: "exclamationmark.triangle.fill")
+                .font(.system(size: 13, weight: .semibold))
+                .foregroundStyle(AppTheme.warning)
+                .frame(width: 25, height: 25)
+        } else if item.importStatus != nil {
+            ProgressView()
+                .controlSize(.small)
+                .frame(width: 25, height: 25)
+        } else {
+            Text(TranscriptionLine.formatTimestamp(Double(item.durationSeconds)))
+                .font(.redditSans(.caption2, weight: .semibold).monospacedDigit())
+                .foregroundStyle(.secondary)
+                .padding(.horizontal, 8)
+                .frame(height: 25)
+                .background(Color.secondary.opacity(0.10), in: Capsule())
+        }
+    }
+}
+
+private struct MacRecordingMetadataStrip: View {
+    let item: RecordingItem
+
+    var body: some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: 5) {
+                MacRecordingMetadataChip(
+                    systemImage: "globe",
+                    text: item.localizedLanguageName
+                )
+                MacRecordingMetadataChip(
+                    systemImage: "text.alignleft",
+                    text: "\(item.lineCount)"
+                )
+                if let projectName = item.projectName {
+                    MacRecordingMetadataChip(systemImage: "briefcase", text: projectName)
+                }
+                if let categoryName = item.categoryName {
+                    let appearance = RecordingCategoryAppearanceCatalog.appearance(for: categoryName)
+                    MacRecordingMetadataChip(
+                        systemImage: appearance.iconName,
+                        text: categoryName,
+                        tint: appearance.color
+                    )
+                }
+                if let placeName = item.location?.placeName {
+                    MacRecordingMetadataChip(
+                        systemImage: "mappin.and.ellipse",
+                        text: placeName
+                    )
+                }
+            }
+        }
+        .scrollClipDisabled()
+    }
+}
+
+private struct MacRecordingMetadataChip: View {
+    let systemImage: String
+    let text: String
+    var tint: Color = .secondary
+
+    var body: some View {
+        HStack(spacing: 4) {
+            Image(systemName: systemImage)
+                .font(.system(size: 10, weight: .semibold))
+            Text(verbatim: text)
+                .font(.redditSans(.caption2, weight: .semibold))
+                .lineLimit(1)
+        }
+        .foregroundStyle(tint)
+        .padding(.horizontal, 7)
+        .frame(height: 21)
+        .background(tint.opacity(0.09), in: Capsule())
     }
 }
 

@@ -95,7 +95,10 @@ final class MacSystemAudioCaptureController: NSObject, ObservableObject {
     }
 
     @discardableResult
-    func startCapture(includesMicrophone: Bool) async -> Bool {
+    func startCapture(
+        includesMicrophone: Bool,
+        systemAudioSampleHandler: (@Sendable (CMSampleBuffer) -> Void)? = nil
+    ) async -> Bool {
         guard let selectedFilter else {
             presentSourcePicker()
             return false
@@ -126,7 +129,8 @@ final class MacSystemAudioCaptureController: NSObject, ObservableObject {
                 : nil
             let sampleRouter = MacCaptureSampleRouter(
                 systemAudioWriter: systemAudioWriter,
-                microphoneAudioWriter: microphoneAudioWriter
+                microphoneAudioWriter: microphoneAudioWriter,
+                systemAudioSampleHandler: systemAudioSampleHandler
             )
             let stream = SCStream(
                 filter: selectedFilter,

@@ -1148,7 +1148,7 @@ struct SettingsView: View {
                 tint: AppTheme.purple
             ) {
                 Menu {
-                    ForEach(MOSSDecoderSegmentDuration.allCases) { duration in
+                    ForEach(MOSSDecoderSegmentDuration.mobileOptions) { duration in
                         let isRecommended = duration == mossDecoderRecommendation.duration
                         Button {
                             HapticFeedback.play(.menuSelection)

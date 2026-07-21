@@ -36,6 +36,8 @@ enum MacRecordingInputMode: String, CaseIterable, Identifiable {
 /// format selection, waveform, timer, interim/final transcript rows, and the
 /// save-to-library flow.
 struct MacTranscriptionView: View {
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.colorScheme) private var colorScheme
     @ObservedObject var transcriber: LiveTranscriptionManager
     @ObservedObject var recordingStore: RecordingStore
     @ObservedObject var systemAudioCapture: MacSystemAudioCaptureController
@@ -60,8 +62,11 @@ struct MacTranscriptionView: View {
     @State private var lineEditRequest: MacLiveTranscriptLineEditRequest?
     @State private var pendingSystemAudioStagingDirectory: URL?
     @State private var systemAudioMessage: String?
-    @State private var microphoneFallbackDraft: RecordingDraft?
-    @State private var microphoneFallbackMessage: String?
+    @State private var recoveredAudioDraft: RecordingDraft?
+    @State private var recoveredAudioMessage: String?
+    @State private var savedRecordingName: String?
+    @State private var savedRecordingBannerIsVisible = false
+    @State private var savedRecordingBannerTask: Task<Void, Never>?
 
     private var recordingInputMode: MacRecordingInputMode {
         MacRecordingInputMode(rawValue: recordingInputModeRaw)
@@ -69,27 +74,23 @@ struct MacTranscriptionView: View {
     }
 
     var body: some View {
-        VStack(spacing: 0) {
-            recorderBar
-            Divider()
-            MacLiveTranscriptList(
-                transcriber: transcriber,
-                finalStore: transcriber.finalTranscriptStore,
-                interimStore: transcriber.interimTranscriptStore,
-                translatedTextByLineID: translatedTextByLineID,
-                translatedLineSignatures: translatedLineSignatures,
-                selectedTranslationLanguage: selectedTranslationLanguage,
-                isTranslating: isTranslating,
-                onEditFinalLine: beginEditingTranscriptLine
-            )
+        GeometryReader { proxy in
+            transcriptionCanvas(usesWideLayout: proxy.size.width >= 900)
         }
         .navigationTitle(Text(L10n.App.transcribeTab))
-        .background(AppTheme.groupedBackground)
+        .animation(
+            reduceMotion ? nil : .snappy(duration: 0.22, extraBounce: 0.02),
+            value: transcriber.isRecording
+        )
+        .animation(
+            reduceMotion ? nil : .snappy(duration: 0.20, extraBounce: 0.02),
+            value: transcriber.isPaused
+        )
         .sheet(item: $pendingDraft) { draft in
             MacRecordingSaveSheet(
                 draft: draft,
                 store: recordingStore,
-                onFinished: {
+                onFinished: { savedName in
                     if let pendingSystemAudioStagingDirectory {
                         systemAudioCapture.discardStagingDirectory(
                             pendingSystemAudioStagingDirectory
@@ -98,6 +99,7 @@ struct MacTranscriptionView: View {
                     pendingSystemAudioStagingDirectory = nil
                     transcriber.clearTranscript()
                     pendingDraft = nil
+                    showSavedRecordingBanner(fileName: savedName)
                 },
                 onDiscard: {
                     try? FileManager.default.removeItem(at: draft.audioURL)
@@ -190,123 +192,346 @@ struct MacTranscriptionView: View {
         .alert(
             String(localized: MacL10n.systemAudioUnavailable),
             isPresented: Binding(
-                get: { microphoneFallbackDraft != nil },
+                get: { recoveredAudioDraft != nil },
                 set: {
-                    if !$0, microphoneFallbackDraft != nil {
-                        discardMicrophoneFallback()
+                    if !$0, recoveredAudioDraft != nil {
+                        discardRecoveredAudio()
                     }
                 }
             )
         ) {
-            Button(String(localized: MacL10n.saveMicrophoneInstead)) {
-                pendingDraft = microphoneFallbackDraft
-                microphoneFallbackDraft = nil
-                microphoneFallbackMessage = nil
+            Button(String(localized: MacL10n.saveRecoveredSystemAudio)) {
+                pendingDraft = recoveredAudioDraft
+                recoveredAudioDraft = nil
+                recoveredAudioMessage = nil
             }
             Button(String(localized: L10n.Transcription.discard), role: .destructive) {
-                discardMicrophoneFallback()
+                discardRecoveredAudio()
             }
         } message: {
             Text(
-                microphoneFallbackMessage
+                recoveredAudioMessage
                     ?? String(localized: MacL10n.systemAudioNoSamples)
             )
         }
     }
 
-    // MARK: - Recorder bar
+    // MARK: - Transcription workspace
 
-    private var recorderBar: some View {
-        VStack(spacing: 12) {
-            HStack(spacing: 14) {
-                MacElapsedTimeText(clock: transcriber.elapsedClock)
+    private func transcriptionCanvas(usesWideLayout: Bool) -> some View {
+        ZStack(alignment: .top) {
+            AmbientActivityBackground(state: transcriptionAmbientState)
 
-                MacLiveWaveform(store: transcriber.waveformStore)
-                    .frame(height: 44)
-                    .frame(maxWidth: .infinity)
+            VStack(alignment: .leading, spacing: 16) {
+                assistantGreetingHeader
 
-                recordingInputMenu
-                translationMenu
-                languageMenu
-                formatMenu
+                if usesWideLayout {
+                    HStack(alignment: .top, spacing: 16) {
+                        recorderCard(expandsVertically: true)
+                            .frame(minWidth: 360, idealWidth: 410, maxWidth: 460)
+
+                        transcriptCard
+                            .frame(maxWidth: .infinity)
+                    }
+                } else {
+                    VStack(alignment: .leading, spacing: 16) {
+                        recorderCard(expandsVertically: false)
+                        transcriptCard
+                    }
+                }
             }
+            .padding(.horizontal, 20)
+            .padding(.top, 14)
+            .padding(.bottom, 18)
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
 
-            HStack(spacing: 12) {
-                statusBadge
-
-                if let errorText = transcriber.errorText {
-                    Label {
-                        Text(verbatim: errorText)
-                    } icon: {
-                        Image(systemName: "exclamationmark.triangle")
-                    }
-                    .font(.callout)
-                    .foregroundStyle(.red)
-                    .lineLimit(1)
-                }
-
-                if let selectedTranslationLanguage {
-                    Label {
-                        Text(verbatim: translationStatusText(for: selectedTranslationLanguage))
-                    } icon: {
-                        if isTranslating {
-                            ProgressView()
-                                .controlSize(.mini)
-                        } else {
-                            Image(systemName: translationErrorMessage == nil ? "translate" : "exclamationmark.triangle")
-                        }
-                    }
-                    .font(.caption)
-                    .foregroundStyle(translationErrorMessage == nil ? .secondary : AppTheme.warning)
-                    .lineLimit(1)
-                }
-
-                if recordingInputMode.usesSystemAudio {
-                    Label {
-                        Text(
-                            verbatim: systemAudioCapture.selectedSourceName
-                                ?? String(localized: MacL10n.chooseSystemAudioSource)
-                        )
-                    } icon: {
-                        Image(systemName: "speaker.wave.2.fill")
-                    }
-                    .font(.caption)
-                    .foregroundStyle(
-                        systemAudioCapture.hasSelectedSource ? .secondary : AppTheme.warning
-                    )
-                    .lineLimit(1)
-                }
-
-                if let warningMessage = systemAudioCapture.warningMessage {
-                    Label(warningMessage, systemImage: "exclamationmark.triangle")
-                        .font(.caption)
-                        .foregroundStyle(AppTheme.warning)
-                        .lineLimit(1)
-                }
-
-                Spacer()
-
-                recordControls
-            }
+            savedRecordingBanner
+                .padding(.top, 12)
+                .padding(.horizontal, 24)
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+                .allowsHitTesting(false)
+                .zIndex(20)
         }
-        .padding(.horizontal, 20)
-        .padding(.vertical, 14)
     }
 
-    private var statusBadge: some View {
-        Label {
-            Text(verbatim: transcriber.statusText)
-        } icon: {
-            Circle()
-                .fill(
-                    transcriber.isRecording
-                        ? (transcriber.isPaused ? AppTheme.success : AppTheme.danger)
-                        : AppTheme.warning
-                )
-                .frame(width: 8, height: 8)
+    private var transcriptionAmbientState: AmbientActivityState {
+        guard transcriber.isRecording else {
+            return .standby
         }
-        .font(.callout)
-        .foregroundStyle(.secondary)
+        return transcriber.isPaused ? .paused : .active
+    }
+
+    private var assistantGreetingHeader: some View {
+        HStack(alignment: .center, spacing: 12) {
+            Image("AssistantRobot")
+                .resizable()
+                .scaledToFit()
+                .frame(width: 48, height: 48)
+                .scaleEffect(transcriber.isRecording && !transcriber.isPaused ? 1.04 : 1)
+                .offset(y: transcriber.isRecording && !transcriber.isPaused ? -2 : 0)
+                .animation(
+                    reduceMotion ? nil : .snappy(duration: 0.32, extraBounce: 0.08),
+                    value: transcriber.isRecording && !transcriber.isPaused
+                )
+                .accessibilityHidden(true)
+
+            VStack(alignment: .leading, spacing: 2) {
+                Text(assistantGreetingTitle)
+                    .font(.redditSans(.title3, weight: .bold))
+                    .foregroundStyle(.primary)
+
+                Text(L10n.Transcription.liveTranscription)
+                    .font(.redditSans(.caption, weight: .semibold))
+                    .foregroundStyle(.secondary)
+            }
+
+            Spacer(minLength: 0)
+        }
+        .padding(.horizontal, 2)
+        .frame(height: 50)
+        .accessibilityElement(children: .combine)
+    }
+
+    private var assistantGreetingTitle: String {
+        let hour = Calendar.current.component(.hour, from: Date())
+        switch hour {
+        case 5..<12:
+            return String(localized: L10n.Greeting.morning)
+        case 12..<18:
+            return String(localized: L10n.Greeting.afternoon)
+        default:
+            return String(localized: L10n.Greeting.evening)
+        }
+    }
+
+    private func recorderCard(expandsVertically: Bool) -> some View {
+        VStack(alignment: .leading, spacing: 14) {
+            recorderDeck(expandsVertically: expandsVertically)
+
+            VStack(alignment: .leading, spacing: 10) {
+                HStack(spacing: 9) {
+                    MacRecordingStateBadge(
+                        isRecording: transcriber.isRecording,
+                        isPaused: transcriber.isPaused,
+                        isPreparing: transcriber.isPreparing
+                    )
+
+                    languageMenu
+
+                    Spacer(minLength: 0)
+                }
+
+                HStack(spacing: 9) {
+                    recordingInputMenu
+
+                    if recordingInputMode.usesSystemAudio {
+                        systemAudioSourceButton
+                    }
+
+                    Spacer(minLength: 0)
+                }
+            }
+
+            recorderNotices
+
+            if expandsVertically {
+                Spacer(minLength: 0)
+            }
+        }
+        .padding(16)
+        .frame(maxWidth: .infinity, maxHeight: expandsVertically ? .infinity : nil, alignment: .top)
+        .macTranscriptionCardSurface()
+    }
+
+    private func recorderDeck(expandsVertically: Bool) -> some View {
+        VStack(alignment: .leading, spacing: 0) {
+            ZStack {
+                HStack(alignment: .center, spacing: 10) {
+                    Image(
+                        systemName: recordingInputMode.usesSystemAudio
+                            ? "waveform.and.magnifyingglass"
+                            : "waveform.and.mic"
+                    )
+                    .font(.redditSans(.caption, weight: .bold))
+                    .foregroundStyle(
+                        transcriber.isRecording && !transcriber.isPaused
+                            ? AppTheme.danger
+                            : recorderDeckSecondaryColor
+                    )
+                    .scaleEffect(transcriber.isRecording && !transcriber.isPaused ? 1.08 : 1)
+                    .animation(
+                        reduceMotion ? nil : .snappy(duration: 0.20, extraBounce: 0),
+                        value: transcriber.isRecording && !transcriber.isPaused
+                    )
+                    .frame(width: 34, height: 34, alignment: .leading)
+                    .accessibilityLabel(Text(L10n.Transcription.liveTranscription))
+
+                    Spacer(minLength: 8)
+
+                    formatMenu
+                }
+
+                MacElapsedTimeText(
+                    clock: transcriber.elapsedClock,
+                    color: recorderDeckPrimaryColor
+                )
+                .allowsHitTesting(false)
+            }
+            .frame(height: 38)
+
+            MacLiveRecordingWaveTimeline(
+                store: transcriber.waveformStore,
+                clock: transcriber.elapsedClock,
+                primaryColor: recorderDeckPrimaryColor,
+                secondaryColor: recorderDeckSecondaryColor,
+                height: expandsVertically ? 214 : 142
+            )
+            .padding(.top, 8)
+            .allowsHitTesting(false)
+        }
+    }
+
+    private var recorderDeckPrimaryColor: Color {
+        colorScheme == .dark ? .white : .primary
+    }
+
+    private var recorderDeckSecondaryColor: Color {
+        colorScheme == .dark ? .white.opacity(0.72) : .secondary
+    }
+
+    private var recorderDeckPillColor: Color {
+        colorScheme == .dark ? .white.opacity(0.14) : .black.opacity(0.06)
+    }
+
+    @ViewBuilder
+    private var recorderNotices: some View {
+        if transcriber.isPreparing {
+            MacRecorderNotice(
+                text: transcriber.statusText,
+                systemImage: "ellipsis.circle",
+                tint: AppTheme.warning,
+                showsProgress: true
+            )
+        }
+
+        if let errorText = transcriber.errorText {
+            MacRecorderNotice(
+                text: errorText,
+                systemImage: "exclamationmark.triangle",
+                tint: AppTheme.warning
+            )
+        }
+
+        if let warningMessage = systemAudioCapture.warningMessage {
+            MacRecorderNotice(
+                text: warningMessage,
+                systemImage: "exclamationmark.triangle",
+                tint: AppTheme.warning
+            )
+        }
+    }
+
+    private var transcriptCard: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack(spacing: 10) {
+                Label {
+                    Text(L10n.Recordings.transcript)
+                } icon: {
+                    Image(systemName: "text.alignleft")
+                }
+                .font(.redditSans(.headline, weight: .semibold))
+
+                Spacer(minLength: 0)
+
+                MacLiveTranscriptLineCount(
+                    finalStore: transcriber.finalTranscriptStore,
+                    interimStore: transcriber.interimTranscriptStore
+                )
+
+                translationMenu
+            }
+
+            translationStatus
+
+            MacLiveTranscriptList(
+                transcriber: transcriber,
+                finalStore: transcriber.finalTranscriptStore,
+                interimStore: transcriber.interimTranscriptStore,
+                translatedTextByLineID: translatedTextByLineID,
+                translatedLineSignatures: translatedLineSignatures,
+                selectedTranslationLanguage: selectedTranslationLanguage,
+                isTranslating: isTranslating,
+                bottomContentInset: transcriptControlContentInset,
+                onEditFinalLine: beginEditingTranscriptLine
+            )
+        }
+        .padding(14)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        .macTranscriptionCardSurface()
+        .overlay(alignment: .bottom) {
+            floatingRecorderDock
+                .padding(.bottom, transcriptControlBottomInset)
+        }
+    }
+
+    private var transcriptControlBottomInset: CGFloat { 20 }
+
+    private var transcriptControlContentInset: CGFloat {
+        transcriptControlBottomInset + 72
+    }
+
+    @ViewBuilder
+    private var translationStatus: some View {
+        if let selectedTranslationLanguage {
+            HStack(spacing: 8) {
+                if isTranslating {
+                    ProgressView()
+                        .controlSize(.mini)
+                } else {
+                    Image(
+                        systemName: translationErrorMessage == nil
+                            ? "translate"
+                            : "exclamationmark.triangle"
+                    )
+                    .font(.system(size: 12, weight: .semibold))
+                }
+
+                Text(verbatim: translationStatusText(for: selectedTranslationLanguage))
+                    .font(.redditSans(.caption, weight: .semibold))
+                    .foregroundStyle(translationErrorMessage == nil ? .secondary : AppTheme.warning)
+                    .lineLimit(2)
+
+                Spacer(minLength: 0)
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var savedRecordingBanner: some View {
+        if let savedRecordingName {
+            HStack(spacing: 10) {
+                Image(systemName: "checkmark.circle.fill")
+                    .font(.system(size: 17, weight: .semibold))
+                    .foregroundStyle(AppTheme.success)
+
+                Text(verbatim: localizedFormat(L10n.Transcription.savedFormat, savedRecordingName))
+                .font(.redditSans(.caption, weight: .semibold))
+                .foregroundStyle(.primary)
+                .lineLimit(1)
+                .truncationMode(.middle)
+            }
+            .padding(.horizontal, 14)
+            .frame(height: 42)
+            .frame(maxWidth: 360)
+            .background(.ultraThinMaterial, in: Capsule())
+            .overlay {
+                Capsule()
+                    .stroke(AppTheme.success.opacity(0.22), lineWidth: 1)
+            }
+            .shadow(color: Color.black.opacity(0.12), radius: 14, y: 6)
+            .offset(y: savedRecordingBannerIsVisible ? 0 : -74)
+            .opacity(savedRecordingBannerIsVisible ? 1 : 0)
+        }
     }
 
     private var languageMenu: some View {
@@ -323,15 +548,14 @@ struct MacTranscriptionView: View {
                 }
             }
         } label: {
-            Label {
-                Text(verbatim: transcriber.selectedLanguage.displayName)
-            } icon: {
-                Image(systemName: "globe")
-            }
+            MacDropdownStatusPill(
+                systemImage: "globe",
+                title: transcriber.selectedLanguage.displayName,
+                tint: AppTheme.info
+            )
         }
+        .buttonStyle(.plain)
         .disabled(transcriber.isRecording || transcriber.isPreparing)
-        .fixedSize()
-
     }
 
     private var recordingInputMenu: some View {
@@ -377,18 +601,31 @@ struct MacTranscriptionView: View {
             }
             Text(MacL10n.systemAudioSourceSelectionHint)
         } label: {
-            Label {
-                Text(recordingInputMode.title)
-            } icon: {
-                Image(
-                    systemName: recordingInputMode.usesSystemAudio
-                        ? "speaker.wave.2.fill"
-                        : "mic"
-                )
-            }
+            MacDropdownStatusPill(
+                systemImage: recordingInputMode.usesSystemAudio
+                    ? "speaker.wave.2.fill"
+                    : "mic",
+                title: String(localized: recordingInputMode.title),
+                tint: recordingInputMode.usesSystemAudio ? AppTheme.purple : AppTheme.info
+            )
         }
+        .buttonStyle(.plain)
         .disabled(transcriber.isRecording || transcriber.isPreparing || systemAudioCapture.isCapturing)
-        .fixedSize()
+    }
+
+    private var systemAudioSourceButton: some View {
+        Button {
+            systemAudioCapture.presentSourcePicker()
+        } label: {
+            MacSourceStatusPill(
+                title: systemAudioCapture.selectedSourceName
+                    ?? String(localized: MacL10n.chooseSystemAudioSource),
+                tint: systemAudioCapture.hasSelectedSource ? AppTheme.success : AppTheme.warning
+            )
+        }
+        .buttonStyle(.plain)
+        .disabled(transcriber.isRecording || transcriber.isPreparing || systemAudioCapture.isCapturing)
+        .help(String(localized: MacL10n.systemAudioSourceSelectionHint))
     }
 
     private var translationMenu: some View {
@@ -421,13 +658,13 @@ struct MacTranscriptionView: View {
                 Text(MacL10n.translationUnavailable)
             }
         } label: {
-            Label {
-                Text(verbatim: selectedTranslationLanguage?.shortName ?? String(localized: L10n.Recordings.translate))
-            } icon: {
-                Image(systemName: "translate")
-            }
+            MacTranslationStatusPill(
+                title: selectedTranslationLanguage?.shortName
+                    ?? String(localized: L10n.Recordings.translate),
+                isActive: selectedTranslationLanguage != nil
+            )
         }
-        .fixedSize()
+        .buttonStyle(.plain)
     }
 
     private var formatMenu: some View {
@@ -444,73 +681,154 @@ struct MacTranscriptionView: View {
                 }
             }
         } label: {
-            Label {
-                Text(
-                    verbatim: recordingInputMode.usesSystemAudio
-                        ? "M4A"
-                        : transcriber.selectedAudioFormat.badgeText
-                )
-            } icon: {
-                Image(systemName: "waveform.circle")
-            }
+            MacCompactDropdownBadge(
+                title: recordingInputMode.usesSystemAudio
+                    ? "M4A"
+                    : transcriber.selectedAudioFormat.badgeText,
+                foreground: recorderDeckPrimaryColor,
+                background: recorderDeckPillColor
+            )
         }
+        .buttonStyle(.plain)
         .disabled(
             transcriber.isRecording
                 || transcriber.isPreparing
                 || recordingInputMode.usesSystemAudio
         )
-        .fixedSize()
     }
 
-    private var recordControls: some View {
-        HStack(spacing: 10) {
-            if transcriber.isRecording {
-                Button {
-                    Task {
-                        if transcriber.isPaused {
-                            systemAudioCapture.resumeCapture()
-                            await transcriber.resumeRecording()
-                        } else {
-                            systemAudioCapture.pauseCapture()
-                            await transcriber.pauseRecording()
-                        }
-                    }
-                } label: {
-                    Image(systemName: transcriber.isPaused ? "play.fill" : "pause.fill")
-                        .frame(width: 20, height: 20)
+    private var floatingRecorderDock: some View {
+        ZStack {
+            Capsule()
+                .fill(.ultraThinMaterial)
+                .overlay {
+                    Capsule()
+                        .fill(
+                            AppTheme.danger.opacity(
+                                transcriber.isRecording
+                                    ? 0
+                                    : (colorScheme == .dark ? 0.80 : 0.86)
+                            )
+                        )
                 }
-                .buttonStyle(.bordered)
-                .buttonBorderShape(.circle)
+                .overlay {
+                    Capsule()
+                        .stroke(.white.opacity(0.28), lineWidth: 1)
+                }
+                .frame(width: transcriber.isRecording ? 120 : 64, height: 64)
+                .shadow(
+                    color: Color.black.opacity(colorScheme == .dark ? 0.24 : 0.10),
+                    radius: transcriber.isRecording ? 14 : 10,
+                    y: transcriber.isRecording ? 9 : 7
+                )
+                .accessibilityHidden(true)
 
-                Button {
-                    stopRecording()
-                } label: {
-                    Image(systemName: "stop.fill")
-                        .frame(width: 20, height: 20)
+            if transcriber.isRecording {
+                HStack(spacing: 8) {
+                    MacFloatingIconControlButton(
+                        title: String(
+                            localized: transcriber.isPaused
+                                ? L10n.Transcription.resume
+                                : L10n.Transcription.pause
+                        ),
+                        systemImage: transcriber.isPaused ? "play.fill" : "pause.fill",
+                        tint: .primary,
+                        background: Color.secondary.opacity(0.14),
+                        action: togglePause
+                    )
+
+                    MacFloatingIconControlButton(
+                        title: String(localized: L10n.Transcription.stop),
+                        systemImage: "stop.fill",
+                        tint: .white,
+                        background: AppTheme.danger,
+                        action: stopRecording
+                    )
                 }
-                .buttonStyle(.borderedProminent)
-                .buttonBorderShape(.circle)
-                .tint(AppTheme.danger)
+                .transition(.opacity.combined(with: .scale(scale: 0.90)))
             } else {
                 Button {
                     startRecording()
                 } label: {
-                    if transcriber.isPreparing {
-                        ProgressView()
-                            .controlSize(.small)
-                            .frame(width: 20, height: 20)
-                    } else {
-                        Image(systemName: "mic.fill")
-                            .frame(width: 20, height: 20)
+                    Group {
+                        if transcriber.isPreparing {
+                            ProgressView()
+                                .controlSize(.small)
+                                .frame(width: 20, height: 20)
+                        } else {
+                            Image(
+                                systemName: recordingInputMode.usesSystemAudio
+                                    ? "speaker.wave.2.fill"
+                                    : "mic.fill"
+                            )
+                            .font(.system(size: 23, weight: .semibold))
+                        }
                     }
+                    .foregroundStyle(.white)
+                    .frame(width: 64, height: 64)
+                    .contentShape(Circle())
                 }
-                .buttonStyle(.borderedProminent)
-                .buttonBorderShape(.circle)
-                .tint(AppTheme.brand)
+                .buttonStyle(MacRecorderPressButtonStyle(pressedScale: 0.94))
                 .disabled(transcriber.isPreparing || systemAudioCapture.phase == .starting)
                 .keyboardShortcut("r", modifiers: [.command])
+                .accessibilityLabel(Text(L10n.Transcription.startRecording))
+                .transition(.opacity.combined(with: .scale(scale: 0.90)))
             }
         }
+        .frame(width: transcriber.isRecording ? 120 : 64, height: 64)
+        .animation(
+            reduceMotion ? nil : .spring(duration: 0.34, bounce: 0.12),
+            value: transcriber.isRecording
+        )
+    }
+
+    private func togglePause() {
+        Task {
+            if transcriber.isPaused {
+                systemAudioCapture.resumeCapture()
+                await transcriber.resumeRecording()
+            } else {
+                systemAudioCapture.pauseCapture()
+                await transcriber.pauseRecording()
+            }
+        }
+    }
+
+    private func showSavedRecordingBanner(fileName: String) {
+        savedRecordingBannerTask?.cancel()
+        savedRecordingName = fileName
+
+        withAnimation(reduceMotion ? nil : .snappy(duration: 0.28, extraBounce: 0.06)) {
+            savedRecordingBannerIsVisible = true
+        }
+
+        savedRecordingBannerTask = Task { @MainActor in
+            try? await Task.sleep(for: .seconds(3))
+            guard !Task.isCancelled else {
+                return
+            }
+
+            withAnimation(reduceMotion ? nil : .snappy(duration: 0.28, extraBounce: 0)) {
+                savedRecordingBannerIsVisible = false
+            }
+
+            try? await Task.sleep(for: .milliseconds(320))
+            guard !Task.isCancelled else {
+                return
+            }
+
+            savedRecordingName = nil
+            savedRecordingBannerTask = nil
+        }
+    }
+
+    private func hideSavedRecordingBanner() {
+        savedRecordingBannerTask?.cancel()
+        savedRecordingBannerTask = nil
+        withAnimation(reduceMotion ? nil : .snappy(duration: 0.18, extraBounce: 0)) {
+            savedRecordingBannerIsVisible = false
+        }
+        savedRecordingName = nil
     }
 
     // MARK: - Recording control flow
@@ -519,6 +837,8 @@ struct MacTranscriptionView: View {
         guard !transcriber.isRecording, !transcriber.isPreparing else {
             return
         }
+
+        hideSavedRecordingBanner()
 
         guard transcriber.selectedTranscriptionBackend.requiresAppleSpeech else {
             Task {
@@ -570,16 +890,32 @@ struct MacTranscriptionView: View {
                 systemAudioCapture.presentSourcePicker()
                 return
             }
+
+            await transcriber.startRecording(
+                inputSource: .externalAudio(sampleRate: 48_000, channelCount: 2)
+            )
+            guard transcriber.isRecording,
+                  let systemAudioSampleHandler = transcriber.externalAudioSampleHandler() else {
+                systemAudioMessage = transcriber.errorText
+                    ?? String(localized: MacL10n.systemAudioNoSamples)
+                return
+            }
+
             guard await systemAudioCapture.startCapture(
-                includesMicrophone: recordingInputMode.includesMicrophoneInSavedAudio
+                includesMicrophone: recordingInputMode.includesMicrophoneInSavedAudio,
+                systemAudioSampleHandler: systemAudioSampleHandler
             ) else {
+                if let abandonedDraft = await transcriber.stopRecording() {
+                    try? FileManager.default.removeItem(at: abandonedDraft.audioURL)
+                }
                 systemAudioMessage = systemAudioCapture.errorMessage
                     ?? String(localized: MacL10n.systemAudioNoSamples)
                 return
             }
+        } else {
+            await transcriber.startRecording()
         }
 
-        await transcriber.startRecording()
         guard transcriber.isRecording else {
             if let result = await systemAudioCapture.stopCapture() {
                 systemAudioCapture.discardStagingDirectory(result.stagingDirectoryURL)
@@ -600,7 +936,7 @@ struct MacTranscriptionView: View {
             let microphoneDraft = await transcriber.stopRecording()
             guard systemAudioCapture.isCapturing else {
                 if recordingInputMode.usesSystemAudio {
-                    offerMicrophoneFallback(
+                    offerRecoveredAudioFallback(
                         microphoneDraft,
                         message: systemAudioCapture.errorMessage
                             ?? String(localized: MacL10n.systemAudioNoSamples)
@@ -612,7 +948,7 @@ struct MacTranscriptionView: View {
             }
 
             guard let result = await systemAudioCapture.stopCapture() else {
-                offerMicrophoneFallback(
+                offerRecoveredAudioFallback(
                     microphoneDraft,
                     message: systemAudioCapture.errorMessage
                         ?? String(localized: MacL10n.systemAudioNoSamples)
@@ -651,7 +987,7 @@ struct MacTranscriptionView: View {
         legacyIncludesSystemAudio = mode.usesSystemAudio
     }
 
-    private func offerMicrophoneFallback(
+    private func offerRecoveredAudioFallback(
         _ draft: RecordingDraft?,
         message: String
     ) {
@@ -659,16 +995,16 @@ struct MacTranscriptionView: View {
             systemAudioMessage = message
             return
         }
-        microphoneFallbackMessage = message
-        microphoneFallbackDraft = draft
+        recoveredAudioMessage = message
+        recoveredAudioDraft = draft
     }
 
-    private func discardMicrophoneFallback() {
-        if let microphoneFallbackDraft {
-            try? FileManager.default.removeItem(at: microphoneFallbackDraft.audioURL)
+    private func discardRecoveredAudio() {
+        if let recoveredAudioDraft {
+            try? FileManager.default.removeItem(at: recoveredAudioDraft.audioURL)
         }
-        microphoneFallbackDraft = nil
-        microphoneFallbackMessage = nil
+        recoveredAudioDraft = nil
+        recoveredAudioMessage = nil
         transcriber.clearTranscript()
     }
 
@@ -883,58 +1219,492 @@ extension RecordingDraft: Identifiable {
 
 private struct MacElapsedTimeText: View {
     @ObservedObject var clock: RecordingElapsedClock
+    let color: Color
 
     var body: some View {
-        Text(verbatim: TranscriptionLine.formatTimestamp(clock.elapsedTime))
-            .font(.system(size: 28, weight: .semibold, design: .rounded).monospacedDigit())
-            .frame(minWidth: 96, alignment: .leading)
+        let text = TranscriptionLine.formatTimestamp(clock.elapsedTime)
+        let components = text.split(separator: ":", omittingEmptySubsequences: false)
+
+        HStack(spacing: 0) {
+            ForEach(Array(components.indices), id: \.self) { index in
+                Text(verbatim: String(components[index]))
+                    .foregroundStyle(color)
+
+                if index < components.index(before: components.endIndex) {
+                    Text(verbatim: ":")
+                        .foregroundStyle(AppTheme.danger)
+                }
+            }
+        }
+        .font(.redditSans(size: 28, weight: .semibold).monospacedDigit())
+        .frame(minWidth: 104)
+        .accessibilityLabel(Text(verbatim: text))
     }
 }
 
-// MARK: - Waveform
+// MARK: - Waveform timeline
 
-private struct MacLiveWaveform: View {
+private struct MacLiveRecordingWaveTimeline: View {
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @ObservedObject var store: RecordingWaveformStore
+    @ObservedObject var clock: RecordingElapsedClock
+    let primaryColor: Color
+    let secondaryColor: Color
+    let height: CGFloat
+
+    private let visibleDuration: TimeInterval = 12
+    private let majorTickInterval: TimeInterval = 2
+    private let minorTickInterval: TimeInterval = 0.5
+    private let rulerHeight: CGFloat = 36
+    private let liveEdgeInset: CGFloat = 24
 
     var body: some View {
-        Canvas { context, size in
-            let samples = store.samples
-            guard !samples.isEmpty else {
-                return
-            }
-            let barWidth: CGFloat = 3
-            let spacing: CGFloat = 2
-            let step = barWidth + spacing
-            let maxBars = Int(size.width / step)
-            let visible = samples.suffix(maxBars)
-            var x = size.width - CGFloat(visible.count) * step
+        GeometryReader { proxy in
+            let size = proxy.size
+            let elapsed = reduceMotion
+                ? TimeInterval(clock.elapsedSeconds)
+                : clock.elapsedTime
+            let leftEdgeFraction = min(32 / max(size.width, 1), 0.2)
+            let rightEdgeFraction = min(8 / max(size.width, 1), 0.06)
 
-            for sample in visible {
-                let amplified = max(CGFloat(sample.level), 0.04)
-                let height = max(size.height * amplified, 2)
-                let rect = CGRect(
-                    x: x,
-                    y: (size.height - height) / 2,
-                    width: barWidth,
-                    height: height
-                )
-                context.fill(
-                    Path(roundedRect: rect, cornerRadius: 1.5),
-                    with: .color(
-                        sample.isCaptured
-                            ? AppTheme.brand.opacity(0.85)
-                            : Color.secondary.opacity(0.35)
+            timelineCanvas(size: size, elapsed: elapsed)
+                .mask(
+                    LinearGradient(
+                        stops: [
+                            .init(color: .clear, location: 0),
+                            .init(color: .black, location: leftEdgeFraction),
+                            .init(color: .black, location: 1 - rightEdgeFraction),
+                            .init(color: .clear, location: 1),
+                        ],
+                        startPoint: .leading,
+                        endPoint: .trailing
                     )
                 )
-                x += step
+                .clipped()
+        }
+        .frame(height: height)
+    }
+
+    private func timelineCanvas(size: CGSize, elapsed: TimeInterval) -> some View {
+        let waveformHeight = max(size.height - rulerHeight - 8, 40)
+        let samples = store.samples
+        let pitch = size.width / CGFloat(max(samples.count, 1))
+        let barWidth = max(1.5, min(2.5, pitch * 0.48))
+        let playheadX = max(size.width - liveEdgeInset, 0)
+        let rulerOriginY = size.height - rulerHeight
+        let rulerBaselineY = rulerOriginY + 16
+        let baselineOpacity = hasAudibleSignal ? 0.08 : 0.16
+
+        return Canvas { context, canvasSize in
+            var waveformBaseline = Path()
+            waveformBaseline.move(to: CGPoint(x: 0, y: waveformHeight / 2))
+            waveformBaseline.addLine(to: CGPoint(x: canvasSize.width, y: waveformHeight / 2))
+            context.stroke(
+                waveformBaseline,
+                with: .color(secondaryColor.opacity(baselineOpacity)),
+                lineWidth: 1
+            )
+
+            for sample in samples where sample.isCaptured {
+                let displayLevel = amplifiedLevel(for: sample.level)
+                let age = max(elapsed - sample.elapsedTime, 0)
+                let x = playheadX - CGFloat(age / visibleDuration) * canvasSize.width
+                guard x >= -barWidth, x <= canvasSize.width + barWidth else {
+                    continue
+                }
+
+                let resolvedBarHeight = barHeight(for: displayLevel, maxHeight: waveformHeight)
+                let barRect = CGRect(
+                    x: x - barWidth / 2,
+                    y: (waveformHeight - resolvedBarHeight) / 2,
+                    width: barWidth,
+                    height: resolvedBarHeight
+                )
+                context.fill(
+                    Path(roundedRect: barRect, cornerRadius: barWidth / 2),
+                    with: .color(primaryColor.opacity(0.88))
+                )
+            }
+
+            drawTimelineTicks(
+                context: &context,
+                width: canvasSize.width,
+                elapsed: elapsed,
+                rulerBaselineY: rulerBaselineY,
+                rulerLabelY: rulerOriginY + 6
+            )
+        }
+        .frame(width: size.width, height: size.height, alignment: .topLeading)
+        .transaction { transaction in
+            transaction.animation = nil
+            transaction.disablesAnimations = true
+        }
+    }
+
+    private func drawTimelineTicks(
+        context: inout GraphicsContext,
+        width: CGFloat,
+        elapsed: TimeInterval,
+        rulerBaselineY: CGFloat,
+        rulerLabelY: CGFloat
+    ) {
+        let currentTime = max(elapsed, 0)
+        let playheadX = max(width - liveEdgeInset, 0)
+        let playheadFraction = playheadX / max(width, 1)
+        let startTime = currentTime - visibleDuration * TimeInterval(playheadFraction)
+        let firstTickIndex = Int(floor(startTime / minorTickInterval))
+        let tickCount = Int(ceil(visibleDuration / minorTickInterval)) + 2
+        let finalTickIndex = firstTickIndex + tickCount
+        let majorTickStride = max(Int((majorTickInterval / minorTickInterval).rounded()), 1)
+        let labelWidth: CGFloat = 42
+
+        var baseline = Path()
+        baseline.move(to: CGPoint(x: 0, y: rulerBaselineY))
+        baseline.addLine(to: CGPoint(x: width, y: rulerBaselineY))
+        context.stroke(
+            baseline,
+            with: .color(secondaryColor.opacity(0.16)),
+            lineWidth: 1
+        )
+
+        for tickIndex in firstTickIndex...finalTickIndex {
+            let tickTime = TimeInterval(tickIndex) * minorTickInterval
+            let x = width * CGFloat((tickTime - startTime) / visibleDuration)
+            let isMajor = tickIndex.isMultiple(of: majorTickStride)
+
+            if x >= -1, x <= width + 1 {
+                let tickHeight: CGFloat = isMajor ? 20 : 12
+                var tick = Path()
+                tick.move(to: CGPoint(x: x, y: rulerBaselineY))
+                tick.addLine(to: CGPoint(x: x, y: rulerBaselineY + tickHeight))
+                context.stroke(
+                    tick,
+                    with: .color(secondaryColor.opacity(isMajor ? 0.42 : 0.24)),
+                    lineWidth: 1
+                )
+            }
+
+            if isMajor,
+               tickTime >= 0,
+               x >= -labelWidth / 2,
+               x <= width + labelWidth / 2 {
+                let label = Text(verbatim: tickLabel(for: tickTime))
+                    .font(.system(size: 10, weight: .medium, design: .monospaced))
+                    .foregroundStyle(secondaryColor.opacity(0.56))
+                    .monospacedDigit()
+                context.draw(
+                    label,
+                    at: CGPoint(x: x, y: rulerLabelY),
+                    anchor: .center
+                )
             }
         }
+    }
+
+    private var hasAudibleSignal: Bool {
+        store.samples.contains { $0.isCaptured && amplifiedLevel(for: $0.level) > 0 }
+    }
+
+    private func amplifiedLevel(for level: Float) -> CGFloat {
+        let noiseFloor: CGFloat = 0.04
+        let clampedLevel = min(max(CGFloat(level), 0), 1)
+        guard clampedLevel > noiseFloor else {
+            return 0
+        }
+
+        let normalizedLevel = (clampedLevel - noiseFloor) / (1 - noiseFloor)
+        return min(1, CGFloat(pow(Double(normalizedLevel), 1.18)) * 1.05)
+    }
+
+    private func barHeight(for displayLevel: CGFloat, maxHeight: CGFloat) -> CGFloat {
+        max(5, min(maxHeight, 5 + displayLevel * (maxHeight - 5)))
+    }
+
+    private func tickLabel(for seconds: TimeInterval) -> String {
+        TranscriptionLine.formatTimestamp(seconds)
+    }
+}
+
+// MARK: - Recorder and transcript controls
+
+private struct MacRecordingStateBadge: View {
+    let isRecording: Bool
+    let isPaused: Bool
+    let isPreparing: Bool
+
+    private var titleResource: LocalizedStringResource {
+        if isPreparing {
+            return L10n.RecordingStatus.requestingPermission
+        }
+        if isRecording {
+            return isPaused ? L10n.RecordingStatus.paused : L10n.RecordingStatus.recording
+        }
+        return L10n.RecordingStatus.ready
+    }
+
+    private var tint: Color {
+        if isRecording && !isPaused {
+            return AppTheme.danger
+        }
+        if isPreparing {
+            return AppTheme.warning
+        }
+        return AppTheme.success
+    }
+
+    private var systemImage: String {
+        if isPreparing {
+            return "ellipsis.circle"
+        }
+        return isRecording && !isPaused ? "record.circle" : "checkmark.circle"
+    }
+
+    var body: some View {
+        Label {
+            Text(titleResource)
+        } icon: {
+            Image(systemName: systemImage)
+                .contentTransition(.symbolEffect(.replace))
+        }
+        .font(.redditSans(.caption, weight: .semibold))
+        .foregroundStyle(tint)
+        .lineLimit(1)
+        .padding(.horizontal, 10)
+        .frame(height: 30)
+        .background(tint.opacity(0.12), in: Capsule())
+        .overlay {
+            Capsule()
+                .stroke(tint.opacity(0.18), lineWidth: 1)
+        }
+        .animation(.snappy(duration: 0.20, extraBounce: 0), value: systemImage)
+    }
+}
+
+private struct MacDropdownStatusPill: View {
+    @Environment(\.isEnabled) private var isEnabled
+    let systemImage: String
+    let title: String
+    let tint: Color
+
+    var body: some View {
+        HStack(spacing: 7) {
+            Image(systemName: systemImage)
+                .font(.system(size: 11, weight: .semibold))
+
+            Text(verbatim: title)
+                .font(.redditSans(.caption, weight: .semibold))
+                .lineLimit(1)
+                .truncationMode(.tail)
+
+            Image(systemName: "chevron.down")
+                .font(.system(size: 9, weight: .bold))
+        }
+        .foregroundStyle(isEnabled ? tint : .secondary)
+        .padding(.leading, 10)
+        .padding(.trailing, 9)
+        .frame(height: 30)
+        .background(
+            isEnabled ? tint.opacity(0.13) : Color.secondary.opacity(0.08),
+            in: Capsule()
+        )
+        .overlay {
+            Capsule()
+                .stroke(
+                    isEnabled ? tint.opacity(0.34) : Color.secondary.opacity(0.16),
+                    lineWidth: 1
+                )
+        }
+        .contentShape(Capsule())
+    }
+}
+
+private struct MacSourceStatusPill: View {
+    @Environment(\.isEnabled) private var isEnabled
+    let title: String
+    let tint: Color
+
+    var body: some View {
+        HStack(spacing: 7) {
+            Image(systemName: "macwindow.on.rectangle")
+                .font(.system(size: 11, weight: .semibold))
+
+            Text(verbatim: title)
+                .font(.redditSans(.caption, weight: .semibold))
+                .lineLimit(1)
+                .truncationMode(.middle)
+
+            Image(systemName: "arrow.triangle.2.circlepath")
+                .font(.system(size: 9, weight: .bold))
+        }
+        .foregroundStyle(isEnabled ? tint : .secondary)
+        .padding(.horizontal, 10)
+        .frame(height: 30)
+        .background(
+            isEnabled ? tint.opacity(0.11) : Color.secondary.opacity(0.08),
+            in: Capsule()
+        )
+        .overlay {
+            Capsule()
+                .stroke(
+                    isEnabled ? tint.opacity(0.26) : Color.secondary.opacity(0.16),
+                    lineWidth: 1
+                )
+        }
+        .contentShape(Capsule())
+    }
+}
+
+private struct MacTranslationStatusPill: View {
+    let title: String
+    let isActive: Bool
+
+    private var tint: Color {
+        isActive ? AppTheme.brand : AppTheme.info
+    }
+
+    var body: some View {
+        HStack(spacing: 5) {
+            Image(systemName: "translate")
+                .font(.system(size: 11, weight: .semibold))
+
+            Text(verbatim: title)
+                .font(.redditSans(.caption, weight: .bold))
+                .lineLimit(1)
+
+            Image(systemName: "chevron.down")
+                .font(.system(size: 8, weight: .bold))
+        }
+        .foregroundStyle(tint)
+        .padding(.horizontal, 9)
+        .frame(height: 28)
+        .background(tint.opacity(0.11), in: Capsule())
+        .overlay {
+            Capsule()
+                .stroke(tint.opacity(0.18), lineWidth: 1)
+        }
+        .contentShape(Capsule())
+    }
+}
+
+private struct MacCompactDropdownBadge: View {
+    @Environment(\.isEnabled) private var isEnabled
+    let title: String
+    let foreground: Color
+    let background: Color
+
+    var body: some View {
+        HStack(spacing: 4) {
+            Text(verbatim: title)
+                .font(.redditSans(.caption2, weight: .bold))
+
+            Image(systemName: "chevron.down")
+                .font(.system(size: 8, weight: .bold))
+        }
+        .foregroundStyle(isEnabled ? foreground : .secondary)
+        .padding(.leading, 8)
+        .padding(.trailing, 7)
+        .frame(height: 24)
+        .background(background, in: Capsule())
+        .overlay {
+            Capsule()
+                .stroke((isEnabled ? foreground : Color.secondary).opacity(0.16), lineWidth: 1)
+        }
+        .contentShape(Capsule())
+    }
+}
+
+private struct MacRecorderNotice: View {
+    let text: String
+    let systemImage: String
+    let tint: Color
+    var showsProgress = false
+
+    var body: some View {
+        HStack(alignment: .top, spacing: 8) {
+            if showsProgress {
+                ProgressView()
+                    .controlSize(.mini)
+            } else {
+                Image(systemName: systemImage)
+                    .font(.system(size: 11, weight: .semibold))
+                    .padding(.top, 1)
+            }
+
+            Text(verbatim: text)
+                .font(.redditSans(.caption))
+                .fixedSize(horizontal: false, vertical: true)
+
+            Spacer(minLength: 0)
+        }
+        .foregroundStyle(tint)
+        .padding(.horizontal, 10)
+        .padding(.vertical, 8)
+        .background(tint.opacity(0.09), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+    }
+}
+
+private struct MacFloatingIconControlButton: View {
+    let title: String
+    let systemImage: String
+    let tint: Color
+    let background: Color
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            Image(systemName: systemImage)
+                .font(.system(size: 17, weight: .semibold))
+                .foregroundStyle(tint)
+                .contentTransition(.symbolEffect(.replace))
+                .frame(width: 48, height: 48)
+                .background(background, in: Circle())
+                .contentShape(Circle())
+        }
+        .buttonStyle(MacRecorderPressButtonStyle(pressedScale: 0.94))
+        .accessibilityLabel(Text(verbatim: title))
+        .animation(.snappy(duration: 0.18, extraBounce: 0), value: systemImage)
+    }
+}
+
+private struct MacRecorderPressButtonStyle: ButtonStyle {
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.isEnabled) private var isEnabled
+    let pressedScale: CGFloat
+
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .scaleEffect(configuration.isPressed && !reduceMotion ? pressedScale : 1)
+            .opacity(isEnabled ? (configuration.isPressed ? 0.9 : 1) : 0.58)
+            .animation(
+                reduceMotion ? nil : .snappy(duration: 0.12, extraBounce: 0),
+                value: configuration.isPressed
+            )
+    }
+}
+
+private struct MacLiveTranscriptLineCount: View {
+    @ObservedObject var finalStore: LiveFinalTranscriptStore
+    @ObservedObject var interimStore: LiveInterimTranscriptStore
+
+    private var count: Int {
+        finalStore.lines.count + (interimStore.line == nil ? 0 : 1)
+    }
+
+    var body: some View {
+        Text(verbatim: "\(count)")
+            .font(.redditSans(.caption2, weight: .semibold).monospacedDigit())
+            .foregroundStyle(.secondary)
+            .padding(.horizontal, 8)
+            .frame(height: 24)
+            .background(Color.secondary.opacity(0.09), in: Capsule())
+            .accessibilityLabel(Text(verbatim: "\(count)"))
     }
 }
 
 // MARK: - Live transcript list
 
 private struct MacLiveTranscriptList: View {
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @ObservedObject var transcriber: LiveTranscriptionManager
     @ObservedObject var finalStore: LiveFinalTranscriptStore
     @ObservedObject var interimStore: LiveInterimTranscriptStore
@@ -942,6 +1712,7 @@ private struct MacLiveTranscriptList: View {
     let translatedLineSignatures: [TranscriptionLine.ID: String]
     let selectedTranslationLanguage: TranscriptionLanguage?
     let isTranslating: Bool
+    let bottomContentInset: CGFloat
     let onEditFinalLine: (TranscriptionLine) -> Void
 
     private static let topAnchorID = "live-transcript-top"
@@ -977,20 +1748,20 @@ private struct MacLiveTranscriptList: View {
                     }
 
                     if finalStore.lines.isEmpty && interimStore.line == nil {
-                        VStack(spacing: 10) {
-                            Image(systemName: "quote.bubble")
-                                .font(.system(size: 34))
-                                .foregroundStyle(.secondary)
-                            Text(L10n.RecordingStatus.waitingForSpeech)
-                                .foregroundStyle(.secondary)
-                        }
+                        EmptyStateView(
+                            icon: "quote.bubble",
+                            titleResource: L10n.Recordings.noText
+                        )
                         .frame(maxWidth: .infinity, minHeight: 260)
                     }
                 }
-                .padding(18)
+                .padding(.horizontal, 4)
+                .padding(.vertical, 2)
+                .padding(.bottom, bottomContentInset)
+                .frame(maxWidth: .infinity, alignment: .topLeading)
             }
             .onChange(of: finalStore.revision) {
-                withAnimation(.easeOut(duration: 0.2)) {
+                withAnimation(reduceMotion ? nil : .snappy(duration: 0.20, extraBounce: 0)) {
                     proxy.scrollTo(Self.topAnchorID, anchor: .top)
                 }
             }
@@ -1017,25 +1788,36 @@ private struct MacLiveTranscriptRow: View {
     var body: some View {
         HStack(alignment: .top, spacing: 10) {
             Text(verbatim: line.timestampText)
-                .font(.caption.monospacedDigit())
+                .font(.redditSans(.caption2, weight: .semibold).monospacedDigit())
                 .foregroundStyle(isInterim ? AppTheme.warning : AppTheme.brand)
-                .frame(width: 66, alignment: .leading)
+                .padding(.horizontal, 8)
+                .frame(height: 23)
+                .background(
+                    (isInterim ? AppTheme.warning : AppTheme.brand).opacity(0.12),
+                    in: Capsule()
+                )
 
             VStack(alignment: .leading, spacing: 4) {
                 Text(verbatim: translatedText ?? line.text)
+                    .font(.redditSans(.subheadline))
                     .textSelection(.enabled)
                     .foregroundStyle(isInterim ? .secondary : .primary)
+                    .lineSpacing(3)
+                    .fixedSize(horizontal: false, vertical: true)
                     .frame(maxWidth: .infinity, alignment: .leading)
 
                 if let translatedText, !translatedText.isEmpty {
                     Text(verbatim: line.text)
-                        .font(.caption)
+                        .font(.redditSans(.caption))
                         .foregroundStyle(.secondary)
                         .textSelection(.enabled)
+                        .lineSpacing(2)
+                        .fixedSize(horizontal: false, vertical: true)
                         .frame(maxWidth: .infinity, alignment: .leading)
+                        .accessibilityHidden(true)
                 } else if isShowingTranslationPlaceholder {
                     Text(L10n.Recordings.translating)
-                        .font(.caption)
+                        .font(.redditSans(.caption, weight: .semibold))
                         .foregroundStyle(.secondary)
                 }
             }
@@ -1064,6 +1846,14 @@ private struct MacLiveTranscriptRow: View {
                 }
             }
         }
+        .accessibilityLabel(accessibilityText)
+    }
+
+    private var accessibilityText: String {
+        if let translatedText {
+            return "\(line.timestampText) \(translatedText) \(line.text)"
+        }
+        return "\(line.timestampText) \(line.text)"
     }
 }
 
@@ -1112,7 +1902,7 @@ private struct MacLiveTranscriptLineEditSheet: View {
 private struct MacRecordingSaveSheet: View {
     let draft: RecordingDraft
     @ObservedObject var store: RecordingStore
-    let onFinished: () -> Void
+    let onFinished: (String) -> Void
     let onDiscard: () -> Void
 
     @StateObject private var locationProvider = MacRecordingLocationProvider()
@@ -1130,7 +1920,7 @@ private struct MacRecordingSaveSheet: View {
     init(
         draft: RecordingDraft,
         store: RecordingStore,
-        onFinished: @escaping () -> Void,
+        onFinished: @escaping (String) -> Void,
         onDiscard: @escaping () -> Void
     ) {
         self.draft = draft
@@ -1304,8 +2094,8 @@ private struct MacRecordingSaveSheet: View {
                 location: includesLocation ? locationProvider.recordingLocation : nil
             )
             isSaving = false
-            if item != nil {
-                onFinished()
+            if let item {
+                onFinished(item.displayFileName)
             } else {
                 errorMessage = String(localized: MacL10n.actionFailed)
             }
@@ -1503,5 +2293,21 @@ final class MacRecordingLocationProvider: NSObject, ObservableObject, CLLocation
                 placeName = nil
             }
         }
+    }
+}
+
+private extension View {
+    func macTranscriptionCardSurface() -> some View {
+        background(AppTheme.cardBackground)
+            .overlay {
+                RoundedRectangle(cornerRadius: AppTheme.cornerRadius, style: .continuous)
+                    .stroke(AppTheme.cardBorder, lineWidth: 1)
+            }
+            .clipShape(RoundedRectangle(cornerRadius: AppTheme.cornerRadius, style: .continuous))
+            .shadow(
+                color: AppTheme.cardShadow,
+                radius: AppTheme.cardShadowRadius,
+                y: AppTheme.cardShadowYOffset
+            )
     }
 }
