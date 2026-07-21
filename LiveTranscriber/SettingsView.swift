@@ -91,6 +91,42 @@ struct SettingsView: View {
         MOSSDecoderSegmentDuration(rawValue: mossDecoderSegmentDurationSeconds) ?? .defaultValue
     }
 
+    private var mossDecoderRecommendation: MOSSDecoderDeviceRecommendation {
+        .current
+    }
+
+    private func mossDecoderDurationLabel(_ duration: MOSSDecoderSegmentDuration) -> String {
+        guard duration == mossDecoderRecommendation.duration else {
+            return duration.displayName
+        }
+        return String(
+            format: String(localized: L10n.MOSSLocal.decoderRecommendedChoiceFormat),
+            duration.displayName
+        )
+    }
+
+    private var mossDecoderRecommendationText: String {
+        String(
+            format: String(localized: L10n.MOSSLocal.decoderRecommendationFormat),
+            mossDecoderRecommendation.duration.displayName,
+            mossDecoderRecommendation.physicalMemoryText
+        )
+    }
+
+    private var mossDecoderUseRecommendationTitle: String {
+        String(
+            format: String(localized: L10n.MOSSLocal.decoderUseRecommendationFormat),
+            mossDecoderRecommendation.duration.displayName
+        )
+    }
+
+    private var mossDecoderAboveRecommendationText: String {
+        String(
+            format: String(localized: L10n.MOSSLocal.decoderAboveRecommendationFormat),
+            selectedMOSSDecoderSegmentDuration.displayName
+        )
+    }
+
     @ViewBuilder
     private func settingsDestination(for route: SettingsRoute) -> some View {
         switch route {
@@ -1112,15 +1148,16 @@ struct SettingsView: View {
             ) {
                 Menu {
                     ForEach(MOSSDecoderSegmentDuration.allCases) { duration in
+                        let isRecommended = duration == mossDecoderRecommendation.duration
                         Button {
                             HapticFeedback.play(.menuSelection)
                             mossDecoderSegmentDurationSeconds = duration.rawValue
                         } label: {
                             Label(
-                                duration.displayName,
+                                mossDecoderDurationLabel(duration),
                                 systemImage: duration == selectedMOSSDecoderSegmentDuration
                                     ? "checkmark"
-                                    : "timer"
+                                    : isRecommended ? "star.fill" : "timer"
                             )
                         }
                     }
@@ -1128,11 +1165,39 @@ struct SettingsView: View {
                     SettingsPickerRow(
                         icon: "timer",
                         titleResource: L10n.MOSSLocal.decoderSegmentDuration,
-                        value: selectedMOSSDecoderSegmentDuration.displayName,
+                        value: mossDecoderDurationLabel(selectedMOSSDecoderSegmentDuration),
                         tint: AppTheme.purple
                     )
                 }
                 .buttonStyle(.plain)
+
+                SettingsVerbatimStatusRow(
+                    icon: "sparkles",
+                    text: mossDecoderRecommendationText,
+                    tint: AppTheme.success
+                )
+
+                if selectedMOSSDecoderSegmentDuration != mossDecoderRecommendation.duration {
+                    Button {
+                        HapticFeedback.play(.menuSelection)
+                        mossDecoderSegmentDurationSeconds = mossDecoderRecommendation.duration.rawValue
+                    } label: {
+                        SettingsCommandRow(
+                            icon: "wand.and.stars",
+                            title: mossDecoderUseRecommendationTitle,
+                            tint: AppTheme.purple
+                        )
+                    }
+                    .buttonStyle(.plain)
+                }
+
+                if selectedMOSSDecoderSegmentDuration.rawValue > mossDecoderRecommendation.duration.rawValue {
+                    SettingsVerbatimStatusRow(
+                        icon: "exclamationmark.triangle",
+                        text: mossDecoderAboveRecommendationText,
+                        tint: AppTheme.warning
+                    )
+                }
 
                 SettingsVerbatimStatusRow(
                     icon: "memorychip",
@@ -2754,7 +2819,7 @@ private struct SettingsICloudSyncRecordingRow: View {
                 .background(tint.opacity(0.10), in: RoundedRectangle(cornerRadius: 8, style: .continuous))
 
             VStack(alignment: .leading, spacing: 4) {
-                Text(entry.item.audioFileName)
+                Text(entry.item.displayName)
                     .font(.redditSans(.subheadline, weight: .semibold))
                     .foregroundStyle(.primary)
                     .lineLimit(1)

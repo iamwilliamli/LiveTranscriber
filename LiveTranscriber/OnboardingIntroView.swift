@@ -10,11 +10,10 @@ struct OnboardingIntroView: View {
 
     @State private var selectedPage: Int? = 0
     @State private var isHeroAnimated = false
-    @State private var selectedLocalWhisperModel = LocalWhisperModelManager.selectedModel
-    @State private var localWhisperModelStatus = LocalWhisperModelManager.currentStatus()
-    @State private var isDownloadingLocalWhisperModel = false
-    @State private var localWhisperDownloadProgress: Double = 0
-    @State private var localWhisperDownloadErrorMessage: String?
+    @State private var mossLocalModelStatus = MOSSLocalModelManager.currentStatus()
+    @State private var isDownloadingMOSSLocalModel = false
+    @State private var mossLocalDownloadProgress: Double = 0
+    @State private var mossLocalDownloadErrorMessage: String?
     @State private var selectedLocalSummaryModel = LocalSummaryModelManager.selectedModel
     @State private var localSummaryModelStatus = LocalSummaryModelManager.currentStatus()
     @State private var isDownloadingLocalSummaryModel = false
@@ -71,26 +70,26 @@ struct OnboardingIntroView: View {
         }
         .task {
             await transcriber.refreshSupportedLanguages()
-            refreshLocalWhisperModelStatus()
+            refreshMOSSLocalModelStatus()
             refreshLocalSummaryModelStatus()
             withAnimation(.smooth(duration: 0.7)) {
                 isHeroAnimated = true
             }
         }
         .alert(
-            String(localized: L10n.LocalWhisper.downloadFailed),
+            String(localized: L10n.MOSSLocal.downloadFailed),
             isPresented: Binding(
-                get: { localWhisperDownloadErrorMessage != nil },
+                get: { mossLocalDownloadErrorMessage != nil },
                 set: { isPresented in
                     if !isPresented {
-                        localWhisperDownloadErrorMessage = nil
+                        mossLocalDownloadErrorMessage = nil
                     }
                 }
             )
         ) {
             Button(String(localized: L10n.Common.ok), role: .cancel) {}
         } message: {
-            Text(localWhisperDownloadErrorMessage ?? "")
+            Text(mossLocalDownloadErrorMessage ?? "")
         }
         .alert(
             String(localized: L10n.LocalSummary.downloadFailed),
@@ -206,7 +205,7 @@ struct OnboardingIntroView: View {
 
                 quickSetupDivider
 
-                whisperDownloadSetup
+                mossDownloadSetup
 
                 quickSetupDivider
 
@@ -314,42 +313,29 @@ struct OnboardingIntroView: View {
             .padding(.leading, 54)
     }
 
-    private var whisperDownloadSetup: some View {
+    private var mossDownloadSetup: some View {
         VStack(alignment: .leading, spacing: 0) {
-            OnboardingSettingMenuRow(
-                icon: localWhisperModelIcon(for: selectedLocalWhisperModel),
-                titleResource: L10n.Onboarding.whisperModelTitle,
-                value: selectedLocalWhisperModel.displayName,
+            OnboardingRecommendedSettingRow(
+                icon: "person.2",
+                titleResource: L10n.Onboarding.mossModelTitle,
+                value: String(localized: L10n.MOSSLocal.modelName),
+                badgeResource: L10n.Onboarding.recommended,
                 tint: AppTheme.purple
-            ) {
-                ForEach(LocalWhisperModelManager.availableModels) { model in
-                    Button {
-                        HapticFeedback.play(.menuSelection)
-                        LocalWhisperModelManager.selectModel(model)
-                        selectedLocalWhisperModel = model
-                        localWhisperModelStatus = LocalWhisperModelManager.status(for: model)
-                    } label: {
-                        Label(
-                            model.displayName,
-                            systemImage: model.id == selectedLocalWhisperModel.id ? "checkmark" : localWhisperModelIcon(for: model)
-                        )
-                    }
-                }
-            }
+            )
 
             VStack(alignment: .leading, spacing: 10) {
                 HStack(alignment: .top, spacing: 10) {
-                    Image(systemName: localWhisperModelStatus.isAvailable ? "checkmark.circle.fill" : "arrow.down.circle")
+                    Image(systemName: mossLocalModelStatus.isAvailable ? "checkmark.circle.fill" : "arrow.down.circle")
                         .font(.system(size: 18, weight: .semibold))
-                        .foregroundStyle(localWhisperModelStatus.isAvailable ? AppTheme.success : AppTheme.info)
+                        .foregroundStyle(mossLocalModelStatus.isAvailable ? AppTheme.success : AppTheme.info)
                         .frame(width: 24, height: 24)
 
                     VStack(alignment: .leading, spacing: 3) {
-                        Text(localWhisperStatusValue)
+                        Text(mossLocalStatusValue)
                             .font(.redditSans(.subheadline, weight: .semibold))
                             .foregroundStyle(.primary)
 
-                        Text(localWhisperModelStatus.detailText)
+                        Text(mossLocalModelStatus.detailText)
                             .font(.redditSans(.caption))
                             .foregroundStyle(.secondary)
                             .fixedSize(horizontal: false, vertical: true)
@@ -358,23 +344,23 @@ struct OnboardingIntroView: View {
                     Spacer(minLength: 8)
                 }
 
-                if isDownloadingLocalWhisperModel {
-                    ProgressView(value: localWhisperDownloadProgress)
+                if isDownloadingMOSSLocalModel {
+                    ProgressView(value: mossLocalDownloadProgress)
                         .tint(AppTheme.purple)
                 }
 
-                if !localWhisperModelStatus.isAvailable {
+                if !mossLocalModelStatus.isAvailable {
                     Button {
-                        downloadLocalWhisperModel()
+                        downloadMOSSLocalModel()
                     } label: {
-                        Label(localWhisperDownloadButtonTitle, systemImage: "arrow.down.circle.fill")
+                        Label(mossLocalDownloadButtonTitle, systemImage: "arrow.down.circle.fill")
                             .font(.redditSans(.subheadline, weight: .semibold))
                             .frame(maxWidth: .infinity)
                             .frame(height: 42)
                     }
                     .buttonStyle(.borderedProminent)
                     .tint(AppTheme.purple)
-                    .disabled(isDownloadingLocalWhisperModel)
+                    .disabled(isDownloadingMOSSLocalModel)
                 }
             }
             .padding(.horizontal, 14)
@@ -382,18 +368,21 @@ struct OnboardingIntroView: View {
         }
     }
 
-    private var localWhisperStatusValue: String {
-        if isDownloadingLocalWhisperModel {
+    private var mossLocalStatusValue: String {
+        if isDownloadingMOSSLocalModel {
             return String(
-                format: String(localized: L10n.LocalWhisper.downloadingModelFormat),
-                localWhisperDownloadProgress * 100
+                format: String(localized: L10n.MOSSLocal.downloadingModelFormat),
+                mossLocalDownloadProgress * 100
             )
         }
-        return localWhisperModelStatus.statusText
+        return mossLocalModelStatus.statusText
     }
 
-    private var localWhisperDownloadButtonTitle: String {
-        String(format: String(localized: L10n.Onboarding.downloadWhisperFormat), selectedLocalWhisperModel.expectedSizeText)
+    private var mossLocalDownloadButtonTitle: String {
+        String(
+            format: String(localized: L10n.Onboarding.downloadMOSSFormat),
+            MOSSLocalModelManager.expectedSizeText
+        )
     }
 
     private var localSummaryDownloadSetup: some View {
@@ -474,9 +463,8 @@ struct OnboardingIntroView: View {
         return localSummaryModelStatus.statusText
     }
 
-    private func refreshLocalWhisperModelStatus() {
-        selectedLocalWhisperModel = LocalWhisperModelManager.selectedModel
-        localWhisperModelStatus = LocalWhisperModelManager.currentStatus()
+    private func refreshMOSSLocalModelStatus() {
+        mossLocalModelStatus = MOSSLocalModelManager.currentStatus()
     }
 
     private func refreshLocalSummaryModelStatus() {
@@ -484,38 +472,34 @@ struct OnboardingIntroView: View {
         localSummaryModelStatus = LocalSummaryModelManager.currentStatus()
     }
 
-    private func downloadLocalWhisperModel() {
-        guard !isDownloadingLocalWhisperModel else {
+    private func downloadMOSSLocalModel() {
+        guard !isDownloadingMOSSLocalModel else {
             return
         }
 
-        isDownloadingLocalWhisperModel = true
-        localWhisperDownloadProgress = 0
+        isDownloadingMOSSLocalModel = true
+        mossLocalDownloadProgress = 0
         HapticFeedback.play(.menuSelection)
 
-        let model = selectedLocalWhisperModel
         Task {
             do {
-                let status = try await LocalWhisperModelManager.download(model: model) { progress in
+                let status = try await MOSSLocalModelManager.download { progress in
                     Task { @MainActor in
-                        localWhisperDownloadProgress = progress
+                        mossLocalDownloadProgress = progress
                     }
                 }
 
                 await MainActor.run {
-                    selectedLocalWhisperModel = status.model
-                    localWhisperModelStatus = status
-                    isDownloadingLocalWhisperModel = false
-                    localWhisperDownloadProgress = 1
+                    mossLocalModelStatus = status
+                    isDownloadingMOSSLocalModel = false
+                    mossLocalDownloadProgress = 1
                     HapticFeedback.play(.menuSelection)
-                    Task {
-                        await transcriber.refreshSupportedLanguages()
-                    }
                 }
             } catch {
                 await MainActor.run {
-                    isDownloadingLocalWhisperModel = false
-                    localWhisperDownloadErrorMessage = error.localizedDescription
+                    mossLocalModelStatus = MOSSLocalModelManager.currentStatus()
+                    isDownloadingMOSSLocalModel = false
+                    mossLocalDownloadErrorMessage = error.localizedDescription
                     HapticFeedback.play(.failure)
                 }
             }
@@ -557,21 +541,6 @@ struct OnboardingIntroView: View {
         }
     }
 
-    private func localWhisperModelIcon(for model: LocalWhisperModel) -> String {
-        if model.id.contains("large") {
-            return "archivebox.fill"
-        }
-        if model.id.contains("medium") {
-            return "shippingbox.fill"
-        }
-        if model.id.contains("small") {
-            return "cube.fill"
-        }
-        if model.id.contains("tiny") {
-            return "cube"
-        }
-        return "shippingbox"
-    }
 }
 
 private struct OnboardingFeaturePage {
@@ -604,9 +573,9 @@ private struct OnboardingSplashHero: View {
             tint: AppTheme.info
         ),
         OnboardingSplashCardModel(
-            icon: "cpu",
-            titleResource: L10n.Onboarding.carouselWhisperTitle,
-            detailResource: L10n.Onboarding.carouselWhisperDetail,
+            icon: "person.2",
+            titleResource: L10n.Onboarding.carouselMOSSTitle,
+            detailResource: L10n.Onboarding.carouselMOSSDetail,
             tint: AppTheme.purple
         ),
         OnboardingSplashCardModel(
@@ -694,7 +663,7 @@ private struct OnboardingSplashHero: View {
 
                 HStack(spacing: 8) {
                     OnboardingTranscriptChip(textResource: L10n.Onboarding.heroChipLive, icon: "dot.radiowaves.left.and.right", tint: AppTheme.brand)
-                    OnboardingTranscriptChip(textResource: L10n.Onboarding.heroChipWhisper, icon: "cpu", tint: AppTheme.purple)
+                    OnboardingTranscriptChip(textResource: L10n.Onboarding.heroChipMOSS, icon: "person.2", tint: AppTheme.purple)
                     OnboardingTranscriptChip(textResource: L10n.Onboarding.heroChipPrivate, icon: "lock.fill", tint: AppTheme.success)
                 }
                 .padding(.bottom, 20)
@@ -838,6 +807,47 @@ private struct OnboardingFeatureCard: View {
             RoundedRectangle(cornerRadius: AppTheme.cornerRadius, style: .continuous)
                 .strokeBorder(AppTheme.cardBorder, lineWidth: 1)
         }
+    }
+}
+
+private struct OnboardingRecommendedSettingRow: View {
+    let icon: String
+    let titleResource: LocalizedStringResource
+    let value: String
+    let badgeResource: LocalizedStringResource
+    let tint: Color
+
+    var body: some View {
+        HStack(spacing: 12) {
+            Image(systemName: icon)
+                .font(.system(size: 17, weight: .semibold))
+                .foregroundStyle(tint)
+                .frame(width: 28, height: 28)
+
+            VStack(alignment: .leading, spacing: 3) {
+                HStack(spacing: 7) {
+                    Text(titleResource)
+                        .font(.redditSans(.subheadline, weight: .semibold))
+                        .foregroundStyle(.primary)
+
+                    Text(badgeResource)
+                        .font(.redditSans(.caption2, weight: .bold))
+                        .foregroundStyle(tint)
+                        .padding(.horizontal, 7)
+                        .frame(height: 20)
+                        .background(tint.opacity(0.12), in: Capsule())
+                }
+
+                Text(value)
+                    .font(.redditSans(.caption))
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+            }
+
+            Spacer(minLength: 8)
+        }
+        .padding(.horizontal, 14)
+        .padding(.vertical, 11)
     }
 }
 

@@ -1,4 +1,5 @@
 import AVFoundation
+import CloudKit
 import CoreMedia
 import CoreSpotlight
 import Darwin
@@ -23,6 +24,7 @@ struct RecordingItem: Identifiable, Codable, Hashable {
     var durationSeconds: Int
     var languageID: String
     var languageName: String
+    var displayName: String
     var audioFileName: String
     var transcriptFileName: String
     var transcriptPreview: String
@@ -31,6 +33,7 @@ struct RecordingItem: Identifiable, Codable, Hashable {
     var importStatus: RecordingImportStatus?
     var manualTags: [String]?
     var projectName: String?
+    var categoryID: UUID?
     var categoryName: String?
     var keyPoints: String?
     var location: RecordingLocation?
@@ -45,6 +48,7 @@ struct RecordingItem: Identifiable, Codable, Hashable {
         durationSeconds: Int,
         languageID: String,
         languageName: String,
+        displayName: String? = nil,
         audioFileName: String,
         transcriptFileName: String,
         transcriptPreview: String,
@@ -53,6 +57,7 @@ struct RecordingItem: Identifiable, Codable, Hashable {
         importStatus: RecordingImportStatus?,
         manualTags: [String]?,
         projectName: String? = nil,
+        categoryID: UUID? = nil,
         categoryName: String? = nil,
         keyPoints: String? = nil,
         location: RecordingLocation?,
@@ -66,6 +71,7 @@ struct RecordingItem: Identifiable, Codable, Hashable {
         self.durationSeconds = durationSeconds
         self.languageID = languageID
         self.languageName = languageName
+        self.displayName = Self.normalizedDisplayName(displayName, audioFileName: audioFileName)
         self.audioFileName = audioFileName
         self.transcriptFileName = transcriptFileName
         self.transcriptPreview = transcriptPreview
@@ -74,6 +80,7 @@ struct RecordingItem: Identifiable, Codable, Hashable {
         self.importStatus = importStatus
         self.manualTags = manualTags
         self.projectName = Self.normalizedProjectName(projectName)
+        self.categoryID = categoryID
         self.categoryName = Self.normalizedCategoryName(categoryName)
         self.keyPoints = Self.normalizedKeyPoints(keyPoints)
         self.location = location
@@ -89,6 +96,7 @@ struct RecordingItem: Identifiable, Codable, Hashable {
         case durationSeconds
         case languageID
         case languageName
+        case displayName
         case audioFileName
         case transcriptFileName
         case transcriptPreview
@@ -97,6 +105,7 @@ struct RecordingItem: Identifiable, Codable, Hashable {
         case importStatus
         case manualTags
         case projectName
+        case categoryID
         case categoryName
         case keyPoints
         case location
@@ -114,6 +123,10 @@ struct RecordingItem: Identifiable, Codable, Hashable {
         languageID = try container.decode(String.self, forKey: .languageID)
         languageName = try container.decode(String.self, forKey: .languageName)
         audioFileName = try container.decode(String.self, forKey: .audioFileName)
+        displayName = Self.normalizedDisplayName(
+            try container.decodeIfPresent(String.self, forKey: .displayName),
+            audioFileName: audioFileName
+        )
         transcriptFileName = try container.decode(String.self, forKey: .transcriptFileName)
         transcriptPreview = try container.decode(String.self, forKey: .transcriptPreview)
         lineCount = try container.decode(Int.self, forKey: .lineCount)
@@ -121,6 +134,7 @@ struct RecordingItem: Identifiable, Codable, Hashable {
         importStatus = try container.decodeIfPresent(RecordingImportStatus.self, forKey: .importStatus)
         manualTags = try container.decodeIfPresent([String].self, forKey: .manualTags)
         projectName = Self.normalizedProjectName(try container.decodeIfPresent(String.self, forKey: .projectName))
+        categoryID = try container.decodeIfPresent(UUID.self, forKey: .categoryID)
         categoryName = Self.normalizedCategoryName(try container.decodeIfPresent(String.self, forKey: .categoryName))
         keyPoints = Self.normalizedKeyPoints(try container.decodeIfPresent(String.self, forKey: .keyPoints))
         location = try container.decodeIfPresent(RecordingLocation.self, forKey: .location)
@@ -136,6 +150,20 @@ struct RecordingItem: Identifiable, Codable, Hashable {
 
     static func normalizedProjectName(_ projectName: String?) -> String? {
         normalizedMetadataText(projectName)
+    }
+
+    static func normalizedDisplayName(_ displayName: String?, audioFileName: String) -> String {
+        if let normalized = normalizedMetadataText(displayName) {
+            return normalized
+        }
+        let fallback = (audioFileName as NSString).deletingPathExtension
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        return fallback.isEmpty ? audioFileName : fallback
+    }
+
+    var displayFileName: String {
+        let fileExtension = (audioFileName as NSString).pathExtension
+        return fileExtension.isEmpty ? displayName : "\(displayName).\(fileExtension)"
     }
 
     static func normalizedCategoryName(_ categoryName: String?) -> String? {
@@ -534,9 +562,11 @@ struct RecordingImportStatus: Codable, Hashable {
 final class RecordingIndexRecord {
     var idString: String = UUID().uuidString
     var createdAt: Date = Date()
+    var modifiedAt: Date = Date()
     var durationSeconds: Int = 0
     var languageID: String = ""
     var languageName: String = ""
+    var displayName: String = ""
     var audioFileName: String = ""
     var transcriptFileName: String = ""
     var transcriptPreview: String = ""
@@ -549,6 +579,7 @@ final class RecordingIndexRecord {
     var importStatusIsFailed: Bool = false
     var manualTagsJSON: String?
     var projectName: String?
+    var categoryIDString: String?
     var categoryName: String?
     var keyPoints: String?
     var locationLatitude: Double?
@@ -566,12 +597,14 @@ final class RecordingIndexRecord {
         apply(item)
     }
 
-    func apply(_ item: RecordingItem) {
+    func apply(_ item: RecordingItem, modifiedAt: Date = Date()) {
         idString = item.id.uuidString
         createdAt = item.createdAt
+        self.modifiedAt = modifiedAt
         durationSeconds = item.durationSeconds
         languageID = item.languageID
         languageName = item.languageName
+        displayName = item.displayName
         audioFileName = item.audioFileName
         transcriptFileName = item.transcriptFileName
         transcriptPreview = item.transcriptPreview
@@ -599,6 +632,7 @@ final class RecordingIndexRecord {
 
         manualTagsJSON = Self.encodeTags(item.manualTags ?? [])
         projectName = item.projectName
+        categoryIDString = item.categoryID?.uuidString
         categoryName = item.categoryName
         keyPoints = item.keyPoints
         locationLatitude = item.location?.latitude
@@ -620,6 +654,7 @@ final class RecordingIndexRecord {
             durationSeconds: durationSeconds,
             languageID: languageID,
             languageName: languageName,
+            displayName: displayName,
             audioFileName: audioFileName,
             transcriptFileName: transcriptFileName,
             transcriptPreview: transcriptPreview,
@@ -628,6 +663,7 @@ final class RecordingIndexRecord {
             importStatus: importStatus,
             manualTags: Self.decodeTags(manualTagsJSON),
             projectName: projectName,
+            categoryID: categoryIDString.flatMap(UUID.init(uuidString:)),
             categoryName: categoryName,
             keyPoints: keyPoints,
             location: location,
@@ -882,13 +918,13 @@ final class RecordingStore: ObservableObject {
     private static let iCloudContainerIdentifier = "iCloud.com.iamwilliamli.LiveTranscriber"
     private static let iCloudStorageEnabledDefaultsKey = "RecordingStore.iCloudStorageEnabled"
     private static let legacyICloudDefaultMigrationDefaultsKey = "RecordingStore.didMigrateLegacyICloudDefaultStorage"
+    private static let deletedRecordingTombstonesDefaultsKey = "RecordingStore.deletedRecordingTombstonesV2"
     private static let swiftDataStoreName = "RecordingIndex"
     private static let audioFileExtensions: Set<String> = ["wav", "m4a", "mp3", "aac", "aif", "aiff", "caf"]
 
     private let fileManager = FileManager.default
     private let userDefaults: UserDefaults
     private var modelContainer: ModelContainer?
-    private var modelContainerUsesICloud = false
     private let encoder: JSONEncoder = {
         let encoder = JSONEncoder()
         encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
@@ -901,6 +937,8 @@ final class RecordingStore: ObservableObject {
         return decoder
     }()
     private var searchIndexCache: [RecordingItem.ID: RecordingSearchIndexCacheEntry] = [:]
+    private var inferredRecordingIDs = Set<RecordingItem.ID>()
+    private var deletedRecordingTombstones: [RecordingItem.ID: Date] = [:]
     private var searchIndexWarmupTask: Task<Void, Never>?
     private var iCloudSyncStatusRefreshTask: Task<Void, Never>?
     private var spotlightIndexTask: Task<Void, Never>?
@@ -1026,81 +1064,61 @@ final class RecordingStore: ObservableObject {
     init(userDefaults: UserDefaults = .standard) {
         self.userDefaults = userDefaults
         isICloudStorageEnabled = userDefaults.bool(forKey: Self.iCloudStorageEnabledDefaultsKey)
+        deletedRecordingTombstones = Self.loadDeletedRecordingTombstones(from: userDefaults)
         configureModelContainer()
-        RecordingCategoryCloudSync.shared.setEnabled(isICloudStorageEnabled)
+        RecordingMetadataCloudSync.shared.attach(store: self, enabled: isICloudStorageEnabled)
     }
 
     private func configureModelContainer() {
-        let result = Self.makeModelContainer(iCloudEnabled: isICloudStorageEnabled)
-        modelContainer = result.container
-        modelContainerUsesICloud = result.usesICloud
+        modelContainer = Self.makeModelContainer()
     }
 
-    private func refreshModelContainerIfNeeded() {
-        guard isICloudStorageEnabled,
-              isICloudStorageAvailable,
-              !modelContainerUsesICloud else {
-            return
-        }
-
-        configureModelContainer()
-    }
-
-    private static func makeModelContainer(iCloudEnabled: Bool) -> (container: ModelContainer?, usesICloud: Bool) {
+    private static func makeModelContainer() -> ModelContainer? {
         let schema = Schema([RecordingIndexRecord.self])
-        if iCloudEnabled {
-            do {
-                let configuration = ModelConfiguration(
-                    swiftDataStoreName,
-                    schema: schema,
-                    cloudKitDatabase: .private(iCloudContainerIdentifier)
-                )
-                return (try ModelContainer(for: schema, configurations: [configuration]), true)
-            } catch {
-                logger.error("CloudKit SwiftData index unavailable: \(error.localizedDescription, privacy: .public)")
-            }
-        }
-
         do {
             let configuration = ModelConfiguration(
                 swiftDataStoreName,
                 schema: schema,
                 cloudKitDatabase: .none
             )
-            return (try ModelContainer(for: schema, configurations: [configuration]), false)
+            return try ModelContainer(for: schema, configurations: [configuration])
         } catch {
             logger.error("Local SwiftData index unavailable: \(error.localizedDescription, privacy: .public)")
-            return (nil, false)
+            return nil
         }
     }
 
-    func reload() async {
+    func reload(synchronizeMetadata: Bool = true) async {
         refreshIntelligenceAvailability()
-        refreshModelContainerIfNeeded()
         do {
             try ensureRecordingsDirectory()
+            retryTombstonedFileCleanup()
             let indexedRecordings = try loadIndexedRecordings()
             let mergedResult = try mergedRecordings(with: indexedRecordings)
+            inferredRecordingIDs = mergedResult.inferredItemIDs
             recordings = mergedResult.items
+                .map(resolvingCategoryReference)
                 .sorted { $0.createdAt > $1.createdAt }
             markInterruptedImportStatuses()
             refreshICloudSyncStatusCache()
             pruneSearchIndexCache()
             warmSearchIndexInBackground()
-            if modelContainerUsesICloud {
-                let indexedItems = recordings.filter { !mergedResult.inferredItemIDs.contains($0.id) }
-                try? persist(indexedItems)
-            } else {
+            if !isICloudStorageEnabled {
                 try? persist()
             }
         } catch {
             recordings = []
+            inferredRecordingIDs = []
             iCloudSyncStatusCache = [:]
             iCloudSyncStatusRefreshTask?.cancel()
             iCloudSyncStatusRefreshTask = nil
             searchIndexCache = [:]
             searchIndexWarmupTask?.cancel()
             searchIndexWarmupTask = nil
+        }
+
+        if synchronizeMetadata && isICloudStorageEnabled {
+            RecordingMetadataCloudSync.shared.synchronizeNow()
         }
     }
 
@@ -1122,8 +1140,6 @@ final class RecordingStore: ObservableObject {
 
         userDefaults.set(enabled, forKey: Self.iCloudStorageEnabledDefaultsKey)
         isICloudStorageEnabled = enabled
-        configureModelContainer()
-        RecordingCategoryCloudSync.shared.setEnabled(enabled)
 
         do {
             try ensureRecordingsDirectory()
@@ -1137,12 +1153,12 @@ final class RecordingStore: ObservableObject {
                 try persist()
             }
 
-            await reload()
         } catch {
             Self.logger.error("Storage location switch failed: \(error.localizedDescription, privacy: .public)")
-            await reload()
         }
 
+        RecordingMetadataCloudSync.shared.setEnabled(enabled)
+        await reload()
         isStorageLocationChanging = false
     }
 
@@ -1160,10 +1176,13 @@ final class RecordingStore: ObservableObject {
         do {
             try ensureRecordingsDirectory()
 
+            let recordingID = UUID()
             let baseName = try uniqueBaseName(forProposedName: preferredName, fallbackDate: draft.startedAt)
+            let categoryDefinition = RecordingCategoryCatalog.register(categoryName)
             let audioExtension = draft.audioURL.pathExtension.isEmpty ? "wav" : draft.audioURL.pathExtension
-            let audioFileName = "\(baseName).\(audioExtension)"
-            let transcriptFileName = "\(baseName).txt"
+            let storageStem = recordingID.uuidString.lowercased()
+            let audioFileName = "\(storageStem).\(audioExtension)"
+            let transcriptFileName = "\(storageStem).txt"
             let targetAudioURL = recordingsDirectory.appendingPathComponent(audioFileName)
             let targetTranscriptURL = recordingsDirectory.appendingPathComponent(transcriptFileName)
             let transcriptText = draft.lines.timedTranscriptText
@@ -1175,11 +1194,12 @@ final class RecordingStore: ObservableObject {
             try transcriptText.write(to: targetTranscriptURL, atomically: true, encoding: .utf8)
 
             let item = RecordingItem(
-                id: UUID(),
+                id: recordingID,
                 createdAt: draft.startedAt,
                 durationSeconds: draft.durationSeconds,
                 languageID: draft.languageID,
                 languageName: draft.languageName,
+                displayName: baseName,
                 audioFileName: audioFileName,
                 transcriptFileName: transcriptFileName,
                 transcriptPreview: draft.lines.plainTranscriptText,
@@ -1188,7 +1208,8 @@ final class RecordingStore: ObservableObject {
                 importStatus: nil,
                 manualTags: manualTags,
                 projectName: projectName,
-                categoryName: categoryName,
+                categoryID: categoryDefinition?.id,
+                categoryName: categoryDefinition?.name,
                 keyPoints: keyPoints,
                 location: location
             )
@@ -1232,21 +1253,24 @@ final class RecordingStore: ObservableObject {
         try ensureRecordingsDirectory()
 
         let createdAt = Date()
+        let recordingID = UUID()
         let baseName = uniqueBaseName(for: createdAt)
         let audioExtension = extractsVideoAudio
             ? "m4a"
             : (sourceURL.pathExtension.isEmpty ? "m4a" : sourceURL.pathExtension.lowercased())
-        let audioFileName = "\(baseName).\(audioExtension)"
-        let transcriptFileName = "\(baseName).txt"
+        let storageStem = recordingID.uuidString.lowercased()
+        let audioFileName = "\(storageStem).\(audioExtension)"
+        let transcriptFileName = "\(storageStem).txt"
         let targetAudioURL = recordingsDirectory.appendingPathComponent(audioFileName)
         let targetTranscriptURL = recordingsDirectory.appendingPathComponent(transcriptFileName)
 
         let item = RecordingItem(
-            id: UUID(),
+            id: recordingID,
             createdAt: createdAt,
             durationSeconds: 0,
             languageID: language.id,
             languageName: language.displayName,
+            displayName: baseName,
             audioFileName: audioFileName,
             transcriptFileName: transcriptFileName,
             transcriptPreview: "",
@@ -1321,19 +1345,22 @@ final class RecordingStore: ObservableObject {
         try ensureRecordingsDirectory()
 
         let createdAt = Date()
+        let recordingID = UUID()
         let baseName = uniqueBaseName(for: createdAt)
         let audioExtension = sourceURL.pathExtension.isEmpty ? "m4a" : sourceURL.pathExtension.lowercased()
-        let audioFileName = "\(baseName).\(audioExtension)"
-        let transcriptFileName = "\(baseName).txt"
+        let storageStem = recordingID.uuidString.lowercased()
+        let audioFileName = "\(storageStem).\(audioExtension)"
+        let transcriptFileName = "\(storageStem).txt"
         let targetAudioURL = recordingsDirectory.appendingPathComponent(audioFileName)
         let targetTranscriptURL = recordingsDirectory.appendingPathComponent(transcriptFileName)
 
         let item = RecordingItem(
-            id: UUID(),
+            id: recordingID,
             createdAt: createdAt,
             durationSeconds: 0,
             languageID: language.id,
             languageName: language.displayName,
+            displayName: baseName,
             audioFileName: audioFileName,
             transcriptFileName: transcriptFileName,
             transcriptPreview: "",
@@ -1875,10 +1902,25 @@ final class RecordingStore: ObservableObject {
     }
 
     func delete(_ item: RecordingItem) throws {
-        try removeRecordingFilesFromAllManagedDirectories(item)
+        do {
+            try removeRecordingFilesFromAllManagedDirectories(item)
+        } catch {
+            Self.logger.error(
+                "Recording file cleanup will be retried by tombstone: \(error.localizedDescription, privacy: .public)"
+            )
+        }
+        addDeletedRecordingTombstone(id: item.id)
         recordings.removeAll { $0.id == item.id }
+        inferredRecordingIDs.remove(item.id)
         searchIndexCache[item.id] = nil
-        try persist()
+        do {
+            try deletePersistedRecording(id: item.id)
+        } catch {
+            Self.logger.error(
+                "Recording index cleanup failed but tombstone remains authoritative: \(error.localizedDescription, privacy: .public)"
+            )
+        }
+        RecordingMetadataCloudSync.shared.scheduleRecordingDelete(id: item.id)
         deleteSpotlightIndex(for: [item.id])
     }
 
@@ -1891,92 +1933,19 @@ final class RecordingStore: ObservableObject {
 
         let currentItem = recordings[index]
         let baseName = try Self.sanitizedBaseName(from: proposedName)
-        let audioExtension = (currentItem.audioFileName as NSString).pathExtension
-        let transcriptExtension = (currentItem.transcriptFileName as NSString).pathExtension.isEmpty
-            ? "txt"
-            : (currentItem.transcriptFileName as NSString).pathExtension
-        let newAudioFileName = audioExtension.isEmpty ? baseName : "\(baseName).\(audioExtension)"
-        let newTranscriptFileName = "\(baseName).\(transcriptExtension)"
-
-        if newAudioFileName == currentItem.audioFileName,
-           newTranscriptFileName == currentItem.transcriptFileName {
+        if baseName == currentItem.displayName {
             return currentItem
         }
-
-        let sourceAudioURL = audioURL(for: currentItem)
-        let sourceTranscriptURL = transcriptURL(for: currentItem)
-        let sourceBackupURL = geminiTranscriptBackupURL(for: currentItem)
-        let targetAudioURL = recordingsDirectory.appendingPathComponent(newAudioFileName)
-        let targetTranscriptURL = recordingsDirectory.appendingPathComponent(newTranscriptFileName)
-        let targetBackupURL = recordingsDirectory.appendingPathComponent(
-            Self.geminiTranscriptBackupFileName(for: newTranscriptFileName)
-        )
-
-        if sourceAudioURL.path != targetAudioURL.path,
-           fileManager.fileExists(atPath: targetAudioURL.path) {
-            throw RecordingRenameError.nameAlreadyExists
-        }
-        if sourceTranscriptURL.path != targetTranscriptURL.path,
-           fileManager.fileExists(atPath: targetTranscriptURL.path) {
-            throw RecordingRenameError.nameAlreadyExists
-        }
-        if sourceBackupURL.path != targetBackupURL.path,
-           fileManager.fileExists(atPath: targetBackupURL.path) {
+        if recordings.contains(where: {
+            $0.id != currentItem.id
+                && $0.displayName.normalizedForRecordingSearch == baseName.normalizedForRecordingSearch
+        }) {
             throw RecordingRenameError.nameAlreadyExists
         }
 
-        var movedAudio = false
-        var movedTranscript = false
-        var movedBackup = false
-        let originalItem = currentItem
-
-        do {
-            if sourceAudioURL.path != targetAudioURL.path {
-                try moveItem(from: sourceAudioURL, to: targetAudioURL)
-                movedAudio = true
-            }
-            if fileManager.fileExists(atPath: sourceTranscriptURL.path),
-               sourceTranscriptURL.path != targetTranscriptURL.path {
-                try moveItem(from: sourceTranscriptURL, to: targetTranscriptURL)
-                movedTranscript = true
-            }
-            if fileManager.fileExists(atPath: sourceBackupURL.path),
-               sourceBackupURL.path != targetBackupURL.path {
-                try moveItem(from: sourceBackupURL, to: targetBackupURL)
-                movedBackup = true
-            }
-
-            var updatedItem = currentItem
-            updatedItem.audioFileName = newAudioFileName
-            updatedItem.transcriptFileName = newTranscriptFileName
-
-            var updatedRecordings = recordings
-            updatedRecordings[index] = updatedItem
-            recordings = updatedRecordings
-            try persist()
-            try? removeRecordingFilesNamed([
-                originalItem.audioFileName,
-                originalItem.transcriptFileName,
-                Self.geminiTranscriptBackupFileName(for: originalItem.transcriptFileName)
-            ])
-            return updatedItem
-        } catch {
-            if movedBackup {
-                try? moveItem(from: targetBackupURL, to: sourceBackupURL)
-            }
-            if movedTranscript {
-                try? moveItem(from: targetTranscriptURL, to: sourceTranscriptURL)
-            }
-            if movedAudio {
-                try? moveItem(from: targetAudioURL, to: sourceAudioURL)
-            }
-            var restoredRecordings = recordings
-            if restoredRecordings.indices.contains(index) {
-                restoredRecordings[index] = originalItem
-                recordings = restoredRecordings
-            }
-            throw error
-        }
+        recordings[index].displayName = baseName
+        try persist()
+        return recordings[index]
     }
 
     @discardableResult
@@ -1998,7 +1967,9 @@ final class RecordingStore: ObservableObject {
 
         recordings[index].manualTags = manualTags
         recordings[index].projectName = RecordingItem.normalizedProjectName(projectName)
-        recordings[index].categoryName = RecordingItem.normalizedCategoryName(categoryName)
+        let categoryDefinition = RecordingCategoryCatalog.register(categoryName)
+        recordings[index].categoryID = categoryDefinition?.id
+        recordings[index].categoryName = categoryDefinition?.name
         recordings[index].keyPoints = RecordingItem.normalizedKeyPoints(keyPoints)
         recordings[index].intelligence = Self.updatedIntelligence(
             from: renamedItem.intelligence,
@@ -2023,7 +1994,9 @@ final class RecordingStore: ObservableObject {
             throw RecordingRenameError.itemMissing
         }
 
-        recordings[index].categoryName = RecordingItem.normalizedCategoryName(categoryName)
+        let categoryDefinition = RecordingCategoryCatalog.register(categoryName)
+        recordings[index].categoryID = categoryDefinition?.id
+        recordings[index].categoryName = categoryDefinition?.name
         searchIndexCache[item.id] = nil
         try persist()
         return recordings[index]
@@ -2048,9 +2021,6 @@ final class RecordingStore: ObservableObject {
             updatedCount += 1
         }
 
-        if updatedCount > 0 {
-            try persist()
-        }
         return updatedCount
     }
 
@@ -2068,13 +2038,11 @@ final class RecordingStore: ObservableObject {
             }
 
             recordings[index].categoryName = nil
+            recordings[index].categoryID = nil
             searchIndexCache[recordings[index].id] = nil
             updatedCount += 1
         }
 
-        if updatedCount > 0 {
-            try persist()
-        }
         return updatedCount
     }
 
@@ -2097,7 +2065,8 @@ final class RecordingStore: ObservableObject {
         for item: RecordingItem,
         lineID: String,
         text: String,
-        speaker: String?
+        speaker: String?,
+        consecutiveFollowingLines: [(lineID: String, text: String)] = []
     ) throws -> RecordingItem {
         try ensureRecordingsDirectory()
         guard let index = recordings.firstIndex(where: { $0.id == item.id }) else {
@@ -2107,22 +2076,34 @@ final class RecordingStore: ObservableObject {
         let currentItem = recordings[index]
         let transcriptURL = transcriptURL(for: currentItem)
         let transcript = (try? String(contentsOf: transcriptURL, encoding: .utf8)) ?? ""
-        let spokenText = Self.cleanedTranscriptLineText(text)
         let speaker = Self.cleanedTranscriptSpeaker(speaker)
-        let replacementText = speaker.map { "\($0): \(spokenText)" } ?? spokenText
-        let updatedTranscript = try Self.replacingTranscriptLine(
+        try Self.validateConsecutiveTranscriptLineIDs(
+            consecutiveFollowingLines.map { $0.lineID },
+            after: lineID,
             in: transcript,
-            lineID: lineID,
-            replacementText: replacementText
-        )
-        let updatedSpeakerDiarization = try Self.updatingSpeakerDiarization(
-            currentItem.speakerDiarization,
-            in: transcript,
-            lineID: lineID,
-            speaker: speaker,
-            spokenText: spokenText,
             recordingDuration: Double(currentItem.durationSeconds)
         )
+        let edits = [(lineID: lineID, text: text)] + consecutiveFollowingLines
+        var updatedTranscript = transcript
+        var updatedSpeakerDiarization = currentItem.speakerDiarization
+
+        for edit in edits {
+            let spokenText = Self.cleanedTranscriptLineText(edit.text)
+            let replacementText = speaker.map { "\($0): \(spokenText)" } ?? spokenText
+            updatedTranscript = try Self.replacingTranscriptLine(
+                in: updatedTranscript,
+                lineID: edit.lineID,
+                replacementText: replacementText
+            )
+            updatedSpeakerDiarization = try Self.updatingSpeakerDiarization(
+                updatedSpeakerDiarization,
+                in: transcript,
+                lineID: edit.lineID,
+                speaker: speaker,
+                spokenText: spokenText,
+                recordingDuration: Double(currentItem.durationSeconds)
+            )
+        }
         try updatedTranscript.write(to: transcriptURL, atomically: true, encoding: .utf8)
 
         recordings[index].transcriptPreview = updatedTranscript.plainTranscriptTextForIntelligence
@@ -2216,6 +2197,34 @@ final class RecordingStore: ObservableObject {
         }
         let cleaned = cleanedTranscriptLineText(speaker)
         return cleaned.isEmpty ? nil : cleaned
+    }
+
+    private static func validateConsecutiveTranscriptLineIDs(
+        _ followingLineIDs: [String],
+        after lineID: String,
+        in transcript: String,
+        recordingDuration: Double
+    ) throws {
+        guard !followingLineIDs.isEmpty else {
+            return
+        }
+
+        let locations = transcriptLineLocations(
+            in: transcript,
+            recordingDuration: recordingDuration
+        )
+        guard let targetIndex = locations.firstIndex(where: { $0.id == lineID }) else {
+            throw RecordingTranscriptEditError.lineMissing
+        }
+        let expectedLineIDs = Array(
+            locations
+                .dropFirst(targetIndex + 1)
+                .prefix(followingLineIDs.count)
+                .map(\.id)
+        )
+        guard expectedLineIDs == followingLineIDs else {
+            throw RecordingTranscriptEditError.lineMissing
+        }
     }
 
     private static func updatingSpeakerDiarization(
@@ -2344,11 +2353,24 @@ final class RecordingStore: ObservableObject {
     }
 
     func audioURL(for item: RecordingItem) -> URL {
-        recordingsDirectory.appendingPathComponent(item.audioFileName)
+        prepareUbiquitousItemForAccess(
+            recordingsDirectory.appendingPathComponent(item.audioFileName)
+        )
     }
 
     func transcriptURL(for item: RecordingItem) -> URL {
-        recordingsDirectory.appendingPathComponent(item.transcriptFileName)
+        prepareUbiquitousItemForAccess(
+            recordingsDirectory.appendingPathComponent(item.transcriptFileName)
+        )
+    }
+
+    private func prepareUbiquitousItemForAccess(_ url: URL) -> URL {
+        guard isICloudStorageEnabled,
+              fileManager.fileExists(atPath: url.path) else {
+            return url
+        }
+        try? fileManager.startDownloadingUbiquitousItem(at: url)
+        return url
     }
 
     private func geminiTranscriptBackupURL(for item: RecordingItem) -> URL {
@@ -2446,6 +2468,7 @@ final class RecordingStore: ObservableObject {
         }
 
         let searchableFields = [
+            item.displayName,
             item.audioFileName,
             item.localizedLanguageName,
             item.languageName,
@@ -2474,6 +2497,135 @@ final class RecordingStore: ObservableObject {
 
     func recording(withID id: RecordingItem.ID) -> RecordingItem? {
         recordings.first { $0.id == id }
+    }
+
+    func persistedRecordingIDsForCloudSync() -> [RecordingItem.ID] {
+        guard let context = modelContainer?.mainContext,
+              let records = try? context.fetch(FetchDescriptor<RecordingIndexRecord>()) else {
+            return []
+        }
+        return Array(Set(records.compactMap { UUID(uuidString: $0.idString) }))
+    }
+
+    func persistedRecordingVersionsForCloudSync() -> [RecordingItem.ID: Date] {
+        guard let context = modelContainer?.mainContext,
+              let records = try? context.fetch(FetchDescriptor<RecordingIndexRecord>()) else {
+            return [:]
+        }
+        var versions: [RecordingItem.ID: Date] = [:]
+        for record in records {
+            guard record.item.importStatus == nil,
+                  let id = UUID(uuidString: record.idString) else {
+                continue
+            }
+            versions[id] = max(versions[id] ?? .distantPast, record.modifiedAt)
+        }
+        return versions
+    }
+
+    func tombstonedRecordingIDsForCloudSync() -> [RecordingItem.ID] {
+        Array(deletedRecordingTombstones.keys)
+    }
+
+    func cloudPayload(forRecordingID id: RecordingItem.ID) -> (data: Data, modifiedAt: Date)? {
+        guard !isRecordingTombstoned(id),
+              let record = persistedIndexRecords(for: id).max(by: { $0.modifiedAt < $1.modifiedAt }),
+              record.item.importStatus == nil else {
+            return nil
+        }
+
+        var item = record.item
+        // The transcript itself travels through iCloud Drive. Keeping it out of
+        // the CloudKit record leaves the metadata small and independently mergeable.
+        item.transcriptPreview = ""
+        item.importStatus = nil
+        item.categoryName = nil
+        guard let data = try? encoder.encode(item) else {
+            return nil
+        }
+        return (data, record.modifiedAt)
+    }
+
+    func applyRemoteRecording(
+        id: RecordingItem.ID,
+        payload: Data,
+        modifiedAt: Date
+    ) async -> Bool {
+        guard !isRecordingTombstoned(id),
+              var remoteItem = try? decoder.decode(RecordingItem.self, from: payload),
+              let context = modelContainer?.mainContext else {
+            return false
+        }
+
+        remoteItem.id = id
+        remoteItem.importStatus = nil
+        remoteItem.categoryName = nil
+        let existingRecords = persistedIndexRecords(for: id)
+        if let newestLocalRecord = existingRecords.max(by: { $0.modifiedAt < $1.modifiedAt }),
+           newestLocalRecord.modifiedAt > modifiedAt {
+            return false
+        }
+
+        if let primaryRecord = existingRecords.first {
+            primaryRecord.apply(remoteItem, modifiedAt: modifiedAt)
+            for duplicate in existingRecords.dropFirst() {
+                context.delete(duplicate)
+            }
+        } else {
+            let record = RecordingIndexRecord(item: remoteItem)
+            record.modifiedAt = modifiedAt
+            context.insert(record)
+        }
+
+        do {
+            try context.save()
+            inferredRecordingIDs.remove(id)
+            return true
+        } catch {
+            Self.iCloudLogger.error(
+                "metadata-apply-failed recording=\(id.uuidString, privacy: .public) error=\(error.localizedDescription, privacy: .public)"
+            )
+            return false
+        }
+    }
+
+    func applyRemoteRecordingDeletion(id: RecordingItem.ID) async {
+        addDeletedRecordingTombstone(id: id)
+        let persistedItems = persistedIndexRecords(for: id).map(\.item)
+        if let item = recordings.first(where: { $0.id == id }) ?? persistedItems.first {
+            try? removeRecordingFilesFromAllManagedDirectories(item)
+        } else {
+            try? removeFilesForStableRecordingID(id)
+        }
+
+        try? deletePersistedRecording(id: id)
+        recordings.removeAll { $0.id == id }
+        inferredRecordingIDs.remove(id)
+        searchIndexCache[id] = nil
+        deleteSpotlightIndex(for: [id])
+    }
+
+    func refreshCategoryReferencesFromCloud() async {
+        recordings = recordings
+            .map(resolvingCategoryReference)
+            .sorted { $0.createdAt > $1.createdAt }
+        pruneSearchIndexCache()
+        await reload(synchronizeMetadata: false)
+    }
+
+    func isRecordingTombstoned(_ id: RecordingItem.ID) -> Bool {
+        deletedRecordingTombstones[id] != nil
+    }
+
+    private func persistedIndexRecords(for id: RecordingItem.ID) -> [RecordingIndexRecord] {
+        guard let context = modelContainer?.mainContext else {
+            return []
+        }
+        let idString = id.uuidString
+        let descriptor = FetchDescriptor<RecordingIndexRecord>(
+            predicate: #Predicate { $0.idString == idString }
+        )
+        return (try? context.fetch(descriptor)) ?? []
     }
 
     func recordingEntities() -> [RecordingEntity] {
@@ -2630,17 +2782,23 @@ final class RecordingStore: ObservableObject {
         )
         let audioFileURLs = fileURLs.filter { fileURL in
             let fileExtension = fileURL.pathExtension.lowercased()
+            let storageID = UUID(uuidString: fileURL.deletingPathExtension().lastPathComponent)
+            let isTombstoned = storageID.map { deletedRecordingTombstones[$0] != nil } ?? false
             return Self.audioFileExtensions.contains(fileExtension)
                 && fileURL.lastPathComponent.hasPrefix(".") == false
+                && !isTombstoned
         }
         let availableAudioFileNames = Set(audioFileURLs.map(\.lastPathComponent))
         var itemsByAudioFileName: [String: RecordingItem] = [:]
         var inferredItemIDs = Set<RecordingItem.ID>()
 
         for item in indexedRecordings {
+            guard deletedRecordingTombstones[item.id] == nil else {
+                continue
+            }
             let hasAudioFile = availableAudioFileNames.contains(item.audioFileName)
             if !hasAudioFile && item.importStatus == nil {
-                if modelContainerUsesICloud {
+                if isICloudStorageEnabled {
                     if let existing = itemsByAudioFileName[item.audioFileName] {
                         itemsByAudioFileName[item.audioFileName] = preferredMetadataItem(existing, item)
                     } else {
@@ -2686,8 +2844,33 @@ final class RecordingStore: ObservableObject {
         return lhs.createdAt >= rhs.createdAt ? lhs : rhs
     }
 
+    private func resolvingCategoryReference(_ item: RecordingItem) -> RecordingItem {
+        var resolved = item
+        if let definition = RecordingCategoryCatalog.definition(id: item.categoryID) {
+            resolved.categoryName = definition.name
+            return resolved
+        }
+        if item.categoryID != nil {
+            resolved.categoryName = nil
+            return resolved
+        }
+        if let definition = RecordingCategoryCatalog.definition(named: item.categoryName) {
+            resolved.categoryID = definition.id
+            resolved.categoryName = definition.name
+        }
+        return resolved
+    }
+
     private func metadataCompletenessScore(for item: RecordingItem) -> Int {
         var score = 0
+        if item.categoryID != nil {
+            score += 80
+        } else if item.categoryName != nil {
+            score += 30
+        }
+        if !item.displayName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            score += 20
+        }
         score += (item.manualTags?.count ?? 0) * 20
         score += (item.intelligence?.tags.count ?? 0) * 20
 
@@ -2750,11 +2933,14 @@ final class RecordingStore: ObservableObject {
         let language = TranscriptionLanguage(id: TranscriptionLanguage.defaultLanguageID)
 
         return RecordingItem(
-            id: UUID(),
+            id: UUID(uuidString: fileBaseName) ?? UUID(),
             createdAt: createdAt,
             durationSeconds: (try? Self.durationSeconds(for: audioURL)) ?? 0,
             languageID: language.id,
             languageName: language.displayName,
+            displayName: UUID(uuidString: fileBaseName) == nil
+                ? fileBaseName
+                : Self.defaultBaseName(for: createdAt),
             audioFileName: audioURL.lastPathComponent,
             transcriptFileName: transcriptFileName,
             transcriptPreview: transcript.plainTranscriptTextForIntelligence,
@@ -2837,6 +3023,78 @@ final class RecordingStore: ObservableObject {
             item.transcriptFileName,
             Self.geminiTranscriptBackupFileName(for: item.transcriptFileName)
         ])
+    }
+
+    private func removeFilesForStableRecordingID(_ id: RecordingItem.ID) throws {
+        let storageStem = id.uuidString.lowercased()
+        var fileNames = Set<String>()
+        for directory in managedRecordingsDirectories {
+            guard let urls = try? fileManager.contentsOfDirectory(
+                at: directory,
+                includingPropertiesForKeys: nil,
+                options: [.skipsHiddenFiles]
+            ) else {
+                continue
+            }
+            for url in urls {
+                let name = url.lastPathComponent.lowercased()
+                if name.hasPrefix(storageStem + ".") {
+                    fileNames.insert(url.lastPathComponent)
+                }
+            }
+        }
+        try removeRecordingFilesNamed(Array(fileNames))
+    }
+
+    private func retryTombstonedFileCleanup() {
+        let stems = Set(deletedRecordingTombstones.keys.map { $0.uuidString.lowercased() })
+        guard !stems.isEmpty else {
+            return
+        }
+        var fileNames = Set<String>()
+        for directory in managedRecordingsDirectories {
+            guard let urls = try? fileManager.contentsOfDirectory(
+                at: directory,
+                includingPropertiesForKeys: nil,
+                options: [.skipsHiddenFiles]
+            ) else {
+                continue
+            }
+            for url in urls {
+                let lowercasedName = url.lastPathComponent.lowercased()
+                let storageStem = lowercasedName.split(separator: ".", maxSplits: 1).first.map(String.init)
+                if storageStem.map(stems.contains) == true {
+                    fileNames.insert(url.lastPathComponent)
+                }
+            }
+        }
+        try? removeRecordingFilesNamed(Array(fileNames))
+    }
+
+    private func addDeletedRecordingTombstone(id: RecordingItem.ID) {
+        deletedRecordingTombstones[id] = Date()
+        let encoded = Dictionary(uniqueKeysWithValues: deletedRecordingTombstones.map {
+            ($0.key.uuidString, $0.value)
+        })
+        if let data = try? encoder.encode(encoded) {
+            userDefaults.set(data, forKey: Self.deletedRecordingTombstonesDefaultsKey)
+        }
+    }
+
+    private static func loadDeletedRecordingTombstones(
+        from userDefaults: UserDefaults
+    ) -> [RecordingItem.ID: Date] {
+        guard let data = userDefaults.data(forKey: deletedRecordingTombstonesDefaultsKey) else {
+            return [:]
+        }
+        let decoder = JSONDecoder()
+        decoder.dateDecodingStrategy = .iso8601
+        guard let stored = try? decoder.decode([String: Date].self, from: data) else {
+            return [:]
+        }
+        return Dictionary(uniqueKeysWithValues: stored.compactMap { key, value in
+            UUID(uuidString: key).map { ($0, value) }
+        })
     }
 
     private func removeRecordingFilesNamed(_ fileNames: [String]) throws {
@@ -3023,6 +3281,7 @@ final class RecordingStore: ObservableObject {
                 id: item.id,
                 signature: signature,
                 metadataText: [
+                    item.displayName,
                     item.audioFileName,
                     item.localizedLanguageName,
                     item.languageName,
@@ -3082,6 +3341,7 @@ final class RecordingStore: ObservableObject {
 
     private func searchIndexSignature(for item: RecordingItem) -> String {
         [
+            item.displayName,
             item.audioFileName,
             item.languageID,
             Locale.current.identifier,
@@ -3106,10 +3366,9 @@ final class RecordingStore: ObservableObject {
     }
 
     private static func recordingTitle(for item: RecordingItem) -> String {
-        let baseName = (item.audioFileName as NSString).deletingPathExtension
-        let trimmedBaseName = baseName.trimmingCharacters(in: .whitespacesAndNewlines)
-        if !trimmedBaseName.isEmpty {
-            return trimmedBaseName
+        let trimmedDisplayName = item.displayName.trimmingCharacters(in: .whitespacesAndNewlines)
+        if !trimmedDisplayName.isEmpty {
+            return trimmedDisplayName
         }
 
         return item.createdAt.formatted(date: .abbreviated, time: .shortened)
@@ -3185,24 +3444,70 @@ final class RecordingStore: ObservableObject {
 
         let descriptor = FetchDescriptor<RecordingIndexRecord>()
         let existingRecords = try context.fetch(descriptor)
-        var recordsByID = Dictionary(uniqueKeysWithValues: existingRecords.map { ($0.idString, $0) })
-        let expectedIDs = Set(items.map(\.id.uuidString))
+        var recordsByID: [String: RecordingIndexRecord] = [:]
+        var removedDuplicate = false
+        for record in existingRecords {
+            if let existing = recordsByID[record.idString] {
+                if existing.modifiedAt >= record.modifiedAt {
+                    context.delete(record)
+                } else {
+                    context.delete(existing)
+                    recordsByID[record.idString] = record
+                }
+                removedDuplicate = true
+            } else {
+                recordsByID[record.idString] = record
+            }
+        }
+        var changedIDs: [RecordingItem.ID] = []
 
-        for item in items {
+        for item in items where !inferredRecordingIDs.contains(item.id) {
+            var persistedItem = item
+            if persistedItem.categoryID != nil {
+                // The category record owns the mutable display name. Recording
+                // metadata keeps only the stable reference, so a rename never
+                // rewrites every recording or revives a stale name.
+                persistedItem.categoryName = nil
+            }
             let idString = item.id.uuidString
             if let record = recordsByID[idString] {
-                record.apply(item)
+                guard record.item != persistedItem else {
+                    continue
+                }
+                record.apply(persistedItem)
             } else {
-                let record = RecordingIndexRecord(item: item)
+                let record = RecordingIndexRecord(item: persistedItem)
                 context.insert(record)
                 recordsByID[idString] = record
             }
+            changedIDs.append(item.id)
         }
 
-        for record in existingRecords where !expectedIDs.contains(record.idString) {
+        guard !changedIDs.isEmpty || removedDuplicate else {
+            return
+        }
+
+        try context.save()
+        for id in changedIDs {
+            RecordingMetadataCloudSync.shared.scheduleRecordingSave(id: id)
+        }
+    }
+
+    private func deletePersistedRecording(id: RecordingItem.ID) throws {
+        guard let context = modelContainer?.mainContext else {
+            return
+        }
+        let idString = id.uuidString
+        let descriptor = FetchDescriptor<RecordingIndexRecord>(
+            predicate: #Predicate { $0.idString == idString }
+        )
+        let records = try context.fetch(descriptor)
+        guard !records.isEmpty else {
+            return
+        }
+        for record in records {
             context.delete(record)
         }
-
         try context.save()
     }
 
@@ -3230,8 +3535,9 @@ final class RecordingStore: ObservableObject {
     private func uniqueBaseName(root: String) -> String {
         var candidate = root
         var index = 1
-        while ["wav", "caf", "m4a", "mp3"].contains(where: { fileManager.fileExists(atPath: recordingsDirectory.appendingPathComponent("\(candidate).\($0)").path) })
-            || fileManager.fileExists(atPath: recordingsDirectory.appendingPathComponent("\(candidate).txt").path) {
+        while recordings.contains(where: {
+            $0.displayName.normalizedForRecordingSearch == candidate.normalizedForRecordingSearch
+        }) {
             index += 1
             candidate = "\(root)_\(index)"
         }
@@ -5583,5 +5889,727 @@ private extension String {
             }
             .filter { !$0.isEmpty }
             .joined(separator: "\n")
+    }
+}
+
+// MARK: - CloudKit metadata sync
+
+/// Small synchronous facade used by the UI/store. The actor below owns the
+/// CKSyncEngine and serializes all CloudKit state transitions.
+final class RecordingMetadataCloudSync: @unchecked Sendable {
+    static let shared = RecordingMetadataCloudSync()
+
+    private let coordinator = RecordingMetadataCloudCoordinator()
+
+    private init() {}
+
+    func attach(store: RecordingStore, enabled: Bool) {
+        Task {
+            await coordinator.attach(store: store, enabled: enabled)
+        }
+    }
+
+    func setEnabled(_ enabled: Bool) {
+        Task {
+            await coordinator.setEnabled(enabled)
+        }
+    }
+
+    func scheduleRecordingSave(id: RecordingItem.ID) {
+        Task {
+            await coordinator.scheduleRecordingSave(id: id)
+        }
+    }
+
+    func scheduleRecordingDelete(id: RecordingItem.ID) {
+        Task {
+            await coordinator.scheduleRecordingDelete(id: id)
+        }
+    }
+
+    func scheduleCategorySave(id: UUID) {
+        Task {
+            await coordinator.scheduleCategorySave(id: id)
+        }
+    }
+
+    func scheduleCategoryDelete(id: UUID) {
+        Task {
+            await coordinator.scheduleCategoryDelete(id: id)
+        }
+    }
+
+    func synchronizeNow() {
+        Task {
+            await coordinator.synchronizeNow()
+        }
+    }
+}
+
+private final class WeakRecordingStoreReference: @unchecked Sendable {
+    weak var value: RecordingStore?
+
+    init(_ value: RecordingStore) {
+        self.value = value
+    }
+}
+
+private actor RecordingMetadataCloudCoordinator: CKSyncEngineDelegate {
+    private enum RecordKind {
+        case recording(UUID)
+        case category(UUID)
+    }
+
+    nonisolated private static let logger = Logger(
+        subsystem: "com.reddownloader.LiveTranscriber",
+        category: "ICloudSync"
+    )
+    private static let containerIdentifier = "iCloud.com.iamwilliamli.LiveTranscriber"
+    private static let zoneName = "LiveTranscriberMetadataV2"
+    private static let recordingRecordType = "LTRecordingV2"
+    private static let categoryRecordType = "LTCategoryV2"
+    private static let recordingPrefix = "recording_"
+    private static let categoryPrefix = "category_"
+    private static let schemaVersionField = "schemaVersion"
+    private static let payloadField = "payload"
+    private static let clientModifiedAtField = "clientModifiedAt"
+    private static let stateDefaultsKey = "CloudMetadataV2.CKSyncEngineState"
+    private static let systemFieldsDefaultsKey = "CloudMetadataV2.RecordSystemFields"
+    private static let syncedVersionsDefaultsKey = "CloudMetadataV2.SyncedClientVersions"
+    private static let completedDeletionsDefaultsKey = "CloudMetadataV2.CompletedDeletions"
+    private static let subscriptionID = "LiveTranscriberMetadataV2Subscription"
+
+    private let container = CKContainer(identifier: containerIdentifier)
+    private let defaults = UserDefaults.standard
+    private let zoneID = CKRecordZone.ID(zoneName: zoneName, ownerName: CKCurrentUserDefaultName)
+    private var storeReferences: [WeakRecordingStoreReference] = []
+    private var enabled = false
+    private var syncEngine: CKSyncEngine?
+    private var systemFieldsByRecordName: [String: Data] = [:]
+    private var syncedVersionsByRecordName: [String: Date] = [:]
+    private var completedDeletionRecordNames = Set<String>()
+    private var sendTask: Task<Void, Never>?
+
+    init() {
+        if let data = defaults.data(forKey: Self.systemFieldsDefaultsKey),
+           let decoded = try? JSONDecoder().decode([String: Data].self, from: data) {
+            systemFieldsByRecordName = decoded
+        }
+        if let data = defaults.data(forKey: Self.syncedVersionsDefaultsKey),
+           let decoded = try? JSONDecoder().decode([String: Date].self, from: data) {
+            syncedVersionsByRecordName = decoded
+        }
+        if let names = defaults.stringArray(forKey: Self.completedDeletionsDefaultsKey) {
+            completedDeletionRecordNames = Set(names)
+        }
+    }
+
+    func attach(store: RecordingStore, enabled: Bool) async {
+        storeReferences.removeAll { $0.value == nil }
+        if !storeReferences.contains(where: { $0.value === store }) {
+            storeReferences.append(WeakRecordingStoreReference(store))
+        }
+        if enabled && !self.enabled {
+            await setEnabled(true)
+        } else if storeReferences.count == 1 {
+            await setEnabled(enabled)
+        }
+    }
+
+    func setEnabled(_ enabled: Bool) async {
+        self.enabled = enabled
+        if enabled {
+            await startIfNeeded()
+            await seedLocalChanges()
+            await bootstrapSync()
+        } else {
+            sendTask?.cancel()
+            sendTask = nil
+            if let syncEngine {
+                await syncEngine.cancelOperations()
+            }
+            syncEngine = nil
+        }
+    }
+
+    func scheduleRecordingSave(id: RecordingItem.ID) async {
+        guard enabled else {
+            return
+        }
+        await startIfNeeded()
+        let recordID = recordID(forRecordingID: id)
+        completedDeletionRecordNames.remove(recordID.recordName)
+        persistBookkeeping()
+        add(.saveRecord(recordID))
+    }
+
+    func scheduleRecordingDelete(id: RecordingItem.ID) async {
+        guard enabled else {
+            return
+        }
+        await startIfNeeded()
+        let recordID = recordID(forRecordingID: id)
+        completedDeletionRecordNames.remove(recordID.recordName)
+        persistBookkeeping()
+        add(.deleteRecord(recordID))
+    }
+
+    func scheduleCategorySave(id: UUID) async {
+        guard enabled else {
+            return
+        }
+        await startIfNeeded()
+        let recordID = recordID(forCategoryID: id)
+        completedDeletionRecordNames.remove(recordID.recordName)
+        persistBookkeeping()
+        add(.saveRecord(recordID))
+    }
+
+    func scheduleCategoryDelete(id: UUID) async {
+        guard enabled else {
+            return
+        }
+        await startIfNeeded()
+        let recordID = recordID(forCategoryID: id)
+        completedDeletionRecordNames.remove(recordID.recordName)
+        persistBookkeeping()
+        add(.deleteRecord(recordID))
+    }
+
+    func synchronizeNow() async {
+        guard enabled else {
+            return
+        }
+        await startIfNeeded()
+        guard let syncEngine else {
+            return
+        }
+
+        do {
+            try await syncEngine.fetchChanges(
+                CKSyncEngine.FetchChangesOptions(scope: .zoneIDs([zoneID]))
+            )
+            await seedLocalChanges()
+            try await syncEngine.sendChanges(
+                CKSyncEngine.SendChangesOptions(scope: .zoneIDs([zoneID]))
+            )
+        } catch {
+            Self.logger.error("manual-sync-failed error=\(error.localizedDescription, privacy: .public)")
+        }
+    }
+
+    private func startIfNeeded() async {
+        guard enabled, syncEngine == nil else {
+            return
+        }
+
+        let stateSerialization: CKSyncEngine.State.Serialization?
+        if let data = defaults.data(forKey: Self.stateDefaultsKey) {
+            stateSerialization = try? JSONDecoder().decode(
+                CKSyncEngine.State.Serialization.self,
+                from: data
+            )
+        } else {
+            stateSerialization = nil
+        }
+
+        var configuration = CKSyncEngine.Configuration(
+            database: container.privateCloudDatabase,
+            stateSerialization: stateSerialization,
+            delegate: self
+        )
+        configuration.automaticallySync = true
+        configuration.subscriptionID = Self.subscriptionID
+        let engine = CKSyncEngine(configuration)
+        syncEngine = engine
+        engine.state.add(pendingDatabaseChanges: [.saveZone(CKRecordZone(zoneID: zoneID))])
+        Self.logger.info("metadata-sync-started zone=\(Self.zoneName, privacy: .public)")
+    }
+
+    private func seedLocalChanges() async {
+        guard enabled, let syncEngine, let store = primaryStore() else {
+            return
+        }
+
+        let recordingVersions = await store.persistedRecordingVersionsForCloudSync()
+        let deletedRecordingIDs = await store.tombstonedRecordingIDsForCloudSync()
+        let categoryVersions = await MainActor.run {
+            var versions: [UUID: Date] = [:]
+            for definition in RecordingCategoryCatalog.definitions() {
+                versions[definition.id] = max(
+                    versions[definition.id] ?? .distantPast,
+                    definition.modifiedAt
+                )
+            }
+            return versions
+        }
+        let deletedCategoryIDs = await MainActor.run {
+            RecordingCategoryCatalog.tombstonedIDs()
+        }
+
+        var changes = recordingVersions.compactMap { id, modifiedAt -> CKSyncEngine.PendingRecordZoneChange? in
+            let recordID = recordID(forRecordingID: id)
+            guard syncedVersionsByRecordName[recordID.recordName].map({ $0 >= modifiedAt }) != true else {
+                return nil
+            }
+            return .saveRecord(recordID)
+        }
+        changes.append(contentsOf: categoryVersions.compactMap { id, modifiedAt in
+            let recordID = recordID(forCategoryID: id)
+            guard syncedVersionsByRecordName[recordID.recordName].map({ $0 >= modifiedAt }) != true else {
+                return nil
+            }
+            return CKSyncEngine.PendingRecordZoneChange.saveRecord(recordID)
+        })
+        changes.append(contentsOf: deletedRecordingIDs.compactMap {
+            let recordID = recordID(forRecordingID: $0)
+            return completedDeletionRecordNames.contains(recordID.recordName)
+                ? nil
+                : CKSyncEngine.PendingRecordZoneChange.deleteRecord(recordID)
+        })
+        changes.append(contentsOf: deletedCategoryIDs.compactMap {
+            let recordID = recordID(forCategoryID: $0)
+            return completedDeletionRecordNames.contains(recordID.recordName)
+                ? nil
+                : CKSyncEngine.PendingRecordZoneChange.deleteRecord(recordID)
+        })
+        syncEngine.state.add(pendingRecordZoneChanges: changes)
+        if !changes.isEmpty {
+            Self.logger.info("metadata-seed pending=\(changes.count, privacy: .public)")
+        }
+    }
+
+    private func add(_ change: CKSyncEngine.PendingRecordZoneChange) {
+        guard let syncEngine else {
+            return
+        }
+        syncEngine.state.add(pendingRecordZoneChanges: [change])
+        scheduleSend()
+    }
+
+    private func scheduleSend() {
+        sendTask?.cancel()
+        sendTask = Task { [weak self] in
+            try? await Task.sleep(for: .milliseconds(350))
+            guard !Task.isCancelled else {
+                return
+            }
+            await self?.sendPendingChanges()
+        }
+    }
+
+    private func sendPendingChanges() async {
+        guard enabled, let syncEngine else {
+            return
+        }
+        do {
+            try await syncEngine.sendChanges(
+                CKSyncEngine.SendChangesOptions(scope: .zoneIDs([zoneID]))
+            )
+        } catch {
+            Self.logger.error("send-failed error=\(error.localizedDescription, privacy: .public)")
+        }
+    }
+
+    private func bootstrapSync() async {
+        guard enabled, let syncEngine else {
+            return
+        }
+        do {
+            // The first send creates the custom zone if needed. Fetching next
+            // establishes the server baseline before the final local merge.
+            try await syncEngine.sendChanges(
+                CKSyncEngine.SendChangesOptions(scope: .zoneIDs([zoneID]))
+            )
+            try await syncEngine.fetchChanges(
+                CKSyncEngine.FetchChangesOptions(scope: .zoneIDs([zoneID]))
+            )
+            await seedLocalChanges()
+            try await syncEngine.sendChanges(
+                CKSyncEngine.SendChangesOptions(scope: .zoneIDs([zoneID]))
+            )
+        } catch {
+            Self.logger.error("bootstrap-sync-failed error=\(error.localizedDescription, privacy: .public)")
+            scheduleSend()
+        }
+    }
+
+    func nextRecordZoneChangeBatch(
+        _ context: CKSyncEngine.SendChangesContext,
+        syncEngine: CKSyncEngine
+    ) async -> CKSyncEngine.RecordZoneChangeBatch? {
+        let pendingChanges = syncEngine.state.pendingRecordZoneChanges.filter {
+            context.options.scope.contains($0)
+        }
+        return await CKSyncEngine.RecordZoneChangeBatch(
+            pendingChanges: pendingChanges
+        ) { [weak self] recordID in
+            guard let self else {
+                return nil
+            }
+            return await self.recordToSave(for: recordID)
+        }
+    }
+
+    func handleEvent(_ event: CKSyncEngine.Event, syncEngine: CKSyncEngine) async {
+        switch event {
+        case .stateUpdate(let update):
+            persist(stateSerialization: update.stateSerialization)
+
+        case .accountChange(let change):
+            systemFieldsByRecordName = [:]
+            syncedVersionsByRecordName = [:]
+            completedDeletionRecordNames = []
+            persistBookkeeping()
+            Self.logger.info("account-change event=\(String(describing: change.changeType), privacy: .public)")
+            await seedLocalChanges()
+
+        case .fetchedDatabaseChanges(let changes):
+            if changes.deletions.contains(where: { $0.zoneID == zoneID }) {
+                systemFieldsByRecordName = [:]
+                syncedVersionsByRecordName = [:]
+                completedDeletionRecordNames = []
+                persistBookkeeping()
+                syncEngine.state.add(
+                    pendingDatabaseChanges: [.saveZone(CKRecordZone(zoneID: zoneID))]
+                )
+                await seedLocalChanges()
+            }
+
+        case .fetchedRecordZoneChanges(let changes):
+            await applyFetchedRecords(
+                changes.modifications.map(\.record),
+                deletions: changes.deletions.map { ($0.recordID, $0.recordType) }
+            )
+
+        case .sentDatabaseChanges(let changes):
+            for failure in changes.failedZoneSaves {
+                Self.logger.error(
+                    "zone-save-failed error=\(failure.error.localizedDescription, privacy: .public)"
+                )
+                syncEngine.state.add(pendingDatabaseChanges: [.saveZone(failure.zone)])
+            }
+
+        case .sentRecordZoneChanges(let changes):
+            for record in changes.savedRecords {
+                storeSystemFields(for: record)
+            }
+            for recordID in changes.deletedRecordIDs {
+                markDeletionCompleted(recordID)
+            }
+            for failure in changes.failedRecordSaves {
+                await handleFailedRecordSave(failure, syncEngine: syncEngine)
+            }
+            for (recordID, error) in changes.failedRecordDeletes {
+                guard error.code != .unknownItem else {
+                    markDeletionCompleted(recordID)
+                    continue
+                }
+                if error.code == .zoneNotFound {
+                    syncEngine.state.add(
+                        pendingDatabaseChanges: [.saveZone(CKRecordZone(zoneID: zoneID))]
+                    )
+                }
+                syncEngine.state.add(
+                    pendingRecordZoneChanges: [.deleteRecord(recordID)]
+                )
+            }
+
+        case .didFetchRecordZoneChanges(let event):
+            if let error = event.error {
+                Self.logger.error(
+                    "fetch-zone-failed zone=\(event.zoneID.zoneName, privacy: .public) error=\(error.localizedDescription, privacy: .public)"
+                )
+            }
+
+        case .willFetchChanges,
+             .willFetchRecordZoneChanges,
+             .didFetchChanges,
+             .willSendChanges,
+             .didSendChanges:
+            break
+
+        @unknown default:
+            Self.logger.notice("unknown-sync-event event=\(String(describing: event), privacy: .public)")
+        }
+    }
+
+    private func handleFailedRecordSave(
+        _ failure: CKSyncEngine.Event.SentRecordZoneChanges.FailedRecordSave,
+        syncEngine: CKSyncEngine
+    ) async {
+        let error = failure.error
+        let recordID = failure.record.recordID
+        Self.logger.error(
+            "record-save-failed record=\(recordID.recordName, privacy: .public) code=\(error.code.rawValue, privacy: .public) error=\(error.localizedDescription, privacy: .public)"
+        )
+
+        if error.code == .serverRecordChanged, let serverRecord = error.serverRecord {
+            storeSystemFields(for: serverRecord)
+            await applyFetchedRecords([serverRecord], deletions: [])
+            return
+        }
+
+        if error.code == .zoneNotFound {
+            syncEngine.state.add(
+                pendingDatabaseChanges: [.saveZone(CKRecordZone(zoneID: zoneID))]
+            )
+        } else if error.code == .unknownItem {
+            systemFieldsByRecordName[recordID.recordName] = nil
+            syncedVersionsByRecordName[recordID.recordName] = nil
+            persistBookkeeping()
+        }
+
+        if error.code == .zoneNotFound || error.code == .unknownItem {
+            syncEngine.state.add(pendingRecordZoneChanges: [.saveRecord(recordID)])
+        }
+    }
+
+    private func applyFetchedRecords(
+        _ records: [CKRecord],
+        deletions: [(recordID: CKRecord.ID, recordType: CKRecord.RecordType)]
+    ) async {
+        guard let store = primaryStore() else {
+            return
+        }
+        Self.logger.info(
+            "metadata-fetch saves=\(records.count, privacy: .public) deletes=\(deletions.count, privacy: .public)"
+        )
+        var didChangeLocalMetadata = false
+
+        // Categories are applied first so recording UUID references resolve in
+        // the same refresh even when CloudKit returns records in another order.
+        for record in records where record.recordType == Self.categoryRecordType {
+            storeSystemFields(for: record)
+            guard case .category(let id) = recordKind(for: record.recordID),
+                  let payload = record[Self.payloadField] as? Data,
+                  let modifiedAt = record[Self.clientModifiedAtField] as? Date,
+                  let definition = try? JSONDecoder().decode(
+                    RecordingCategoryDefinition.self,
+                    from: payload
+                  ),
+                  definition.id == id else {
+                continue
+            }
+
+            let isTombstoned = await MainActor.run {
+                RecordingCategoryCatalog.isTombstoned(id)
+            }
+            if isTombstoned {
+                completedDeletionRecordNames.remove(record.recordID.recordName)
+                persistBookkeeping()
+                syncEngine?.state.add(
+                    pendingRecordZoneChanges: [.deleteRecord(record.recordID)]
+                )
+                continue
+            }
+
+            let localModifiedAt = await MainActor.run {
+                RecordingCategoryCatalog.cloudPayload(for: id)?.modifiedAt
+            }
+            if let localModifiedAt, localModifiedAt > modifiedAt {
+                syncEngine?.state.add(
+                    pendingRecordZoneChanges: [.saveRecord(record.recordID)]
+                )
+                continue
+            }
+
+            let applied = await MainActor.run {
+                RecordingCategoryCatalog.applyRemote(definition)
+            }
+            Self.logger.info(
+                "metadata-category id=\(id.uuidString, privacy: .public) action=\(applied ? "applied" : "unchanged", privacy: .public)"
+            )
+            didChangeLocalMetadata = applied || didChangeLocalMetadata
+        }
+
+        for record in records where record.recordType == Self.recordingRecordType {
+            storeSystemFields(for: record)
+            guard case .recording(let id) = recordKind(for: record.recordID),
+                  let payload = record[Self.payloadField] as? Data,
+                  let modifiedAt = record[Self.clientModifiedAtField] as? Date else {
+                continue
+            }
+
+            if await store.isRecordingTombstoned(id) {
+                completedDeletionRecordNames.remove(record.recordID.recordName)
+                persistBookkeeping()
+                syncEngine?.state.add(
+                    pendingRecordZoneChanges: [.deleteRecord(record.recordID)]
+                )
+                continue
+            }
+
+            let applied = await store.applyRemoteRecording(
+                id: id,
+                payload: payload,
+                modifiedAt: modifiedAt
+            )
+            if applied {
+                Self.logger.info(
+                    "metadata-recording id=\(id.uuidString, privacy: .public) action=applied"
+                )
+                didChangeLocalMetadata = true
+            } else {
+                Self.logger.info(
+                    "metadata-recording id=\(id.uuidString, privacy: .public) action=keep-local"
+                )
+                syncEngine?.state.add(
+                    pendingRecordZoneChanges: [.saveRecord(record.recordID)]
+                )
+            }
+        }
+
+        for deletion in deletions {
+            Self.logger.info(
+                "metadata-delete record=\(deletion.recordID.recordName, privacy: .public)"
+            )
+            systemFieldsByRecordName[deletion.recordID.recordName] = nil
+            syncedVersionsByRecordName[deletion.recordID.recordName] = nil
+            completedDeletionRecordNames.insert(deletion.recordID.recordName)
+            syncEngine?.state.remove(
+                pendingRecordZoneChanges: [.saveRecord(deletion.recordID)]
+            )
+            switch recordKind(for: deletion.recordID) {
+            case .recording(let id):
+                await store.applyRemoteRecordingDeletion(id: id)
+                didChangeLocalMetadata = true
+            case .category(let id):
+                let changed = await MainActor.run {
+                    RecordingCategoryCatalog.applyRemoteDeletion(id: id)
+                }
+                didChangeLocalMetadata = changed || didChangeLocalMetadata
+            case nil:
+                break
+            }
+        }
+        persistBookkeeping()
+
+        if didChangeLocalMetadata {
+            for liveStore in liveStores() {
+                await liveStore.reload(synchronizeMetadata: false)
+            }
+        }
+    }
+
+    private func recordToSave(for recordID: CKRecord.ID) async -> CKRecord? {
+        let payload: (data: Data, modifiedAt: Date)?
+        let recordType: CKRecord.RecordType
+
+        switch recordKind(for: recordID) {
+        case .recording(let id):
+            guard let store = primaryStore() else {
+                return nil
+            }
+            payload = await store.cloudPayload(forRecordingID: id)
+            recordType = Self.recordingRecordType
+
+        case .category(let id):
+            payload = await MainActor.run {
+                RecordingCategoryCatalog.cloudPayload(for: id)
+            }
+            recordType = Self.categoryRecordType
+
+        case nil:
+            return nil
+        }
+
+        guard let payload else {
+            return nil
+        }
+        let record = restoredRecord(for: recordID)
+            ?? CKRecord(recordType: recordType, recordID: recordID)
+        record[Self.schemaVersionField] = 2 as CKRecordValue
+        record[Self.payloadField] = payload.data as CKRecordValue
+        record[Self.clientModifiedAtField] = payload.modifiedAt as CKRecordValue
+        return record
+    }
+
+    private func recordID(forRecordingID id: RecordingItem.ID) -> CKRecord.ID {
+        CKRecord.ID(
+            recordName: Self.recordingPrefix + id.uuidString.lowercased(),
+            zoneID: zoneID
+        )
+    }
+
+    private func recordID(forCategoryID id: UUID) -> CKRecord.ID {
+        CKRecord.ID(
+            recordName: Self.categoryPrefix + id.uuidString.lowercased(),
+            zoneID: zoneID
+        )
+    }
+
+    private func recordKind(for recordID: CKRecord.ID) -> RecordKind? {
+        let name = recordID.recordName
+        if name.hasPrefix(Self.recordingPrefix),
+           let id = UUID(uuidString: String(name.dropFirst(Self.recordingPrefix.count))) {
+            return .recording(id)
+        }
+        if name.hasPrefix(Self.categoryPrefix),
+           let id = UUID(uuidString: String(name.dropFirst(Self.categoryPrefix.count))) {
+            return .category(id)
+        }
+        return nil
+    }
+
+    private func liveStores() -> [RecordingStore] {
+        storeReferences.removeAll { $0.value == nil }
+        return storeReferences.compactMap(\.value)
+    }
+
+    private func primaryStore() -> RecordingStore? {
+        liveStores().first
+    }
+
+    private func storeSystemFields(for record: CKRecord) {
+        let archiver = NSKeyedArchiver(requiringSecureCoding: true)
+        record.encodeSystemFields(with: archiver)
+        archiver.finishEncoding()
+        systemFieldsByRecordName[record.recordID.recordName] = archiver.encodedData
+        if let modifiedAt = record[Self.clientModifiedAtField] as? Date {
+            syncedVersionsByRecordName[record.recordID.recordName] = modifiedAt
+        }
+        completedDeletionRecordNames.remove(record.recordID.recordName)
+        persistBookkeeping()
+    }
+
+    private func restoredRecord(for recordID: CKRecord.ID) -> CKRecord? {
+        guard let data = systemFieldsByRecordName[recordID.recordName],
+              let unarchiver = try? NSKeyedUnarchiver(forReadingFrom: data) else {
+            return nil
+        }
+        unarchiver.requiresSecureCoding = true
+        let record = CKRecord(coder: unarchiver)
+        unarchiver.finishDecoding()
+        guard record?.recordID == recordID else {
+            return nil
+        }
+        return record
+    }
+
+    private func persist(stateSerialization: CKSyncEngine.State.Serialization) {
+        if let data = try? JSONEncoder().encode(stateSerialization) {
+            defaults.set(data, forKey: Self.stateDefaultsKey)
+        }
+    }
+
+    private func markDeletionCompleted(_ recordID: CKRecord.ID) {
+        systemFieldsByRecordName[recordID.recordName] = nil
+        syncedVersionsByRecordName[recordID.recordName] = nil
+        completedDeletionRecordNames.insert(recordID.recordName)
+        persistBookkeeping()
+    }
+
+    private func persistBookkeeping() {
+        if let data = try? JSONEncoder().encode(systemFieldsByRecordName) {
+            defaults.set(data, forKey: Self.systemFieldsDefaultsKey)
+        }
+        if let data = try? JSONEncoder().encode(syncedVersionsByRecordName) {
+            defaults.set(data, forKey: Self.syncedVersionsDefaultsKey)
+        }
+        defaults.set(
+            completedDeletionRecordNames.sorted(),
+            forKey: Self.completedDeletionsDefaultsKey
+        )
     }
 }

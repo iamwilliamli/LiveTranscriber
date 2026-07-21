@@ -36,11 +36,16 @@ struct MOSSLocalModelStatus: Equatable {
 
 enum MOSSDecoderSegmentDuration: Int, CaseIterable, Identifiable {
     static let defaultsKey = "moss_local.decoder_segment_duration_seconds"
-    static let defaultValue: MOSSDecoderSegmentDuration = .seconds30
+    static var defaultValue: MOSSDecoderSegmentDuration {
+        MOSSDecoderDeviceRecommendation.current.duration
+    }
 
     case seconds30 = 30
     case seconds60 = 60
     case seconds90 = 90
+    case seconds120 = 120
+    case seconds180 = 180
+    case seconds300 = 300
 
     var id: Int { rawValue }
 
@@ -56,9 +61,44 @@ enum MOSSDecoderSegmentDuration: Int, CaseIterable, Identifiable {
     }
 
     static var selected: MOSSDecoderSegmentDuration {
-        MOSSDecoderSegmentDuration(
-            rawValue: UserDefaults.standard.integer(forKey: defaultsKey)
-        ) ?? defaultValue
+        guard let storedValue = UserDefaults.standard.object(forKey: defaultsKey) as? NSNumber else {
+            return defaultValue
+        }
+        return MOSSDecoderSegmentDuration(rawValue: storedValue.intValue) ?? defaultValue
+    }
+}
+
+struct MOSSDecoderDeviceRecommendation: Equatable {
+    let duration: MOSSDecoderSegmentDuration
+    let physicalMemoryBytes: UInt64
+
+    static var current: MOSSDecoderDeviceRecommendation {
+        let physicalMemoryBytes = ProcessInfo.processInfo.physicalMemory
+        return MOSSDecoderDeviceRecommendation(
+            duration: recommendedDuration(forPhysicalMemoryBytes: physicalMemoryBytes),
+            physicalMemoryBytes: physicalMemoryBytes
+        )
+    }
+
+    static func recommendedDuration(forPhysicalMemoryBytes byteCount: UInt64) -> MOSSDecoderSegmentDuration {
+        let gibibyte: UInt64 = 1_073_741_824
+        switch byteCount {
+        case ..<(5 * gibibyte):
+            return .seconds30
+        case ..<(7 * gibibyte):
+            return .seconds90
+        case ..<(10 * gibibyte):
+            return .seconds120
+        default:
+            return .seconds180
+        }
+    }
+
+    var physicalMemoryText: String {
+        ByteCountFormatter.string(
+            fromByteCount: Int64(clamping: physicalMemoryBytes),
+            countStyle: .memory
+        )
     }
 }
 

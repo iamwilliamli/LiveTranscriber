@@ -900,7 +900,9 @@ struct RecordingsView: View {
             RecordingCategoryFolder(
                 id: categoryName,
                 name: categoryName,
-                count: store.recordings.filter { $0.categoryName == categoryName }.count,
+                count: store.recordings.filter {
+                    $0.categoryName?.normalizedForRecordingSearch == categoryName.normalizedForRecordingSearch
+                }.count,
                 isUncategorized: false,
                 appearance: categoryAppearances[categoryName.normalizedForRecordingSearch] ?? .defaultValue
             )
@@ -1171,7 +1173,7 @@ struct RecordingsView: View {
             }
             Button(localized(L10n.Common.cancel), role: .cancel) {}
         } message: {
-            Text(localizedFormat(L10n.Recordings.deleteConfirmationFormat, deleteRequest?.item.audioFileName ?? ""))
+            Text(localizedFormat(L10n.Recordings.deleteConfirmationFormat, deleteRequest?.item.displayName ?? ""))
         }
         .alert(
             localized(L10n.Recordings.deleteCategory),
@@ -2113,6 +2115,7 @@ private enum SpeechLocaleReleaseOperation {
 private struct TranscriptLineEditRequest: Identifiable {
     let lineID: String
     let timeText: String
+    let originalSpeakerID: String?
 
     var id: String {
         lineID
@@ -2121,12 +2124,19 @@ private struct TranscriptLineEditRequest: Identifiable {
     init(line: StoredTranscriptLine) {
         lineID = line.id
         timeText = line.timeText
+        originalSpeakerID = line.speaker
     }
 
     init(line: TranscriptionLine) {
         lineID = line.id.uuidString
         timeText = line.timestampText
+        originalSpeakerID = nil
     }
+}
+
+private struct TranscriptSpeakerPropagationRequest: Identifiable {
+    let id = UUID()
+    let followingLines: [StoredTranscriptLine]
 }
 
 private struct RecordingDeleteRequest: Identifiable {
@@ -2137,42 +2147,109 @@ private struct RecordingDeleteRequest: Identifiable {
     }
 }
 
-/// Central store for the user's category names. Recording assignments live on
-/// `RecordingItem.categoryName`; this registry additionally keeps categories
-/// that currently have no recordings, and is the single place that mutates
-/// the persisted list so create/rename/delete stay consistent across entry
-/// points (folder list, organizer, edit sheet, save sheet).
+/// Local cache for CloudKit-backed category records. Recording assignments use
+/// `RecordingItem.categoryID`; `categoryName` is only a resolved display value.
+/// Keeping the UUID stable means renaming a category never rewrites every
+/// recording and cannot race a second device's metadata refresh.
 enum RecordingCategoryCatalog {
     static let customCategoriesDefaultsKey = "Recordings.customCategoriesJSON"
+    static let definitionsDefaultsKey = "Recordings.categoryDefinitionsV2JSON"
+    static let deletedCategoryTombstonesDefaultsKey = "Recordings.deletedCategoryTombstonesV2JSON"
 
-    static func customNames() -> [String] {
-        guard let json = UserDefaults.standard.string(forKey: customCategoriesDefaultsKey),
-              let data = json.data(using: .utf8),
-              let decoded = try? JSONDecoder().decode([String].self, from: data) else {
+    static func definitions() -> [RecordingCategoryDefinition] {
+        guard let data = UserDefaults.standard.data(forKey: definitionsDefaultsKey),
+              let decoded = try? JSONDecoder().decode([RecordingCategoryDefinition].self, from: data) else {
             return []
         }
-        return normalized(decoded)
+        let tombstones = deletedCategoryTombstones()
+        return decoded
+            .filter { tombstones[$0.id] == nil }
+            .map(\.normalized)
+            .sorted { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
+    }
+
+    static func customNames() -> [String] {
+        definitions().map(\.name)
     }
 
     static func allNames(recordings: [RecordingItem]) -> [String] {
         normalized(recordings.compactMap(\.categoryName) + customNames())
     }
 
-    static func register(_ name: String?) {
-        guard let cleaned = RecordingItem.normalizedCategoryName(name ?? "") else {
-            return
+    static func definition(named name: String?) -> RecordingCategoryDefinition? {
+        guard let cleaned = RecordingItem.normalizedCategoryName(name), !cleaned.isEmpty else {
+            return nil
         }
-        write(customNames() + [cleaned])
+        let key = cleaned.normalizedForRecordingSearch
+        return definitions().first { $0.name.normalizedForRecordingSearch == key }
+    }
+
+    static func definition(id: UUID?) -> RecordingCategoryDefinition? {
+        guard let id else {
+            return nil
+        }
+        return definitions().first { $0.id == id }
+    }
+
+    @discardableResult
+    static func register(_ name: String?) -> RecordingCategoryDefinition? {
+        guard let cleaned = RecordingItem.normalizedCategoryName(name ?? "") else {
+            return nil
+        }
+        if let existing = definition(named: cleaned) {
+            return existing
+        }
+
+        let definition = RecordingCategoryDefinition(
+            id: UUID(),
+            name: cleaned,
+            appearance: .defaultValue,
+            modifiedAt: Date()
+        )
+        writeDefinitions(definitions() + [definition])
+        RecordingMetadataCloudSync.shared.scheduleCategorySave(id: definition.id)
+        return definition
     }
 
     static func remove(_ name: String) {
         let key = name.normalizedForRecordingSearch
-        write(customNames().filter { $0.normalizedForRecordingSearch != key })
+        let current = definitions()
+        let removedIDs = current
+            .filter { $0.name.normalizedForRecordingSearch == key }
+            .map(\.id)
+        guard !removedIDs.isEmpty else {
+            return
+        }
+        addDeletedCategoryTombstones(removedIDs)
+        writeDefinitions(current.filter { !removedIDs.contains($0.id) })
+        for id in removedIDs {
+            RecordingMetadataCloudSync.shared.scheduleCategoryDelete(id: id)
+        }
     }
 
     static func rename(_ oldName: String, to newName: String) {
         let oldKey = oldName.normalizedForRecordingSearch
-        write(customNames().filter { $0.normalizedForRecordingSearch != oldKey } + [newName])
+        guard let cleanedName = RecordingItem.normalizedCategoryName(newName) else {
+            return
+        }
+        var current = definitions()
+        let matchingIndices = current.indices.filter {
+            current[$0].name.normalizedForRecordingSearch == oldKey
+        }
+        guard !matchingIndices.isEmpty else {
+            _ = register(cleanedName)
+            return
+        }
+        let now = Date()
+        let ids = matchingIndices.map { index in
+            current[index].name = cleanedName
+            current[index].modifiedAt = now
+            return current[index].id
+        }
+        writeDefinitions(current)
+        for id in ids {
+            RecordingMetadataCloudSync.shared.scheduleCategorySave(id: id)
+        }
     }
 
     static func normalized(_ names: [String]) -> [String] {
@@ -2195,18 +2272,137 @@ enum RecordingCategoryCatalog {
         }
     }
 
-    private static func write(_ names: [String]) {
-        let cleaned = normalized(names)
-        guard let data = try? JSONEncoder().encode(cleaned),
-              let json = String(data: data, encoding: .utf8) else {
+    static func updateAppearance(
+        _ appearance: RecordingCategoryAppearance,
+        for name: String
+    ) {
+        guard let existing = definition(named: name) ?? register(name) else {
             return
         }
-        UserDefaults.standard.set(json, forKey: customCategoriesDefaultsKey)
-        RecordingCategoryCloudSync.shared.localStateDidChange()
+        var current = definitions()
+        guard let index = current.firstIndex(where: { $0.id == existing.id }) else {
+            return
+        }
+        current[index].appearance = appearance.normalized
+        current[index].modifiedAt = Date()
+        writeDefinitions(current)
+        RecordingMetadataCloudSync.shared.scheduleCategorySave(id: existing.id)
+    }
+
+    @discardableResult
+    static func applyRemote(_ remote: RecordingCategoryDefinition) -> Bool {
+        let remote = remote.normalized
+        guard !isTombstoned(remote.id) else {
+            return false
+        }
+        var current = definitions()
+        if let index = current.firstIndex(where: { $0.id == remote.id }) {
+            guard current[index].modifiedAt <= remote.modifiedAt else {
+                return false
+            }
+            current[index] = remote
+        } else {
+            current.append(remote)
+        }
+        writeDefinitions(current)
+        return true
+    }
+
+    @discardableResult
+    static func applyRemoteDeletion(id: UUID) -> Bool {
+        let current = definitions()
+        let existed = current.contains(where: { $0.id == id })
+        addDeletedCategoryTombstones([id])
+        writeDefinitions(current.filter { $0.id != id })
+        return existed
+    }
+
+    static func cloudPayload(for id: UUID) -> (data: Data, modifiedAt: Date)? {
+        guard !isTombstoned(id),
+              let definition = definition(id: id),
+              let data = try? JSONEncoder().encode(definition.cloudPayload) else {
+            return nil
+        }
+        return (data, definition.modifiedAt)
+    }
+
+    static func tombstonedIDs() -> [UUID] {
+        Array(deletedCategoryTombstones().keys)
+    }
+
+    static func isTombstoned(_ id: UUID) -> Bool {
+        deletedCategoryTombstones()[id] != nil
+    }
+
+    private static func deletedCategoryTombstones() -> [UUID: Date] {
+        guard let data = UserDefaults.standard.data(forKey: deletedCategoryTombstonesDefaultsKey),
+              let stored = try? JSONDecoder().decode([String: Date].self, from: data) else {
+            return [:]
+        }
+        return Dictionary(uniqueKeysWithValues: stored.compactMap { key, date in
+            UUID(uuidString: key).map { ($0, date) }
+        })
+    }
+
+    private static func addDeletedCategoryTombstones(_ ids: [UUID]) {
+        var tombstones = deletedCategoryTombstones()
+        let now = Date()
+        for id in ids {
+            tombstones[id] = now
+        }
+        let stored = Dictionary(uniqueKeysWithValues: tombstones.map {
+            ($0.key.uuidString, $0.value)
+        })
+        if let data = try? JSONEncoder().encode(stored) {
+            UserDefaults.standard.set(data, forKey: deletedCategoryTombstonesDefaultsKey)
+        }
+    }
+
+    private static func writeDefinitions(_ definitions: [RecordingCategoryDefinition]) {
+        let normalizedDefinitions = definitions.map(\.normalized)
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = [.sortedKeys]
+        var appearances: [String: RecordingCategoryAppearance] = [:]
+        for definition in normalizedDefinitions.sorted(by: { $0.modifiedAt < $1.modifiedAt }) {
+            appearances[definition.name.normalizedForRecordingSearch] = definition.appearance
+        }
+        guard let definitionsData = try? encoder.encode(normalizedDefinitions),
+              let namesData = try? encoder.encode(normalized(normalizedDefinitions.map(\.name))),
+              let namesJSON = String(data: namesData, encoding: .utf8),
+              let appearancesData = try? encoder.encode(appearances),
+              let appearancesJSON = String(data: appearancesData, encoding: .utf8) else {
+            return
+        }
+        let defaults = UserDefaults.standard
+        defaults.set(definitionsData, forKey: definitionsDefaultsKey)
+        // These two keys remain local SwiftUI invalidation caches. They are no
+        // longer synchronized through iCloud KVS.
+        defaults.set(namesJSON, forKey: customCategoriesDefaultsKey)
+        defaults.set(appearancesJSON, forKey: RecordingCategoryAppearanceCatalog.defaultsKey)
     }
 }
 
-private struct RecordingCategoryAppearance: Codable, Hashable {
+struct RecordingCategoryDefinition: Codable, Hashable, Identifiable, Sendable {
+    let id: UUID
+    var name: String
+    var appearance: RecordingCategoryAppearance
+    var modifiedAt: Date
+
+    var normalized: RecordingCategoryDefinition {
+        RecordingCategoryDefinition(
+            id: id,
+            name: RecordingItem.normalizedCategoryName(name) ?? name,
+            appearance: appearance.normalized,
+            modifiedAt: modifiedAt
+        )
+    }
+
+    var cloudPayload: RecordingCategoryDefinition {
+        normalized
+    }
+}
+
+struct RecordingCategoryAppearance: Codable, Hashable, Sendable {
     static let defaultValue = RecordingCategoryAppearance(
         iconName: "folder.fill",
         red: 0.96,
@@ -2275,7 +2471,7 @@ private struct RecordingCategoryAppearance: Codable, Hashable {
     }
 }
 
-private enum RecordingCategoryAppearanceCatalog {
+enum RecordingCategoryAppearanceCatalog {
     static let defaultsKey = "Recordings.categoryAppearancesJSON"
 
     static func decode(_ json: String) -> [String: RecordingCategoryAppearance] {
@@ -2287,7 +2483,11 @@ private enum RecordingCategoryAppearanceCatalog {
     }
 
     static func all() -> [String: RecordingCategoryAppearance] {
-        decode(UserDefaults.standard.string(forKey: defaultsKey) ?? "{}")
+        var appearances: [String: RecordingCategoryAppearance] = [:]
+        for definition in RecordingCategoryCatalog.definitions().sorted(by: { $0.modifiedAt < $1.modifiedAt }) {
+            appearances[definition.name.normalizedForRecordingSearch] = definition.appearance
+        }
+        return appearances
     }
 
     static func appearance(for categoryName: String) -> RecordingCategoryAppearance {
@@ -2299,241 +2499,12 @@ private enum RecordingCategoryAppearanceCatalog {
         for categoryName: String,
         removing oldCategoryName: String? = nil
     ) {
-        var appearances = all()
-        if let oldCategoryName {
-            appearances.removeValue(forKey: oldCategoryName.normalizedForRecordingSearch)
-        }
-        appearances[categoryName.normalizedForRecordingSearch] = appearance.normalized
-        write(appearances)
+        RecordingCategoryCatalog.updateAppearance(appearance, for: categoryName)
     }
 
     static func remove(_ categoryName: String) {
-        var appearances = all()
-        appearances.removeValue(forKey: categoryName.normalizedForRecordingSearch)
-        write(appearances)
-    }
-
-    private static func write(_ appearances: [String: RecordingCategoryAppearance]) {
-        let encoder = JSONEncoder()
-        encoder.outputFormatting = [.sortedKeys]
-        guard let data = try? encoder.encode(appearances),
-              let json = String(data: data, encoding: .utf8) else {
-            return
-        }
-        UserDefaults.standard.set(json, forKey: defaultsKey)
-        RecordingCategoryCloudSync.shared.localStateDidChange()
-    }
-}
-
-private struct RecordingCategoryCloudSnapshot: Codable {
-    var schemaVersion: Int
-    var updatedAt: Date
-    var categoryNames: [String]
-    var appearances: [String: RecordingCategoryAppearance]
-}
-
-/// Keeps the small category catalog in iCloud KVS while `@AppStorage` remains
-/// the immediate local source for SwiftUI. Recording assignments continue to
-/// sync through the CloudKit-backed `RecordingIndexRecord`.
-final class RecordingCategoryCloudSync: @unchecked Sendable {
-    static let shared = RecordingCategoryCloudSync()
-
-    private static let snapshotKey = "Recordings.categoryCatalog.cloudSnapshot.v1"
-    private static let localRevisionDefaultsKey = "Recordings.categoryCatalog.localRevision.v1"
-
-    private let cloudStore: NSUbiquitousKeyValueStore
-    private let defaults: UserDefaults
-    private let encoder = JSONEncoder()
-    private let decoder = JSONDecoder()
-    private let logger = Logger(
-        subsystem: "com.reddownloader.LiveTranscriber",
-        category: "CategoryCloudSync"
-    )
-    private var isEnabled = false
-    private var changeObserver: NSObjectProtocol?
-
-    private init(
-        cloudStore: NSUbiquitousKeyValueStore = .default,
-        defaults: UserDefaults = .standard
-    ) {
-        self.cloudStore = cloudStore
-        self.defaults = defaults
-        encoder.outputFormatting = [.sortedKeys]
-    }
-
-    deinit {
-        if let changeObserver {
-            NotificationCenter.default.removeObserver(changeObserver)
-        }
-    }
-
-    func setEnabled(_ enabled: Bool) {
-        guard enabled != isEnabled else {
-            return
-        }
-
-        isEnabled = enabled
-        if enabled {
-            changeObserver = NotificationCenter.default.addObserver(
-                forName: NSUbiquitousKeyValueStore.didChangeExternallyNotification,
-                object: cloudStore,
-                queue: .main
-            ) { [weak self] notification in
-                self?.handleCloudStoreChange(notification)
-            }
-            cloudStore.synchronize()
-            reconcileInitialState()
-        } else if let changeObserver {
-            NotificationCenter.default.removeObserver(changeObserver)
-            self.changeObserver = nil
-        }
-    }
-
-    func localStateDidChange() {
-        let revision = Date()
-        defaults.set(revision.timeIntervalSince1970, forKey: Self.localRevisionDefaultsKey)
-        guard isEnabled else {
-            return
-        }
-        publishLocalState(updatedAt: revision)
-    }
-
-    private func reconcileInitialState() {
-        let remoteSnapshot = cloudSnapshot()
-        let localRevision = localRevisionDate()
-
-        if let remoteSnapshot {
-            if let localRevision,
-               localRevision > remoteSnapshot.updatedAt,
-               hasExplicitLocalState {
-                publishLocalState(updatedAt: localRevision)
-            } else if localRevision == nil, hasLocalCatalogData {
-                let mergedSnapshot = merging(remoteSnapshotWithLocalState: remoteSnapshot)
-                apply(mergedSnapshot)
-                publishLocalState(updatedAt: mergedSnapshot.updatedAt)
-            } else {
-                apply(remoteSnapshot)
-            }
-        } else if hasExplicitLocalState {
-            let revision = localRevision ?? Date()
-            publishLocalState(updatedAt: revision)
-        }
-    }
-
-    private func handleCloudStoreChange(_ notification: Notification) {
-        guard isEnabled else {
-            return
-        }
-        if let changedKeys = notification.userInfo?[NSUbiquitousKeyValueStoreChangedKeysKey] as? [String],
-           !changedKeys.contains(Self.snapshotKey) {
-            return
-        }
-        guard let remoteSnapshot = cloudSnapshot() else {
-            return
-        }
-
-        if localRevisionDate() == nil, hasLocalCatalogData {
-            let mergedSnapshot = merging(remoteSnapshotWithLocalState: remoteSnapshot)
-            apply(mergedSnapshot)
-            publishLocalState(updatedAt: mergedSnapshot.updatedAt)
-            return
-        }
-
-        if let localRevision = localRevisionDate(),
-           localRevision > remoteSnapshot.updatedAt {
-            publishLocalState(updatedAt: localRevision)
-            return
-        }
-        apply(remoteSnapshot)
-    }
-
-    private var hasExplicitLocalState: Bool {
-        localRevisionDate() != nil || hasLocalCatalogData
-    }
-
-    private var hasLocalCatalogData: Bool {
-        !RecordingCategoryCatalog.customNames().isEmpty
-            || !RecordingCategoryAppearanceCatalog.all().isEmpty
-    }
-
-    private func localRevisionDate() -> Date? {
-        let value = defaults.double(forKey: Self.localRevisionDefaultsKey)
-        return value > 0 ? Date(timeIntervalSince1970: value) : nil
-    }
-
-    private func publishLocalState(updatedAt: Date) {
-        let snapshot = RecordingCategoryCloudSnapshot(
-            schemaVersion: 1,
-            updatedAt: updatedAt,
-            categoryNames: RecordingCategoryCatalog.customNames(),
-            appearances: RecordingCategoryAppearanceCatalog.all()
-        )
-        do {
-            let data = try encoder.encode(snapshot)
-            cloudStore.set(data, forKey: Self.snapshotKey)
-            cloudStore.synchronize()
-            logger.debug(
-                "Published category snapshot categories=\(snapshot.categoryNames.count, privacy: .public) appearances=\(snapshot.appearances.count, privacy: .public)"
-            )
-        } catch {
-            logger.error("Failed to encode category snapshot: \(error.localizedDescription, privacy: .public)")
-        }
-    }
-
-    private func merging(
-        remoteSnapshotWithLocalState remoteSnapshot: RecordingCategoryCloudSnapshot
-    ) -> RecordingCategoryCloudSnapshot {
-        var appearances = RecordingCategoryAppearanceCatalog.all()
-        appearances.merge(remoteSnapshot.appearances.mapValues(\.normalized)) { _, remote in
-            remote
-        }
-        return RecordingCategoryCloudSnapshot(
-            schemaVersion: 1,
-            updatedAt: Date(),
-            categoryNames: RecordingCategoryCatalog.normalized(
-                remoteSnapshot.categoryNames + RecordingCategoryCatalog.customNames()
-            ),
-            appearances: appearances
-        )
-    }
-
-    private func cloudSnapshot() -> RecordingCategoryCloudSnapshot? {
-        guard let data = cloudStore.data(forKey: Self.snapshotKey) else {
-            return nil
-        }
-        do {
-            let snapshot = try decoder.decode(RecordingCategoryCloudSnapshot.self, from: data)
-            guard snapshot.schemaVersion == 1 else {
-                return nil
-            }
-            return snapshot
-        } catch {
-            logger.error("Failed to decode category snapshot: \(error.localizedDescription, privacy: .public)")
-            return nil
-        }
-    }
-
-    private func apply(_ snapshot: RecordingCategoryCloudSnapshot) {
-        let categoryNames = RecordingCategoryCatalog.normalized(snapshot.categoryNames)
-        let appearances = snapshot.appearances.mapValues(\.normalized)
-
-        do {
-            let namesData = try encoder.encode(categoryNames)
-            let appearancesData = try encoder.encode(appearances)
-            guard let namesJSON = String(data: namesData, encoding: .utf8),
-                  let appearancesJSON = String(data: appearancesData, encoding: .utf8) else {
-                return
-            }
-
-            defaults.set(namesJSON, forKey: RecordingCategoryCatalog.customCategoriesDefaultsKey)
-            defaults.set(appearancesJSON, forKey: RecordingCategoryAppearanceCatalog.defaultsKey)
-            defaults.set(snapshot.updatedAt.timeIntervalSince1970, forKey: Self.localRevisionDefaultsKey)
-            logger.debug(
-                "Applied category snapshot categories=\(categoryNames.count, privacy: .public) appearances=\(appearances.count, privacy: .public)"
-            )
-        } catch {
-            logger.error("Failed to apply category snapshot: \(error.localizedDescription, privacy: .public)")
-        }
+        // The category record owns its appearance, so deleting the category
+        // already removes the appearance atomically.
     }
 }
 
@@ -2968,7 +2939,7 @@ private struct RecordingCategoryOrganizerSheet: View {
                 ForEach(store.recordings) { item in
                     HStack(spacing: 12) {
                         VStack(alignment: .leading, spacing: 3) {
-                            Text((item.audioFileName as NSString).deletingPathExtension)
+                            Text(item.displayName)
                                 .font(.redditSans(.subheadline, weight: .semibold))
                                 .lineLimit(1)
                                 .truncationMode(.middle)
@@ -3047,7 +3018,7 @@ private struct RecordingCategoryAddRecordingsSheet: View {
                     ForEach(candidateRecordings) { item in
                         HStack(spacing: 12) {
                             VStack(alignment: .leading, spacing: 3) {
-                                Text((item.audioFileName as NSString).deletingPathExtension)
+                                Text(item.displayName)
                                     .font(.redditSans(.subheadline, weight: .semibold))
                                     .lineLimit(1)
                                     .truncationMode(.middle)
@@ -3320,7 +3291,7 @@ private struct RecordingMapPoint: Identifiable {
     init(item: RecordingItem, location: RecordingLocation) {
         id = item.id
         self.item = item
-        title = (item.audioFileName as NSString).deletingPathExtension
+        title = item.displayName
         durationText = TranscriptionLine.formatTimestamp(Double(item.durationSeconds))
         createdAt = item.createdAt
         self.location = location
@@ -3578,7 +3549,7 @@ private struct RecordingRow: View {
                 .padding(.top, 1)
 
                 VStack(alignment: .leading, spacing: 4) {
-                    Text((item.audioFileName as NSString).deletingPathExtension)
+                    Text(item.displayName)
                         .font(.redditSans(.headline, weight: .semibold))
                         .foregroundStyle(.primary)
                         .lineLimit(1)
@@ -3988,6 +3959,7 @@ struct RecordingDetailView: View {
     @State private var isSavingSummaryEdit = false
     @State private var editErrorMessage: String?
     @State private var transcriptLineEditRequest: TranscriptLineEditRequest?
+    @State private var transcriptSpeakerPropagationRequest: TranscriptSpeakerPropagationRequest?
     @State private var editedTranscriptLineText = ""
     @State private var editedTranscriptLineSpeakerID: String?
     @State private var isSavingTranscriptLineEdit = false
@@ -4021,8 +3993,7 @@ struct RecordingDetailView: View {
     }
 
     private var currentItemDisplayTitle: String {
-        let title = (currentItem.audioFileName as NSString).deletingPathExtension
-        return title.isEmpty ? currentItem.audioFileName : title
+        currentItem.displayName
     }
 
     private var selectedSummaryProvider: RecordingSummaryProvider {
@@ -4352,12 +4323,48 @@ struct RecordingDetailView: View {
                 isSaving: isSavingTranscriptLineEdit,
                 onSave: saveTranscriptLineEdit,
                 onCancel: {
+                    transcriptSpeakerPropagationRequest = nil
                     transcriptLineEditRequest = nil
                 }
             )
             .interactiveDismissDisabled(isSavingTranscriptLineEdit)
             .presentationDetents([.medium, .large])
             .presentationDragIndicator(.visible)
+            .confirmationDialog(
+                localized(L10n.Recordings.transcriptSpeakerPropagationTitle),
+                isPresented: transcriptSpeakerPropagationDialogIsPresented,
+                titleVisibility: .visible
+            ) {
+                if let propagationRequest = transcriptSpeakerPropagationRequest {
+                    Button(
+                        localizedFormat(
+                            L10n.Recordings.transcriptSpeakerPropagationFollowingActionFormat,
+                            propagationRequest.followingLines.count
+                        )
+                    ) {
+                        performTranscriptLineEdit(
+                            propagatingSpeakerTo: propagationRequest.followingLines
+                        )
+                    }
+
+                    Button(localized(L10n.Recordings.transcriptSpeakerPropagationCurrentOnlyAction)) {
+                        performTranscriptLineEdit(propagatingSpeakerTo: [])
+                    }
+                }
+
+                Button(localized(L10n.Common.cancel), role: .cancel) {
+                    transcriptSpeakerPropagationRequest = nil
+                }
+            } message: {
+                if let propagationRequest = transcriptSpeakerPropagationRequest {
+                    Text(
+                        localizedFormat(
+                            L10n.Recordings.transcriptSpeakerPropagationMessageFormat,
+                            propagationRequest.followingLines.count
+                        )
+                    )
+                }
+            }
         }
         .sheet(isPresented: $isShowingLocalWhisperRetranscriptionPicker) {
             LocalWhisperRetranscriptionPicker(
@@ -4425,6 +4432,7 @@ struct RecordingDetailView: View {
                 store.refreshIntelligenceAvailability()
                 await refreshAudioFileInfo()
                 player.load(item: currentItem, url: store.audioURL(for: currentItem))
+                updatePlayerNowPlayingTranscript()
             }
         }
         .task(id: transcriptCacheIdentifier) {
@@ -4556,7 +4564,7 @@ struct RecordingDetailView: View {
             }
             Button(localized(L10n.Common.cancel), role: .cancel) {}
         } message: {
-            Text(localizedFormat(L10n.Recordings.deleteConfirmationFormat, deleteRequest?.item.audioFileName ?? ""))
+            Text(localizedFormat(L10n.Recordings.deleteConfirmationFormat, deleteRequest?.item.displayName ?? ""))
         }
         .alert(
             localized(L10n.Recordings.deleteFailed),
@@ -4869,7 +4877,7 @@ struct RecordingDetailView: View {
         return VStack(alignment: .leading, spacing: 0) {
             RetroRecordingDisplay(
                 statusText: localized(L10n.Recordings.recordingPlayback),
-                title: item.audioFileName,
+                title: item.displayFileName,
                 audioURL: store.audioURL(for: item),
                 player: player,
                 scrubbedTime: scrubbedPlaybackTime,
@@ -5899,7 +5907,7 @@ struct RecordingDetailView: View {
 
         let drafts = actionItems
             .filter { !$0.task.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
-            .map { ReminderDraft(actionItem: $0, recordingTitle: currentItem.audioFileName) }
+            .map { ReminderDraft(actionItem: $0, recordingTitle: currentItem.displayName) }
         guard !drafts.isEmpty else {
             analysisErrorMessage = localized(L10n.Recordings.reminderNoActionItems)
             HapticFeedback.play(.blocked)
@@ -6215,6 +6223,7 @@ struct RecordingDetailView: View {
         }
 
         cachedTranscriptLines = lines
+        updatePlayerNowPlayingTranscript()
         translatedTranscriptByLineID = [:]
         translatedTranscriptCache = translatedTranscriptCache.filter { key, _ in
             key.hasPrefix(transcriptTranslationCachePrefix)
@@ -6225,8 +6234,18 @@ struct RecordingDetailView: View {
         }
     }
 
+    private func updatePlayerNowPlayingTranscript(for recordingID: UUID? = nil) {
+        player.setNowPlayingTranscript(
+            for: recordingID ?? currentItem.id,
+            cues: cachedTranscriptLines.map { line in
+                (startTime: line.startSeconds, text: line.spokenText)
+            }
+        )
+    }
+
     private func beginTranscriptLineEdit(_ line: StoredTranscriptLine) {
         HapticFeedback.play(.menuSelection)
+        transcriptSpeakerPropagationRequest = nil
         editedTranscriptLineText = line.spokenText
         editedTranscriptLineSpeakerID = line.speaker
         transcriptLineEditRequest = TranscriptLineEditRequest(line: line)
@@ -6238,18 +6257,88 @@ struct RecordingDetailView: View {
             return
         }
 
+        let followingLines = consecutiveFollowingLinesForSpeakerChange(
+            request: transcriptLineEditRequest
+        )
+        if !followingLines.isEmpty {
+            transcriptSpeakerPropagationRequest = TranscriptSpeakerPropagationRequest(
+                followingLines: followingLines
+            )
+            HapticFeedback.play(.menuSelection)
+            return
+        }
+
+        performTranscriptLineEdit(propagatingSpeakerTo: [])
+    }
+
+    private var transcriptSpeakerPropagationDialogIsPresented: Binding<Bool> {
+        Binding(
+            get: { transcriptSpeakerPropagationRequest != nil },
+            set: { isPresented in
+                if !isPresented {
+                    transcriptSpeakerPropagationRequest = nil
+                }
+            }
+        )
+    }
+
+    private func consecutiveFollowingLinesForSpeakerChange(
+        request: TranscriptLineEditRequest
+    ) -> [StoredTranscriptLine] {
+        guard let originalSpeakerID = TranscriptSpeakerNaming.normalizedID(request.originalSpeakerID),
+              !transcriptSpeakerIDsMatch(originalSpeakerID, editedTranscriptLineSpeakerID),
+              let editedLineIndex = cachedTranscriptLines.firstIndex(where: { $0.id == request.lineID }) else {
+            return []
+        }
+
+        var followingLines: [StoredTranscriptLine] = []
+        for line in cachedTranscriptLines.dropFirst(editedLineIndex + 1) {
+            guard transcriptSpeakerIDsMatch(line.speaker, originalSpeakerID) else {
+                break
+            }
+            followingLines.append(line)
+        }
+        return followingLines
+    }
+
+    private func transcriptSpeakerIDsMatch(_ lhs: String?, _ rhs: String?) -> Bool {
+        let normalizedLHS = TranscriptSpeakerNaming.normalizedID(lhs)
+        let normalizedRHS = TranscriptSpeakerNaming.normalizedID(rhs)
+        switch (normalizedLHS, normalizedRHS) {
+        case let (lhs?, rhs?):
+            return lhs.caseInsensitiveCompare(rhs) == .orderedSame
+        case (nil, nil):
+            return true
+        default:
+            return false
+        }
+    }
+
+    private func performTranscriptLineEdit(
+        propagatingSpeakerTo followingLines: [StoredTranscriptLine]
+    ) {
+        guard let transcriptLineEditRequest,
+              !isSavingTranscriptLineEdit else {
+            return
+        }
+
+        transcriptSpeakerPropagationRequest = nil
         isSavingTranscriptLineEdit = true
         do {
             let updatedItem = try store.updateTranscriptLine(
                 for: currentItem,
                 lineID: transcriptLineEditRequest.lineID,
                 text: editedTranscriptLineText,
-                speaker: editedTranscriptLineSpeakerID
+                speaker: editedTranscriptLineSpeakerID,
+                consecutiveFollowingLines: followingLines.map {
+                    (lineID: $0.id, text: $0.spokenText)
+                }
             )
             cachedTranscriptLines = StoredTranscriptLine.parse(
                 store.transcriptText(for: updatedItem),
                 speakerDiarization: updatedItem.speakerDiarization
             )
+            updatePlayerNowPlayingTranscript()
             clearTranscriptTranslationState()
             self.transcriptLineEditRequest = nil
             HapticFeedback.play(.recordingSaved)
@@ -6406,7 +6495,7 @@ struct RecordingDetailView: View {
 
     private func prepareRecordingEditSheet() {
         let item = currentItem
-        editRecordingName = (item.audioFileName as NSString).deletingPathExtension
+        editRecordingName = item.displayName
         editRecordingLanguageID = TranscriptionLanguage(id: item.languageID).baseLanguage.id
         editRecordingCategory = item.categoryName ?? ""
         editRecordingKeyPoints = item.keyPoints ?? ""
@@ -6453,6 +6542,7 @@ struct RecordingDetailView: View {
             HapticFeedback.play(.primaryAction)
             isShowingRecordingEditSheet = false
             player.load(item: updatedItem, url: store.audioURL(for: updatedItem))
+            updatePlayerNowPlayingTranscript(for: updatedItem.id)
             Task {
                 await refreshAudioFileInfo()
                 await refreshTranscriptCache()
@@ -6477,7 +6567,7 @@ struct RecordingDetailView: View {
         do {
             let updatedItem = try store.updateDetails(
                 for: currentItem,
-                proposedName: (currentItem.audioFileName as NSString).deletingPathExtension,
+                proposedName: currentItem.displayName,
                 manualTags: currentItem.manualTags ?? [],
                 summary: editedSummaryText,
                 projectName: currentItem.projectName,
@@ -6488,6 +6578,7 @@ struct RecordingDetailView: View {
             HapticFeedback.play(.primaryAction)
             isShowingSummaryEditSheet = false
             player.load(item: updatedItem, url: store.audioURL(for: updatedItem))
+            updatePlayerNowPlayingTranscript(for: updatedItem.id)
         } catch {
             editErrorMessage = error.localizedDescription
             HapticFeedback.play(.failure)
@@ -8446,6 +8537,9 @@ final class RecordingPlaybackController: ObservableObject {
     private var playbackCommandID = 0
     private var hasScheduledPlayback = false
     private var needsPlaybackReschedule = true
+    private var nowPlayingTranscriptRecordingID: UUID?
+    private var nowPlayingTranscriptCues: [NowPlayingTranscriptCue] = []
+    private var lastPublishedNowPlayingTitle: String?
     private var remoteCommandTargets: [RemoteCommandTarget] = []
     private var isReceivingRemoteControlEvents = false
 
@@ -8465,6 +8559,8 @@ final class RecordingPlaybackController: ObservableObject {
 
     func load(item: RecordingItem, url: URL) {
         guard currentItem?.id != item.id || currentItem?.audioFileName != item.audioFileName || !isLoaded else {
+            currentItem = item
+            updateNowPlayingInfo()
             return
         }
 
@@ -8472,6 +8568,31 @@ final class RecordingPlaybackController: ObservableObject {
         currentItem = item
         updateNowPlayingInfo()
         updateRemoteCommandAvailability(isEnabled: isLoaded)
+    }
+
+    fileprivate func setNowPlayingTranscript(
+        for recordingID: UUID,
+        cues: [(startTime: TimeInterval, text: String)]
+    ) {
+        guard currentItem?.id == recordingID else {
+            return
+        }
+
+        nowPlayingTranscriptRecordingID = recordingID
+        nowPlayingTranscriptCues = cues.compactMap { cue in
+            let text = cue.text
+                .components(separatedBy: .whitespacesAndNewlines)
+                .filter { !$0.isEmpty }
+                .joined(separator: " ")
+            guard cue.startTime.isFinite, cue.startTime >= 0, !text.isEmpty else {
+                return nil
+            }
+            return NowPlayingTranscriptCue(startTime: cue.startTime, text: text)
+        }
+        .sorted { lhs, rhs in
+            lhs.startTime < rhs.startTime
+        }
+        updateNowPlayingInfo()
     }
 
     func load(url: URL) {
@@ -8625,6 +8746,9 @@ final class RecordingPlaybackController: ObservableObject {
         currentItem = nil
         hasScheduledPlayback = false
         needsPlaybackReschedule = true
+        nowPlayingTranscriptRecordingID = nil
+        nowPlayingTranscriptCues = []
+        lastPublishedNowPlayingTitle = nil
         isLoaded = false
         isPlaying = false
         currentTime = 0
@@ -8662,7 +8786,9 @@ final class RecordingPlaybackController: ObservableObject {
                     continue
                 }
 
-                self.currentTime = min(self.currentPlaybackTime(), self.duration)
+                let playbackTime = min(self.currentPlaybackTime(), self.duration)
+                self.currentTime = playbackTime
+                self.refreshNowPlayingTitleIfNeeded(at: playbackTime)
 
                 do {
                     try await Task.sleep(for: .milliseconds(Self.playbackUITickMilliseconds))
@@ -8886,16 +9012,17 @@ final class RecordingPlaybackController: ObservableObject {
         commandCenter.previousTrackCommand.isEnabled = false
     }
 
-    private func updateNowPlayingInfo() {
+    private func updateNowPlayingInfo(elapsedTime providedElapsedTime: TimeInterval? = nil) {
         guard isLoaded else {
             clearNowPlayingInfo()
             return
         }
 
-        let elapsedTime = min(max(currentPlaybackTime(), 0), duration)
+        let elapsedTime = min(max(providedElapsedTime ?? currentPlaybackTime(), 0), duration)
+        let title = nowPlayingTitle(at: elapsedTime)
         var info: [String: Any] = [
-            MPMediaItemPropertyTitle: nowPlayingTitle,
-            MPMediaItemPropertyArtist: "LiveTranscriber",
+            MPMediaItemPropertyTitle: title,
+            MPMediaItemPropertyArtist: nowPlayingArtist,
             MPMediaItemPropertyAlbumTitle: nowPlayingSubtitle,
             MPMediaItemPropertyPlaybackDuration: duration,
             MPNowPlayingInfoPropertyElapsedPlaybackTime: elapsedTime,
@@ -8909,14 +9036,16 @@ final class RecordingPlaybackController: ObservableObject {
 
         let center = MPNowPlayingInfoCenter.default()
         center.nowPlayingInfo = info
+        lastPublishedNowPlayingTitle = title
         Self.logger.debug(
-            "[RecordingPlayback] NowPlaying updated title=\(self.nowPlayingTitle, privacy: .public) elapsed=\(elapsedTime, privacy: .public) duration=\(self.duration, privacy: .public) rate=\(self.playbackRate, privacy: .public) playing=\(self.isPlaying, privacy: .public)"
+            "[RecordingPlayback] NowPlaying updated title=\(title, privacy: .private) artist=\(self.nowPlayingArtist, privacy: .private) elapsed=\(elapsedTime, privacy: .public) duration=\(self.duration, privacy: .public) rate=\(self.playbackRate, privacy: .public) playing=\(self.isPlaying, privacy: .public)"
         )
     }
 
     private func clearNowPlayingInfo() {
         let center = MPNowPlayingInfoCenter.default()
         center.nowPlayingInfo = nil
+        lastPublishedNowPlayingTitle = nil
         Self.logger.debug("[RecordingPlayback] NowPlaying cleared")
     }
 
@@ -8940,8 +9069,43 @@ final class RecordingPlaybackController: ObservableObject {
         Self.logger.debug("[RecordingPlayback] Ended receiving remote control events")
     }
 
-    private var nowPlayingTitle: String {
-        currentItem?.audioFileName ?? localized(L10n.Recordings.recordingFallback)
+    private var fallbackNowPlayingTitle: String {
+        currentItem?.displayName ?? localized(L10n.Recordings.recordingFallback)
+    }
+
+    private var nowPlayingArtist: String {
+        fallbackNowPlayingTitle
+    }
+
+    private func nowPlayingTitle(at time: TimeInterval) -> String {
+        guard nowPlayingTranscriptRecordingID == currentItem?.id,
+              !nowPlayingTranscriptCues.isEmpty else {
+            return fallbackNowPlayingTitle
+        }
+
+        var lowerBound = 0
+        var upperBound = nowPlayingTranscriptCues.count
+        while lowerBound < upperBound {
+            let middle = (lowerBound + upperBound) / 2
+            if nowPlayingTranscriptCues[middle].startTime <= time {
+                lowerBound = middle + 1
+            } else {
+                upperBound = middle
+            }
+        }
+
+        let index = lowerBound - 1
+        guard nowPlayingTranscriptCues.indices.contains(index) else {
+            return fallbackNowPlayingTitle
+        }
+        return nowPlayingTranscriptCues[index].text
+    }
+
+    private func refreshNowPlayingTitleIfNeeded(at time: TimeInterval) {
+        guard nowPlayingTitle(at: time) != lastPublishedNowPlayingTitle else {
+            return
+        }
+        updateNowPlayingInfo(elapsedTime: time)
     }
 
     private var nowPlayingSubtitle: String {
@@ -8952,6 +9116,11 @@ final class RecordingPlaybackController: ObservableObject {
         let formattedDate = item.createdAt.formatted(date: .abbreviated, time: .shortened)
         return "\(item.localizedLanguageName) · \(formattedDate)"
     }
+}
+
+private struct NowPlayingTranscriptCue {
+    let startTime: TimeInterval
+    let text: String
 }
 
 private struct RemoteCommandTarget {
