@@ -1,0 +1,51 @@
+name: LiveTranscriberMac
+
+options:
+  bundleIdPrefix: com.iamwilliamli
+  createIntermediateGroups: true
+  deploymentTarget:
+    macOS: "15.0"
+  groupSortPosition: top
+
+settings:
+  base:
+    DEVELOPMENT_TEAM: F8M4T754W4
+    SWIFT_VERSION: "5.0"
+    MACOSX_DEPLOYMENT_TARGET: "15.0"
+
+targets:
+  LiveTranscriberMac:
+    type: application
+    platform: macOS
+    deploymentTarget: "15.0"
+    sources:
+      - path: Sources
+    resources:
+      - path: Resources
+    settings:
+      base:
+        CODE_SIGN_ENTITLEMENTS: LiveTranscriberMac.entitlements
+        CODE_SIGN_STYLE: Automatic
+        CURRENT_PROJECT_VERSION: 1
+        ENABLE_HARDENED_RUNTIME: YES
+        GENERATE_INFOPLIST_FILE: NO
+        INFOPLIST_FILE: Info.plist
+        MARKETING_VERSION: 1.0
+        PRODUCT_BUNDLE_IDENTIFIER: com.iamwilliamli.LiveTranscriber.mac
+        PRODUCT_MODULE_NAME: LiveTranscriberMac
+        PRODUCT_NAME: Live Transcriber
+        SWIFT_EMIT_LOC_STRINGS: YES
+
+schemes:
+  LiveTranscriberMac:
+    build:
+      targets:
+        LiveTranscriberMac: all
+    run:
+      config: Debug
+    profile:
+      config: Release
+    analyze:
+      config: Debug
+    archive:
+      config: Release
