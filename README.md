@@ -10,13 +10,13 @@
 </p>
 
 <p align="center">
-  <img alt="Platform" src="https://img.shields.io/badge/platform-iOS%2026%2B-black">
+  <img alt="Platform" src="https://img.shields.io/badge/platform-iOS%2026%2B%20%7C%20macOS%2015%2B-black">
   <img alt="SwiftUI" src="https://img.shields.io/badge/SwiftUI-native-blue">
   <img alt="Local first" src="https://img.shields.io/badge/privacy-local--first-green">
   <img alt="License" src="https://img.shields.io/badge/license-source--available-orange">
 </p>
 
-LiveTranscriber is a local-first iOS recording app built around one workflow: record on your iPhone, read the transcript as it appears, translate the text while recording, then turn saved audio into searchable notes with local transcription, summaries, and tags.
+LiveTranscriber is a local-first recording and transcription project. The iOS app is the current shipping product: record on your iPhone, read the transcript as it appears, translate while recording, then turn saved audio into searchable notes with local transcription, summaries, and tags. A native macOS companion is developed in the same repository for meeting-window, system-audio, and microphone capture.
 
 It uses Apple Speech for the default live transcription path, supports optional Local Whisper for offline high-accuracy re-transcription, and can generate summaries and topic tags with Apple Intelligence or a downloaded Qwen3 1.7B Q4 GGUF model through embedded llama.cpp. This makes it useful on devices where Apple Intelligence is unavailable, including China-region iPhones and other unsupported configurations.
 
@@ -41,6 +41,14 @@ It uses Apple Speech for the default live transcription path, supports optional 
 6. **Search later.** Find recordings by file name, language, transcript body, summary, or tags.
 
 ## Current Features
+
+### Native macOS Companion
+
+- Native SwiftUI macOS app, not a Catalyst wrapper.
+- Provider-neutral ScreenCaptureKit picker for a display, app, or individual meeting window, including Zoom, Teams, and Meet.
+- H.264 MP4 capture up to 4K/30 fps, with independent AAC sidecars for system audio and microphone input.
+- Versioned multi-asset session manifests shared with the iOS domain model.
+- Reads and plays the shared iCloud recording library, with a local Application Support fallback and security-scoped folder access.
 
 ### Recording
 
@@ -182,6 +190,7 @@ Local Whisper uses model-specific language support:
 - Xcode beta with the iOS 27 SDK.
 - iOS 26 or later device or simulator for development.
 - iOS 27 is required for the Native Speech Pipeline mode.
+- macOS 15 or later for the native Mac app; Screen Recording and Microphone permission are required for the corresponding capture options.
 - Apple Speech availability on the target device.
 - FoundationModels availability for Apple Intelligence summaries.
 - Embedded whisper.cpp runtime for Local Whisper.
@@ -193,20 +202,29 @@ Local Whisper uses model-specific language support:
 ```sh
 /Applications/Xcode-beta.app/Contents/Developer/usr/bin/xcodebuild \
   -quiet \
-  -project LiveTranscriber.xcodeproj \
+  -workspace LiveTranscriber.xcworkspace \
   -scheme LiveTranscriber \
-  -destination 'generic/platform=iOS' \
-  -derivedDataPath /tmp/LiveTranscriberDerivedData \
+  -destination 'generic/platform=iOS Simulator' \
   CODE_SIGNING_ALLOWED=NO \
   build
+
+/Applications/Xcode-beta.app/Contents/Developer/usr/bin/xcodebuild \
+  -quiet \
+  -workspace LiveTranscriber.xcworkspace \
+  -scheme LiveTranscriberMac \
+  -destination 'platform=macOS,arch=arm64' \
+  CODE_SIGNING_ALLOWED=NO \
+  test
 ```
 
-For device testing, open `LiveTranscriber.xcodeproj` in Xcode and use a signing team with the iCloud and Live Activity capabilities enabled.
+Both commands use Xcode's standard incremental DerivedData location. For development, open `LiveTranscriber.xcworkspace`. Device testing requires a signing team with the iCloud and Live Activity capabilities enabled; the macOS App ID must also be associated with the existing iCloud container.
 
 ## Project Structure
 
 - `LiveTranscriber/`: Main iOS app target.
 - `LiveTranscriberWidget/`: ActivityKit widget extension for Lock Screen and Dynamic Island.
+- `LiveTranscriberMac/`: Native macOS app, generated from its checked-in `project.yml`.
+- `Packages/TranscriberDomain/`: Shared recording models and platform-neutral service boundaries.
 - `Vendor/`: Embedded whisper.cpp and llama.cpp XCFrameworks.
 - `docs/`: Focused engineering documents.
 - `DEVELOPMENT_NOTES.md`: Long-form development log and implementation notes.
@@ -218,6 +236,8 @@ For device testing, open `LiveTranscriber.xcodeproj` in Xcode and use a signing 
 - [Recording Processing Pipeline](docs/RECORDING_PIPELINE.md)
 - [Live Activity Design](docs/LIVE_ACTIVITY.md)
 - [Localization](docs/LOCALIZATION.md)
+- [Native macOS Architecture](docs/architecture/macos-foundation.md)
+- [Continuous Integration](docs/CI.md)
 - [Development Notes](DEVELOPMENT_NOTES.md)
 
 ## Community
@@ -257,6 +277,7 @@ Reddit Sans is included under the SIL Open Font License, Version 1.1. whisper.cp
 - [ActivityKit](https://developer.apple.com/documentation/activitykit)
 - [Foundation Models](https://developer.apple.com/documentation/foundationmodels)
 - [Translation](https://developer.apple.com/documentation/translation)
+- [ScreenCaptureKit](https://developer.apple.com/documentation/screencapturekit)
 
 ## Privacy Model
 

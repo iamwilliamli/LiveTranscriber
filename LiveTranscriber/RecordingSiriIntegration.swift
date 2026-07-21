@@ -140,6 +140,7 @@ struct RecordingEntityQuery: EntityStringQuery {
     }
 }
 
+#if HAS_IOS27_SDK
 @available(iOS 27.0, macOS 27.0, watchOS 27.0, tvOS 27.0, visionOS 27.0, *)
 extension RecordingEntityQuery: IndexedEntityQuery {
     func reindexEntities(
@@ -156,6 +157,7 @@ extension RecordingEntityQuery: IndexedEntityQuery {
         try await CSSearchableIndex.default().indexAppEntities(entities)
     }
 }
+#endif
 
 struct ReadRecordingSummaryIntent: AppIntent {
     static let title = LocalizedStringResource(

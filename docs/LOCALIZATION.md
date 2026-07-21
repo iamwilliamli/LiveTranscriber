@@ -104,10 +104,9 @@ jq empty LiveTranscriber/Semantic.xcstrings
 git diff --check
 rg -n "[\\p{Han}]" --glob '*.swift' LiveTranscriber LiveTranscriberWidget
 /Applications/Xcode-beta.app/Contents/Developer/usr/bin/xcodebuild \
-  -project LiveTranscriber.xcodeproj \
+  -workspace LiveTranscriber.xcworkspace \
   -scheme LiveTranscriber \
   -destination 'generic/platform=iOS Simulator' \
-  -derivedDataPath /tmp/LiveTranscriberDerivedDataLocalization \
   -quiet build
 ```
 

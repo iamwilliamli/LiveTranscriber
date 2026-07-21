@@ -54,6 +54,14 @@ The manifest is committed only after the video writer finishes. Empty or failed 
 
 The macOS App ID must be associated with the existing iCloud container in Apple Developer signing configuration before CloudKit and iCloud Drive access can work outside unsigned local builds.
 
+## Repository and branch policy
+
+The Mac app is a second product in this repository, not a permanent platform branch. `main` is the integration and release source of truth; use short-lived `feature/ios-*`, `feature/macos-*`, and `feature/shared-*` branches according to the ownership of a change. A cross-platform feature should land its schema or protocol change in `Packages/` first, followed by independent platform adapters and UI.
+
+The iOS baseline from before the Mac project is retained as the annotated tag `ios-baseline-before-macos-2026-07-21`. Do not keep a long-running `macOS` branch after this foundation is reviewed: that would make shared-model migrations and fixes drift between two histories.
+
+Pull requests should keep the shared domain, iOS compatibility build, and macOS tests green. A release additionally requires a full Xcode 27 iOS build and signed device smoke tests. iOS and macOS retain separate bundle identifiers, signing/App Store records, versions, and release timing even though their source and recording schema live together.
+
 The generated macOS project is defined by `LiveTranscriberMac/project.yml`. Regenerate it with:
 
 ```sh

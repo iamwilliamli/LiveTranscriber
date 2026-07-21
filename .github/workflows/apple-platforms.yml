@@ -1,0 +1,71 @@
+name: Apple Platforms
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+      - "feature/**"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: apple-platforms-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    name: ${{ matrix.name }}
+    runs-on: macos-26
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - lane: domain
+            name: Shared domain tests
+          - lane: ios
+            name: iOS 26 compatibility build
+          - lane: macos
+            name: macOS app tests
+
+    env:
+      DEVELOPER_DIR: /Applications/Xcode.app/Contents/Developer
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Report toolchain
+        run: xcodebuild -version
+
+      - name: Test shared packages
+        if: matrix.lane == 'domain'
+        run: >-
+          xcrun swift test
+          --package-path Packages/TranscriberDomain
+          --scratch-path "$HOME/Library/Developer/Xcode/DerivedData/TranscriberDomain-CI"
+
+      - name: Build iOS app
+        if: matrix.lane == 'ios'
+        run: >-
+          xcodebuild
+          -workspace LiveTranscriber.xcworkspace
+          -scheme LiveTranscriber
+          -destination 'generic/platform=iOS Simulator'
+          CODE_SIGNING_ALLOWED=NO
+          -quiet
+          build
+
+      - name: Test macOS app
+        if: matrix.lane == 'macos'
+        run: >-
+          xcodebuild
+          -workspace LiveTranscriber.xcworkspace
+          -scheme LiveTranscriberMac
+          -destination 'platform=macOS,arch=arm64'
+          CODE_SIGNING_ALLOWED=NO
+          -quiet
+          test

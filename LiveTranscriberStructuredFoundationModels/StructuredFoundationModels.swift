@@ -1,6 +1,8 @@
 import Darwin
 import Foundation
+#if HAS_IOS27_SDK
 import FoundationModels
+#endif
 
 public typealias StructuredGenerationCallback = @convention(c) (
     UnsafeMutableRawPointer?,
@@ -8,6 +10,7 @@ public typealias StructuredGenerationCallback = @convention(c) (
     UnsafeMutablePointer<CChar>?
 ) -> Void
 
+#if HAS_IOS27_SDK
 @available(iOS 27.0, *)
 @Generable
 private struct StructuredRecordingIntelligence {
@@ -349,6 +352,27 @@ private func duplicatedJSONString(_ value: [String: Any]) -> UnsafeMutablePointe
     }
     return duplicatedCString(text)
 }
+#else
+@_cdecl("LiveTranscriberStructuredGenerateIntelligence")
+public func LiveTranscriberStructuredGenerateIntelligence(
+    _ transcriptCString: UnsafePointer<CChar>?,
+    _ languageCString: UnsafePointer<CChar>?,
+    _ context: UnsafeMutableRawPointer?,
+    _ callback: @escaping StructuredGenerationCallback
+) {
+    callback(context, nil, duplicatedCString("Structured FoundationModels output requires the iOS 27 SDK."))
+}
+
+@_cdecl("LiveTranscriberStructuredGenerateTitle")
+public func LiveTranscriberStructuredGenerateTitle(
+    _ transcriptCString: UnsafePointer<CChar>?,
+    _ languageCString: UnsafePointer<CChar>?,
+    _ context: UnsafeMutableRawPointer?,
+    _ callback: @escaping StructuredGenerationCallback
+) {
+    callback(context, nil, duplicatedCString("Structured FoundationModels output requires the iOS 27 SDK."))
+}
+#endif
 
 private func duplicatedCString(_ text: String) -> UnsafeMutablePointer<CChar>? {
     strdup(text)
