@@ -5,7 +5,8 @@ Live Transcriber is managed as one repository with two native application projec
 - `LiveTranscriber.xcodeproj` owns the existing iOS and Widget targets.
 - `LiveTranscriberMac/LiveTranscriberMac.xcodeproj` owns the native macOS app.
 - `LiveTranscriber.xcworkspace` is the development entry point for both products.
-- `Packages/TranscriberDomain` owns Foundation-only shared value types; speaker diarization is the first model moved across this boundary.
+- `TranscriberDomain` owns Foundation-only shared value types.
+- `TranscriberCore` owns Foundation-only service protocols and depends on `TranscriberDomain`.
 
 The macOS app is not a Catalyst target and does not compile the iOS source directory. Platform-independent behavior will move incrementally into local packages under `Packages/`; platform capture and presentation code remain in their respective app targets.
 
@@ -17,6 +18,16 @@ The macOS app is not a Catalyst target and does not compile the iOS source direc
 4. Recording metadata is versioned independently from either UI.
 5. A recording can own multiple typed assets; no shared API should assume one audio file per recording.
 6. Both apps must build from `main` before it can be released.
+
+## Shared service boundaries
+
+`TranscriberCore` deliberately describes capabilities without importing AVFoundation, CloudKit, SwiftData, UIKit, or AppKit:
+
+- `RecordingTranscribing` accepts an audio URL and returns shared transcript lines plus optional speaker diarization.
+- `RecordingLibraryReading` and `RecordingLibraryWriting` describe session discovery, asset resolution, and persistence independently of the backing store.
+- `RecordingMetadataSyncing` accepts typed recording/category mutations without exposing CloudKit records.
+
+The current iOS adapters are `MOSSRecordingTranscriber`, `RecordingStore`, and `RecordingMetadataCloudSync`. The macOS app can provide different capture and storage implementations while consuming the same contracts.
 
 ## Recording asset compatibility
 

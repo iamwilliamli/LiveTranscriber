@@ -71,6 +71,7 @@
 		7B000000000000000000003F /* MLXAudioSTT in Frameworks */ = {isa = PBXBuildFile; productRef = 7B000000000000000000B006 /* MLXAudioSTT */; };
 		7B0000000000000000000040 /* MLXAudioCore in Frameworks */ = {isa = PBXBuildFile; productRef = 7B000000000000000000B007 /* MLXAudioCore */; };
 		7B0000000000000000000041 /* TranscriberDomain in Frameworks */ = {isa = PBXBuildFile; productRef = 7B000000000000000000B009 /* TranscriberDomain */; };
+		7B0000000000000000000042 /* TranscriberCore in Frameworks */ = {isa = PBXBuildFile; productRef = 7B000000000000000000B00A /* TranscriberCore */; };
 		7B00000000000000000000C1 /* LaunchSplashView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7B00000000000000000010C1 /* LaunchSplashView.swift */; };
 		7B00000000000000000000C2 /* QuickRecordingControlIntent.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7B00000000000000000010C2 /* QuickRecordingControlIntent.swift */; };
 		7B00000000000000000000C3 /* QuickRecordingControlIntent.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7B00000000000000000010C2 /* QuickRecordingControlIntent.swift */; };
@@ -212,6 +213,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				7B0000000000000000000042 /* TranscriberCore in Frameworks */,
 				7B0000000000000000000041 /* TranscriberDomain in Frameworks */,
 				7B0000000000000000000040 /* MLXAudioCore in Frameworks */,
 				7B000000000000000000003F /* MLXAudioSTT in Frameworks */,
@@ -379,6 +381,7 @@
 			);
 			name = LiveTranscriber;
 			packageProductDependencies = (
+				7B000000000000000000B00A /* TranscriberCore */,
 				7B000000000000000000B009 /* TranscriberDomain */,
 				7B000000000000000000B002 /* Qwen3ASR */,
 				7B000000000000000000B003 /* SpeechVAD */,
@@ -1024,6 +1027,11 @@
 			isa = XCSwiftPackageProductDependency;
 			package = 7B000000000000000000B008 /* XCLocalSwiftPackageReference "Packages/TranscriberDomain" */;
 			productName = TranscriberDomain;
+		};
+		7B000000000000000000B00A /* TranscriberCore */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 7B000000000000000000B008 /* XCLocalSwiftPackageReference "Packages/TranscriberDomain" */;
+			productName = TranscriberCore;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};

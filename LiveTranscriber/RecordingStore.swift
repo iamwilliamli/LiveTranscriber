@@ -8,6 +8,7 @@ import FoundationModels
 import Speech
 import OSLog
 import SwiftData
+import TranscriberCore
 import TranscriberDomain
 
 struct RecordingDraft {
@@ -1650,13 +1651,16 @@ final class RecordingStore: ObservableObject {
         )
 
         do {
-            let result = try await MOSSLocalTranscriptionService.transcribe(
-                audioURL: audioURL
+            let result = try await MOSSRecordingTranscriber().transcribe(
+                RecordingTranscriptionRequest(
+                    sourceURL: audioURL,
+                    languageIdentifier: item.languageID
+                )
             ) { [weak self] progress in
                 Task { @MainActor in
                     self?.updateImportStatus(
                         for: item.id,
-                        progress: 0.04 + progress * 0.9,
+                        progress: 0.04 + progress.fractionCompleted * 0.9,
                         message: String(localized: L10n.Import.transcribing)
                     )
                 }
@@ -1677,7 +1681,7 @@ final class RecordingStore: ObservableObject {
             recordings[index].lineCount = result.lines.count
             recordings[index].intelligence = nil
             recordings[index].meetingAnalysis = nil
-            recordings[index].speakerDiarization = result.diarization
+            recordings[index].speakerDiarization = result.speakerDiarization
             recordings[index].importStatus = nil
             searchIndexCache[item.id] = nil
             try persist()
@@ -3661,6 +3665,34 @@ final class RecordingStore: ObservableObject {
             return 0
         }
         return max(Int((Double(file.length) / sampleRate).rounded()), 0)
+    }
+}
+
+extension RecordingStore: RecordingLibraryReading {
+    func recordingSessions() async throws -> [RecordingSession] {
+        recordings.map(\.recordingSession)
+    }
+
+    func recordingSession(withID id: RecordingSession.ID) async throws -> RecordingSession? {
+        recordings.first(where: { $0.id == id })?.recordingSession
+    }
+
+    func recordingAssetURL(
+        sessionID: RecordingSession.ID,
+        assetID: RecordingAsset.ID
+    ) async throws -> URL {
+        guard let item = recordings.first(where: { $0.id == sessionID }) else {
+            throw RecordingLibraryError.recordingNotFound(sessionID)
+        }
+        guard let asset = item.assets.first(where: { $0.id == assetID }) else {
+            throw RecordingLibraryError.assetNotFound(assetID)
+        }
+        guard asset.isSafeRelativePath else {
+            throw RecordingLibraryError.unsafeAssetPath(asset.relativePath)
+        }
+        return prepareUbiquitousItemForAccess(
+            recordingsDirectory.appendingPathComponent(asset.relativePath)
+        )
     }
 }
 
@@ -6013,6 +6045,29 @@ final class RecordingMetadataCloudSync: @unchecked Sendable {
         Task {
             await coordinator.synchronizeNow()
         }
+    }
+}
+
+extension RecordingMetadataCloudSync: RecordingMetadataSyncing {
+    func setMetadataSyncEnabled(_ enabled: Bool) async {
+        await coordinator.setEnabled(enabled)
+    }
+
+    func enqueueMetadataMutation(_ mutation: RecordingMetadataMutation) async {
+        switch (mutation.entityID.kind, mutation.operation) {
+        case (.recording, .upsert):
+            await coordinator.scheduleRecordingSave(id: mutation.entityID.value)
+        case (.recording, .delete):
+            await coordinator.scheduleRecordingDelete(id: mutation.entityID.value)
+        case (.category, .upsert):
+            await coordinator.scheduleCategorySave(id: mutation.entityID.value)
+        case (.category, .delete):
+            await coordinator.scheduleCategoryDelete(id: mutation.entityID.value)
+        }
+    }
+
+    func synchronizeMetadata() async {
+        await coordinator.synchronizeNow()
     }
 }
 

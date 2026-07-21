@@ -28,6 +28,8 @@ targets:
       - path: Resources
     dependencies:
       - package: TranscriberDomain
+      - package: TranscriberDomain
+        product: TranscriberCore
     settings:
       base:
         CODE_SIGN_ENTITLEMENTS: LiveTranscriberMac.entitlements

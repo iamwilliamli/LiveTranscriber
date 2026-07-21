@@ -2,6 +2,7 @@ import AudioCommon
 import Foundation
 import MLXAudioCore
 @preconcurrency import MLXAudioSTT
+import TranscriberCore
 import TranscriberDomain
 
 struct MOSSLocalModelStatus: Equatable {
@@ -263,6 +264,30 @@ enum MOSSLocalTranscriptionService {
         return try await MOSSLocalRuntime.shared.transcribe(
             audioURL: audioURL,
             progressHandler: progressHandler
+        )
+    }
+}
+
+struct MOSSRecordingTranscriber: RecordingTranscribing {
+    let identifier = "moss.local"
+
+    func transcribe(
+        _ request: RecordingTranscriptionRequest,
+        progressHandler: @escaping @Sendable (RecordingTranscriptionProgress) -> Void
+    ) async throws -> RecordingTranscriptionResult {
+        let result = try await MOSSLocalTranscriptionService.transcribe(
+            audioURL: request.sourceURL
+        ) { fractionCompleted in
+            progressHandler(
+                RecordingTranscriptionProgress(
+                    fractionCompleted: fractionCompleted,
+                    stage: .transcribing
+                )
+            )
+        }
+        return RecordingTranscriptionResult(
+            lines: result.lines,
+            speakerDiarization: result.diarization
         )
     }
 }

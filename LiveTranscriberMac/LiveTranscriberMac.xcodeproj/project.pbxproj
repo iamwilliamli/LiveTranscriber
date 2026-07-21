@@ -11,6 +11,7 @@
 		876487A8AF883EFBA9059258 /* TranscriberDomain in Frameworks */ = {isa = PBXBuildFile; productRef = E0B2A813EFB2F988E6C1C94A /* TranscriberDomain */; };
 		A48F098CCFCC4C5251695080 /* LiveTranscriberMacApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 92EDB649F0FE3E9F9AC8E2C0 /* LiveTranscriberMacApp.swift */; };
 		B677D5BE189245624DAEC599 /* MacRootView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A3AE257FB6CBB7815E9751D0 /* MacRootView.swift */; };
+		EA9CE6280A8B76F7DEFC330E /* TranscriberCore in Frameworks */ = {isa = PBXBuildFile; productRef = B514CD646E50CFF75485A278 /* TranscriberCore */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -27,6 +28,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				876487A8AF883EFBA9059258 /* TranscriberDomain in Frameworks */,
+				EA9CE6280A8B76F7DEFC330E /* TranscriberCore in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -85,6 +87,7 @@
 			name = LiveTranscriberMac;
 			packageProductDependencies = (
 				E0B2A813EFB2F988E6C1C94A /* TranscriberDomain */,
+				B514CD646E50CFF75485A278 /* TranscriberCore */,
 			);
 			productName = LiveTranscriberMac;
 			productReference = 2470C7C27246AF9E5C609031 /* LiveTranscriberMac.app */;
@@ -343,6 +346,10 @@
 /* End XCLocalSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
+		B514CD646E50CFF75485A278 /* TranscriberCore */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = TranscriberCore;
+		};
 		E0B2A813EFB2F988E6C1C94A /* TranscriberDomain */ = {
 			isa = XCSwiftPackageProductDependency;
 			productName = TranscriberDomain;
