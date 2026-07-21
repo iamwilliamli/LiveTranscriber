@@ -22,12 +22,25 @@ struct RecordingDraft {
 struct RecordingItem: Identifiable, Codable, Hashable {
     var id: UUID
     var createdAt: Date
-    var durationSeconds: Int
+    var durationSeconds: Int {
+        didSet {
+            synchronizeLegacyAssets()
+        }
+    }
     var languageID: String
     var languageName: String
     var displayName: String
-    var audioFileName: String
-    var transcriptFileName: String
+    var audioFileName: String {
+        didSet {
+            synchronizeLegacyAssets()
+        }
+    }
+    var transcriptFileName: String {
+        didSet {
+            synchronizeLegacyAssets()
+        }
+    }
+    var assets: [RecordingAsset]
     var transcriptPreview: String
     var lineCount: Int
     var intelligence: RecordingIntelligence?
@@ -65,7 +78,8 @@ struct RecordingItem: Identifiable, Codable, Hashable {
         isTranscriptLocked: Bool = false,
         meetingAnalysis: RecordingMeetingAnalysis? = nil,
         speakerDiarization: RecordingSpeakerDiarization? = nil,
-        audioEventAnalysis: RecordingAudioEventAnalysis? = nil
+        audioEventAnalysis: RecordingAudioEventAnalysis? = nil,
+        assets: [RecordingAsset]? = nil
     ) {
         self.id = id
         self.createdAt = createdAt
@@ -75,6 +89,12 @@ struct RecordingItem: Identifiable, Codable, Hashable {
         self.displayName = Self.normalizedDisplayName(displayName, audioFileName: audioFileName)
         self.audioFileName = audioFileName
         self.transcriptFileName = transcriptFileName
+        self.assets = LegacyRecordingAssetMigration.migrate(
+            assets,
+            audioFileName: audioFileName,
+            transcriptFileName: transcriptFileName,
+            durationSeconds: Double(durationSeconds)
+        )
         self.transcriptPreview = transcriptPreview
         self.lineCount = lineCount
         self.intelligence = intelligence
@@ -100,6 +120,7 @@ struct RecordingItem: Identifiable, Codable, Hashable {
         case displayName
         case audioFileName
         case transcriptFileName
+        case assets
         case transcriptPreview
         case lineCount
         case intelligence
@@ -129,6 +150,12 @@ struct RecordingItem: Identifiable, Codable, Hashable {
             audioFileName: audioFileName
         )
         transcriptFileName = try container.decode(String.self, forKey: .transcriptFileName)
+        assets = LegacyRecordingAssetMigration.migrate(
+            try container.decodeIfPresent([RecordingAsset].self, forKey: .assets),
+            audioFileName: audioFileName,
+            transcriptFileName: transcriptFileName,
+            durationSeconds: Double(durationSeconds)
+        )
         transcriptPreview = try container.decode(String.self, forKey: .transcriptPreview)
         lineCount = try container.decode(Int.self, forKey: .lineCount)
         intelligence = try container.decodeIfPresent(RecordingIntelligence.self, forKey: .intelligence)
@@ -165,6 +192,28 @@ struct RecordingItem: Identifiable, Codable, Hashable {
     var displayFileName: String {
         let fileExtension = (audioFileName as NSString).pathExtension
         return fileExtension.isEmpty ? displayName : "\(displayName).\(fileExtension)"
+    }
+
+    var recordingSession: RecordingSession {
+        let primaryAssetID = assets.first(where: { $0.relativePath == audioFileName })?.id
+        return RecordingSession(
+            id: id,
+            createdAt: createdAt,
+            title: displayName,
+            durationSeconds: Double(durationSeconds),
+            languageIdentifier: languageID,
+            assets: assets,
+            primaryAssetID: primaryAssetID
+        )
+    }
+
+    private mutating func synchronizeLegacyAssets() {
+        assets = LegacyRecordingAssetMigration.migrate(
+            assets,
+            audioFileName: audioFileName,
+            transcriptFileName: transcriptFileName,
+            durationSeconds: Double(durationSeconds)
+        )
     }
 
     static func normalizedCategoryName(_ categoryName: String?) -> String? {
@@ -570,6 +619,7 @@ final class RecordingIndexRecord {
     var displayName: String = ""
     var audioFileName: String = ""
     var transcriptFileName: String = ""
+    var assetsJSON: String?
     var transcriptPreview: String = ""
     var lineCount: Int = 0
     var intelligenceSummary: String?
@@ -608,6 +658,7 @@ final class RecordingIndexRecord {
         displayName = item.displayName
         audioFileName = item.audioFileName
         transcriptFileName = item.transcriptFileName
+        assetsJSON = Self.encodeCodable(item.assets)
         transcriptPreview = item.transcriptPreview
         lineCount = item.lineCount
 
@@ -671,7 +722,8 @@ final class RecordingIndexRecord {
             isTranscriptLocked: isTranscriptLocked,
             meetingAnalysis: Self.decodeCodable(RecordingMeetingAnalysis.self, from: meetingAnalysisJSON),
             speakerDiarization: Self.decodeCodable(RecordingSpeakerDiarization.self, from: speakerDiarizationJSON),
-            audioEventAnalysis: Self.decodeCodable(RecordingAudioEventAnalysis.self, from: audioEventAnalysisJSON)
+            audioEventAnalysis: Self.decodeCodable(RecordingAudioEventAnalysis.self, from: audioEventAnalysisJSON),
+            assets: Self.decodeCodable([RecordingAsset].self, from: assetsJSON)
         )
     }
 
@@ -2365,6 +2417,19 @@ final class RecordingStore: ObservableObject {
         )
     }
 
+    func assetURLs(for item: RecordingItem) -> [URL] {
+        var seenPaths = Set<String>()
+        return item.assets.compactMap { asset in
+            guard asset.isSafeRelativePath,
+                  seenPaths.insert(asset.relativePath).inserted else {
+                return nil
+            }
+            return prepareUbiquitousItemForAccess(
+                recordingsDirectory.appendingPathComponent(asset.relativePath)
+            )
+        }
+    }
+
     private func prepareUbiquitousItemForAccess(_ url: URL) -> URL {
         guard isICloudStorageEnabled,
               fileManager.fileExists(atPath: url.path) else {
@@ -2429,8 +2494,7 @@ final class RecordingStore: ObservableObject {
         let workItems = recordings.map {
             RecordingICloudSyncStatusWorkItem(
                 id: $0.id,
-                audioURL: audioURL(for: $0),
-                transcriptURL: transcriptURL(for: $0)
+                fileURLs: assetURLs(for: $0)
             )
         }
 
@@ -2441,7 +2505,7 @@ final class RecordingStore: ObservableObject {
                         (
                             workItem.id,
                             Self.iCloudSyncStatus(
-                                for: [workItem.audioURL, workItem.transcriptURL],
+                                for: workItem.fileURLs,
                                 diagnosticRecordingID: logDiagnostics ? workItem.id : nil
                             )
                         )
@@ -2471,6 +2535,7 @@ final class RecordingStore: ObservableObject {
         let searchableFields = [
             item.displayName,
             item.audioFileName,
+            item.assets.map(\.relativePath).joined(separator: " "),
             item.localizedLanguageName,
             item.languageName,
             item.transcriptPreview,
@@ -2493,7 +2558,7 @@ final class RecordingStore: ObservableObject {
     }
 
     func shareURLs(for item: RecordingItem) -> [URL] {
-        [audioURL(for: item), transcriptURL(for: item)]
+        assetURLs(for: item)
     }
 
     func recording(withID id: RecordingItem.ID) -> RecordingItem? {
@@ -3019,11 +3084,14 @@ final class RecordingStore: ObservableObject {
     }
 
     private func removeRecordingFilesFromAllManagedDirectories(_ item: RecordingItem) throws {
-        try removeRecordingFilesNamed([
+        let assetPaths = item.assets
+            .filter(\.isSafeRelativePath)
+            .map(\.relativePath)
+        try removeRecordingFilesNamed(Array(Set(assetPaths + [
             item.audioFileName,
             item.transcriptFileName,
             Self.geminiTranscriptBackupFileName(for: item.transcriptFileName)
-        ])
+        ])))
     }
 
     private func removeFilesForStableRecordingID(_ id: RecordingItem.ID) throws {
@@ -3284,6 +3352,7 @@ final class RecordingStore: ObservableObject {
                 metadataText: [
                     item.displayName,
                     item.audioFileName,
+                    item.assets.map(\.relativePath).joined(separator: " "),
                     item.localizedLanguageName,
                     item.languageName,
                     item.transcriptPreview,
@@ -3344,6 +3413,7 @@ final class RecordingStore: ObservableObject {
         [
             item.displayName,
             item.audioFileName,
+            "\(item.assets.hashValue)",
             item.languageID,
             Locale.current.identifier,
             item.transcriptFileName,
@@ -3648,8 +3718,7 @@ private struct RecordingICloudFileSyncInspection {
 
 private struct RecordingICloudSyncStatusWorkItem {
     var id: RecordingItem.ID
-    var audioURL: URL
-    var transcriptURL: URL
+    var fileURLs: [URL]
 }
 
 private struct RecordingSearchIndexWorkItem {

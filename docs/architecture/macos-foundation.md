@@ -18,6 +18,10 @@ The macOS app is not a Catalyst target and does not compile the iOS source direc
 5. A recording can own multiple typed assets; no shared API should assume one audio file per recording.
 6. Both apps must build from `main` before it can be released.
 
+## Recording asset compatibility
+
+`RecordingSession` and `RecordingAsset` are versioned in `TranscriberDomain`. The iOS `RecordingItem` keeps `audioFileName` and `transcriptFileName` as compatibility aliases while persisting an asset manifest alongside them. Records created before the manifest existed are upgraded in memory to deterministic `legacy.primary-audio` and `legacy.transcript` assets, then written back through the existing SwiftData and CloudKit payload paths. Older clients continue to ignore the additive `assets` field.
+
 The generated macOS project is defined by `LiveTranscriberMac/project.yml`. Regenerate it with:
 
 ```sh
