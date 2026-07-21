@@ -26,8 +26,8 @@ It uses Apple Speech for the default live transcription path, supports optional 
 | --- | --- |
 | While recording | Saves audio and shows live transcript lines immediately. |
 | While listening | Translates confirmed transcript text with Apple's Translation framework. |
-| After recording | Re-transcribes saved audio with Apple Speech, Local Whisper, or optional OpenAI. |
-| For notes | Generates summaries and tags with Apple Intelligence or local Qwen3. |
+| After recording | Re-transcribes saved audio with Apple Speech or Local Whisper, or explicitly processes it with Gemini Cloud. |
+| For notes | Generates summaries and tags with Apple Intelligence, local Qwen3, or Gemini Cloud. |
 | For recall | Searches names, languages, transcript text, summaries, and tags. |
 | For privacy | Keeps recordings local by default, with optional private iCloud sync. |
 
@@ -56,7 +56,8 @@ It uses Apple Speech for the default live transcription path, supports optional 
 - Optional Local Whisper Live beta for offline realtime transcription with a selected downloaded model.
 - Import audio from Files or the iOS share/Open In menu.
 - Offline imported-audio transcription with progress and failure states.
-- Saved-recording re-transcription with Apple Speech, Local Whisper, or OpenAI.
+- Saved-recording re-transcription with Apple Speech or Local Whisper, plus explicitly confirmed Gemini Cloud processing.
+- EchoScript-inspired Gemini flow: upload original audio only after confirmation, generate a verbatim speaker-labeled timeline with color-coded speaker chips in the transcript UI, then create summary and meeting intelligence. The pre-Gemini transcript remains restorable.
 - Live and saved transcript translation using Apple's Translation framework.
 
 ### Saved Recordings
@@ -69,7 +70,8 @@ It uses Apple Speech for the default live transcription path, supports optional 
 
 ### Intelligence
 
-- Selectable summary engine: Automatic, Apple Intelligence, or Local Qwen3.
+- Selectable summary engine: Automatic, Apple Intelligence, Local Qwen3, or Gemini Cloud.
+- Dedicated Gemini Cloud submenu in Intelligence Settings with an enable switch, Keychain-backed API key, model name, and locally tracked request/input/output/thinking/cached/total token usage.
 - Tap Analyze to use the Settings default; long-press Analyze to choose a provider for that run.
 - Local Qwen3 1.7B Q4_K_M GGUF summaries and tags through embedded llama.cpp.
 - Summary model download/delete controls in Settings.
@@ -111,7 +113,7 @@ flowchart TB
     localWhisper["Local Whisper\nsaved-recording re-transcription"]
     appleIntel["Apple Intelligence\nFoundationModels summary + tags"]
     localQwen["Local Qwen3 GGUF\nsummary through llama.cpp"]
-    openai["OpenAI Audio\noptional saved-recording re-transcription"]
+    gemini["Gemini Cloud\nverbatim transcript + speaker timeline + intelligence"]
     activity["ActivityKit + WidgetKit\nLock Screen, Dynamic Island, Widget"]
 
     user --> ui
@@ -133,11 +135,11 @@ flowchart TB
     detail --> localWhisper
     detail --> appleIntel
     detail --> localQwen
-    detail --> openai
+    detail --> gemini
     localWhisper --> store
     appleIntel --> store
     localQwen --> store
-    openai --> store
+    gemini --> store
 ```
 
 ## Transcription Paths
@@ -147,7 +149,7 @@ flowchart TB
 | Apple Speech | Default live transcription, import transcription, Apple re-transcription | On-device Apple system framework |
 | Local Whisper Live beta | Offline realtime transcription with a selected Whisper model | On-device after model download |
 | Local Whisper saved-recording | Higher-accuracy offline pass after recording | On-device after model download |
-| OpenAI saved-recording | Optional cloud transcription with the user's own API key | Uploads only when explicitly selected |
+| Gemini Cloud | Optional verbatim transcript, speaker turns, timestamps, summary, and meeting analysis | Uploads audio and the current draft only after explicit confirmation; keeps a restorable transcript backup |
 
 ## Summary Paths
 
@@ -156,6 +158,7 @@ flowchart TB
 | Automatic | Best available local option | Apple Intelligence first, then Local Qwen if installed |
 | Apple Intelligence | System FoundationModels summary and tags | Requires device and region availability |
 | Local Qwen3 | Local summaries on unsupported devices | Uses `Qwen_Qwen3-1.7B-Q4_K_M.gguf` with embedded llama.cpp |
+| Gemini Cloud | Cloud summaries, meeting analysis, and recording Q&A | Uses the user's Gemini API key; Automatic mode never selects it |
 
 ## Supported Languages
 
@@ -165,8 +168,6 @@ Local Whisper uses model-specific language support:
 
 - English-only models expose English only.
 - Multilingual models expose Whisper's multilingual language list.
-
-OpenAI saved-recording transcription uses the saved recording's current language ID when sending the request.
 
 ## Storage and Sync
 
@@ -265,7 +266,8 @@ LiveTranscriber is built around local processing by default.
 - Apple Speech, Apple Translation, and Apple Intelligence use Apple system frameworks.
 - Local Whisper transcription runs on device after the user downloads or bundles a model.
 - Local Qwen summaries run on device through embedded llama.cpp after the user downloads or bundles the GGUF model.
-- OpenAI is used only when the user manually chooses OpenAI transcription for a saved recording; that audio is sent directly from the iPhone to OpenAI with the user's own API key.
+- Gemini is used only after the user confirms **Process with Gemini Cloud** for a saved recording, or explicitly selects Gemini for a text-only intelligence action. Audio or transcript text is sent directly from the iPhone with the user's own API key; Automatic mode remains local-only.
+- Gemini Interactions requests set `store: false`, and the temporary Gemini Files upload is deleted after processing on a best-effort basis.
 - Files are stored in the local app-private container by default.
 - Optional iCloud sync uses the user's app-private iCloud container and CloudKit private database.
 - The camera is not used for photos or video. `NSCameraUsageDescription` is present because Apple static review requires it when the app uses `AVCaptureSession` / `AVCaptureDeviceInput` for microphone recording.

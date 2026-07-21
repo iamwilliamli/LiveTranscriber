@@ -4,3 +4,8 @@
 "NSMicrophoneUsageDescription" = "Wird verwendet, um Audio fuer Live-Transkription aufzunehmen.";
 "NSLocationWhenInUseUsageDescription" = "Wird nur verwendet, wenn du einer gespeicherten Aufnahme einen Standort hinzufuegst.";
 "NSSpeechRecognitionUsageDescription" = "Wird verwendet, um aufgezeichnete Sprache in Live-Transkriptionstext umzuwandeln.";
+"NSRemindersFullAccessUsageDescription" = "Wird nur verwendet, wenn du extrahierte Aufgaben zu Erinnerungen hinzufuegst.";
+"NSRemindersUsageDescription" = "Wird nur verwendet, wenn du extrahierte Aufgaben zu Erinnerungen hinzufuegst.";
+"Start Recording" = "Aufnahme starten";
+"Audio Recording" = "Audioaufnahme";
+"NSUbiquitousContainerName" = "Live-Transkription";

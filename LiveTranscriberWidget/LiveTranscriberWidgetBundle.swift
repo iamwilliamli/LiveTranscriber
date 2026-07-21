@@ -5,8 +5,24 @@ import WidgetKit
 @main
 struct LiveTranscriberWidgetBundle: WidgetBundle {
     var body: some Widget {
+        QuickRecordingControl()
         LiveTranscriberHomeWidget()
         TranscriptionLiveActivityWidget()
+    }
+}
+
+struct QuickRecordingControl: ControlWidget {
+    static let kind = "com.iamwilliamli.LiveTranscriber.quickRecording"
+
+    var body: some ControlWidgetConfiguration {
+        StaticControlConfiguration(kind: Self.kind) {
+            ControlWidgetButton(action: StartQuickRecordingIntent()) {
+                Label(QuickRecordingControlL10n.startRecording, systemImage: "waveform.and.mic")
+                    .controlWidgetActionHint(QuickRecordingControlL10n.startRecording)
+            }
+        }
+        .displayName(QuickRecordingControlL10n.title)
+        .description(QuickRecordingControlL10n.description)
     }
 }
 
@@ -16,9 +32,16 @@ struct LiveTranscriberHomeWidget: Widget {
             LiveTranscriberHomeWidgetView(entry: entry)
                 .containerBackground(.fill.tertiary, for: .widget)
         }
-        .configurationDisplayName("Live Transcriber")
-        .description("Start recording, open saved files, and change recording settings.")
-        .supportedFamilies([.systemSmall, .systemMedium, .systemLarge])
+        .configurationDisplayName(HomeWidgetL10n.appName)
+        .description(HomeWidgetL10n.configurationDescription)
+        .supportedFamilies([
+            .systemSmall,
+            .systemMedium,
+            .systemLarge,
+            .accessoryCircular,
+            .accessoryRectangular,
+            .accessoryInline
+        ])
     }
 }
 
@@ -53,9 +76,61 @@ private struct LiveTranscriberHomeWidgetView: View {
                 .widgetURL(WidgetRoute.record.url)
         case .systemLarge:
             LargeHomeWidget()
+        case .accessoryCircular:
+            QuickRecordingCircularWidget()
+                .widgetURL(WidgetRoute.record.url)
+        case .accessoryRectangular:
+            QuickRecordingRectangularWidget()
+                .widgetURL(WidgetRoute.record.url)
+        case .accessoryInline:
+            QuickRecordingInlineWidget()
+                .widgetURL(WidgetRoute.record.url)
         default:
             MediumHomeWidget()
         }
+    }
+}
+
+private struct QuickRecordingCircularWidget: View {
+    var body: some View {
+        ZStack {
+            AccessoryWidgetBackground()
+
+            Image(systemName: "waveform.and.mic")
+                .font(.system(size: 22, weight: .semibold))
+                .widgetAccentable()
+        }
+        .accessibilityLabel(Text(QuickRecordingControlL10n.startRecording))
+    }
+}
+
+private struct QuickRecordingRectangularWidget: View {
+    var body: some View {
+        HStack(spacing: 8) {
+            Image(systemName: "waveform.and.mic")
+                .font(.system(size: 21, weight: .semibold))
+                .widgetAccentable()
+
+            VStack(alignment: .leading, spacing: 1) {
+                Text(QuickRecordingControlL10n.title)
+                    .font(.redditSans(.headline, weight: .semibold))
+                    .lineLimit(1)
+
+                Text(QuickRecordingControlL10n.startRecording)
+                    .font(.redditSans(.caption, weight: .medium))
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+            }
+
+            Spacer(minLength: 0)
+        }
+        .accessibilityElement(children: .combine)
+    }
+}
+
+private struct QuickRecordingInlineWidget: View {
+    var body: some View {
+        Label(QuickRecordingControlL10n.startRecording, systemImage: "waveform.and.mic")
     }
 }
 
@@ -67,13 +142,13 @@ private struct SmallHomeWidget: View {
             Spacer(minLength: 2)
 
             VStack(alignment: .leading, spacing: 4) {
-                Text("Start")
+                Text(HomeWidgetL10n.start)
                     .font(.redditSans(size: 31, weight: .bold))
                     .foregroundStyle(.primary)
                     .lineLimit(1)
                     .minimumScaleFactor(0.75)
 
-                Text("Recording")
+                Text(HomeWidgetL10n.recording)
                     .font(.redditSans(.caption, weight: .semibold))
                     .foregroundStyle(.secondary)
                     .lineLimit(1)
@@ -81,7 +156,7 @@ private struct SmallHomeWidget: View {
 
             Spacer(minLength: 0)
 
-            WidgetStatusPill(systemImage: "captions.bubble", text: "Live transcript")
+            WidgetStatusPill(systemImage: "captions.bubble", text: HomeWidgetL10n.liveTranscript)
         }
         .padding(16)
     }
@@ -93,13 +168,13 @@ private struct MediumHomeWidget: View {
             VStack(alignment: .leading, spacing: 10) {
                 WidgetHeader(compact: false)
 
-                Text("Quick Actions")
+                Text(HomeWidgetL10n.quickActions)
                     .font(.redditSans(.headline, weight: .semibold))
                     .foregroundStyle(.primary)
                     .lineLimit(1)
                     .fixedSize(horizontal: false, vertical: true)
 
-                Text("Start recording or jump to saved files.")
+                Text(HomeWidgetL10n.quickActionsDescription)
                     .font(.redditSans(.caption, weight: .medium))
                     .foregroundStyle(.secondary)
                     .lineLimit(2)
@@ -107,9 +182,9 @@ private struct MediumHomeWidget: View {
             .frame(maxWidth: .infinity, alignment: .leading)
 
             VStack(spacing: 8) {
-                WidgetActionLink(route: .record, systemImage: "record.circle", title: "Start", prominence: .primary)
-                WidgetActionLink(route: .recordings, systemImage: "folder", title: "Files", prominence: .secondary)
-                WidgetActionLink(route: .settings, systemImage: "gearshape", title: "Settings", prominence: .secondary)
+                WidgetActionLink(route: .record, systemImage: "record.circle", title: HomeWidgetL10n.start, prominence: .primary)
+                WidgetActionLink(route: .recordings, systemImage: "folder", title: HomeWidgetL10n.files, prominence: .secondary)
+                WidgetActionLink(route: .settings, systemImage: "gearshape", title: HomeWidgetL10n.settings, prominence: .secondary)
             }
             .frame(width: 116)
         }
@@ -123,12 +198,12 @@ private struct LargeHomeWidget: View {
             WidgetHeader(compact: false)
 
             VStack(alignment: .leading, spacing: 6) {
-                Text("Recording Controls")
+                Text(HomeWidgetL10n.recordingControls)
                     .font(.redditSans(.title3, weight: .bold))
                     .foregroundStyle(.primary)
                     .lineLimit(2)
 
-                Text("Start recording, open saved files, import audio, or adjust recording settings.")
+                Text(HomeWidgetL10n.recordingControlsDescription)
                     .font(.redditSans(.caption, weight: .medium))
                     .foregroundStyle(.secondary)
                     .lineLimit(3)
@@ -136,16 +211,16 @@ private struct LargeHomeWidget: View {
             }
 
             HStack(spacing: 8) {
-                WidgetStatusPill(systemImage: "captions.bubble", text: "Live transcript")
-                WidgetStatusPill(systemImage: "waveform", text: "Stereo audio")
+                WidgetStatusPill(systemImage: "captions.bubble", text: HomeWidgetL10n.liveTranscript)
+                WidgetStatusPill(systemImage: "waveform", text: HomeWidgetL10n.stereoAudio)
             }
 
             Spacer(minLength: 0)
 
             VStack(spacing: 10) {
-                WidgetActionLink(route: .record, systemImage: "record.circle", title: "Start Recording", prominence: .primary)
-                WidgetActionLink(route: .recordings, systemImage: "folder", title: "Saved Files", prominence: .secondary)
-                WidgetActionLink(route: .settings, systemImage: "gearshape", title: "Settings", prominence: .secondary)
+                WidgetActionLink(route: .record, systemImage: "record.circle", title: QuickRecordingControlL10n.startRecording, prominence: .primary)
+                WidgetActionLink(route: .recordings, systemImage: "folder", title: HomeWidgetL10n.savedFiles, prominence: .secondary)
+                WidgetActionLink(route: .settings, systemImage: "gearshape", title: HomeWidgetL10n.settings, prominence: .secondary)
             }
         }
         .padding(18)
@@ -168,12 +243,12 @@ private struct WidgetHeader: View {
             .frame(width: compact ? 36 : 38, height: compact ? 36 : 38)
 
             VStack(alignment: .leading, spacing: 1) {
-                Text("Live")
+                Text(HomeWidgetL10n.brandLive)
                     .font(.redditSans(.caption2, weight: .semibold))
                     .foregroundStyle(.secondary)
                     .textCase(.uppercase)
 
-                Text("Transcriber")
+                Text(HomeWidgetL10n.brandTranscriber)
                     .font(.redditSans(.subheadline, weight: .bold))
                     .foregroundStyle(.primary)
                     .lineLimit(1)
@@ -191,7 +266,7 @@ private struct WidgetActionLink: View {
 
     let route: WidgetRoute
     let systemImage: String
-    let title: String
+    let title: LocalizedStringResource
     let prominence: Prominence
 
     var body: some View {
@@ -226,7 +301,7 @@ private struct WidgetActionLink: View {
 
 private struct WidgetStatusPill: View {
     let systemImage: String
-    let text: String
+    let text: LocalizedStringResource
 
     var body: some View {
         Label(text, systemImage: systemImage)
@@ -371,7 +446,7 @@ private struct ActivityStateBlock: View {
             ActivityStatusDot(state: state, size: style == .lockScreen ? 8 : 7)
 
             VStack(alignment: .leading, spacing: 1) {
-                Text("Status")
+                Text(HomeWidgetL10n.activityStatus)
                     .font(.redditSans(size: style == .lockScreen ? 9 : 8, weight: .bold))
                     .foregroundStyle(.secondary)
                     .textCase(.uppercase)
@@ -397,7 +472,7 @@ private struct ActivityTopSummaryBlock: View {
 
     var body: some View {
         VStack(alignment: .center, spacing: 1) {
-            Text("Transcript")
+            Text(HomeWidgetL10n.activityTranscript)
                 .font(.redditSans(size: 9, weight: .bold))
                 .foregroundStyle(.secondary)
                 .textCase(.uppercase)
@@ -450,7 +525,7 @@ private struct StopRecordingLink: View {
 
     var body: some View {
         Link(destination: stopURL) {
-            Label("Stop", systemImage: "stop.fill")
+            Label(HomeWidgetL10n.activityStop, systemImage: "stop.fill")
                 .font(.redditSans(.caption2, weight: .bold))
                 .foregroundStyle(.white)
                 .lineLimit(1)
@@ -474,7 +549,7 @@ private struct ExpandedTranscriptionIslandContent: View {
 
             HStack(alignment: .center, spacing: 7) {
                 ActivityMetricBlock(
-                    label: "Lang",
+                    label: HomeWidgetL10n.activityLanguage,
                     value: state.languageName,
                     systemImage: "globe",
                     alignment: .leading
@@ -537,7 +612,7 @@ private struct ActivityMetricBlock: View {
         case trailing
     }
 
-    let label: String
+    let label: LocalizedStringResource
     let value: String
     let systemImage: String
     let alignment: Alignment

@@ -22,6 +22,7 @@
 		7B000000000000000000000E /* RedditSans-SemiBold.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 7B0000000000000000001012 /* RedditSans-SemiBold.ttf */; };
 		7B000000000000000000000F /* RedditSans-Bold.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 7B0000000000000000001013 /* RedditSans-Bold.ttf */; };
 		7B0000000000000000000010 /* RedditSans-Italic.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 7B0000000000000000001014 /* RedditSans-Italic.ttf */; };
+		7B000000000000000000001F /* Baloo2-Variable.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 7B000000000000000000101F /* Baloo2-Variable.ttf */; };
 		7B0000000000000000000011 /* TranscriptionLanguage.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7B0000000000000000001015 /* TranscriptionLanguage.swift */; };
 		7B0000000000000000000012 /* RecordingStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7B0000000000000000001016 /* RecordingStore.swift */; };
 		7B0000000000000000000013 /* RecordingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7B0000000000000000001017 /* RecordingsView.swift */; };
@@ -38,10 +39,18 @@
 		7B000000000000000000001E /* RedditSans-Italic.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 7B0000000000000000001014 /* RedditSans-Italic.ttf */; };
 		7B0000000000000000000020 /* HapticFeedback.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7B0000000000000000001020 /* HapticFeedback.swift */; };
 		7B0000000000000000000021 /* L10n.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7B0000000000000000001021 /* L10n.swift */; };
+		7B00000000000000000000C1 /* LaunchSplashView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7B00000000000000000010C1 /* LaunchSplashView.swift */; };
+		7B00000000000000000000C2 /* QuickRecordingControlIntent.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7B00000000000000000010C2 /* QuickRecordingControlIntent.swift */; };
+		7B00000000000000000000C3 /* QuickRecordingControlIntent.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7B00000000000000000010C2 /* QuickRecordingControlIntent.swift */; };
+		7B00000000000000000000C4 /* ControlCenter.xcstrings in Resources */ = {isa = PBXBuildFile; fileRef = 7B00000000000000000010C3 /* ControlCenter.xcstrings */; };
+		7B00000000000000000000C5 /* ControlCenter.xcstrings in Resources */ = {isa = PBXBuildFile; fileRef = 7B00000000000000000010C3 /* ControlCenter.xcstrings */; };
+		7B00000000000000000000D0 /* AppShortcuts.strings in Resources */ = {isa = PBXBuildFile; fileRef = 7B00000000000000000030D0 /* AppShortcuts.strings */; };
+		7B00000000000000000000D1 /* InfoPlist.strings in Resources */ = {isa = PBXBuildFile; fileRef = 7B00000000000000000030D1 /* InfoPlist.strings */; };
+		7B00000000000000000000E0 /* AudioEvents.xcstrings in Resources */ = {isa = PBXBuildFile; fileRef = 7B00000000000000000010E0 /* AudioEvents.xcstrings */; };
 		7B0000000000000000000022 /* Semantic.xcstrings in Resources */ = {isa = PBXBuildFile; fileRef = 7B0000000000000000001022 /* Semantic.xcstrings */; };
 		7B0000000000000000000023 /* StructuredFoundationModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7B0000000000000000001027 /* StructuredFoundationModels.swift */; };
 		7B0000000000000000000024 /* LiveTranscriberStructuredFoundationModels.framework in Embed Frameworks */ = {isa = PBXBuildFile; fileRef = 7B0000000000000000001028 /* LiveTranscriberStructuredFoundationModels.framework */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
-		7B0000000000000000000025 /* OpenAITranscription.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7B0000000000000000001029 /* OpenAITranscription.swift */; };
+		7B0000000000000000000025 /* LiveTranscriptionBackend.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7B0000000000000000001029 /* LiveTranscriptionBackend.swift */; };
 		7B0000000000000000000026 /* TranscriptLineEditSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7B000000000000000000102A /* TranscriptLineEditSheet.swift */; };
 		7B0000000000000000000027 /* LocalWhisperTranscription.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7B000000000000000000102B /* LocalWhisperTranscription.swift */; };
 		7B0000000000000000000028 /* LocalWhisperBridge.m in Sources */ = {isa = PBXBuildFile; fileRef = 7B000000000000000000102D /* LocalWhisperBridge.m */; };
@@ -57,6 +66,18 @@
 		7B0000000000000000000032 /* RecordingSiriIntegration.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7B0000000000000000001037 /* RecordingSiriIntegration.swift */; };
 		7B0000000000000000000033 /* RecordingChatView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7B0000000000000000001038 /* RecordingChatView.swift */; };
 		7B0000000000000000000034 /* TranscriptContextBuilder.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7B0000000000000000001039 /* TranscriptContextBuilder.swift */; };
+		7B0000000000000000000035 /* MeetingAnalysisService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7B000000000000000000103A /* MeetingAnalysisService.swift */; };
+		7B0000000000000000000036 /* ReminderExportService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7B000000000000000000103B /* ReminderExportService.swift */; };
+		7B0000000000000000000037 /* TranscriptExportService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7B000000000000000000103C /* TranscriptExportService.swift */; };
+		7B0000000000000000000038 /* RecordingSoundAnalysisService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7B000000000000000000103D /* RecordingSoundAnalysisService.swift */; };
+		7B0000000000000000000039 /* GeminiCloudService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7B000000000000000000103E /* GeminiCloudService.swift */; };
+		7B000000000000000000003A /* Qwen3ASRTranscription.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7B000000000000000000103F /* Qwen3ASRTranscription.swift */; };
+		7B000000000000000000003B /* Qwen3ASR in Frameworks */ = {isa = PBXBuildFile; productRef = 7B000000000000000000B002 /* Qwen3ASR */; };
+		7B000000000000000000003C /* SpeechVAD in Frameworks */ = {isa = PBXBuildFile; productRef = 7B000000000000000000B003 /* SpeechVAD */; };
+		7B000000000000000000003D /* AudioCommon in Frameworks */ = {isa = PBXBuildFile; productRef = 7B000000000000000000B004 /* AudioCommon */; };
+		7B000000000000000000003E /* MOSSLocalTranscription.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7B0000000000000000001040 /* MOSSLocalTranscription.swift */; };
+		7B000000000000000000003F /* MLXAudioSTT in Frameworks */ = {isa = PBXBuildFile; productRef = 7B000000000000000000B006 /* MLXAudioSTT */; };
+		7B0000000000000000000040 /* MLXAudioCore in Frameworks */ = {isa = PBXBuildFile; productRef = 7B000000000000000000B007 /* MLXAudioCore */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -126,6 +147,8 @@
 		7B0000000000000000001012 /* RedditSans-SemiBold.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = "RedditSans-SemiBold.ttf"; sourceTree = "<group>"; };
 		7B0000000000000000001013 /* RedditSans-Bold.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = "RedditSans-Bold.ttf"; sourceTree = "<group>"; };
 		7B0000000000000000001014 /* RedditSans-Italic.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = "RedditSans-Italic.ttf"; sourceTree = "<group>"; };
+		7B000000000000000000101F /* Baloo2-Variable.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = "Baloo2-Variable.ttf"; sourceTree = "<group>"; };
+		7B00000000000000000010F0 /* Baloo2-OFL.txt */ = {isa = PBXFileReference; lastKnownFileType = text; path = "Baloo2-OFL.txt"; sourceTree = "<group>"; };
 		7B0000000000000000001015 /* TranscriptionLanguage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TranscriptionLanguage.swift; sourceTree = "<group>"; };
 		7B0000000000000000001016 /* RecordingStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecordingStore.swift; sourceTree = "<group>"; };
 		7B0000000000000000001017 /* RecordingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecordingsView.swift; sourceTree = "<group>"; };
@@ -138,10 +161,26 @@
 		7B000000000000000000101E /* LiveTranscriber.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = LiveTranscriber.entitlements; sourceTree = "<group>"; };
 		7B0000000000000000001020 /* HapticFeedback.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HapticFeedback.swift; sourceTree = "<group>"; };
 		7B0000000000000000001021 /* L10n.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = L10n.swift; sourceTree = "<group>"; };
+		7B00000000000000000010C1 /* LaunchSplashView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LaunchSplashView.swift; sourceTree = "<group>"; };
+		7B00000000000000000010C2 /* QuickRecordingControlIntent.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QuickRecordingControlIntent.swift; sourceTree = "<group>"; };
+		7B00000000000000000010C3 /* ControlCenter.xcstrings */ = {isa = PBXFileReference; lastKnownFileType = text.json.xcstrings; path = ControlCenter.xcstrings; sourceTree = "<group>"; };
+		7B00000000000000000010D0 /* en */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = en; path = en.lproj/AppShortcuts.strings; sourceTree = "<group>"; };
+		7B00000000000000000010D1 /* zh-Hans */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = "zh-Hans"; path = "zh-Hans.lproj/AppShortcuts.strings"; sourceTree = "<group>"; };
+		7B00000000000000000010D2 /* zh-Hant */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = "zh-Hant"; path = "zh-Hant.lproj/AppShortcuts.strings"; sourceTree = "<group>"; };
+		7B00000000000000000010D3 /* de */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = de; path = de.lproj/AppShortcuts.strings; sourceTree = "<group>"; };
+		7B00000000000000000010D4 /* nl */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = nl; path = nl.lproj/AppShortcuts.strings; sourceTree = "<group>"; };
+		7B00000000000000000010D5 /* ja */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = ja; path = ja.lproj/AppShortcuts.strings; sourceTree = "<group>"; };
+		7B00000000000000000010D6 /* en */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = en; path = en.lproj/InfoPlist.strings; sourceTree = "<group>"; };
+		7B00000000000000000010D7 /* zh-Hans */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = "zh-Hans"; path = "zh-Hans.lproj/InfoPlist.strings"; sourceTree = "<group>"; };
+		7B00000000000000000010D8 /* zh-Hant */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = "zh-Hant"; path = "zh-Hant.lproj/InfoPlist.strings"; sourceTree = "<group>"; };
+		7B00000000000000000010D9 /* de */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = de; path = de.lproj/InfoPlist.strings; sourceTree = "<group>"; };
+		7B00000000000000000010DA /* nl */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = nl; path = nl.lproj/InfoPlist.strings; sourceTree = "<group>"; };
+		7B00000000000000000010DB /* ja */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = ja; path = ja.lproj/InfoPlist.strings; sourceTree = "<group>"; };
+		7B00000000000000000010E0 /* AudioEvents.xcstrings */ = {isa = PBXFileReference; lastKnownFileType = text.json.xcstrings; path = AudioEvents.xcstrings; sourceTree = "<group>"; };
 		7B0000000000000000001022 /* Semantic.xcstrings */ = {isa = PBXFileReference; lastKnownFileType = text.json.xcstrings; path = Semantic.xcstrings; sourceTree = "<group>"; };
 		7B0000000000000000001027 /* StructuredFoundationModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StructuredFoundationModels.swift; sourceTree = "<group>"; };
 		7B0000000000000000001028 /* LiveTranscriberStructuredFoundationModels.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; includeInIndex = 0; path = LiveTranscriberStructuredFoundationModels.framework; sourceTree = BUILT_PRODUCTS_DIR; };
-		7B0000000000000000001029 /* OpenAITranscription.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OpenAITranscription.swift; sourceTree = "<group>"; };
+		7B0000000000000000001029 /* LiveTranscriptionBackend.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LiveTranscriptionBackend.swift; sourceTree = "<group>"; };
 		7B000000000000000000102A /* TranscriptLineEditSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TranscriptLineEditSheet.swift; sourceTree = "<group>"; };
 		7B000000000000000000102B /* LocalWhisperTranscription.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocalWhisperTranscription.swift; sourceTree = "<group>"; };
 		7B000000000000000000102C /* LocalWhisperBridge.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = LocalWhisperBridge.h; sourceTree = "<group>"; };
@@ -158,6 +197,13 @@
 		7B0000000000000000001037 /* RecordingSiriIntegration.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecordingSiriIntegration.swift; sourceTree = "<group>"; };
 		7B0000000000000000001038 /* RecordingChatView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecordingChatView.swift; sourceTree = "<group>"; };
 		7B0000000000000000001039 /* TranscriptContextBuilder.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TranscriptContextBuilder.swift; sourceTree = "<group>"; };
+		7B000000000000000000103A /* MeetingAnalysisService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MeetingAnalysisService.swift; sourceTree = "<group>"; };
+		7B000000000000000000103B /* ReminderExportService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReminderExportService.swift; sourceTree = "<group>"; };
+		7B000000000000000000103C /* TranscriptExportService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TranscriptExportService.swift; sourceTree = "<group>"; };
+		7B000000000000000000103D /* RecordingSoundAnalysisService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecordingSoundAnalysisService.swift; sourceTree = "<group>"; };
+		7B000000000000000000103E /* GeminiCloudService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GeminiCloudService.swift; sourceTree = "<group>"; };
+		7B000000000000000000103F /* Qwen3ASRTranscription.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Qwen3ASRTranscription.swift; sourceTree = "<group>"; };
+		7B0000000000000000001040 /* MOSSLocalTranscription.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MOSSLocalTranscription.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -165,6 +211,11 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				7B0000000000000000000040 /* MLXAudioCore in Frameworks */,
+				7B000000000000000000003F /* MLXAudioSTT in Frameworks */,
+				7B000000000000000000003D /* AudioCommon in Frameworks */,
+				7B000000000000000000003B /* Qwen3ASR in Frameworks */,
+				7B000000000000000000003C /* SpeechVAD in Frameworks */,
 				7B0000000000000000000029 /* whisper.xcframework in Frameworks */,
 				7B0000000000000000000030 /* llama.xcframework in Frameworks */,
 			);
@@ -210,7 +261,7 @@
 				7B0000000000000000001006 /* LiveTranscriptionManager.swift */,
 				7B0000000000000000001030 /* AppleTranslationLanguages.swift */,
 				7B0000000000000000001031 /* AppleSpeechTranscriptionSupport.swift */,
-				7B0000000000000000001029 /* OpenAITranscription.swift */,
+				7B0000000000000000001029 /* LiveTranscriptionBackend.swift */,
 				7B000000000000000000102B /* LocalWhisperTranscription.swift */,
 				7B0000000000000000001032 /* LocalSummaryIntelligence.swift */,
 				7B000000000000000000102C /* LocalWhisperBridge.h */,
@@ -221,11 +272,20 @@
 				7B0000000000000000001015 /* TranscriptionLanguage.swift */,
 				7B0000000000000000001020 /* HapticFeedback.swift */,
 				7B0000000000000000001021 /* L10n.swift */,
+				7B00000000000000000010C1 /* LaunchSplashView.swift */,
+				7B00000000000000000010C2 /* QuickRecordingControlIntent.swift */,
 				7B0000000000000000001016 /* RecordingStore.swift */,
 				7B0000000000000000001037 /* RecordingSiriIntegration.swift */,
 				7B0000000000000000001017 /* RecordingsView.swift */,
 				7B0000000000000000001038 /* RecordingChatView.swift */,
 				7B0000000000000000001039 /* TranscriptContextBuilder.swift */,
+				7B000000000000000000103A /* MeetingAnalysisService.swift */,
+				7B000000000000000000103B /* ReminderExportService.swift */,
+				7B000000000000000000103C /* TranscriptExportService.swift */,
+				7B000000000000000000103D /* RecordingSoundAnalysisService.swift */,
+				7B000000000000000000103E /* GeminiCloudService.swift */,
+				7B000000000000000000103F /* Qwen3ASRTranscription.swift */,
+				7B0000000000000000001040 /* MOSSLocalTranscription.swift */,
 				7B000000000000000000102A /* TranscriptLineEditSheet.swift */,
 				7B0000000000000000001018 /* SettingsView.swift */,
 				7B0000000000000000001019 /* TranscriptionActivityAttributes.swift */,
@@ -233,8 +293,11 @@
 				7B0000000000000000001007 /* EmptyStateView.swift */,
 				7B0000000000000000001008 /* Assets.xcassets */,
 				7B0000000000000000003010 /* Fonts */,
+				7B00000000000000000010E0 /* AudioEvents.xcstrings */,
 				7B0000000000000000001022 /* Semantic.xcstrings */,
+				7B00000000000000000010C3 /* ControlCenter.xcstrings */,
 				7B0000000000000000003006 /* InfoPlist.strings */,
+				7B00000000000000000030D0 /* AppShortcuts.strings */,
 				7B000000000000000000100A /* Info.plist */,
 				7B000000000000000000101E /* LiveTranscriber.entitlements */,
 				7B0000000000000000001009 /* PrivacyInfo.xcprivacy */,
@@ -256,6 +319,7 @@
 			isa = PBXGroup;
 			children = (
 				7B000000000000000000101B /* LiveTranscriberWidgetBundle.swift */,
+				7B00000000000000000030D1 /* InfoPlist.strings */,
 				7B000000000000000000101C /* Info.plist */,
 			);
 			path = LiveTranscriberWidget;
@@ -277,6 +341,8 @@
 				7B0000000000000000001012 /* RedditSans-SemiBold.ttf */,
 				7B0000000000000000001013 /* RedditSans-Bold.ttf */,
 				7B0000000000000000001014 /* RedditSans-Italic.ttf */,
+				7B000000000000000000101F /* Baloo2-Variable.ttf */,
+				7B00000000000000000010F0 /* Baloo2-OFL.txt */,
 			);
 			path = Fonts;
 			sourceTree = "<group>";
@@ -310,6 +376,13 @@
 				7B000000000000000000A004 /* PBXTargetDependency */,
 			);
 			name = LiveTranscriber;
+			packageProductDependencies = (
+				7B000000000000000000B002 /* Qwen3ASR */,
+				7B000000000000000000B003 /* SpeechVAD */,
+				7B000000000000000000B004 /* AudioCommon */,
+				7B000000000000000000B006 /* MLXAudioSTT */,
+				7B000000000000000000B007 /* MLXAudioCore */,
+			);
 			productName = LiveTranscriber;
 			productReference = 7B0000000000000000001000 /* LiveTranscriber.app */;
 			productType = "com.apple.product-type.application";
@@ -382,6 +455,10 @@
 					Base,
 				);
 			mainGroup = 7B0000000000000000003001;
+			packageReferences = (
+				7B000000000000000000B001 /* XCRemoteSwiftPackageReference "speech-swift" */,
+				7B000000000000000000B005 /* XCLocalSwiftPackageReference "MLXAudioMOSS" */,
+			);
 			productRefGroup = 7B0000000000000000003003 /* Products */;
 			projectDirPath = "";
 			projectRoot = "";
@@ -400,13 +477,17 @@
 			files = (
 				7B0000000000000000000008 /* Assets.xcassets in Resources */,
 				7B0000000000000000000009 /* PrivacyInfo.xcprivacy in Resources */,
+				7B00000000000000000000E0 /* AudioEvents.xcstrings in Resources */,
 				7B0000000000000000000022 /* Semantic.xcstrings in Resources */,
+				7B00000000000000000000C4 /* ControlCenter.xcstrings in Resources */,
 				7B000000000000000000000B /* InfoPlist.strings in Resources */,
+				7B00000000000000000000D0 /* AppShortcuts.strings in Resources */,
 				7B000000000000000000000C /* RedditSans-Regular.ttf in Resources */,
 				7B000000000000000000000D /* RedditSans-Medium.ttf in Resources */,
 				7B000000000000000000000E /* RedditSans-SemiBold.ttf in Resources */,
 				7B000000000000000000000F /* RedditSans-Bold.ttf in Resources */,
 				7B0000000000000000000010 /* RedditSans-Italic.ttf in Resources */,
+				7B000000000000000000001F /* Baloo2-Variable.ttf in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -414,6 +495,8 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				7B00000000000000000000C5 /* ControlCenter.xcstrings in Resources */,
+				7B00000000000000000000D1 /* InfoPlist.strings in Resources */,
 				7B000000000000000000001A /* RedditSans-Regular.ttf in Resources */,
 				7B000000000000000000001B /* RedditSans-Medium.ttf in Resources */,
 				7B000000000000000000001C /* RedditSans-SemiBold.ttf in Resources */,
@@ -437,7 +520,7 @@
 				7B0000000000000000000006 /* LiveTranscriptionManager.swift in Sources */,
 				7B000000000000000000002B /* AppleTranslationLanguages.swift in Sources */,
 				7B000000000000000000002C /* AppleSpeechTranscriptionSupport.swift in Sources */,
-				7B0000000000000000000025 /* OpenAITranscription.swift in Sources */,
+				7B0000000000000000000025 /* LiveTranscriptionBackend.swift in Sources */,
 				7B0000000000000000000027 /* LocalWhisperTranscription.swift in Sources */,
 				7B000000000000000000002D /* LocalSummaryIntelligence.swift in Sources */,
 				7B0000000000000000000028 /* LocalWhisperBridge.m in Sources */,
@@ -447,10 +530,19 @@
 				7B0000000000000000000032 /* RecordingSiriIntegration.swift in Sources */,
 				7B0000000000000000000020 /* HapticFeedback.swift in Sources */,
 				7B0000000000000000000021 /* L10n.swift in Sources */,
+				7B00000000000000000000C1 /* LaunchSplashView.swift in Sources */,
+				7B00000000000000000000C2 /* QuickRecordingControlIntent.swift in Sources */,
 				7B000000000000000000002E /* OnboardingIntroView.swift in Sources */,
 				7B0000000000000000000013 /* RecordingsView.swift in Sources */,
 				7B0000000000000000000033 /* RecordingChatView.swift in Sources */,
 				7B0000000000000000000034 /* TranscriptContextBuilder.swift in Sources */,
+				7B0000000000000000000035 /* MeetingAnalysisService.swift in Sources */,
+				7B0000000000000000000036 /* ReminderExportService.swift in Sources */,
+				7B0000000000000000000037 /* TranscriptExportService.swift in Sources */,
+				7B0000000000000000000038 /* RecordingSoundAnalysisService.swift in Sources */,
+				7B0000000000000000000039 /* GeminiCloudService.swift in Sources */,
+				7B000000000000000000003A /* Qwen3ASRTranscription.swift in Sources */,
+				7B000000000000000000003E /* MOSSLocalTranscription.swift in Sources */,
 				7B0000000000000000000026 /* TranscriptLineEditSheet.swift in Sources */,
 				7B0000000000000000000014 /* SettingsView.swift in Sources */,
 				7B0000000000000000000015 /* TranscriptionActivityAttributes.swift in Sources */,
@@ -465,6 +557,7 @@
 			files = (
 				7B0000000000000000000017 /* TranscriptionActivityAttributes.swift in Sources */,
 				7B0000000000000000000018 /* LiveTranscriberWidgetBundle.swift in Sources */,
+				7B00000000000000000000C3 /* QuickRecordingControlIntent.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -505,7 +598,79 @@
 			name = InfoPlist.strings;
 			sourceTree = "<group>";
 		};
+		7B00000000000000000030D0 /* AppShortcuts.strings */ = {
+			isa = PBXVariantGroup;
+			children = (
+				7B00000000000000000010D0 /* en */,
+				7B00000000000000000010D1 /* zh-Hans */,
+				7B00000000000000000010D2 /* zh-Hant */,
+				7B00000000000000000010D3 /* de */,
+				7B00000000000000000010D4 /* nl */,
+				7B00000000000000000010D5 /* ja */,
+			);
+			name = AppShortcuts.strings;
+			sourceTree = "<group>";
+		};
+		7B00000000000000000030D1 /* InfoPlist.strings */ = {
+			isa = PBXVariantGroup;
+			children = (
+				7B00000000000000000010D6 /* en */,
+				7B00000000000000000010D7 /* zh-Hans */,
+				7B00000000000000000010D8 /* zh-Hant */,
+				7B00000000000000000010D9 /* de */,
+				7B00000000000000000010DA /* nl */,
+				7B00000000000000000010DB /* ja */,
+			);
+			name = InfoPlist.strings;
+			sourceTree = "<group>";
+		};
 /* End PBXVariantGroup section */
+
+/* Begin XCRemoteSwiftPackageReference section */
+		7B000000000000000000B001 /* XCRemoteSwiftPackageReference "speech-swift" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/soniqo/speech-swift";
+			requirement = {
+				kind = revision;
+				revision = a7fd06d6f68f167203fb995f7bdb8bc9ed10c179;
+			};
+		};
+/* End XCRemoteSwiftPackageReference section */
+
+/* Begin XCLocalSwiftPackageReference section */
+		7B000000000000000000B005 /* XCLocalSwiftPackageReference "MLXAudioMOSS" */ = {
+			isa = XCLocalSwiftPackageReference;
+			relativePath = Vendor/MLXAudioMOSS;
+		};
+/* End XCLocalSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		7B000000000000000000B002 /* Qwen3ASR */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 7B000000000000000000B001 /* XCRemoteSwiftPackageReference "speech-swift" */;
+			productName = Qwen3ASR;
+		};
+		7B000000000000000000B003 /* SpeechVAD */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 7B000000000000000000B001 /* XCRemoteSwiftPackageReference "speech-swift" */;
+			productName = SpeechVAD;
+		};
+		7B000000000000000000B004 /* AudioCommon */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 7B000000000000000000B001 /* XCRemoteSwiftPackageReference "speech-swift" */;
+			productName = AudioCommon;
+		};
+		7B000000000000000000B006 /* MLXAudioSTT */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 7B000000000000000000B005 /* XCLocalSwiftPackageReference "MLXAudioMOSS" */;
+			productName = MLXAudioSTT;
+		};
+		7B000000000000000000B007 /* MLXAudioCore */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 7B000000000000000000B005 /* XCLocalSwiftPackageReference "MLXAudioMOSS" */;
+			productName = MLXAudioCore;
+		};
+/* End XCSwiftPackageProductDependency section */
 
 /* Begin XCBuildConfiguration section */
 		7B0000000000000000008001 /* Debug */ = {

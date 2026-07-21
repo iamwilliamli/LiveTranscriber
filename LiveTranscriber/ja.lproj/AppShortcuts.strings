@@ -1,0 +1,6 @@
+"Read my recording summary in ${applicationName}" = "${applicationName}で自分の録音の要約を読み上げて";
+"Read the summary of a recording in ${applicationName}" = "${applicationName}で録音の要約を読み上げて";
+"Read my recording transcript in ${applicationName}" = "${applicationName}で自分の録音の文字起こしを読み上げて";
+"Read the transcript of a recording in ${applicationName}" = "${applicationName}で録音の文字起こしを読み上げて";
+"Search recordings in ${applicationName}" = "${applicationName}で録音を検索して";
+"Find a recording in ${applicationName}" = "${applicationName}で録音を探して";

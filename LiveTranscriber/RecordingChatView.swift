@@ -126,7 +126,7 @@ final class RecordingChatEngine: ObservableObject {
 
         messages.append(RecordingChatMessage(role: .user, text: trimmedQuestion))
         isResponding = true
-        analysisStatusText = "Searching transcript excerpts"
+        analysisStatusText = localized(L10n.Recordings.chatSearchingTranscriptExcerpts)
 
         Task {
             do {
@@ -171,14 +171,16 @@ final class RecordingChatEngine: ObservableObject {
     private func streamAnswer(question: String, context: RecordingChatContext) async throws {
         switch RecordingSummaryProvider.selected {
         case .appleIntelligence:
-            analysisStatusText = "Preparing transcript context"
+            analysisStatusText = localized(L10n.Recordings.chatPreparingTranscriptContext)
             try await appleStreamAnswer(question: question, context: context)
         case .localQwen:
             try await localStreamAnswer(question: question, context: context)
+        case .geminiCloud:
+            try await geminiStreamAnswer(question: question, context: context)
         case .automatic:
             if RecordingSummaryProvider.appleIntelligence.isCurrentlyAvailable {
                 do {
-                    analysisStatusText = "Preparing transcript context"
+                    analysisStatusText = localized(L10n.Recordings.chatPreparingTranscriptContext)
                     try await appleStreamAnswer(question: question, context: context)
                     return
                 } catch {
@@ -186,11 +188,35 @@ final class RecordingChatEngine: ObservableObject {
                         throw error
                     }
                     removeUnfinishedAssistantMessage()
-                    analysisStatusText = "Switching to local Qwen"
+                    analysisStatusText = localized(L10n.Recordings.chatSwitchingToLocalQwen)
                 }
             }
             try await localStreamAnswer(question: question, context: context)
         }
+    }
+
+    private func geminiStreamAnswer(question: String, context: RecordingChatContext) async throws {
+        analysisStatusText = localized(L10n.Recordings.chatGeneratingAnswer)
+        let history = messages
+            .dropLast()
+            .suffix(6)
+            .filter { !$0.isError }
+            .map { message in
+                let label = message.role == .user ? "User" : "Assistant"
+                return "\(label): \(Self.limited(message.text, to: 500))"
+            }
+            .joined(separator: "\n")
+        let answer = try await GeminiCloudService.answerQuestion(
+            question: question,
+            transcript: context.transcript,
+            summary: context.summary,
+            languageName: context.languageName,
+            history: history
+        )
+
+        streamBuffer = answer
+        isStreamFinished = true
+        await revealLoop(messageID: UUID())
     }
 
     private func appleStreamAnswer(question: String, context: RecordingChatContext) async throws {
@@ -223,7 +249,7 @@ final class RecordingChatEngine: ObservableObject {
         let revealTask = Task { await revealLoop(messageID: messageID) }
 
         do {
-            analysisStatusText = "Generating answer"
+            analysisStatusText = localized(L10n.Recordings.chatGeneratingAnswer)
             let stream = session.streamResponse(
                 to: question,
                 options: GenerationOptions(temperature: 0.3, maximumResponseTokens: 700)
@@ -282,14 +308,17 @@ final class RecordingChatEngine: ObservableObject {
         let rawAnswer: String
 
         do {
-            analysisStatusText = "Searching transcript excerpts"
+            analysisStatusText = localized(L10n.Recordings.chatSearchingTranscriptExcerpts)
             let transcriptContext = Self.transcriptContext(
                 for: question,
                 transcript: context.transcript,
                 profile: .localQwenChat,
                 maximumChunkCount: 2
             )
-            analysisStatusText = "\(transcriptContext.statusText). Generating answer"
+            analysisStatusText = String(
+                format: localized(L10n.Recordings.chatGeneratingAnswerWithContextFormat),
+                transcriptContext.statusText
+            )
             rawAnswer = try await Self.generateLocalAnswer(
                 modelPath: modelPath,
                 question: question,
@@ -302,14 +331,17 @@ final class RecordingChatEngine: ObservableObject {
             guard Self.isLocalContextExceeded(error) else {
                 throw error
             }
-            analysisStatusText = "Context was too long. Retrying with a smaller excerpt"
+            analysisStatusText = localized(L10n.Recordings.chatRetryingSmallerExcerpt)
             let retryTranscriptContext = Self.transcriptContext(
                 for: question,
                 transcript: context.transcript,
                 profile: .localQwenChat,
                 maximumChunkCount: 1
             )
-            analysisStatusText = "\(retryTranscriptContext.statusText). Generating answer"
+            analysisStatusText = String(
+                format: localized(L10n.Recordings.chatGeneratingAnswerWithContextFormat),
+                retryTranscriptContext.statusText
+            )
             rawAnswer = try await Self.generateLocalAnswer(
                 modelPath: modelPath,
                 question: question,
@@ -423,7 +455,7 @@ final class RecordingChatEngine: ObservableObject {
         guard cleaned.count > profile.directCharacterLimit else {
             return RecordingChatTranscriptContext(
                 text: cleaned,
-                statusText: "Using the full transcript"
+                statusText: localized(L10n.Recordings.chatUsingFullTranscript)
             )
         }
 
@@ -436,7 +468,7 @@ final class RecordingChatEngine: ObservableObject {
         guard !chunks.isEmpty else {
             return RecordingChatTranscriptContext(
                 text: TranscriptContextBuilder.boundaryDigest(from: cleaned, profile: profile),
-                statusText: "Compressing transcript context"
+                statusText: localized(L10n.Recordings.chatCompressingTranscriptContext)
             )
         }
 
@@ -447,7 +479,10 @@ final class RecordingChatEngine: ObservableObject {
             .joined(separator: "\n\n")
         return RecordingChatTranscriptContext(
             text: text,
-            statusText: "Found \(chunks.count) relevant transcript excerpt\(chunks.count == 1 ? "" : "s")"
+            statusText: String(
+                format: localized(L10n.Recordings.chatRelevantExcerptCountFormat),
+                chunks.count
+            )
         )
     }
 

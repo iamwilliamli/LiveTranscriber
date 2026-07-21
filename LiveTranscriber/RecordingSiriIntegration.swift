@@ -4,7 +4,12 @@ import Foundation
 import UniformTypeIdentifiers
 
 struct RecordingEntity: AppEntity, IndexedEntity, URLRepresentableEntity {
-    static let typeDisplayRepresentation = TypeDisplayRepresentation(name: "Recording")
+    static let typeDisplayRepresentation = TypeDisplayRepresentation(name: LocalizedStringResource(
+        "siri.recording_entity",
+        defaultValue: "Recording",
+        table: "Semantic",
+        comment: "App Entity type and parameter title for a saved recording."
+    ))
     static let defaultQuery = RecordingEntityQuery()
 
     let id: UUID
@@ -56,7 +61,7 @@ struct RecordingEntity: AppEntity, IndexedEntity, URLRepresentableEntity {
             return trimmedPreview
         }
 
-        return "No summary is available for this recording."
+        return String(localized: L10n.Siri.noSummary)
     }
 
     var transcriptText: String {
@@ -70,7 +75,7 @@ struct RecordingEntity: AppEntity, IndexedEntity, URLRepresentableEntity {
             return trimmedPreview
         }
 
-        return "No transcript is available for this recording."
+        return String(localized: L10n.Siri.noTranscript)
     }
 
     private var searchableText: String {
@@ -153,14 +158,29 @@ extension RecordingEntityQuery: IndexedEntityQuery {
 }
 
 struct ReadRecordingSummaryIntent: AppIntent {
-    static let title: LocalizedStringResource = "Read Recording Summary"
-    static let description = IntentDescription("Reads the saved summary for a recording.")
+    static let title = LocalizedStringResource(
+        "siri.read_summary.title",
+        defaultValue: "Read Recording Summary",
+        table: "Semantic",
+        comment: "Siri intent title for reading a recording summary."
+    )
+    static let description = IntentDescription(LocalizedStringResource(
+        "app_intents.read_recording_summary.description",
+        defaultValue: "Reads the saved summary for a recording.",
+        table: "Semantic",
+        comment: "App Intent description for reading a recording summary."
+    ))
 
-    @Parameter(title: "Recording")
+    @Parameter(title: LocalizedStringResource(
+        "siri.recording_entity",
+        defaultValue: "Recording",
+        table: "Semantic",
+        comment: "App Entity type and parameter title for a saved recording."
+    ))
     var recording: RecordingEntity
 
     static var parameterSummary: some ParameterSummary {
-        Summary("Read the summary of \(\.$recording)")
+        Summary("Read the summary of \(\.$recording)", table: "Semantic")
     }
 
     func perform() async throws -> some IntentResult & ProvidesDialog & ReturnsValue<String> {
@@ -170,14 +190,29 @@ struct ReadRecordingSummaryIntent: AppIntent {
 }
 
 struct ReadRecordingTranscriptIntent: AppIntent {
-    static let title: LocalizedStringResource = "Read Recording Transcript"
-    static let description = IntentDescription("Reads the transcript for a recording.")
+    static let title = LocalizedStringResource(
+        "siri.read_transcript.title",
+        defaultValue: "Read Recording Transcript",
+        table: "Semantic",
+        comment: "Siri intent title for reading a recording transcript."
+    )
+    static let description = IntentDescription(LocalizedStringResource(
+        "app_intents.read_recording_transcript.description",
+        defaultValue: "Reads the transcript for a recording.",
+        table: "Semantic",
+        comment: "App Intent description for reading a recording transcript."
+    ))
 
-    @Parameter(title: "Recording")
+    @Parameter(title: LocalizedStringResource(
+        "siri.recording_entity",
+        defaultValue: "Recording",
+        table: "Semantic",
+        comment: "App Entity type and parameter title for a saved recording."
+    ))
     var recording: RecordingEntity
 
     static var parameterSummary: some ParameterSummary {
-        Summary("Read the transcript of \(\.$recording)")
+        Summary("Read the transcript of \(\.$recording)", table: "Semantic")
     }
 
     func perform() async throws -> some IntentResult & ProvidesDialog & ReturnsValue<String> {
@@ -187,38 +222,72 @@ struct ReadRecordingTranscriptIntent: AppIntent {
 }
 
 struct SearchRecordingsIntent: AppIntent {
-    static let title: LocalizedStringResource = "Search Recordings"
-    static let description = IntentDescription("Searches recording titles, summaries, tags, and transcripts.")
+    static let title = LocalizedStringResource(
+        "siri.search.title",
+        defaultValue: "Search Recordings",
+        table: "Semantic",
+        comment: "Siri intent title for searching recordings."
+    )
+    static let description = IntentDescription(LocalizedStringResource(
+        "app_intents.search_recordings.description",
+        defaultValue: "Searches recording titles, summaries, tags, and transcripts.",
+        table: "Semantic",
+        comment: "App Intent description for searching recordings."
+    ))
 
-    @Parameter(title: "Search Text")
+    @Parameter(title: LocalizedStringResource(
+        "siri.search.parameter",
+        defaultValue: "Search Text",
+        table: "Semantic",
+        comment: "Siri search text parameter title."
+    ))
     var searchText: String
 
     static var parameterSummary: some ParameterSummary {
-        Summary("Search recordings for \(\.$searchText)")
+        Summary("Search recordings for \(\.$searchText)", table: "Semantic")
     }
 
     func perform() async throws -> some IntentResult & ProvidesDialog & ReturnsValue<[RecordingEntity]> {
         let results = try await RecordingEntityQuery().entities(matching: searchText)
         let dialog: String
         if results.isEmpty {
-            dialog = "No matching recordings were found."
+            dialog = String(localized: L10n.Siri.searchNoMatches)
         } else {
             let titles = results.prefix(5).map(\.title).joined(separator: ", ")
-            dialog = "Found \(results.count) matching recording\(results.count == 1 ? "" : "s"): \(titles)."
+            dialog = String(
+                format: String(localized: L10n.Siri.searchMatchesFormat),
+                results.count,
+                titles
+            )
         }
         return .result(value: results, dialog: IntentDialog(stringLiteral: dialog))
     }
 }
 
 struct OpenRecordingIntent: OpenIntent, URLRepresentableIntent {
-    static let title: LocalizedStringResource = "Open Recording"
-    static let description = IntentDescription("Opens a recording in Live Transcriber.")
+    static let title = LocalizedStringResource(
+        "siri.open.title",
+        defaultValue: "Open Recording",
+        table: "Semantic",
+        comment: "Siri intent title for opening a recording."
+    )
+    static let description = IntentDescription(LocalizedStringResource(
+        "app_intents.open_recording.description",
+        defaultValue: "Opens a recording in Live Transcriber.",
+        table: "Semantic",
+        comment: "App Intent description for opening a recording."
+    ))
 
-    @Parameter(title: "Recording")
+    @Parameter(title: LocalizedStringResource(
+        "siri.recording_entity",
+        defaultValue: "Recording",
+        table: "Semantic",
+        comment: "App Entity type and parameter title for a saved recording."
+    ))
     var target: RecordingEntity
 
     static var parameterSummary: some ParameterSummary {
-        Summary("Open \(\.$target)")
+        Summary("Open \(\.$target)", table: "Semantic")
     }
 }
 
@@ -230,7 +299,12 @@ struct LiveTranscriberAppShortcuts: AppShortcutsProvider {
                 "Read my recording summary in \(.applicationName)",
                 "Read the summary of a recording in \(.applicationName)"
             ],
-            shortTitle: "Read Summary",
+            shortTitle: LocalizedStringResource(
+                "siri.read_summary.short_title",
+                defaultValue: "Read Summary",
+                table: "Semantic",
+                comment: "Shortcuts short title for reading a recording summary."
+            ),
             systemImageName: "text.bubble"
         )
 
@@ -240,7 +314,12 @@ struct LiveTranscriberAppShortcuts: AppShortcutsProvider {
                 "Read my recording transcript in \(.applicationName)",
                 "Read the transcript of a recording in \(.applicationName)"
             ],
-            shortTitle: "Read Transcript",
+            shortTitle: LocalizedStringResource(
+                "siri.read_transcript.short_title",
+                defaultValue: "Read Transcript",
+                table: "Semantic",
+                comment: "Shortcuts short title for reading a recording transcript."
+            ),
             systemImageName: "text.quote"
         )
 
@@ -250,7 +329,12 @@ struct LiveTranscriberAppShortcuts: AppShortcutsProvider {
                 "Search recordings in \(.applicationName)",
                 "Find a recording in \(.applicationName)"
             ],
-            shortTitle: "Search Recordings",
+            shortTitle: LocalizedStringResource(
+                "siri.search.short_title",
+                defaultValue: "Search Recordings",
+                table: "Semantic",
+                comment: "Shortcuts short title for searching recordings."
+            ),
             systemImageName: "magnifyingglass"
         )
     }
@@ -273,6 +357,8 @@ enum RecordingSiriText {
         }
 
         let endIndex = normalized.index(normalized.startIndex, offsetBy: maxDialogCharacterCount)
-        return String(normalized[..<endIndex]) + "\n\nThe transcript is longer, so I read the beginning. Open the recording to review the rest."
+        return String(normalized[..<endIndex])
+            + "\n\n"
+            + String(localized: L10n.Siri.transcriptTruncated)
     }
 }

@@ -3,6 +3,9 @@ import Foundation
 
 @MainActor
 enum TranscriptionLiveActivityCoordinator {
+    private static var updateTask: Task<Void, Never>?
+    private static var updateGeneration = 0
+
     static func start(
         startedAt: Date,
         status: String,
@@ -15,6 +18,7 @@ enum TranscriptionLiveActivityCoordinator {
             return
         }
 
+        await finishPendingUpdate()
         let state = contentState(
             status: status,
             languageName: languageName,
@@ -56,8 +60,23 @@ enum TranscriptionLiveActivityCoordinator {
             isRecording: isRecording
         )
 
-        for activity in Activity<TranscriptionActivityAttributes>.activities {
-            await activity.update(ActivityContent(state: state, staleDate: nil))
+        updateGeneration += 1
+        let generation = updateGeneration
+        let previousTask = updateTask
+        let task = Task { @MainActor in
+            await previousTask?.value
+            guard !Task.isCancelled else {
+                return
+            }
+
+            for activity in Activity<TranscriptionActivityAttributes>.activities {
+                await activity.update(ActivityContent(state: state, staleDate: nil))
+            }
+        }
+        updateTask = task
+        await task.value
+        if generation == updateGeneration {
+            updateTask = nil
         }
     }
 
@@ -77,6 +96,7 @@ enum TranscriptionLiveActivityCoordinator {
             isRecording: false
         )
 
+        await finishPendingUpdate()
         for activity in Activity<TranscriptionActivityAttributes>.activities {
             await activity.end(
                 ActivityContent(state: state, staleDate: nil),
@@ -103,5 +123,13 @@ enum TranscriptionLiveActivityCoordinator {
             lineCount: lineCount,
             isRecording: isRecording
         )
+    }
+
+    private static func finishPendingUpdate() async {
+        let generation = updateGeneration
+        await updateTask?.value
+        if generation == updateGeneration {
+            updateTask = nil
+        }
     }
 }

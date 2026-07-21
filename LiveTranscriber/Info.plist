@@ -56,13 +56,17 @@
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
 	<key>NSCameraUsageDescription</key>
-	<string>Live Transcriber does not use the camera. Apple's capture framework is used only for microphone recording. 不使用相机；录音功能仅使用 Apple 采集框架获取麦克风音频。</string>
+	<string>Live Transcriber does not use the camera. Apple's capture framework is used only for microphone recording.</string>
 	<key>NSMicrophoneUsageDescription</key>
-	<string>Used to record audio for live transcription. 用于录音并实时转录文本。</string>
+	<string>Used to record audio for live transcription.</string>
 	<key>NSLocationWhenInUseUsageDescription</key>
-	<string>Used only when you choose to attach a location to a saved recording. 仅在你选择给录音添加地理位置时使用。</string>
+	<string>Used only when you choose to attach a location to a saved recording.</string>
+	<key>NSRemindersFullAccessUsageDescription</key>
+	<string>Used only when you choose to add extracted action items to Reminders.</string>
+	<key>NSRemindersUsageDescription</key>
+	<string>Used only when you choose to add extracted action items to Reminders.</string>
 	<key>NSSpeechRecognitionUsageDescription</key>
-	<string>Used to turn recorded speech into live transcription text. 用于把录到的语音实时转成文字。</string>
+	<string>Used to turn recorded speech into live transcription text.</string>
 	<key>NSUbiquitousContainers</key>
 	<dict>
 		<key>iCloud.com.iamwilliamli.LiveTranscriber</key>
@@ -99,9 +103,13 @@
 		<string>RedditSans-SemiBold.ttf</string>
 		<string>RedditSans-Bold.ttf</string>
 		<string>RedditSans-Italic.ttf</string>
+		<string>Baloo2-Variable.ttf</string>
 	</array>
 	<key>UILaunchScreen</key>
-	<dict/>
+	<dict>
+		<key>UIColorName</key>
+		<string>LaunchBackground</string>
+	</dict>
 	<key>UIBackgroundModes</key>
 	<array>
 		<string>audio</string>

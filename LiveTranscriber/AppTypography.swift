@@ -10,6 +10,7 @@ enum AppTypography {
     static let semiBoldName = "RedditSans-SemiBold"
     static let boldName = "RedditSans-Bold"
     static let italicName = "RedditSans-Italic"
+    static let baloo2SemiBoldName = "Baloo2-SemiBold"
 
     static func fontName(for weight: Font.Weight = .regular, italic: Bool = false) -> String {
         if italic {

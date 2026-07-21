@@ -6,20 +6,26 @@ struct SettingsView: View {
         case transcription
         case recording
         case intelligence
+        case geminiCloud
         case files
+        case iCloudSyncDetails
         case privacy
         case developer
         case transcriptionLanguage
+        case localWhisper
         case localWhisperModel
         case liveWhisperModel
+        case qwen3ASRModel
+        case mossLocalModel
         case recordingFormat
         case speechPipelineMode
     }
 
     @ObservedObject var transcriber: LiveTranscriptionManager
     @ObservedObject var recordingStore: RecordingStore
+    @ObservedObject private var geminiUsageTracker = GeminiTokenUsageTracker.shared
     @State private var navigationPath: [SettingsRoute] = []
-    @State private var iCloudSyncRefreshTick = 0
+    @State private var interactiveNavigationPopHasPlayedHaptic = false
     @State private var pendingSpeechLocaleReleaseRequest: SpeechLocaleReleaseRequest?
     @State private var speechLocaleErrorMessage: String?
     @State private var feedbackErrorMessage: String?
@@ -41,15 +47,34 @@ struct SettingsView: View {
     @State private var localWhisperDownloadErrorMessage: String?
     @State private var localWhisperDeleteErrorMessage: String?
     @State private var localWhisperModelRefreshTick = 0
+    @State private var qwen3ASRModelStatus = Qwen3ASRModelManager.currentStatus()
+    @State private var isDownloadingQwen3ASRModel = false
+    @State private var qwen3ASRDownloadProgress: Double = 0
+    @State private var qwen3ASRDownloadErrorMessage: String?
+    @State private var qwen3ASRDeleteErrorMessage: String?
+    @State private var mossLocalModelStatus = MOSSLocalModelManager.currentStatus()
+    @State private var isDownloadingMOSSLocalModel = false
+    @State private var mossLocalDownloadProgress: Double = 0
+    @State private var mossLocalDownloadErrorMessage: String?
+    @State private var mossLocalDeleteErrorMessage: String?
     @State private var selectedLocalSummaryModel = LocalSummaryModelManager.selectedModel
     @State private var localSummaryModelStatus = LocalSummaryModelManager.currentStatus()
     @State private var isDownloadingLocalSummaryModel = false
     @State private var localSummaryDownloadProgress: Double = 0
     @State private var localSummaryDownloadErrorMessage: String?
     @State private var localSummaryDeleteErrorMessage: String?
+    @State private var geminiAPIKey = (try? GeminiAPIKeyStore.load()) ?? ""
+    @State private var geminiAPIKeyErrorMessage: String?
+    @State private var isGeminiCloudEnabled = GeminiCloudConfiguration.isEnabled
     @AppStorage(OnboardingState.completedDefaultsKey) private var hasCompletedOnboarding = true
     @AppStorage(RecordingSummaryProvider.selectedDefaultsKey) private var selectedSummaryProviderRawValue = RecordingSummaryProvider.automatic.rawValue
+    @AppStorage(Qwen3ASRDeveloperConfiguration.streamingLongAudioDefaultsKey) private var isQwen3ASRStreamingLongAudioEnabled = false
+    @AppStorage(MOSSDecoderSegmentDuration.defaultsKey) private var mossDecoderSegmentDurationSeconds = MOSSDecoderSegmentDuration.defaultValue.rawValue
     private static let publicBetaFeedbackURL = URL(string: "https://t.me/livetranscriber")!
+    private static let privacyPolicyURL = URL(string: "https://iamwilliamli.github.io/LiveTranscriber/privacy/")!
+    private static let whisperModelURL = URL(string: "https://github.com/openai/whisper")!
+    private static let qwen3ASRModelURL = URL(string: "https://github.com/QwenLM/Qwen3-ASR")!
+    private static let mossModelURL = URL(string: "https://github.com/OpenMOSS/MOSS-Transcribe-Diarize#model-architecture")!
     private static let feedbackRecipient = "lichengqi0805@gmail.com"
     private static let mailtoQueryAllowedCharacters: CharacterSet = {
         var allowed = CharacterSet.urlQueryAllowed
@@ -62,6 +87,10 @@ struct SettingsView: View {
         RecordingSummaryProvider(rawValue: selectedSummaryProviderRawValue) ?? .automatic
     }
 
+    private var selectedMOSSDecoderSegmentDuration: MOSSDecoderSegmentDuration {
+        MOSSDecoderSegmentDuration(rawValue: mossDecoderSegmentDurationSeconds) ?? .defaultValue
+    }
+
     @ViewBuilder
     private func settingsDestination(for route: SettingsRoute) -> some View {
         switch route {
@@ -71,18 +100,28 @@ struct SettingsView: View {
             recordingSettingsPage
         case .intelligence:
             intelligenceSettingsPage
+        case .geminiCloud:
+            geminiCloudSettingsPage
         case .files:
             fileSettingsPage
+        case .iCloudSyncDetails:
+            iCloudSyncDetailsPage
         case .privacy:
             privacySettingsPage
         case .developer:
             developerSettingsPage
         case .transcriptionLanguage:
             transcriptionLanguagePage
+        case .localWhisper:
+            localWhisperSettingsPage
         case .localWhisperModel:
             localWhisperModelPage
         case .liveWhisperModel:
             liveWhisperModelPage
+        case .qwen3ASRModel:
+            qwen3ASRModelPage
+        case .mossLocalModel:
+            mossLocalModelPage
         case .recordingFormat:
             recordingFormatPage
         case .speechPipelineMode:
@@ -199,6 +238,15 @@ struct SettingsView: View {
                 .padding()
             }
             .background(AppTheme.groupedBackground.ignoresSafeArea())
+            .onInteractiveNavigationPopGesture(
+                onBegan: {
+                    interactiveNavigationPopHasPlayedHaptic = true
+                    HapticFeedback.play(.navigation)
+                },
+                onCancelled: {
+                    interactiveNavigationPopHasPlayedHaptic = false
+                }
+            )
             .toolbar(.visible, for: .navigationBar)
             .navigationTitle(String(localized: L10n.Settings.title))
             .navigationBarTitleDisplayMode(.inline)
@@ -207,7 +255,11 @@ struct SettingsView: View {
             }
             .onChange(of: navigationPath) { oldValue, newValue in
                 if newValue.count < oldValue.count {
-                    HapticFeedback.play(.navigation)
+                    if interactiveNavigationPopHasPlayedHaptic {
+                        interactiveNavigationPopHasPlayedHaptic = false
+                    } else {
+                        HapticFeedback.play(.navigation)
+                    }
                 }
             }
         }
@@ -216,6 +268,8 @@ struct SettingsView: View {
             await recordingStore.reload()
             recordingStore.refreshIntelligenceAvailability()
             refreshLocalWhisperModelStatus()
+            refreshQwen3ASRModelStatus()
+            refreshMOSSLocalModelStatus()
             refreshLocalSummaryModelStatus()
         }
         .task {
@@ -288,6 +342,66 @@ struct SettingsView: View {
             Text(localWhisperDeleteErrorMessage ?? "")
         }
         .alert(
+            String(localized: L10n.Qwen3ASR.downloadFailed),
+            isPresented: Binding(
+                get: { qwen3ASRDownloadErrorMessage != nil },
+                set: { isPresented in
+                    if !isPresented {
+                        qwen3ASRDownloadErrorMessage = nil
+                    }
+                }
+            )
+        ) {
+            Button(String(localized: L10n.Common.ok), role: .cancel) {}
+        } message: {
+            Text(qwen3ASRDownloadErrorMessage ?? "")
+        }
+        .alert(
+            String(localized: L10n.Qwen3ASR.deleteFailed),
+            isPresented: Binding(
+                get: { qwen3ASRDeleteErrorMessage != nil },
+                set: { isPresented in
+                    if !isPresented {
+                        qwen3ASRDeleteErrorMessage = nil
+                    }
+                }
+            )
+        ) {
+            Button(String(localized: L10n.Common.ok), role: .cancel) {}
+        } message: {
+            Text(qwen3ASRDeleteErrorMessage ?? "")
+        }
+        .alert(
+            String(localized: L10n.MOSSLocal.downloadFailed),
+            isPresented: Binding(
+                get: { mossLocalDownloadErrorMessage != nil },
+                set: { isPresented in
+                    if !isPresented {
+                        mossLocalDownloadErrorMessage = nil
+                    }
+                }
+            )
+        ) {
+            Button(String(localized: L10n.Common.ok), role: .cancel) {}
+        } message: {
+            Text(mossLocalDownloadErrorMessage ?? "")
+        }
+        .alert(
+            String(localized: L10n.MOSSLocal.deleteFailed),
+            isPresented: Binding(
+                get: { mossLocalDeleteErrorMessage != nil },
+                set: { isPresented in
+                    if !isPresented {
+                        mossLocalDeleteErrorMessage = nil
+                    }
+                }
+            )
+        ) {
+            Button(String(localized: L10n.Common.ok), role: .cancel) {}
+        } message: {
+            Text(mossLocalDeleteErrorMessage ?? "")
+        }
+        .alert(
             String(localized: L10n.LocalSummary.downloadFailed),
             isPresented: Binding(
                 get: { localSummaryDownloadErrorMessage != nil },
@@ -332,6 +446,21 @@ struct SettingsView: View {
         } message: {
             Text(feedbackErrorMessage ?? "")
         }
+        .alert(
+            String(localized: L10n.GeminiCloud.settingsErrorTitle),
+            isPresented: Binding(
+                get: { geminiAPIKeyErrorMessage != nil },
+                set: { isPresented in
+                    if !isPresented {
+                        geminiAPIKeyErrorMessage = nil
+                    }
+                }
+            )
+        ) {
+            Button(String(localized: L10n.Common.ok), role: .cancel) {}
+        } message: {
+            Text(geminiAPIKeyErrorMessage ?? "")
+        }
     }
 
     private var transcriptionSettingsPage: some View {
@@ -350,17 +479,72 @@ struct SettingsView: View {
                 .settingsNavigationHaptic()
                 .disabled(transcriber.isRecording || transcriber.isPreparing)
 
-                openAITranscriptionToggleSettings
-
-                if transcriber.isOpenAITranscriptionEnabled {
-                    openAITranscriptionAPIKeySettings
-                }
-
-                localWhisperModelSettings
-
                 if transcriber.isRecording || transcriber.isPreparing {
                     SettingsStatusRow(icon: "lock.fill", textResource: L10n.Settings.cannotChangeLanguageWhileRecording, tint: AppTheme.warning)
                 }
+            }
+
+            SettingsSection(
+                titleResource: L10n.Settings.offlineTranscription,
+                systemImage: "cpu",
+                tint: AppTheme.brand
+            ) {
+                NavigationLink(value: SettingsRoute.localWhisper) {
+                    SettingsNavigationRow(
+                        icon: "waveform",
+                        titleResource: L10n.LocalWhisper.engineTitle,
+                        value: localWhisperModelStatus.statusText,
+                        subtitleResource: L10n.LocalWhisper.submenuDescription,
+                        tint: AppTheme.info
+                    )
+                }
+                .buttonStyle(.plain)
+                .settingsNavigationHaptic()
+                .disabled(isDownloadingLocalWhisperModel || isDownloadingLocalWhisperCoreMLEncoder)
+
+                NavigationLink(value: SettingsRoute.qwen3ASRModel) {
+                    SettingsNavigationRow(
+                        icon: "waveform.badge.magnifyingglass",
+                        titleResource: L10n.Qwen3ASR.modelTitle,
+                        value: qwen3ASRModelStatus.statusText,
+                        subtitleResource: L10n.Qwen3ASR.submenuDescription,
+                        tint: AppTheme.brand
+                    )
+                }
+                .buttonStyle(.plain)
+                .settingsNavigationHaptic()
+                .disabled(isDownloadingQwen3ASRModel)
+
+                NavigationLink(value: SettingsRoute.mossLocalModel) {
+                    SettingsNavigationRow(
+                        icon: "person.2",
+                        titleResource: L10n.MOSSLocal.modelTitle,
+                        value: mossLocalModelStatus.statusText,
+                        subtitleResource: L10n.MOSSLocal.submenuDescription,
+                        tint: AppTheme.purple
+                    )
+                }
+                .buttonStyle(.plain)
+                .settingsNavigationHaptic()
+                .disabled(isDownloadingMOSSLocalModel)
+            }
+
+            SettingsSection(
+                titleResource: L10n.Settings.onlineTranscription,
+                systemImage: "cloud",
+                tint: AppTheme.purple
+            ) {
+                NavigationLink(value: SettingsRoute.geminiCloud) {
+                    SettingsNavigationRow(
+                        icon: "cloud",
+                        titleResource: L10n.GeminiCloud.settingsTitle,
+                        value: geminiCloudStatusText,
+                        subtitleResource: L10n.GeminiCloud.submenuDescription,
+                        tint: AppTheme.purple
+                    )
+                }
+                .buttonStyle(.plain)
+                .settingsNavigationHaptic()
             }
 
             SettingsSection(titleResource: L10n.Settings.betaFeatures, systemImage: "testtube.2", tint: AppTheme.purple) {
@@ -385,6 +569,7 @@ struct SettingsView: View {
                                 systemImage: provider == selectedSummaryProvider ? "checkmark" : provider.systemImage
                             )
                         }
+                        .disabled(!provider.isCurrentlyAvailable)
                     }
                 } label: {
                     SettingsPickerRow(
@@ -422,6 +607,68 @@ struct SettingsView: View {
                 localSummaryModelSettings
             }
         }
+    }
+
+    private var geminiCloudSettingsPage: some View {
+        SettingsDetailPage(titleResource: L10n.GeminiCloud.settingsTitle) {
+            SettingsSection(
+                titleResource: L10n.GeminiCloud.controlTitle,
+                systemImage: "cloud",
+                tint: AppTheme.purple
+            ) {
+                Toggle(isOn: geminiCloudEnabledBinding) {
+                    HStack(alignment: .top, spacing: 10) {
+                        SettingsIcon(systemImage: "power", tint: AppTheme.purple)
+
+                        VStack(alignment: .leading, spacing: 3) {
+                            Text(L10n.GeminiCloud.enableTitle)
+                                .font(.redditSans(.subheadline, weight: .semibold))
+                                .foregroundStyle(.primary)
+
+                            Text(L10n.GeminiCloud.enableDescription)
+                                .font(.redditSans(.caption))
+                                .foregroundStyle(.secondary)
+                                .fixedSize(horizontal: false, vertical: true)
+                        }
+                    }
+                }
+                .toggleStyle(.switch)
+                .disabled(transcriber.isRecording || transcriber.isPreparing)
+
+                SettingsStatusRow(
+                    icon: GeminiCloudConfiguration.isAvailable ? "checkmark.seal.fill" : "exclamationmark.triangle.fill",
+                    textResource: GeminiCloudConfiguration.isAvailable
+                        ? L10n.GeminiCloud.readyDescription
+                        : L10n.GeminiCloud.notReadyDescription,
+                    tint: GeminiCloudConfiguration.isAvailable ? AppTheme.success : AppTheme.warning
+                )
+            }
+
+            SettingsSection(
+                titleResource: L10n.GeminiCloud.apiConfigurationTitle,
+                systemImage: "key",
+                tint: AppTheme.purple
+            ) {
+                geminiCloudSettings
+            }
+
+            SettingsSection(
+                titleResource: L10n.GeminiCloud.usageTitle,
+                systemImage: "chart.bar",
+                tint: AppTheme.info
+            ) {
+                geminiUsageSettings
+            }
+        }
+    }
+
+    private var geminiCloudStatusText: String {
+        guard isGeminiCloudEnabled else {
+            return String(localized: L10n.GeminiCloud.statusOff)
+        }
+        return GeminiAPIKeyStore.isConfigured
+            ? String(localized: L10n.GeminiCloud.statusOn)
+            : String(localized: L10n.GeminiCloud.statusNeedsAPIKey)
     }
 
     private var localSummaryModelSettings: some View {
@@ -618,6 +865,34 @@ struct SettingsView: View {
         }
     }
 
+    private var localWhisperSettingsPage: some View {
+        SettingsDetailPage(titleResource: L10n.LocalWhisper.engineTitle) {
+            SettingsSection(
+                titleResource: L10n.LocalWhisper.engineTitle,
+                systemImage: "waveform",
+                tint: AppTheme.info
+            ) {
+                localWhisperModelSettings
+            }
+
+            SettingsSection(
+                titleResource: L10n.Settings.modelInformation,
+                systemImage: "info.circle",
+                tint: AppTheme.info
+            ) {
+                Link(destination: Self.whisperModelURL) {
+                    SettingsExternalLinkRow(
+                        icon: "safari",
+                        titleResource: L10n.LocalWhisper.aboutModel,
+                        tint: AppTheme.info
+                    )
+                }
+                .buttonStyle(.plain)
+                .settingsNavigationHaptic()
+            }
+        }
+    }
+
     private var localWhisperModelPage: some View {
         let refreshTick = localWhisperModelRefreshTick
         let downloadedStatuses = LocalWhisperModelManager.downloadedStatuses()
@@ -672,10 +947,236 @@ struct SettingsView: View {
         }
     }
 
+    private var qwen3ASRModelPage: some View {
+        SettingsDetailPage(titleResource: L10n.Qwen3ASR.modelTitle) {
+            SettingsSection(
+                titleResource: L10n.Qwen3ASR.modelTitle,
+                systemImage: "waveform.badge.magnifyingglass",
+                tint: AppTheme.brand
+            ) {
+                SettingsMetricRow(
+                    icon: "cpu",
+                    titleResource: L10n.Qwen3ASR.modelName,
+                    value: Qwen3ASRModelManager.expectedSizeText,
+                    tint: AppTheme.brand
+                )
+
+                SettingsVerbatimStatusRow(
+                    icon: "iphone",
+                    text: String(localized: L10n.Qwen3ASR.modelDescription),
+                    tint: AppTheme.info
+                )
+
+                SettingsMetricRow(
+                    icon: "internaldrive",
+                    titleResource: L10n.Qwen3ASR.modelStatus,
+                    value: isDownloadingQwen3ASRModel
+                        ? qwen3ASRDownloadProgressText
+                        : qwen3ASRModelStatus.statusText,
+                    tint: qwen3ASRModelStatus.isAvailable ? AppTheme.success : AppTheme.warning
+                )
+
+                SettingsVerbatimStatusRow(
+                    icon: qwen3ASRModelStatus.isAvailable ? "checkmark.circle" : "arrow.down.circle",
+                    text: qwen3ASRModelStatus.detailText,
+                    tint: qwen3ASRModelStatus.isAvailable ? AppTheme.success : AppTheme.info
+                )
+
+                if isDownloadingQwen3ASRModel {
+                    ProgressView(value: qwen3ASRDownloadProgress)
+                        .tint(AppTheme.brand)
+                        .frame(maxWidth: .infinity)
+                }
+
+                if !qwen3ASRModelStatus.isAvailable {
+                    Button {
+                        downloadQwen3ASRModel()
+                    } label: {
+                        SettingsCommandRow(
+                            icon: "arrow.down.circle",
+                            titleResource: L10n.Qwen3ASR.downloadModel,
+                            tint: AppTheme.brand
+                        )
+                    }
+                    .buttonStyle(.plain)
+                    .disabled(isDownloadingQwen3ASRModel)
+                }
+
+                if qwen3ASRModelStatus.hasStoredFiles {
+                    Button(role: .destructive) {
+                        deleteQwen3ASRModel()
+                    } label: {
+                        SettingsCommandRow(
+                            icon: "trash",
+                            titleResource: L10n.Qwen3ASR.deleteModel,
+                            tint: AppTheme.danger
+                        )
+                    }
+                    .buttonStyle(.plain)
+                    .disabled(isDownloadingQwen3ASRModel)
+                }
+            }
+
+            SettingsSection(
+                titleResource: L10n.Settings.modelInformation,
+                systemImage: "info.circle",
+                tint: AppTheme.brand
+            ) {
+                Link(destination: Self.qwen3ASRModelURL) {
+                    SettingsExternalLinkRow(
+                        icon: "safari",
+                        titleResource: L10n.Qwen3ASR.aboutModel,
+                        tint: AppTheme.brand
+                    )
+                }
+                .buttonStyle(.plain)
+                .settingsNavigationHaptic()
+            }
+        }
+    }
+
+    private var mossLocalModelPage: some View {
+        SettingsDetailPage(titleResource: L10n.MOSSLocal.modelTitle) {
+            SettingsSection(
+                titleResource: L10n.MOSSLocal.modelTitle,
+                systemImage: "person.2",
+                tint: AppTheme.purple
+            ) {
+                SettingsMetricRow(
+                    icon: "cpu",
+                    titleResource: L10n.MOSSLocal.modelName,
+                    value: MOSSLocalModelManager.expectedSizeText,
+                    tint: AppTheme.purple
+                )
+
+                SettingsVerbatimStatusRow(
+                    icon: "iphone",
+                    text: String(localized: L10n.MOSSLocal.modelDescription),
+                    tint: AppTheme.info
+                )
+
+                SettingsMetricRow(
+                    icon: "internaldrive",
+                    titleResource: L10n.MOSSLocal.modelStatus,
+                    value: isDownloadingMOSSLocalModel
+                        ? mossLocalDownloadProgressText
+                        : mossLocalModelStatus.statusText,
+                    tint: mossLocalModelStatus.isAvailable ? AppTheme.success : AppTheme.warning
+                )
+
+                SettingsVerbatimStatusRow(
+                    icon: mossLocalModelStatus.isAvailable ? "checkmark.circle" : "arrow.down.circle",
+                    text: mossLocalModelStatus.detailText,
+                    tint: mossLocalModelStatus.isAvailable ? AppTheme.success : AppTheme.info
+                )
+
+                if isDownloadingMOSSLocalModel {
+                    ProgressView(value: mossLocalDownloadProgress)
+                        .tint(AppTheme.purple)
+                        .frame(maxWidth: .infinity)
+                }
+
+                if !mossLocalModelStatus.isAvailable {
+                    Button {
+                        downloadMOSSLocalModel()
+                    } label: {
+                        SettingsCommandRow(
+                            icon: "arrow.down.circle",
+                            titleResource: L10n.MOSSLocal.downloadModel,
+                            tint: AppTheme.purple
+                        )
+                    }
+                    .buttonStyle(.plain)
+                    .disabled(isDownloadingMOSSLocalModel)
+                }
+
+                if mossLocalModelStatus.hasStoredFiles {
+                    Button(role: .destructive) {
+                        deleteMOSSLocalModel()
+                    } label: {
+                        SettingsCommandRow(
+                            icon: "trash",
+                            titleResource: L10n.MOSSLocal.deleteModel,
+                            tint: AppTheme.danger
+                        )
+                    }
+                    .buttonStyle(.plain)
+                    .disabled(isDownloadingMOSSLocalModel)
+                }
+            }
+
+            SettingsSection(
+                titleResource: L10n.MOSSLocal.decoderSectionTitle,
+                systemImage: "timer",
+                tint: AppTheme.purple
+            ) {
+                Menu {
+                    ForEach(MOSSDecoderSegmentDuration.allCases) { duration in
+                        Button {
+                            HapticFeedback.play(.menuSelection)
+                            mossDecoderSegmentDurationSeconds = duration.rawValue
+                        } label: {
+                            Label(
+                                duration.displayName,
+                                systemImage: duration == selectedMOSSDecoderSegmentDuration
+                                    ? "checkmark"
+                                    : "timer"
+                            )
+                        }
+                    }
+                } label: {
+                    SettingsPickerRow(
+                        icon: "timer",
+                        titleResource: L10n.MOSSLocal.decoderSegmentDuration,
+                        value: selectedMOSSDecoderSegmentDuration.displayName,
+                        tint: AppTheme.purple
+                    )
+                }
+                .buttonStyle(.plain)
+
+                SettingsVerbatimStatusRow(
+                    icon: "memorychip",
+                    text: String(localized: L10n.MOSSLocal.decoderSegmentDurationDescription),
+                    tint: AppTheme.info
+                )
+            }
+
+            SettingsSection(
+                titleResource: L10n.Settings.modelInformation,
+                systemImage: "info.circle",
+                tint: AppTheme.purple
+            ) {
+                Link(destination: Self.mossModelURL) {
+                    SettingsExternalLinkRow(
+                        icon: "safari",
+                        titleResource: L10n.MOSSLocal.aboutModel,
+                        tint: AppTheme.purple
+                    )
+                }
+                .buttonStyle(.plain)
+                .settingsNavigationHaptic()
+            }
+        }
+    }
+
     private var localWhisperDownloadProgressText: String {
         String(
             format: String(localized: L10n.LocalWhisper.downloadingModelFormat),
             localWhisperDownloadProgress * 100
+        )
+    }
+
+    private var qwen3ASRDownloadProgressText: String {
+        String(
+            format: String(localized: L10n.Qwen3ASR.downloadingModelFormat),
+            qwen3ASRDownloadProgress * 100
+        )
+    }
+
+    private var mossLocalDownloadProgressText: String {
+        String(
+            format: String(localized: L10n.MOSSLocal.downloadingModelFormat),
+            mossLocalDownloadProgress * 100
         )
     }
 
@@ -715,6 +1216,14 @@ struct SettingsView: View {
         liveWhisperModelStatus = LocalWhisperModelManager.currentLiveStatus()
         liveWhisperCoreMLEncoderStatus = LocalWhisperModelManager.currentLiveCoreMLEncoderStatus()
         localWhisperModelRefreshTick &+= 1
+    }
+
+    private func refreshQwen3ASRModelStatus() {
+        qwen3ASRModelStatus = Qwen3ASRModelManager.currentStatus()
+    }
+
+    private func refreshMOSSLocalModelStatus() {
+        mossLocalModelStatus = MOSSLocalModelManager.currentStatus()
     }
 
     private func refreshLocalSummaryModelStatus() {
@@ -762,7 +1271,10 @@ struct SettingsView: View {
 
     private func feedbackEmailSubject() -> String {
         let build = DeveloperBuildInfo.current
-        return "LiveTranscriber Feedback - \(build.version)"
+        return String(
+            format: String(localized: L10n.Settings.feedbackEmailSubjectFormat),
+            build.version
+        )
     }
 
     private func feedbackEmailBody() -> String {
@@ -773,44 +1285,48 @@ struct SettingsView: View {
         let liveWhisperModel = LocalWhisperModelManager.selectedLiveModel?.displayName ?? String(localized: L10n.LocalWhisper.liveModelNotSelected)
         let localSummaryModel = LocalSummaryModelManager.defaultModel.displayName
         let localSummaryStatus = LocalSummaryModelManager.currentStatus().statusText
-        let coreMLEncoderState = LocalWhisperModelManager.isCoreMLEncoderLoadingEnabled ? "On" : "Off"
+        let coreMLEncoderState = String(localized:
+            LocalWhisperModelManager.isCoreMLEncoderLoadingEnabled
+                ? L10n.ICloud.enabled
+                : L10n.ICloud.disabled
+        )
 
         return [
-            "Hi,",
+            String(localized: L10n.Settings.feedbackEmailGreeting),
             "",
-            "Please describe your feedback or issue here:",
+            String(localized: L10n.Settings.feedbackEmailPrompt),
             "",
             "",
-            "Steps to reproduce:",
+            String(localized: L10n.Settings.feedbackEmailSteps),
             "1.",
             "2.",
             "3.",
             "",
-            "Expected result:",
+            String(localized: L10n.Settings.feedbackEmailExpected),
             "",
             "",
-            "Actual result:",
+            String(localized: L10n.Settings.feedbackEmailActual),
             "",
             "",
             "---",
-            "Diagnostics",
-            "App: LiveTranscriber",
-            "Version: \(build.version)",
-            "Build Time: \(build.buildTime)",
-            "Device: \(device.modelIdentifier)",
-            "System: \(device.systemVersion)",
-            "Current Pipeline: \(pipeline.activePipelineName)",
-            "Configured Pipeline: \(pipeline.configuredPipelineName)",
-            "Selected Language: \(transcriber.selectedLanguage.displayName) (\(transcriber.selectedLanguageID))",
-            "Live Backend: \(transcriber.selectedTranscriptionBackend.title)",
-            "Local Whisper Model: \(localWhisperModel)",
-            "Realtime Whisper Model: \(liveWhisperModel)",
-            "Summary Engine: \(selectedSummaryProvider.displayName)",
-            "Local Summary Model: \(localSummaryModel)",
-            "Local Summary Status: \(localSummaryStatus)",
-            "Core ML Encoder Loading: \(coreMLEncoderState)",
-            "Recording Count: \(recordingStore.recordings.count)",
-            "Storage: \(recordingStore.storageDisplayName)"
+            String(localized: L10n.Settings.feedbackEmailDiagnostics),
+            "\(String(localized: L10n.Settings.feedbackEmailApp)): LiveTranscriber",
+            "\(String(localized: L10n.Settings.version)): \(build.version)",
+            "\(String(localized: L10n.Settings.buildTime)): \(build.buildTime)",
+            "\(String(localized: L10n.Settings.device)): \(device.modelIdentifier)",
+            "\(String(localized: L10n.Settings.systemVersion)): \(device.systemVersion)",
+            "\(String(localized: L10n.Settings.feedbackEmailCurrentPipeline)): \(pipeline.activePipelineName)",
+            "\(String(localized: L10n.Settings.feedbackEmailConfiguredPipeline)): \(pipeline.configuredPipelineName)",
+            "\(String(localized: L10n.Settings.feedbackEmailSelectedLanguage)): \(transcriber.selectedLanguage.displayName) (\(transcriber.selectedLanguageID))",
+            "\(String(localized: L10n.Settings.feedbackEmailLiveBackend)): \(transcriber.selectedTranscriptionBackend.title)",
+            "\(String(localized: L10n.Settings.feedbackEmailLocalWhisperModel)): \(localWhisperModel)",
+            "\(String(localized: L10n.Settings.feedbackEmailRealtimeWhisperModel)): \(liveWhisperModel)",
+            "\(String(localized: L10n.Settings.feedbackEmailSummaryEngine)): \(selectedSummaryProvider.displayName)",
+            "\(String(localized: L10n.Settings.feedbackEmailLocalSummaryModel)): \(localSummaryModel)",
+            "\(String(localized: L10n.Settings.feedbackEmailLocalSummaryStatus)): \(localSummaryStatus)",
+            "\(String(localized: L10n.Settings.feedbackEmailCoreMLEncoderLoading)): \(coreMLEncoderState)",
+            "\(String(localized: L10n.Settings.recordingCount)): \(recordingStore.recordings.count)",
+            "\(String(localized: L10n.Settings.storage)): \(recordingStore.storageDisplayName)"
         ].joined(separator: "\r\n")
     }
 
@@ -1069,6 +1585,104 @@ struct SettingsView: View {
         }
     }
 
+    private func downloadQwen3ASRModel() {
+        guard !isDownloadingQwen3ASRModel else {
+            return
+        }
+
+        isDownloadingQwen3ASRModel = true
+        qwen3ASRDownloadProgress = 0
+        HapticFeedback.play(.menuSelection)
+
+        Task {
+            do {
+                let status = try await Qwen3ASRModelManager.download { progress in
+                    Task { @MainActor in
+                        qwen3ASRDownloadProgress = progress
+                    }
+                }
+
+                await MainActor.run {
+                    qwen3ASRModelStatus = status
+                    isDownloadingQwen3ASRModel = false
+                    qwen3ASRDownloadProgress = 1
+                    HapticFeedback.play(.menuSelection)
+                }
+            } catch {
+                await MainActor.run {
+                    qwen3ASRModelStatus = Qwen3ASRModelManager.currentStatus()
+                    isDownloadingQwen3ASRModel = false
+                    qwen3ASRDownloadErrorMessage = error.localizedDescription
+                    HapticFeedback.play(.failure)
+                }
+            }
+        }
+    }
+
+    private func deleteQwen3ASRModel() {
+        guard !isDownloadingQwen3ASRModel else {
+            return
+        }
+
+        HapticFeedback.play(.menuSelection)
+        do {
+            qwen3ASRModelStatus = try Qwen3ASRModelManager.deleteDownloadedModel()
+            qwen3ASRDownloadProgress = 0
+        } catch {
+            qwen3ASRDeleteErrorMessage = error.localizedDescription
+            HapticFeedback.play(.failure)
+        }
+    }
+
+    private func downloadMOSSLocalModel() {
+        guard !isDownloadingMOSSLocalModel else {
+            return
+        }
+
+        isDownloadingMOSSLocalModel = true
+        mossLocalDownloadProgress = 0
+        HapticFeedback.play(.menuSelection)
+
+        Task {
+            do {
+                let status = try await MOSSLocalModelManager.download { progress in
+                    Task { @MainActor in
+                        mossLocalDownloadProgress = progress
+                    }
+                }
+
+                await MainActor.run {
+                    mossLocalModelStatus = status
+                    isDownloadingMOSSLocalModel = false
+                    mossLocalDownloadProgress = 1
+                    HapticFeedback.play(.menuSelection)
+                }
+            } catch {
+                await MainActor.run {
+                    mossLocalModelStatus = MOSSLocalModelManager.currentStatus()
+                    isDownloadingMOSSLocalModel = false
+                    mossLocalDownloadErrorMessage = error.localizedDescription
+                    HapticFeedback.play(.failure)
+                }
+            }
+        }
+    }
+
+    private func deleteMOSSLocalModel() {
+        guard !isDownloadingMOSSLocalModel else {
+            return
+        }
+
+        HapticFeedback.play(.menuSelection)
+        do {
+            mossLocalModelStatus = try MOSSLocalModelManager.deleteDownloadedModel()
+            mossLocalDownloadProgress = 0
+        } catch {
+            mossLocalDeleteErrorMessage = error.localizedDescription
+            HapticFeedback.play(.failure)
+        }
+    }
+
     private func downloadLocalSummaryModel() {
         guard !isDownloadingLocalSummaryModel else {
             return
@@ -1122,28 +1736,46 @@ struct SettingsView: View {
         }
     }
 
-    private var openAITranscriptionAPIKeySettings: some View {
+    private var geminiCloudSettings: some View {
         VStack(alignment: .leading, spacing: 12) {
             SettingsSecureTextFieldRow(
                 icon: "key",
-                titleResource: L10n.Settings.openAIAPIKey,
-                promptResource: L10n.Settings.openAIAPIKeyPrompt,
-                text: openAIAPIKeyBinding,
+                titleResource: L10n.GeminiCloud.apiKey,
+                promptResource: L10n.GeminiCloud.apiKeyPrompt,
+                text: geminiAPIKeyBinding,
                 tint: AppTheme.purple
             )
             .disabled(transcriber.isRecording || transcriber.isPreparing)
 
-            SettingsStatusRow(icon: "key", textResource: L10n.Settings.openAIAPIKeyDescription, tint: AppTheme.warning)
-            SettingsStatusRow(icon: "cloud", textResource: L10n.Settings.openAIManualRetranscriptionUploadsAudio, tint: AppTheme.warning)
+            SettingsStatusRow(
+                icon: "lock.shield",
+                textResource: L10n.GeminiCloud.apiKeyDescription,
+                tint: AppTheme.info
+            )
+            SettingsStatusRow(
+                icon: "arrow.up.circle",
+                textResource: L10n.GeminiCloud.manualUploadDescription,
+                tint: AppTheme.warning
+            )
 
-            if !transcriber.openAIAPIKey.isEmpty {
+            if !geminiAPIKey.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
                 Button(role: .destructive) {
                     HapticFeedback.play(.menuSelection)
-                    transcriber.openAIAPIKey = ""
+                    do {
+                        try GeminiAPIKeyStore.delete()
+                        geminiAPIKey = ""
+                        if selectedSummaryProvider == .geminiCloud {
+                            selectSummaryProvider(.automatic)
+                        }
+                        recordingStore.refreshIntelligenceAvailability()
+                    } catch {
+                        geminiAPIKeyErrorMessage = error.localizedDescription
+                        HapticFeedback.play(.failure)
+                    }
                 } label: {
                     SettingsCommandRow(
                         icon: "trash",
-                        titleResource: L10n.Settings.clearOpenAIAPIKey,
+                        titleResource: L10n.GeminiCloud.clearAPIKey,
                         tint: AppTheme.danger
                     )
                 }
@@ -1153,32 +1785,122 @@ struct SettingsView: View {
         }
     }
 
-    private var openAITranscriptionToggleSettings: some View {
-        Toggle(isOn: openAITranscriptionEnabledBinding) {
-            HStack(alignment: .top, spacing: 10) {
-                SettingsIcon(systemImage: "cloud", tint: AppTheme.purple)
+    private var geminiUsageSettings: some View {
+        let usage = geminiUsageTracker.snapshot
 
-                VStack(alignment: .leading, spacing: 3) {
-                    Text(L10n.Settings.onlineOpenAI)
-                        .font(.redditSans(.subheadline, weight: .semibold))
-                        .foregroundStyle(.primary)
+        return VStack(alignment: .leading, spacing: 12) {
+            SettingsMetricRow(
+                icon: "cpu",
+                titleResource: L10n.GeminiCloud.usageModel,
+                value: GeminiCloudService.model,
+                tint: AppTheme.purple
+            )
+            SettingsMetricRow(
+                icon: "number",
+                titleResource: L10n.GeminiCloud.usageRequests,
+                value: formattedGeminiTokenCount(usage.requestCount),
+                tint: AppTheme.info
+            )
+            SettingsMetricRow(
+                icon: "clock.arrow.circlepath",
+                titleResource: L10n.GeminiCloud.usageLastRequest,
+                value: formattedGeminiTokenCount(usage.lastTotalTokens),
+                tint: AppTheme.info
+            )
+            SettingsMetricRow(
+                icon: "sum",
+                titleResource: L10n.GeminiCloud.usageTotalTokens,
+                value: formattedGeminiTokenCount(usage.totalTokens),
+                tint: AppTheme.info
+            )
+            SettingsMetricRow(
+                icon: "arrow.down.circle",
+                titleResource: L10n.GeminiCloud.usageInputTokens,
+                value: formattedGeminiTokenCount(usage.inputTokens),
+                tint: AppTheme.info
+            )
+            SettingsMetricRow(
+                icon: "arrow.up.circle",
+                titleResource: L10n.GeminiCloud.usageOutputTokens,
+                value: formattedGeminiTokenCount(usage.outputTokens),
+                tint: AppTheme.info
+            )
+            SettingsMetricRow(
+                icon: "brain",
+                titleResource: L10n.GeminiCloud.usageThoughtTokens,
+                value: formattedGeminiTokenCount(usage.thoughtTokens),
+                tint: AppTheme.purple
+            )
+            SettingsMetricRow(
+                icon: "bolt.horizontal.circle",
+                titleResource: L10n.GeminiCloud.usageCachedTokens,
+                value: formattedGeminiTokenCount(usage.cachedTokens),
+                tint: AppTheme.info
+            )
 
-                    Text(L10n.Settings.onlineOpenAIDescription)
-                        .font(.redditSans(.caption))
-                        .foregroundStyle(.secondary)
-                        .fixedSize(horizontal: false, vertical: true)
+            if let lastUpdatedAt = usage.lastUpdatedAt {
+                SettingsVerbatimStatusRow(
+                    icon: "clock",
+                    text: String(
+                        format: String(localized: L10n.GeminiCloud.usageUpdatedFormat),
+                        lastUpdatedAt.formatted(date: .abbreviated, time: .shortened)
+                    ),
+                    tint: AppTheme.info
+                )
+            }
+
+            SettingsStatusRow(
+                icon: "info.circle",
+                textResource: L10n.GeminiCloud.usageLocalDescription,
+                tint: AppTheme.info
+            )
+
+            if usage.requestCount > 0 {
+                Button(role: .destructive) {
+                    HapticFeedback.play(.menuSelection)
+                    geminiUsageTracker.reset()
+                } label: {
+                    SettingsCommandRow(
+                        icon: "arrow.counterclockwise",
+                        titleResource: L10n.GeminiCloud.resetUsage,
+                        tint: AppTheme.danger
+                    )
                 }
+                .buttonStyle(.plain)
             }
         }
-        .toggleStyle(.switch)
-        .disabled(transcriber.isRecording || transcriber.isPreparing)
     }
 
-    private var openAITranscriptionEnabledBinding: Binding<Bool> {
+    private var geminiCloudEnabledBinding: Binding<Bool> {
         Binding {
-            transcriber.isOpenAITranscriptionEnabled
+            isGeminiCloudEnabled
+        } set: { isEnabled in
+            HapticFeedback.play(.menuSelection)
+            isGeminiCloudEnabled = isEnabled
+            GeminiCloudConfiguration.setEnabled(isEnabled)
+            if !isEnabled, selectedSummaryProvider == .geminiCloud {
+                selectSummaryProvider(.automatic)
+            }
+            recordingStore.refreshIntelligenceAvailability()
+        }
+    }
+
+    private func formattedGeminiTokenCount(_ value: Int64) -> String {
+        value.formatted(.number.grouping(.automatic))
+    }
+
+    private var geminiAPIKeyBinding: Binding<String> {
+        Binding {
+            geminiAPIKey
         } set: { value in
-            transcriber.isOpenAITranscriptionEnabled = value
+            geminiAPIKey = value
+            do {
+                try GeminiAPIKeyStore.save(value)
+                recordingStore.refreshIntelligenceAvailability()
+            } catch {
+                geminiAPIKeyErrorMessage = error.localizedDescription
+                HapticFeedback.play(.failure)
+            }
         }
     }
 
@@ -1342,14 +2064,6 @@ struct SettingsView: View {
         }
     }
 
-    private var openAIAPIKeyBinding: Binding<String> {
-        Binding {
-            transcriber.openAIAPIKey
-        } set: { value in
-            transcriber.openAIAPIKey = value
-        }
-    }
-
     private var transcriptionLanguagePage: some View {
         SettingsDetailPage(titleResource: L10n.Settings.transcriptionLanguage) {
             SettingsSection(titleResource: L10n.Settings.transcriptionLanguage, systemImage: "globe", tint: AppTheme.info) {
@@ -1468,6 +2182,79 @@ struct SettingsView: View {
         }
     }
 
+    private var iCloudSyncDetailsPage: some View {
+        let summary = recordingStore.iCloudSyncSummary
+        let groups = iCloudSyncDetailGroups
+        let summaryTint = summary.failedRecordingCount > 0 ? AppTheme.danger : AppTheme.info
+
+        return SettingsDetailPage(titleResource: L10n.Settings.iCloudProgress) {
+            SettingsSection(
+                titleResource: L10n.Settings.iCloudProgress,
+                systemImage: summary.systemImage,
+                tint: summaryTint
+            ) {
+                SettingsMetricRow(
+                    icon: "waveform",
+                    titleResource: L10n.Settings.recordingCount,
+                    value: "\(summary.totalRecordingCount)",
+                    tint: summaryTint
+                )
+
+                SettingsVerbatimStatusRow(
+                    icon: summary.systemImage,
+                    text: summary.detailText,
+                    tint: summaryTint
+                )
+            }
+
+            if groups.isEmpty {
+                SettingsSection(
+                    titleResource: L10n.Settings.iCloudProgress,
+                    systemImage: "icloud",
+                    tint: AppTheme.info
+                ) {
+                    SettingsStatusRow(
+                        icon: "waveform",
+                        textResource: L10n.ICloud.noRecordingsToSync,
+                        tint: AppTheme.info
+                    )
+                }
+            } else {
+                ForEach(groups) { group in
+                    SettingsICloudSyncStatusSection(group: group)
+                }
+            }
+        }
+        .task {
+            recordingStore.refreshICloudSyncStatus(logDiagnostics: true)
+        }
+    }
+
+    private var iCloudSyncDetailGroups: [SettingsICloudSyncGroup] {
+        let entries = recordingStore.recordings.map { item in
+            SettingsICloudSyncEntry(
+                item: item,
+                status: recordingStore.iCloudSyncStatus(for: item)
+            )
+        }
+        let stateOrder: [RecordingICloudSyncState] = [
+            .failed,
+            .uploading,
+            .waiting,
+            .iCloudUnavailable,
+            .localOnly,
+            .uploaded
+        ]
+
+        return stateOrder.compactMap { state in
+            let matchingEntries = entries.filter { $0.status.state == state }
+            guard !matchingEntries.isEmpty else {
+                return nil
+            }
+            return SettingsICloudSyncGroup(state: state, entries: matchingEntries)
+        }
+    }
+
     private var iCloudStorageBinding: Binding<Bool> {
         Binding {
             recordingStore.isICloudStorageEnabled
@@ -1504,19 +2291,21 @@ struct SettingsView: View {
                     tint: AppTheme.info
                 )
 
-                if transcriber.isOpenAITranscriptionEnabled {
-                    SettingsStatusRow(
-                        icon: "cloud",
-                        textResource: L10n.Settings.openAIManualRetranscriptionUploadsAudio,
-                        tint: AppTheme.warning
-                    )
-                }
-
                 SettingsStatusRow(
                     icon: "person.crop.circle.badge.xmark",
                     textResource: L10n.Settings.developerCannotAccessContent,
                     tint: AppTheme.success
                 )
+
+                Link(destination: Self.privacyPolicyURL) {
+                    SettingsExternalLinkRow(
+                        icon: "doc.text",
+                        titleResource: L10n.Settings.privacyPolicy,
+                        tint: AppTheme.success
+                    )
+                }
+                .buttonStyle(.plain)
+                .settingsNavigationHaptic()
             }
 
             SettingsSection(titleResource: L10n.Settings.storage, systemImage: "internaldrive", tint: AppTheme.info) {
@@ -1608,7 +2397,6 @@ struct SettingsView: View {
     }
 
     private var fileSection: some View {
-        let refreshTick = iCloudSyncRefreshTick
         let iCloudSyncSummary = recordingStore.iCloudSyncSummary
         let iCloudSyncTint = iCloudSyncSummary.failedRecordingCount > 0 ? AppTheme.warning : AppTheme.info
 
@@ -1659,33 +2447,30 @@ struct SettingsView: View {
                 tint: recordingStore.isICloudStorageEnabled ? AppTheme.info : AppTheme.success
             )
 
-            SettingsMetricRow(
-                icon: iCloudSyncSummary.systemImage,
-                titleResource: L10n.Settings.iCloudProgress,
-                value: iCloudSyncSummary.statusText,
-                tint: iCloudSyncTint
-            )
-            .id(refreshTick)
-
-            SettingsVerbatimStatusRow(
-                icon: iCloudSyncSummary.systemImage,
-                text: iCloudSyncSummary.detailText,
-                tint: iCloudSyncTint
-            )
-            .id("detail-\(refreshTick)")
+            NavigationLink(value: SettingsRoute.iCloudSyncDetails) {
+                SettingsNavigationRow(
+                    icon: iCloudSyncSummary.systemImage,
+                    titleResource: L10n.Settings.iCloudProgress,
+                    value: iCloudSyncSummary.statusText,
+                    subtitle: iCloudSyncSummary.detailText,
+                    tint: iCloudSyncTint
+                )
+            }
+            .buttonStyle(.plain)
+            .settingsNavigationHaptic()
         }
     }
 
     private func refreshICloudSyncStatusPeriodically() async {
         while !Task.isCancelled {
+            await MainActor.run {
+                recordingStore.refreshICloudSyncStatus()
+            }
+
             do {
                 try await Task.sleep(nanoseconds: 5_000_000_000)
             } catch {
                 return
-            }
-
-            await MainActor.run {
-                iCloudSyncRefreshTick &+= 1
             }
         }
     }
@@ -1725,6 +2510,24 @@ struct SettingsView: View {
                 value: build.buildTime,
                 tint: AppTheme.info
             )
+
+            Toggle(isOn: $isQwen3ASRStreamingLongAudioEnabled) {
+                HStack(alignment: .top, spacing: 10) {
+                    SettingsIcon(systemImage: "waveform.path.ecg.rectangle", tint: AppTheme.purple)
+
+                    VStack(alignment: .leading, spacing: 3) {
+                        Text(L10n.Qwen3ASR.streamingLongAudio)
+                            .font(.redditSans(.subheadline, weight: .semibold))
+                            .foregroundStyle(.primary)
+
+                        Text(L10n.Qwen3ASR.streamingLongAudioDescription)
+                            .font(.redditSans(.caption))
+                            .foregroundStyle(.secondary)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                }
+            }
+            .toggleStyle(.switch)
 
             SettingsMetricRow(
                 icon: "waveform.path.ecg",
@@ -1864,6 +2667,140 @@ private struct DeveloperDeviceInfo {
             pointer.withMemoryRebound(to: CChar.self, capacity: 1) { reboundPointer in
                 String(cString: reboundPointer)
             }
+        }
+    }
+}
+
+private struct SettingsICloudSyncEntry: Identifiable {
+    let item: RecordingItem
+    let status: RecordingICloudSyncStatus
+
+    var id: RecordingItem.ID { item.id }
+}
+
+private struct SettingsICloudSyncGroup: Identifiable {
+    let state: RecordingICloudSyncState
+    let entries: [SettingsICloudSyncEntry]
+
+    var id: String { state.settingsID }
+    var displayName: String { entries.first?.status.displayName ?? "" }
+    var systemImage: String { entries.first?.status.systemImage ?? "icloud" }
+    var tint: Color { state.settingsTint }
+}
+
+private struct SettingsICloudSyncStatusSection: View {
+    let group: SettingsICloudSyncGroup
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack(spacing: 10) {
+                SettingsIcon(systemImage: group.systemImage, tint: group.tint)
+
+                Text(group.displayName)
+                    .font(.redditSans(.headline, weight: .semibold))
+                    .foregroundStyle(.primary)
+
+                Spacer(minLength: 12)
+
+                Text("\(group.entries.count)")
+                    .font(.redditSans(.caption, weight: .bold).monospacedDigit())
+                    .foregroundStyle(group.tint)
+                    .padding(.horizontal, 9)
+                    .frame(height: 26)
+                    .background(group.tint.opacity(0.12), in: Capsule())
+            }
+
+            VStack(spacing: 0) {
+                ForEach(group.entries) { entry in
+                    SettingsICloudSyncRecordingRow(entry: entry, tint: group.tint)
+
+                    if entry.id != group.entries.last?.id {
+                        Divider()
+                            .padding(.leading, 38)
+                    }
+                }
+            }
+        }
+        .settingsSurface()
+    }
+}
+
+private struct SettingsICloudSyncRecordingRow: View {
+    let entry: SettingsICloudSyncEntry
+    let tint: Color
+
+    private var supplementalFileProgress: String? {
+        switch entry.status.state {
+        case .waiting, .failed:
+            guard entry.status.totalFileCount > 0 else {
+                return nil
+            }
+            return String(
+                format: String(localized: L10n.ICloud.filesUploadedFormat),
+                entry.status.uploadedFileCount,
+                entry.status.totalFileCount
+            )
+        case .localOnly, .iCloudUnavailable, .uploading, .uploaded:
+            return nil
+        }
+    }
+
+    var body: some View {
+        HStack(alignment: .top, spacing: 10) {
+            Image(systemName: entry.status.systemImage)
+                .font(.system(size: 14, weight: .semibold))
+                .foregroundStyle(tint)
+                .frame(width: 28, height: 28)
+                .background(tint.opacity(0.10), in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+
+            VStack(alignment: .leading, spacing: 4) {
+                Text(entry.item.audioFileName)
+                    .font(.redditSans(.subheadline, weight: .semibold))
+                    .foregroundStyle(.primary)
+                    .lineLimit(1)
+                    .truncationMode(.middle)
+
+                Text(entry.item.createdAt, format: .dateTime.year().month().day().hour().minute())
+                    .font(.redditSans(.caption))
+                    .foregroundStyle(.secondary)
+
+                Text(entry.status.detailText)
+                    .font(.redditSans(.caption))
+                    .foregroundStyle(entry.status.state == .failed ? AppTheme.danger : Color.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+
+                if let supplementalFileProgress {
+                    Text(supplementalFileProgress)
+                        .font(.redditSans(.caption, weight: .semibold).monospacedDigit())
+                        .foregroundStyle(tint)
+                }
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+        }
+        .padding(.vertical, 8)
+    }
+}
+
+private extension RecordingICloudSyncState {
+    var settingsID: String {
+        switch self {
+        case .localOnly: return "localOnly"
+        case .iCloudUnavailable: return "iCloudUnavailable"
+        case .waiting: return "waiting"
+        case .uploading: return "uploading"
+        case .uploaded: return "uploaded"
+        case .failed: return "failed"
+        }
+    }
+
+    var settingsTint: Color {
+        switch self {
+        case .localOnly: return .secondary
+        case .iCloudUnavailable: return AppTheme.warning
+        case .waiting: return AppTheme.warning
+        case .uploading: return AppTheme.info
+        case .uploaded: return AppTheme.success
+        case .failed: return AppTheme.danger
         }
     }
 }
@@ -2238,6 +3175,37 @@ private struct SettingsCommandRow: View {
     }
 }
 
+private struct SettingsExternalLinkRow: View {
+    let icon: String
+    let title: Text
+    let tint: Color
+
+    init(icon: String, titleResource: LocalizedStringResource, tint: Color) {
+        self.icon = icon
+        self.title = Text(titleResource)
+        self.tint = tint
+    }
+
+    var body: some View {
+        HStack(spacing: 10) {
+            SettingsIcon(systemImage: icon, tint: tint)
+
+            title
+                .font(.redditSans(.subheadline, weight: .semibold))
+                .foregroundStyle(.primary)
+
+            Spacer(minLength: 12)
+
+            Image(systemName: "arrow.up.right")
+                .font(.system(size: 12, weight: .semibold))
+                .foregroundStyle(tint)
+                .accessibilityHidden(true)
+        }
+        .frame(minHeight: 42)
+        .contentShape(Rectangle())
+    }
+}
+
 private struct SettingsStatusRow: View {
     let icon: String
     let text: Text
@@ -2250,11 +3218,11 @@ private struct SettingsStatusRow: View {
     }
 
     var body: some View {
-        HStack(alignment: .top, spacing: 8) {
+        HStack(alignment: .top, spacing: 10) {
             Image(systemName: icon)
                 .font(.system(size: 12, weight: .semibold))
                 .foregroundStyle(tint)
-                .frame(width: 18, height: 18)
+                .frame(width: 28, height: 18)
 
             text
                 .font(.redditSans(.caption))
@@ -2270,11 +3238,11 @@ private struct SettingsVerbatimStatusRow: View {
     let tint: Color
 
     var body: some View {
-        HStack(alignment: .top, spacing: 8) {
+        HStack(alignment: .top, spacing: 10) {
             Image(systemName: icon)
                 .font(.system(size: 12, weight: .semibold))
                 .foregroundStyle(tint)
-                .frame(width: 18, height: 18)
+                .frame(width: 28, height: 18)
 
             Text(text)
                 .font(.redditSans(.caption))
@@ -2315,7 +3283,11 @@ private extension View {
                     .stroke(AppTheme.cardBorder, lineWidth: 1)
             }
             .clipShape(RoundedRectangle(cornerRadius: AppTheme.cornerRadius, style: .continuous))
-            .shadow(color: AppTheme.cardShadow, radius: 7, y: 2)
+            .shadow(
+                color: AppTheme.cardShadow,
+                radius: AppTheme.cardShadowRadius,
+                y: AppTheme.cardShadowYOffset
+            )
     }
 }
 
