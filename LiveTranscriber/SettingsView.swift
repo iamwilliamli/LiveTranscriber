@@ -70,6 +70,7 @@ struct SettingsView: View {
     @AppStorage(OnboardingState.completedDefaultsKey) private var hasCompletedOnboarding = true
     @AppStorage(RecordingSummaryProvider.selectedDefaultsKey) private var selectedSummaryProviderRawValue = RecordingSummaryProvider.automatic.rawValue
     @AppStorage(Qwen3ASRDeveloperConfiguration.streamingLongAudioDefaultsKey) private var isQwen3ASRStreamingLongAudioEnabled = false
+    @AppStorage(ManualGeminiDeveloperConfiguration.enabledDefaultsKey) private var isManualGeminiEnabled = false
     @AppStorage(MOSSDecoderSegmentDuration.defaultsKey) private var mossDecoderSegmentDurationSeconds = MOSSDecoderSegmentDuration.defaultValue.rawValue
     private static let publicBetaFeedbackURL = URL(string: "https://t.me/livetranscriber")!
     private static let privacyPolicyURL = URL(string: "https://iamwilliamli.github.io/LiveTranscriber/privacy/")!
@@ -2591,6 +2592,17 @@ struct SettingsView: View {
                             .foregroundStyle(.secondary)
                             .fixedSize(horizontal: false, vertical: true)
                     }
+                }
+            }
+            .toggleStyle(.switch)
+
+            Toggle(isOn: $isManualGeminiEnabled) {
+                HStack(spacing: 10) {
+                    SettingsIcon(systemImage: "sparkles", tint: AppTheme.purple)
+
+                    Text(L10n.Recordings.manualGemini)
+                        .font(.redditSans(.subheadline, weight: .semibold))
+                        .foregroundStyle(.primary)
                 }
             }
             .toggleStyle(.switch)

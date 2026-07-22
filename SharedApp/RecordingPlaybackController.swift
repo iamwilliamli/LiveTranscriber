@@ -24,12 +24,22 @@ final class RecordingPlaybackController: ObservableObject {
     private static let logger = Logger(subsystem: "com.reddownloader.LiveTranscriber", category: "RecordingPlayback")
     static let availablePlaybackRates: [Float] = [0.75, 1, 1.25, 1.5, 2]
 
-    private let audioSessionOwner = UUID()
-    private var audioEngine: AVAudioEngine?
-    private var playerNode: AVAudioPlayerNode?
-    private var timePitchUnit: AVAudioUnitTimePitch?
-    private var gainUnit: AVAudioUnitEQ?
+    /// Local recordings are decoded by AVAudioFile/AVAudioPlayerNode, which is
+    /// Apple's file-playback path and supports the Float32 WAV files already
+    /// in the library. Keep the graph alive for the controller's lifetime;
+    /// rebuilding and deallocating an engine for every detail transition was
+    /// the source of the earlier main-thread stalls.
+    private let audioEngine = AVAudioEngine()
+    private let playerNode = AVAudioPlayerNode()
+    private let sourceMixerNode = AVAudioMixerNode()
+    private let timePitchUnit = AVAudioUnitTimePitch()
+    private let gainUnit = AVAudioUnitEQ(numberOfBands: 1)
+    private let audioSessionQueue = DispatchQueue(
+        label: "com.reddownloader.live-transcriber.playback-session",
+        qos: .userInitiated
+    )
     private var audioFile: AVAudioFile?
+    private var connectedFileFormat: AVAudioFormat?
     private var playbackTimerTask: Task<Void, Never>?
     private var sampleRate: Double = 44_100
     private var scheduledStartFrame: AVAudioFramePosition = 0
@@ -42,8 +52,12 @@ final class RecordingPlaybackController: ObservableObject {
     private var lastPublishedNowPlayingTitle: String?
     private var remoteCommandTargets: [RemoteCommandTarget] = []
     private var isReceivingRemoteControlEvents = false
+    private var isPlaybackSessionActive = false
+    private var playbackSessionActivationTask: Task<Void, Error>?
+    private var playbackSessionGeneration = 0
 
     init() {
+        configurePersistentPlaybackGraph()
         configureRemoteCommands()
         updateRemoteCommandAvailability(isEnabled: false)
     }
@@ -64,10 +78,23 @@ final class RecordingPlaybackController: ObservableObject {
             return
         }
 
-        load(url: url)
+        Task { [weak self] in
+            await self?.loadPrepared(item: item, url: url)
+        }
+    }
+
+    func loadPrepared(item: RecordingItem, url: URL) async {
+        guard currentItem?.id != item.id
+                || currentItem?.audioFileName != item.audioFileName
+                || !isLoaded else {
+            currentItem = item
+            updateNowPlayingInfo()
+            return
+        }
+
+        resetPlaybackState(deactivateSession: false)
         currentItem = item
-        updateNowPlayingInfo()
-        updateRemoteCommandAvailability(isEnabled: isLoaded)
+        loadAudioFile(at: url)
     }
 
     func setNowPlayingTranscript(
@@ -96,27 +123,44 @@ final class RecordingPlaybackController: ObservableObject {
     }
 
     func load(url: URL) {
-        unload()
+        resetPlaybackState(deactivateSession: false)
+        loadAudioFile(at: url)
+    }
+
+    private func loadAudioFile(at url: URL) {
         errorText = nil
 
-        guard FileManager.default.fileExists(atPath: url.path) else {
+        guard FileManager.default.fileExists(atPath: url.path),
+              FileManager.default.isReadableFile(atPath: url.path) else {
             errorText = localized(L10n.Recordings.recordingFileMissing)
+            Self.logger.error(
+                "[RecordingPlayback] load.file-unavailable file=\(url.lastPathComponent, privacy: .public)"
+            )
             return
         }
 
         do {
             let file = try AVAudioFile(forReading: url)
+            guard file.length > 0, file.fileFormat.sampleRate > 0 else {
+                throw CocoaError(.fileReadCorruptFile)
+            }
             audioFile = file
-            sampleRate = file.processingFormat.sampleRate
+            sampleRate = file.fileFormat.sampleRate
             duration = sampleRate > 0 ? Double(file.length) / sampleRate : 0
             try configurePlaybackEngine(format: file.processingFormat)
             currentTime = 0
             isLoaded = true
             updateNowPlayingInfo()
             updateRemoteCommandAvailability(isEnabled: true)
+            Self.logger.info(
+                "[RecordingPlayback] load.ready file=\(url.lastPathComponent, privacy: .public) frames=\(file.length, privacy: .public) duration=\(self.duration, privacy: .public) fileFormat=\(String(describing: file.fileFormat), privacy: .public) processingFormat=\(String(describing: file.processingFormat), privacy: .public)"
+            )
         } catch {
             errorText = localizedFormat(L10n.Recordings.playbackFailedFormat, error.localizedDescription)
             updateRemoteCommandAvailability(isEnabled: false)
+            Self.logger.error(
+                "[RecordingPlayback] load.failed file=\(url.lastPathComponent, privacy: .public) domain=\((error as NSError).domain, privacy: .public) code=\((error as NSError).code, privacy: .public) error=\(error.localizedDescription, privacy: .public)"
+            )
         }
     }
 
@@ -132,7 +176,8 @@ final class RecordingPlaybackController: ObservableObject {
     }
 
     func play() {
-        guard isLoaded, let playerNode else {
+        guard isLoaded, audioFile != nil else {
+            Self.logger.error("[RecordingPlayback] play.rejected reason=not-loaded")
             return
         }
 
@@ -148,9 +193,8 @@ final class RecordingPlaybackController: ObservableObject {
                 guard commandID == playbackCommandID, isLoaded else {
                     return
                 }
-                try await configurePlaybackSession()
+                try await configurePlaybackSessionIfNeeded()
                 guard commandID == playbackCommandID, isLoaded else {
-                    await deactivatePlaybackSession()
                     return
                 }
 
@@ -175,8 +219,16 @@ final class RecordingPlaybackController: ObservableObject {
                 isPlaying = true
                 startTimer()
                 updateNowPlayingInfo()
+                Self.logger.info(
+                    "[RecordingPlayback] play.started command=\(commandID, privacy: .public) time=\(self.currentTime, privacy: .public)"
+                )
+            } catch is CancellationError {
+                return
             } catch {
                 errorText = localizedFormat(L10n.Recordings.playbackStartFailedFormat, error.localizedDescription)
+                Self.logger.error(
+                    "[RecordingPlayback] play.failed command=\(commandID, privacy: .public) domain=\((error as NSError).domain, privacy: .public) code=\((error as NSError).code, privacy: .public) error=\(error.localizedDescription, privacy: .public)"
+                )
             }
         }
     }
@@ -185,8 +237,7 @@ final class RecordingPlaybackController: ObservableObject {
         playbackCommandID += 1
         let pausedTime = currentPlaybackTime()
         isPlaying = false
-        playerNode?.pause()
-        audioEngine?.pause()
+        playerNode.pause()
         currentTime = pausedTime
         stopTimer()
         updateNowPlayingInfo()
@@ -206,7 +257,7 @@ final class RecordingPlaybackController: ObservableObject {
             let commandID = playbackCommandID
             schedulePlayback(from: clampedTime)
             if commandID == playbackCommandID {
-                playerNode?.play()
+                playerNode.play()
             }
         }
         updateNowPlayingInfo()
@@ -224,7 +275,7 @@ final class RecordingPlaybackController: ObservableObject {
 
         currentTime = currentPlaybackTime()
         playbackRate = clampedRate
-        timePitchUnit?.rate = clampedRate
+        timePitchUnit.rate = clampedRate
         updateNowPlayingInfo()
     }
 
@@ -233,15 +284,14 @@ final class RecordingPlaybackController: ObservableObject {
     }
 
     func unload() {
+        resetPlaybackState(deactivateSession: true)
+    }
+
+    private func resetPlaybackState(deactivateSession: Bool) {
         playbackCommandID += 1
         playbackScheduleID += 1
-        playerNode?.stop()
-        playerNode?.reset()
-        audioEngine?.stop()
-        playerNode = nil
-        timePitchUnit = nil
-        gainUnit = nil
-        audioEngine = nil
+        playerNode.stop()
+        playerNode.reset()
         audioFile = nil
         currentItem = nil
         hasScheduledPlayback = false
@@ -257,8 +307,41 @@ final class RecordingPlaybackController: ObservableObject {
         clearNowPlayingInfo()
         updateRemoteCommandAvailability(isEnabled: false)
         endReceivingRemoteControlEventsIfNeeded()
-        Task {
-            await deactivatePlaybackSession()
+
+        if deactivateSession {
+            // Keep the graph and its nodes alive, but stop rendering while the
+            // detail screen is gone. This avoids AVAudioEngine deallocation on
+            // the main actor and makes the next file a cheap reconnect.
+            audioEngine.pause()
+            playbackSessionGeneration += 1
+            playbackSessionActivationTask?.cancel()
+            playbackSessionActivationTask = nil
+            isPlaybackSessionActive = false
+            requestPlaybackSessionDeactivation()
+        }
+    }
+
+    /// Warm the session and persistent graph while the detail transition is
+    /// completing so the first play tap only starts the already-scheduled
+    /// player node.
+    func prewarmPlaybackSession() {
+        Task { [weak self] in
+            guard let self else {
+                return
+            }
+            do {
+                try await self.configurePlaybackSessionIfNeeded()
+                guard self.isLoaded else {
+                    return
+                }
+                try self.startPlaybackEngineIfNeeded()
+            } catch is CancellationError {
+                return
+            } catch {
+                Self.logger.error(
+                    "[RecordingPlayback] prewarm.failed domain=\((error as NSError).domain, privacy: .public) code=\((error as NSError).code, privacy: .public) error=\(error.localizedDescription, privacy: .public)"
+                )
+            }
         }
     }
 
@@ -304,44 +387,51 @@ final class RecordingPlaybackController: ObservableObject {
         playbackTimerTask = nil
     }
 
-    private func configurePlaybackEngine(format: AVAudioFormat) throws {
-        let engine = AVAudioEngine()
-        let node = AVAudioPlayerNode()
-        let timePitch = AVAudioUnitTimePitch()
-        timePitch.rate = playbackRate
-        let equalizer = AVAudioUnitEQ(numberOfBands: 1)
-        if let band = equalizer.bands.first {
+    private func configurePersistentPlaybackGraph() {
+        timePitchUnit.rate = playbackRate
+        if let band = gainUnit.bands.first {
             band.filterType = .parametric
             band.frequency = 1_000
             band.bandwidth = 1
             band.gain = 0
             band.bypass = false
         }
-        equalizer.globalGain = Self.playbackGainDecibels
+        gainUnit.globalGain = Self.playbackGainDecibels
 
-        engine.attach(node)
-        engine.attach(timePitch)
-        engine.attach(equalizer)
-        engine.connect(node, to: timePitch, format: format)
-        engine.connect(timePitch, to: equalizer, format: format)
-        engine.connect(equalizer, to: engine.mainMixerNode, format: format)
-        engine.prepare()
+        audioEngine.attach(playerNode)
+        audioEngine.attach(sourceMixerNode)
+        audioEngine.attach(timePitchUnit)
+        audioEngine.attach(gainUnit)
 
-        audioEngine = engine
-        playerNode = node
-        timePitchUnit = timePitch
-        gainUnit = equalizer
+        // The source mixer is the stable format boundary. Only the upstream
+        // player connection changes when a recording has a different channel
+        // count/sample rate; the expensive output/effect graph stays intact.
+        audioEngine.connect(sourceMixerNode, to: timePitchUnit, format: nil)
+        audioEngine.connect(timePitchUnit, to: gainUnit, format: nil)
+        audioEngine.connect(gainUnit, to: audioEngine.mainMixerNode, format: nil)
+    }
+
+    private func configurePlaybackEngine(format: AVAudioFormat) throws {
+        playerNode.stop()
+        playerNode.reset()
+
+        if connectedFileFormat != format {
+            audioEngine.disconnectNodeOutput(playerNode)
+            audioEngine.connect(playerNode, to: sourceMixerNode, format: format)
+            connectedFileFormat = format
+        }
+        audioEngine.prepare()
     }
 
     private func startPlaybackEngineIfNeeded() throws {
-        guard let audioEngine, !audioEngine.isRunning else {
+        guard !audioEngine.isRunning else {
             return
         }
         try audioEngine.start()
     }
 
     private func schedulePlayback(from time: TimeInterval) {
-        guard let audioFile, let playerNode else {
+        guard let audioFile else {
             return
         }
 
@@ -379,6 +469,7 @@ final class RecordingPlaybackController: ObservableObject {
                 self.finishPlayback()
             }
         }
+        playerNode.prepare(withFrameCount: frameCount)
     }
 
     private func framePosition(for time: TimeInterval) -> AVAudioFramePosition {
@@ -393,7 +484,6 @@ final class RecordingPlaybackController: ObservableObject {
     private func currentPlaybackTime() -> TimeInterval {
         guard isPlaying,
               sampleRate > 0,
-              let playerNode,
               let nodeTime = playerNode.lastRenderTime,
               let playerTime = playerNode.playerTime(forNodeTime: nodeTime) else {
             return currentTime
@@ -407,25 +497,78 @@ final class RecordingPlaybackController: ObservableObject {
     private func finishPlayback() {
         playbackCommandID += 1
         playbackScheduleID += 1
-        playerNode?.stop()
-        playerNode?.reset()
+        playerNode.stop()
+        playerNode.reset()
         hasScheduledPlayback = false
         needsPlaybackReschedule = true
         currentTime = duration
         isPlaying = false
         stopTimer()
         updateNowPlayingInfo()
-        Task {
-            await deactivatePlaybackSession()
+    }
+
+    private func configurePlaybackSessionIfNeeded() async throws {
+        guard !isPlaybackSessionActive else {
+            return
+        }
+
+        let generation = playbackSessionGeneration
+        let activationTask: Task<Void, Error>
+        if let playbackSessionActivationTask {
+            activationTask = playbackSessionActivationTask
+        } else {
+            let task = Task { [weak self] in
+                guard let self else {
+                    throw CancellationError()
+                }
+                try await self.activatePlaybackSession()
+            }
+            playbackSessionActivationTask = task
+            activationTask = task
+        }
+
+        do {
+            try await activationTask.value
+            guard generation == playbackSessionGeneration else {
+                throw CancellationError()
+            }
+            playbackSessionActivationTask = nil
+            isPlaybackSessionActive = true
+        } catch {
+            if generation == playbackSessionGeneration {
+                playbackSessionActivationTask = nil
+            }
+            throw error
         }
     }
 
-    private func configurePlaybackSession() async throws {
-        try await AppAudioSessionCoordinator.shared.activatePlayback(owner: audioSessionOwner)
+    private func activatePlaybackSession() async throws {
+        #if os(iOS)
+        try Task.checkCancellation()
+        try await withCheckedThrowingContinuation { continuation in
+            audioSessionQueue.async {
+                do {
+                    let session = AVAudioSession.sharedInstance()
+                    try session.setCategory(.playback, mode: .default, options: [])
+                    try session.setActive(true, options: .notifyOthersOnDeactivation)
+                    continuation.resume(returning: ())
+                } catch {
+                    continuation.resume(throwing: error)
+                }
+            }
+        }
+        #endif
     }
 
-    private func deactivatePlaybackSession() async {
-        await AppAudioSessionCoordinator.shared.deactivatePlayback(owner: audioSessionOwner)
+    private func requestPlaybackSessionDeactivation() {
+        #if os(iOS)
+        audioSessionQueue.async {
+            try? AVAudioSession.sharedInstance().setActive(
+                false,
+                options: .notifyOthersOnDeactivation
+            )
+        }
+        #endif
     }
 
     private func configureRemoteCommands() {

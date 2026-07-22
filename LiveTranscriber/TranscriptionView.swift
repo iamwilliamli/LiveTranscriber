@@ -12,7 +12,11 @@ struct TranscriptionView: View {
     @Environment(\.verticalSizeClass) private var verticalSizeClass
     @ObservedObject var transcriber: LiveTranscriptionManager
     @ObservedObject var recordingStore: RecordingStore
+    @ObservedObject var systemAudioCoordinator: SystemAudioSessionCoordinator
+    @ObservedObject var captionStore: CaptionPresentationStore
+    @ObservedObject var captionPiPController: CaptionPiPController
     @Binding var externalPendingRecordingDraft: RecordingDraft?
+    @State private var selectedAudioInput: TranscriptionAudioInput = .microphone
     @State private var savedRecordingName: String?
     @State private var savedRecordingBannerIsVisible = false
     @State private var savedRecordingBannerTask: Task<Void, Never>?
@@ -67,12 +71,32 @@ struct TranscriptionView: View {
         }
         .onAppear {
             consumeExternalPendingRecordingDraftIfNeeded()
+            refreshCaptionPresentation()
+        }
+        .onReceive(transcriber.finalTranscriptStore.$lines) { _ in
+            refreshCaptionPresentation()
+        }
+        .onReceive(transcriber.interimTranscriptStore.$line) { _ in
+            refreshCaptionPresentation()
         }
         .onReceive(transcriber.finalTranscriptStore.$revision.dropFirst()) { _ in
             scheduleFinalTranscriptTranslationIfNeeded()
         }
+        .onReceive(systemAudioCoordinator.$completedDraft.compactMap { $0 }) { _ in
+            guard let draft = systemAudioCoordinator.takeCompletedDraft() else {
+                return
+            }
+            presentSaveSheet(for: draft)
+        }
         .onChange(of: transcriber.selectedLanguageID) { _, _ in
             clearLiveTranscriptTranslation(playsHaptic: false)
+            refreshCaptionPresentation()
+        }
+        .onChange(of: translatedLiveTranscriptByLineID) { _, _ in
+            refreshCaptionPresentation()
+        }
+        .onChange(of: selectedLiveTranslationLanguage?.id) { _, _ in
+            refreshCaptionPresentation()
         }
         .onChange(of: externalPendingRecordingDraft?.audioURL) { _, _ in
             consumeExternalPendingRecordingDraftIfNeeded()
@@ -343,15 +367,25 @@ struct TranscriptionView: View {
             recorderDeck
 
             HStack(spacing: 10) {
-                RecordingStateBadge(
-                    isRecording: transcriber.isRecording,
-                    isPaused: transcriber.isPaused,
-                    isPreparing: transcriber.isPreparing
-                )
+                if isScreenAudioMode {
+                    SystemAudioStateBadge(state: systemAudioCoordinator.state)
+                } else {
+                    RecordingStateBadge(
+                        isRecording: transcriber.isRecording,
+                        isPaused: transcriber.isPaused,
+                        isPreparing: transcriber.isPreparing
+                    )
+                }
+
+                audioInputMenu
 
                 languageMenu
 
                 Spacer(minLength: 0)
+            }
+
+            if isScreenAudioMode {
+                screenAudioControls
             }
 
             if let errorText = transcriber.errorText {
@@ -365,6 +399,172 @@ struct TranscriptionView: View {
         .frame(maxWidth: .infinity)
         .frame(maxHeight: expandsVertically ? .infinity : nil, alignment: .top)
         .cardSurface()
+    }
+
+    private var isScreenAudioMode: Bool {
+        selectedAudioInput == .screenAudio || systemAudioCoordinator.state.isActive
+    }
+
+    private var audioInputMenu: some View {
+        Menu {
+            ForEach(TranscriptionAudioInput.allCases) { input in
+                Button {
+                    selectedAudioInput = input
+                    HapticFeedback.play(.menuSelection)
+                } label: {
+                    Label(
+                        input == .microphone
+                            ? localized(L10n.ScreenAudio.microphone)
+                            : localized(L10n.ScreenAudio.screenAudio),
+                        systemImage: input == selectedAudioInput ? "checkmark" : input.systemImage
+                    )
+                }
+            }
+        } label: {
+            DropdownStatusPill(
+                systemImage: selectedAudioInput.systemImage,
+                title: selectedAudioInput == .microphone
+                    ? localized(L10n.ScreenAudio.microphone)
+                    : localized(L10n.ScreenAudio.screenAudio),
+                tint: selectedAudioInput == .microphone ? AppTheme.success : AppTheme.brand
+            )
+        }
+        .buttonStyle(.plain)
+        .disabled(transcriber.isRecording || transcriber.isPreparing || systemAudioCoordinator.state.isActive)
+        .accessibilityLabel(Text(L10n.ScreenAudio.inputSource))
+    }
+
+    private var screenAudioControls: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(spacing: 8) {
+                Label(screenAudioBackendTitle, systemImage: "rectangle.on.rectangle")
+                    .font(.redditSans(.caption, weight: .semibold))
+                    .foregroundStyle(.secondary)
+
+                Spacer(minLength: 8)
+
+                Label(screenAudioHeartbeatText, systemImage: "wave.3.right")
+                    .font(.redditSans(.caption2, weight: .semibold))
+                    .foregroundStyle(screenAudioHeartbeatTint)
+                    .lineLimit(1)
+            }
+
+            CaptionPiPPreview(controller: captionPiPController)
+                .frame(height: verticalSizeClass == .compact ? 52 : 78)
+                .accessibilityLabel(Text(L10n.ScreenAudio.title))
+
+            HStack(spacing: 10) {
+                if systemAudioCoordinator.requiresReplayKitPicker,
+                   systemAudioCoordinator.state.isActive {
+                    HStack(spacing: 8) {
+                        ReplayKitBroadcastPicker()
+                            .frame(width: 44, height: 44)
+
+                        Text(L10n.ScreenAudio.startBroadcast)
+                            .font(.redditSans(.caption, weight: .semibold))
+                            .foregroundStyle(.primary)
+                            .lineLimit(2)
+                    }
+                    .padding(.trailing, 10)
+                    .background(AppTheme.brand.opacity(0.10), in: Capsule())
+                    .overlay {
+                        Capsule().stroke(AppTheme.brand.opacity(0.20), lineWidth: 1)
+                    }
+                }
+
+                Button {
+                    Task {
+                        if captionPiPController.isActive {
+                            captionPiPController.stop()
+                        } else {
+                            await captionPiPController.start()
+                        }
+                    }
+                } label: {
+                    Label(
+                        captionPiPController.isActive
+                            ? localized(L10n.ScreenAudio.closePiP)
+                            : localized(L10n.ScreenAudio.openPiP),
+                        systemImage: captionPiPController.isActive
+                            ? "pip.exit"
+                            : "pip.enter"
+                    )
+                    .font(.redditSans(.caption, weight: .semibold))
+                    .padding(.horizontal, 12)
+                    .frame(height: 44)
+                    .background(AppTheme.info.opacity(0.11), in: Capsule())
+                    .overlay {
+                        Capsule().stroke(AppTheme.info.opacity(0.20), lineWidth: 1)
+                    }
+                }
+                .buttonStyle(.plain)
+                .disabled(!transcriber.isRecording || captionPiPController.isStarting)
+
+                Spacer(minLength: 0)
+            }
+
+            if let diagnostic = systemAudioDiagnosticText {
+                Label(diagnostic, systemImage: "exclamationmark.triangle.fill")
+                    .font(.redditSans(.caption2))
+                    .foregroundStyle(AppTheme.warning)
+                    .fixedSize(horizontal: false, vertical: true)
+            } else if verticalSizeClass != .compact {
+                Text(
+                    systemAudioCoordinator.requiresReplayKitPicker
+                        ? L10n.ScreenAudio.broadcastPickerHint
+                        : L10n.ScreenAudio.privacyNote
+                )
+                .font(.redditSans(.caption2))
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+            }
+        }
+        .padding(12)
+        .background(AppTheme.brand.opacity(colorScheme == .dark ? 0.10 : 0.06), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+        .overlay {
+            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                .stroke(AppTheme.brand.opacity(0.16), lineWidth: 1)
+        }
+    }
+
+    private var screenAudioBackendTitle: String {
+        switch systemAudioCoordinator.backend {
+        case .replayKitCompatibility:
+            return localized(L10n.ScreenAudio.compatibilityBackend)
+        case .screenCaptureKit:
+            return localized(L10n.ScreenAudio.nativeBackend)
+        }
+    }
+
+    private var screenAudioHeartbeatText: String {
+        guard let heartbeat = systemAudioCoordinator.lastHeartbeat else {
+            return localized(L10n.ScreenAudio.noHeartbeat)
+        }
+        if Date().timeIntervalSince(heartbeat) < 3 {
+            return localized(L10n.ScreenAudio.heartbeatNow)
+        }
+        return localizedFormat(
+            L10n.ScreenAudio.heartbeatFormat,
+            heartbeat.formatted(date: .omitted, time: .standard)
+        )
+    }
+
+    private var screenAudioHeartbeatTint: Color {
+        guard let heartbeat = systemAudioCoordinator.lastHeartbeat,
+              Date().timeIntervalSince(heartbeat) < 5 else {
+            return .secondary
+        }
+        return AppTheme.success
+    }
+
+    private var systemAudioDiagnosticText: String? {
+        if case .failed(let message) = systemAudioCoordinator.state {
+            return message
+        }
+        if let message = captionPiPController.errorMessage {
+            return message
+        }
+        return systemAudioCoordinator.diagnostics.lastError
     }
 
     private var recorderDeck: some View {
@@ -527,7 +727,7 @@ struct TranscriptionView: View {
                     HapticFeedback.play(.menuSelection)
                 case .startRecording:
                     HapticFeedback.play(.recordingStart)
-                    await transcriber.startRecording()
+                    await startSelectedAudioInput()
                 }
             } catch {
                 speechLocaleErrorMessage = error.localizedDescription
@@ -554,7 +754,7 @@ struct TranscriptionView: View {
                     Capsule()
                         .stroke(.white.opacity(0.28), lineWidth: 1)
                 }
-                .frame(width: transcriber.isRecording ? 120 : 64, height: 64)
+                .frame(width: activeRecorderDockWidth, height: 64)
                 .shadow(
                     color: Color.black.opacity(colorScheme == .dark ? 0.24 : 0.08),
                     radius: 2,
@@ -569,15 +769,17 @@ struct TranscriptionView: View {
 
             if transcriber.isRecording {
                 HStack(spacing: 8) {
-                    FloatingIconControlButton(
-                        titleResource: transcriber.isPaused
-                            ? L10n.Transcription.resume
-                            : L10n.Transcription.pause,
-                        systemImage: transcriber.isPaused ? "play.fill" : "pause.fill",
-                        tint: .primary,
-                        background: Color.secondary.opacity(0.14)
-                    ) {
-                        togglePause()
+                    if showsPauseControl {
+                        FloatingIconControlButton(
+                            titleResource: transcriber.isPaused
+                                ? L10n.Transcription.resume
+                                : L10n.Transcription.pause,
+                            systemImage: transcriber.isPaused ? "play.fill" : "pause.fill",
+                            tint: .primary,
+                            background: Color.secondary.opacity(0.14)
+                        ) {
+                            togglePause()
+                        }
                     }
 
                     FloatingIconControlButton(
@@ -603,7 +805,7 @@ struct TranscriptionView: View {
                             Image(systemName: "tray.and.arrow.down.fill")
                                 .font(.system(size: 23, weight: .semibold))
                         } else {
-                            Image(systemName: "mic.fill")
+                            Image(systemName: selectedAudioInput == .microphone ? "mic.fill" : "rectangle.on.rectangle.angled")
                                 .font(.system(size: 24, weight: .semibold))
                         }
                     }
@@ -619,7 +821,7 @@ struct TranscriptionView: View {
                 .transition(.opacity.combined(with: .scale(scale: 0.90)))
             }
         }
-        .frame(width: transcriber.isRecording ? 120 : 64, height: 64)
+        .frame(width: activeRecorderDockWidth, height: 64)
         .animation(
             reduceMotion ? nil : .spring(duration: 0.34, bounce: 0.12),
             value: transcriber.isRecording
@@ -634,7 +836,7 @@ struct TranscriptionView: View {
         guard transcriber.selectedTranscriptionBackend.requiresAppleSpeech else {
             HapticFeedback.play(.recordingStart)
             Task {
-                await transcriber.startRecording()
+                await startSelectedAudioInput()
             }
             return
         }
@@ -648,7 +850,7 @@ struct TranscriptionView: View {
                 switch preparation {
                 case .ready:
                     HapticFeedback.play(.recordingStart)
-                    await transcriber.startRecording()
+                    await startSelectedAudioInput()
                 case .needsRelease(let request):
                     pendingSpeechLocaleReleaseAction = PendingTranscriptionSpeechLocaleReleaseAction(
                         request: request,
@@ -660,6 +862,23 @@ struct TranscriptionView: View {
                 speechLocaleErrorMessage = error.localizedDescription
                 HapticFeedback.play(.failure)
             }
+        }
+    }
+
+    private var showsPauseControl: Bool {
+        !(isScreenAudioMode && systemAudioCoordinator.backend == .replayKitCompatibility)
+    }
+
+    private var activeRecorderDockWidth: CGFloat {
+        transcriber.isRecording && showsPauseControl ? 120 : 64
+    }
+
+    private func startSelectedAudioInput() async {
+        switch selectedAudioInput {
+        case .microphone:
+            await transcriber.startRecording()
+        case .screenAudio:
+            await systemAudioCoordinator.startSession()
         }
     }
 
@@ -677,7 +896,14 @@ struct TranscriptionView: View {
     private func stopRecording() {
         HapticFeedback.play(.recordingStop)
         Task {
-            if let draft = await transcriber.stopRecording() {
+            let draft: RecordingDraft?
+            if isScreenAudioMode || systemAudioCoordinator.state.isActive {
+                captionPiPController.stop()
+                draft = await systemAudioCoordinator.stopSession()
+            } else {
+                draft = await transcriber.stopRecording()
+            }
+            if let draft {
                 presentSaveSheet(for: draft)
             } else {
                 HapticFeedback.play(.warning)
@@ -1059,6 +1285,29 @@ struct TranscriptionView: View {
 
     private func liveTranslationSignature(for line: TranscriptionLine, language: TranscriptionLanguage) -> String {
         "\(language.id)|\(line.id.uuidString)|\(line.text.hashValue)"
+    }
+
+    private func refreshCaptionPresentation() {
+        captionStore.updateTranscript(
+            finalLines: transcriber.finalTranscriptStore.lines,
+            interimLine: transcriber.interimTranscriptStore.line,
+            sourceLanguageID: transcriber.selectedLanguageID
+        )
+        captionStore.updateTranslation(
+            translatedLiveTranscriptByLineID,
+            targetLanguageID: selectedLiveTranslationLanguage?.id
+        )
+    }
+}
+
+private extension TranscriptionAudioInput {
+    var systemImage: String {
+        switch self {
+        case .microphone:
+            return "mic"
+        case .screenAudio:
+            return "rectangle.on.rectangle.angled"
+        }
     }
 }
 
@@ -2214,6 +2463,80 @@ private struct RecordingStateBadge: View {
     }
 }
 
+private struct SystemAudioStateBadge: View {
+    let state: SystemAudioSessionState
+
+    private var titleResource: LocalizedStringResource {
+        switch state {
+        case .idle:
+            return L10n.ScreenAudio.statusReady
+        case .awaitingUserApproval:
+            return L10n.ScreenAudio.statusApproval
+        case .waitingForAudio:
+            return L10n.ScreenAudio.statusWaiting
+        case .capturing:
+            return L10n.ScreenAudio.statusCapturing
+        case .paused:
+            return L10n.ScreenAudio.statusPaused
+        case .stopping:
+            return L10n.ScreenAudio.statusStopping
+        case .failed:
+            return L10n.ScreenAudio.statusFailed
+        }
+    }
+
+    private var tint: Color {
+        switch state {
+        case .capturing:
+            return AppTheme.danger
+        case .awaitingUserApproval, .waitingForAudio, .paused, .stopping:
+            return AppTheme.warning
+        case .failed:
+            return AppTheme.danger
+        case .idle:
+            return AppTheme.success
+        }
+    }
+
+    private var systemImage: String {
+        switch state {
+        case .idle:
+            return "checkmark.circle"
+        case .awaitingUserApproval:
+            return "person.crop.circle.badge.questionmark"
+        case .waitingForAudio:
+            return "waveform.badge.magnifyingglass"
+        case .capturing:
+            return "record.circle"
+        case .paused:
+            return "pause.circle"
+        case .stopping:
+            return "stop.circle"
+        case .failed:
+            return "exclamationmark.triangle"
+        }
+    }
+
+    var body: some View {
+        Label {
+            Text(titleResource)
+        } icon: {
+            Image(systemName: systemImage)
+                .contentTransition(.symbolEffect(.replace))
+        }
+        .font(.redditSans(.caption, weight: .semibold))
+        .foregroundStyle(tint)
+        .lineLimit(1)
+        .minimumScaleFactor(0.72)
+        .padding(.horizontal, 10)
+        .frame(height: 32)
+        .background(tint.opacity(0.12), in: Capsule())
+        .overlay {
+            Capsule().stroke(tint.opacity(0.18), lineWidth: 1)
+        }
+    }
+}
+
 private struct StatusPill: View {
     let systemImage: String
     let title: String
@@ -2357,9 +2680,17 @@ private extension View {
 
 #if DEBUG
 #Preview("Transcription") {
+    let transcriber = LiveTranscriptionManager()
+    let captionStore = CaptionPresentationStore()
     TranscriptionView(
-        transcriber: LiveTranscriptionManager(),
+        transcriber: transcriber,
         recordingStore: RecordingStore(),
+        systemAudioCoordinator: SystemAudioSessionCoordinator(
+            transcriber: transcriber,
+            captionStore: captionStore
+        ),
+        captionStore: captionStore,
+        captionPiPController: CaptionPiPController(store: captionStore),
         externalPendingRecordingDraft: .constant(nil)
     )
     .font(.redditSans(.body))

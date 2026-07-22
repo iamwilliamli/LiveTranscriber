@@ -42,6 +42,8 @@ struct MacRecordingDetailView: View {
     @State private var isShowingManualGeminiImport = false
     @State private var manualGeminiJSONText = ""
     @State private var manualGeminiImportErrorMessage: String?
+    @AppStorage(ManualGeminiDeveloperConfiguration.enabledDefaultsKey)
+    private var isManualGeminiEnabled = false
     @State private var appleSpeechLanguages: [TranscriptionLanguage] = TranscriptionLanguage.fallbackOptions
     @State private var downloadedWhisperModels: [LocalWhisperModel] = []
     @State private var whisperLanguagesByModelID: [String: [TranscriptionLanguage]] = [:]
@@ -1124,7 +1126,9 @@ struct MacRecordingDetailView: View {
 
             retranscribeMenu
 
-            manualGeminiMenu
+            if isManualGeminiEnabled {
+                manualGeminiMenu
+            }
 
             if store.hasGeminiTranscriptBackup(for: currentItem) {
                 Button {

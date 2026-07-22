@@ -1,8 +1,53 @@
+import AVFoundation
 import Foundation
 import XCTest
 @testable import LiveTranscriberMac
 
 final class RecordingStorageWorkerTests: XCTestCase {
+    func testPreparingReadableLocalFileReportsCheckingThenAvailable() async throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent(
+            "RecordingStoragePreparationTests-\(UUID().uuidString)",
+            isDirectory: true
+        )
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+
+        let audioURL = root.appendingPathComponent("recording.m4a")
+        try Data([0, 1, 2, 3]).write(to: audioURL)
+        let stateRecorder = RecordingFilePreparationStateRecorder()
+        let worker = RecordingStorageWorker()
+
+        let preparedURL = try await worker.prepareFileForAccess(
+            at: audioURL,
+            isEnabled: true,
+            stateHandler: { state in
+                await stateRecorder.append(state)
+            }
+        )
+
+        XCTAssertEqual(preparedURL, audioURL)
+        let states = await stateRecorder.states
+        XCTAssertEqual(states, [.checking, .available])
+    }
+
+    func testPreparingMissingFileReturnsExplicitFailure() async throws {
+        let missingURL = FileManager.default.temporaryDirectory.appendingPathComponent(
+            "missing-recording-\(UUID().uuidString).m4a"
+        )
+        let worker = RecordingStorageWorker()
+
+        do {
+            _ = try await worker.prepareFileForAccess(
+                at: missingURL,
+                isEnabled: true,
+                stateHandler: nil
+            )
+            XCTFail("Expected a missing-file error")
+        } catch let error as RecordingFilePreparationError {
+            XCTAssertEqual(error, .fileMissing)
+        }
+    }
+
     func testPrepareDirectoryMigratesRecordingFilesButLeavesUnrelatedFiles() async throws {
         let root = FileManager.default.temporaryDirectory.appendingPathComponent(
             "RecordingStorageWorkerTests-\(UUID().uuidString)",
@@ -107,5 +152,150 @@ final class RecordingStorageWorkerTests: XCTestCase {
         )
 
         XCTAssertTrue(snapshots.isEmpty)
+    }
+
+    func testNamedFileCleanupRemovesRecordingAssetsWithoutTouchingOtherFiles() async throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent(
+            "RecordingStorageCleanupTests-\(UUID().uuidString)",
+            isDirectory: true
+        )
+        let assets = root.appendingPathComponent("Assets", isDirectory: true)
+        try FileManager.default.createDirectory(at: assets, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+
+        let audioURL = root.appendingPathComponent("recording.m4a")
+        let transcriptURL = root.appendingPathComponent("recording.txt")
+        let assetURL = assets.appendingPathComponent("waveform.json")
+        let unrelatedURL = root.appendingPathComponent("keep.json")
+        try Data([0, 1, 2, 3]).write(to: audioURL)
+        try "transcript".write(to: transcriptURL, atomically: true, encoding: .utf8)
+        try "waveform".write(to: assetURL, atomically: true, encoding: .utf8)
+        try "keep".write(to: unrelatedURL, atomically: true, encoding: .utf8)
+
+        let worker = RecordingStorageWorker()
+        await worker.removeFiles(
+            namedRelativePaths: [
+                "recording.m4a",
+                "recording.txt",
+                "Assets/waveform.json",
+            ],
+            in: [root]
+        )
+
+        XCTAssertFalse(FileManager.default.fileExists(atPath: audioURL.path))
+        XCTAssertFalse(FileManager.default.fileExists(atPath: transcriptURL.path))
+        XCTAssertFalse(FileManager.default.fileExists(atPath: assetURL.path))
+        XCTAssertTrue(FileManager.default.fileExists(atPath: unrelatedURL.path))
+    }
+
+    func testWAVWriterPersistsInterleavedIntegerPCMThatAVAssetCanPlay() async throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent(
+            "AudioFileWriterTests-\(UUID().uuidString)",
+            isDirectory: true
+        )
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+
+        let url = root.appendingPathComponent("stereo.wav")
+        let inputFormat = try XCTUnwrap(
+            AVAudioFormat(
+                commonFormat: .pcmFormatFloat32,
+                sampleRate: 48_000,
+                channels: 2,
+                interleaved: false
+            )
+        )
+        let buffer = try XCTUnwrap(
+            AVAudioPCMBuffer(
+                pcmFormat: inputFormat,
+                frameCapacity: 4_800
+            )
+        )
+        buffer.frameLength = buffer.frameCapacity
+
+        let writer = try AudioFileWriter(
+            url: url,
+            inputFormat: inputFormat,
+            outputFormat: .wav
+        )
+        _ = try writer.write(buffer)
+        _ = writer.finish()
+
+        let writtenFile = try AVAudioFile(forReading: url)
+        XCTAssertTrue(writtenFile.fileFormat.isInterleaved)
+        XCTAssertEqual(writtenFile.fileFormat.channelCount, 2)
+        XCTAssertEqual(writtenFile.length, 4_800)
+        let streamDescription = writtenFile.fileFormat.streamDescription.pointee
+        XCTAssertEqual(streamDescription.mBitsPerChannel, 24)
+        XCTAssertEqual(streamDescription.mFormatFlags & kAudioFormatFlagIsFloat, 0)
+
+        let asset = AVURLAsset(url: url)
+        let isPlayable = try await asset.load(.isPlayable)
+        XCTAssertTrue(isPlayable)
+    }
+
+    @MainActor
+    func testPlaybackControllerPlaysExistingFloatWAVThroughAVAudioFile() async throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent(
+            "PlaybackCompatibilityTests-\(UUID().uuidString)",
+            isDirectory: true
+        )
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+
+        let sourceURL = root.appendingPathComponent("legacy-float.wav")
+        let format = try XCTUnwrap(
+            AVAudioFormat(
+                commonFormat: .pcmFormatFloat32,
+                sampleRate: 48_000,
+                channels: 2,
+                interleaved: false
+            )
+        )
+        let buffer = try XCTUnwrap(
+            AVAudioPCMBuffer(
+                pcmFormat: format,
+                frameCapacity: 48_000
+            )
+        )
+        buffer.frameLength = buffer.frameCapacity
+
+        var legacyWriter: AVAudioFile? = try AVAudioFile(
+            forWriting: sourceURL,
+            settings: [
+                AVFormatIDKey: kAudioFormatLinearPCM,
+                AVSampleRateKey: format.sampleRate,
+                AVNumberOfChannelsKey: Int(format.channelCount),
+                AVLinearPCMBitDepthKey: 32,
+                AVLinearPCMIsFloatKey: true,
+                AVLinearPCMIsBigEndianKey: false,
+                AVLinearPCMIsNonInterleaved: false,
+            ],
+            commonFormat: format.commonFormat,
+            interleaved: format.isInterleaved
+        )
+        try legacyWriter?.write(from: buffer)
+        legacyWriter = nil
+
+        let controller = RecordingPlaybackController()
+        controller.load(url: sourceURL)
+        XCTAssertTrue(controller.isLoaded)
+        XCTAssertNil(controller.errorText)
+        XCTAssertEqual(controller.duration, 1, accuracy: 0.001)
+
+        controller.play()
+        try await Task.sleep(for: .milliseconds(100))
+        XCTAssertTrue(controller.isPlaying)
+        controller.pause()
+        XCTAssertGreaterThan(controller.currentTime, 0)
+        controller.unload()
+    }
+}
+
+private actor RecordingFilePreparationStateRecorder {
+    private(set) var states: [RecordingFilePreparationState] = []
+
+    func append(_ state: RecordingFilePreparationState) {
+        states.append(state)
     }
 }

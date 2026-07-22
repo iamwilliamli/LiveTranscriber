@@ -1490,6 +1490,8 @@ struct MacDeveloperSettingsPane: View {
     @EnvironmentObject private var recordingStore: RecordingStore
     @AppStorage(Qwen3ASRDeveloperConfiguration.streamingLongAudioDefaultsKey)
     private var isQwen3StreamingEnabled = false
+    @AppStorage(ManualGeminiDeveloperConfiguration.enabledDefaultsKey)
+    private var isManualGeminiEnabled = false
     @AppStorage(MacOnboardingState.completedDefaultsKey)
     private var hasCompletedOnboarding = true
 
@@ -1578,6 +1580,10 @@ struct MacDeveloperSettingsPane: View {
                             .font(.caption)
                             .foregroundStyle(.secondary)
                     }
+                }
+
+                Toggle(isOn: $isManualGeminiEnabled) {
+                    Text(L10n.Recordings.manualGemini)
                 }
 
                 LabeledContent {

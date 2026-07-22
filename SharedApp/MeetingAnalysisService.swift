@@ -81,7 +81,7 @@ enum MeetingAnalysisService {
         )
         let response = try await session.respond(
             to: prompt(transcript: context, languageName: languageName),
-            options: GenerationOptions(
+            options: compatibleGenerationOptions(
                 samplingMode: .greedy,
                 temperature: 0.2,
                 maximumResponseTokens: 900

@@ -67,6 +67,8 @@
 	<string>Used only when you choose to add extracted action items to Reminders.</string>
 	<key>NSRemindersUsageDescription</key>
 	<string>Used only when you choose to add extracted action items to Reminders.</string>
+	<key>NSScreenCaptureUsageDescription</key>
+	<string>Used only when you choose Screen Audio to transcribe audio made available by another app.</string>
 	<key>NSSpeechRecognitionUsageDescription</key>
 	<string>Used to turn recorded speech into live transcription text.</string>
 	<key>NSSupportsLiveActivities</key>
@@ -109,6 +111,7 @@
 	<array>
 		<string>audio</string>
 		<string>remote-notification</string>
+		<string>screen-capture</string>
 	</array>
 	<key>UILaunchScreen</key>
 	<dict>

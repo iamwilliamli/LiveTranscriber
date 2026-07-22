@@ -154,7 +154,6 @@ struct MacRecordingsView: View {
                         Image(systemName: "map")
                     }
                 }
-                .disabled(!store.recordings.contains(where: { $0.location != nil }))
 
                 Button {
                     Task {
@@ -211,6 +210,14 @@ struct MacRecordingsView: View {
         }
         .onChange(of: pendingImportURLs) { _, _ in
             consumePendingImportURLs()
+        }
+        .onChange(of: selectedRecordingID) { _, newValue in
+            if newValue == nil {
+                player.unload()
+            }
+        }
+        .onDisappear {
+            player.unload()
         }
     }
 

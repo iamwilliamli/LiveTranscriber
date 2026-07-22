@@ -14,6 +14,26 @@ import SwiftData
 import TranscriberCore
 import TranscriberDomain
 
+func compatibleGenerationOptions(
+    samplingMode: GenerationOptions.SamplingMode? = nil,
+    temperature: Double? = nil,
+    maximumResponseTokens: Int? = nil
+) -> GenerationOptions {
+    #if HAS_IOS27_SDK
+    GenerationOptions(
+        samplingMode: samplingMode,
+        temperature: temperature,
+        maximumResponseTokens: maximumResponseTokens
+    )
+    #else
+    GenerationOptions(
+        sampling: samplingMode,
+        temperature: temperature,
+        maximumResponseTokens: maximumResponseTokens
+    )
+    #endif
+}
+
 struct RecordingDraft {
     var audioURL: URL
     var startedAt: Date
@@ -886,6 +906,38 @@ struct RecordingICloudSyncStatus: Equatable {
     }
 }
 
+enum RecordingFilePreparationState: Equatable, Sendable {
+    case checking
+    case downloading
+    case available
+}
+
+enum RecordingFilePreparationError: LocalizedError, Equatable, Sendable {
+    case fileMissing
+    case metadataUnavailable(String)
+    case downloadFailed(String)
+    case downloadTimedOut
+
+    var errorDescription: String? {
+        switch self {
+        case .fileMissing:
+            return String(localized: L10n.Recordings.recordingFileMissing)
+        case .metadataUnavailable(let description):
+            return String(
+                format: String(localized: L10n.Recordings.iCloudFileStatusFailedFormat),
+                description
+            )
+        case .downloadFailed(let description):
+            return String(
+                format: String(localized: L10n.Recordings.iCloudDownloadFailedFormat),
+                description
+            )
+        case .downloadTimedOut:
+            return String(localized: L10n.Recordings.iCloudDownloadTimedOut)
+        }
+    }
+}
+
 struct RecordingICloudSyncSummary: Equatable {
     var totalRecordingCount: Int
     var uploadedRecordingCount: Int
@@ -995,6 +1047,18 @@ struct RecordingStorageFileSnapshot: Sendable, Equatable {
 /// RecordingStore can stay MainActor-isolated without freezing SwiftUI.
 actor RecordingStorageWorker {
     typealias ICloudContainerResolver = @Sendable (String) -> URL?
+    typealias FilePreparationStateHandler = @Sendable (RecordingFilePreparationState) async -> Void
+
+    private struct InFlightFilePreparation {
+        let id: UUID
+        let task: Task<URL, Error>
+    }
+
+    private struct UbiquitousFileSnapshot: Sendable {
+        var isUbiquitous: Bool
+        var isLocallyAvailable: Bool
+        var downloadErrorDescription: String?
+    }
 
     nonisolated private static let logger = Logger(
         subsystem: "com.reddownloader.LiveTranscriber",
@@ -1003,6 +1067,7 @@ actor RecordingStorageWorker {
 
     private let fileManager = FileManager.default
     private let iCloudContainerResolver: ICloudContainerResolver
+    private var inFlightFilePreparations: [String: InFlightFilePreparation] = [:]
 
     init(
         iCloudContainerResolver: @escaping ICloudContainerResolver = { identifier in
@@ -1014,6 +1079,222 @@ actor RecordingStorageWorker {
 
     func resolveICloudContainer(identifier: String) -> URL? {
         iCloudContainerResolver(identifier)
+    }
+
+    /// File Provider can synchronously wait on XPC for several seconds when a
+    /// ubiquitous download is requested. Keep that work off the main actor and
+    /// avoid making the request at all when the item is already local.
+    func prepareUbiquitousItemForAccess(
+        at url: URL,
+        isEnabled: Bool
+    ) async -> URL {
+        do {
+            return try await prepareFileForAccess(
+                at: url,
+                isEnabled: isEnabled,
+                stateHandler: nil
+            )
+        } catch {
+            Self.logger.debug(
+                "[RecordingStorage] Unable to prepare file path=\(url.lastPathComponent, privacy: .public) error=\(error.localizedDescription, privacy: .public)"
+            )
+            return url
+        }
+    }
+
+    /// Prepares a local or ubiquitous file and reports enough state for the UI
+    /// to distinguish a player that is loading from an iCloud download. Calls
+    /// for the same path share one materialization task.
+    func prepareFileForAccess(
+        at url: URL,
+        isEnabled: Bool,
+        stateHandler: FilePreparationStateHandler?
+    ) async throws -> URL {
+        if let stateHandler {
+            await stateHandler(.checking)
+        }
+
+        guard fileManager.fileExists(atPath: url.path) else {
+            throw RecordingFilePreparationError.fileMissing
+        }
+
+        guard isEnabled else {
+            if let stateHandler {
+                await stateHandler(.available)
+            }
+            return url
+        }
+
+        let preparationKey = url.standardizedFileURL.path
+        if let existingPreparation = inFlightFilePreparations[preparationKey] {
+            if let stateHandler {
+                await stateHandler(.downloading)
+            }
+            return try await finishFilePreparation(
+                existingPreparation,
+                key: preparationKey,
+                stateHandler: stateHandler
+            )
+        }
+
+        let initialSnapshot: UbiquitousFileSnapshot
+        do {
+            initialSnapshot = try Self.ubiquitousFileSnapshot(at: url)
+        } catch {
+            throw RecordingFilePreparationError.metadataUnavailable(error.localizedDescription)
+        }
+
+        guard initialSnapshot.isUbiquitous else {
+            if let stateHandler {
+                await stateHandler(.available)
+            }
+            return url
+        }
+
+        if let errorDescription = initialSnapshot.downloadErrorDescription {
+            throw RecordingFilePreparationError.downloadFailed(errorDescription)
+        }
+
+        if initialSnapshot.isLocallyAvailable {
+            if let stateHandler {
+                await stateHandler(.available)
+            }
+            return url
+        }
+
+        if let stateHandler {
+            await stateHandler(.downloading)
+        }
+
+        let preparation = InFlightFilePreparation(
+            id: UUID(),
+            task: Task.detached(priority: .userInitiated) {
+                try await Self.materializeUbiquitousFile(at: url)
+            }
+        )
+        inFlightFilePreparations[preparationKey] = preparation
+        return try await finishFilePreparation(
+            preparation,
+            key: preparationKey,
+            stateHandler: stateHandler
+        )
+    }
+
+    private func finishFilePreparation(
+        _ preparation: InFlightFilePreparation,
+        key: String,
+        stateHandler: FilePreparationStateHandler?
+    ) async throws -> URL {
+        do {
+            let preparedURL = try await preparation.task.value
+            if inFlightFilePreparations[key]?.id == preparation.id {
+                inFlightFilePreparations.removeValue(forKey: key)
+            }
+            if let stateHandler {
+                await stateHandler(.available)
+            }
+            return preparedURL
+        } catch {
+            if inFlightFilePreparations[key]?.id == preparation.id {
+                inFlightFilePreparations.removeValue(forKey: key)
+            }
+            throw error
+        }
+    }
+
+    nonisolated private static func materializeUbiquitousFile(at url: URL) async throws -> URL {
+        // iOS 27 can occasionally omit the downloading-status value for a file
+        // that is already readable. Probe the file itself before waiting on
+        // File Provider metadata so an available recording never stays grey.
+        if isFileReadable(at: url) {
+            return url
+        }
+
+        do {
+            try FileManager.default.startDownloadingUbiquitousItem(at: url)
+        } catch {
+            if isFileReadable(at: url) {
+                return url
+            }
+            throw RecordingFilePreparationError.downloadFailed(error.localizedDescription)
+        }
+
+        var lastMetadataErrorDescription: String?
+        for attempt in 0..<800 {
+            try Task.checkCancellation()
+
+            do {
+                let snapshot = try ubiquitousFileSnapshot(at: url)
+                lastMetadataErrorDescription = nil
+                if let errorDescription = snapshot.downloadErrorDescription {
+                    throw RecordingFilePreparationError.downloadFailed(errorDescription)
+                }
+                if snapshot.isLocallyAvailable {
+                    return url
+                }
+            } catch let error as RecordingFilePreparationError {
+                throw error
+            } catch {
+                lastMetadataErrorDescription = error.localizedDescription
+            }
+
+            // The status key is not reliable enough to be the sole readiness
+            // signal. Periodically verify that the file can actually be read.
+            if attempt.isMultiple(of: 5), isFileReadable(at: url) {
+                return url
+            }
+
+            try await Task.sleep(for: .milliseconds(150))
+        }
+
+        if let lastMetadataErrorDescription {
+            throw RecordingFilePreparationError.metadataUnavailable(lastMetadataErrorDescription)
+        }
+        throw RecordingFilePreparationError.downloadTimedOut
+    }
+
+    nonisolated private static func ubiquitousFileSnapshot(
+        at url: URL
+    ) throws -> UbiquitousFileSnapshot {
+        let keys: Set<URLResourceKey> = [
+            .isUbiquitousItemKey,
+            .ubiquitousItemDownloadingStatusKey,
+            .ubiquitousItemDownloadingErrorKey,
+        ]
+        let values = try url.resourceValues(forKeys: keys)
+        return UbiquitousFileSnapshot(
+            isUbiquitous: values.isUbiquitousItem == true,
+            isLocallyAvailable: isLocallyAvailable(values.ubiquitousItemDownloadingStatus),
+            downloadErrorDescription: values.ubiquitousItemDownloadingError?.localizedDescription
+        )
+    }
+
+    nonisolated private static func isFileReadable(at url: URL) -> Bool {
+        do {
+            let handle = try FileHandle(forReadingFrom: url)
+            defer { try? handle.close() }
+            _ = try handle.read(upToCount: 1)
+            return true
+        } catch {
+            return false
+        }
+    }
+
+    func transcriptText(
+        at url: URL,
+        preparesUbiquitousItem: Bool
+    ) async -> String {
+        let preparedURL = await prepareUbiquitousItemForAccess(
+            at: url,
+            isEnabled: preparesUbiquitousItem
+        )
+        return (try? String(contentsOf: preparedURL, encoding: .utf8)) ?? ""
+    }
+
+    nonisolated private static func isLocallyAvailable(
+        _ status: URLUbiquitousItemDownloadingStatus?
+    ) -> Bool {
+        status == .current || status == .downloaded
     }
 
     func prepareRecordingsDirectory(
@@ -1140,6 +1421,43 @@ actor RecordingStorageWorker {
                 } catch {
                     Self.logger.error(
                         "Tombstoned file cleanup failed file=\(url.lastPathComponent, privacy: .private) error=\(error.localizedDescription, privacy: .public)"
+                    )
+                }
+            }
+        }
+    }
+
+    func removeFiles(
+        namedRelativePaths relativePaths: Set<String>,
+        in directories: [URL]
+    ) {
+        guard !relativePaths.isEmpty else {
+            return
+        }
+
+        for directory in Self.uniqueDirectories(directories) {
+            let standardizedDirectory = directory.standardizedFileURL
+            let directoryPrefix = standardizedDirectory.path + "/"
+
+            for relativePath in relativePaths {
+                let url = standardizedDirectory
+                    .appendingPathComponent(relativePath)
+                    .standardizedFileURL
+                guard url.path.hasPrefix(directoryPrefix) else {
+                    Self.logger.error(
+                        "Refused recording cleanup outside managed directory path=\(relativePath, privacy: .private)"
+                    )
+                    continue
+                }
+                guard fileManager.fileExists(atPath: url.path) else {
+                    continue
+                }
+
+                do {
+                    try fileManager.removeItem(at: url)
+                } catch {
+                    Self.logger.error(
+                        "Recording cleanup failed file=\(url.lastPathComponent, privacy: .private) error=\(error.localizedDescription, privacy: .public)"
                     )
                 }
             }
@@ -2241,13 +2559,12 @@ final class RecordingStore: ObservableObject {
     }
 
     func delete(_ item: RecordingItem) throws {
-        do {
-            try removeRecordingFilesFromAllManagedDirectories(item)
-        } catch {
-            Self.logger.error(
-                "Recording file cleanup will be retried by tombstone: \(error.localizedDescription, privacy: .public)"
-            )
-        }
+        let deletionRelativePaths = recordingFileRelativePaths(for: item)
+        let deletionDirectories = managedRecordingsDirectories
+
+        // Publish the tombstone and list removal before touching iCloud Drive or
+        // large audio files. Otherwise the confirmation UI can disappear while
+        // the old row is still visible, making the recording flash back briefly.
         addDeletedRecordingTombstone(id: item.id)
         recordings.removeAll { $0.id == item.id }
         inferredRecordingIDs.remove(item.id)
@@ -2257,6 +2574,14 @@ final class RecordingStore: ObservableObject {
         } catch {
             Self.logger.error(
                 "Recording index cleanup failed but tombstone remains authoritative: \(error.localizedDescription, privacy: .public)"
+            )
+        }
+
+        let worker = storageWorker
+        Task {
+            await worker.removeFiles(
+                namedRelativePaths: deletionRelativePaths,
+                in: deletionDirectories
             )
         }
         RecordingMetadataCloudSync.shared.scheduleRecordingDelete(id: item.id)
@@ -2700,19 +3025,22 @@ final class RecordingStore: ObservableObject {
     }
 
     func audioURL(for item: RecordingItem) -> URL {
-        prepareUbiquitousItemForAccess(
-            recordingsDirectory.appendingPathComponent(item.audioFileName)
-        )
+        recordingsDirectory.appendingPathComponent(item.audioFileName)
     }
 
     func transcriptURL(for item: RecordingItem) -> URL {
-        prepareUbiquitousItemForAccess(
-            recordingsDirectory.appendingPathComponent(item.transcriptFileName)
-        )
+        storedTranscriptURL(for: item)
+    }
+
+    /// Returns the managed transcript path without asking iCloud to download it.
+    /// Callers doing indexing or metadata inspection use this path off the main
+    /// actor so ubiquitous-item coordination cannot stall SwiftUI.
+    private func storedTranscriptURL(for item: RecordingItem) -> URL {
+        recordingsDirectory.appendingPathComponent(item.transcriptFileName)
     }
 
     func assetURLs(for item: RecordingItem) -> [URL] {
-        storedAssetURLs(for: item).map(prepareUbiquitousItemForAccess)
+        storedAssetURLs(for: item)
     }
 
     /// Produces paths without touching ubiquitous-item state. Status polling
@@ -2728,13 +3056,31 @@ final class RecordingStore: ObservableObject {
         }
     }
 
-    private func prepareUbiquitousItemForAccess(_ url: URL) -> URL {
-        guard isICloudStorageEnabled,
-              fileManager.fileExists(atPath: url.path) else {
-            return url
-        }
-        try? fileManager.startDownloadingUbiquitousItem(at: url)
-        return url
+    func preparedAudioURL(for item: RecordingItem) async -> URL {
+        await storageWorker.prepareUbiquitousItemForAccess(
+            at: audioURL(for: item),
+            isEnabled: isICloudStorageEnabled
+        )
+    }
+
+    func prepareAudioURL(
+        for item: RecordingItem,
+        stateHandler: @escaping @MainActor @Sendable (RecordingFilePreparationState) -> Void
+    ) async throws -> URL {
+        try await storageWorker.prepareFileForAccess(
+            at: audioURL(for: item),
+            isEnabled: isICloudStorageEnabled,
+            stateHandler: { state in
+                await stateHandler(state)
+            }
+        )
+    }
+
+    func loadTranscriptText(for item: RecordingItem) async -> String {
+        await storageWorker.transcriptText(
+            at: storedTranscriptURL(for: item),
+            preparesUbiquitousItem: isICloudStorageEnabled
+        )
     }
 
     private func geminiTranscriptBackupURL(for item: RecordingItem) -> URL {
@@ -2824,35 +3170,16 @@ final class RecordingStore: ObservableObject {
     }
 
     func normalizedSearchText(for item: RecordingItem) -> String {
-        let signature = searchIndexSignature(for: item)
+        let metadataSignature = searchIndexSignature(for: item)
         if let cachedEntry = searchIndexCache[item.id],
-           cachedEntry.signature == signature {
+           cachedEntry.metadataSignature == metadataSignature {
             return cachedEntry.normalizedText
         }
 
-        let searchableFields = [
-            item.displayName,
-            item.audioFileName,
-            item.assets.map(\.relativePath).joined(separator: " "),
-            item.localizedLanguageName,
-            item.languageName,
-            item.transcriptPreview,
-            item.combinedTags.joined(separator: " "),
-            item.projectName ?? "",
-            item.keyPoints ?? "",
-            item.intelligence?.summary ?? "",
-            item.meetingAnalysis?.searchableText ?? "",
-            item.audioEventAnalysis?.searchableText ?? "",
-            transcriptText(for: item)
-        ]
-        let normalizedText = searchableFields
-            .joined(separator: "\n")
-            .normalizedForRecordingSearch
-        searchIndexCache[item.id] = RecordingSearchIndexCacheEntry(
-            signature: signature,
-            normalizedText: normalizedText
-        )
-        return normalizedText
+        // Never synchronously open a transcript from a SwiftUI body. The
+        // background warmup will populate the full transcript-backed entry;
+        // metadata remains searchable immediately while that work is pending.
+        return searchMetadataText(for: item).normalizedForRecordingSearch
     }
 
     func searchRecordings(matching query: String) async -> [RecordingSearchResult] {
@@ -2861,23 +3188,30 @@ final class RecordingStore: ObservableObject {
             return []
         }
 
-        let workItems = recordings.map { item in
-            let signature = searchIndexSignature(for: item)
-            let cachedNormalizedText: String?
-            if let cachedEntry = searchIndexCache[item.id],
-               cachedEntry.signature == signature {
-                cachedNormalizedText = cachedEntry.normalizedText
-            } else {
-                cachedNormalizedText = nil
+        var workItems: [RecordingSearchQueryWorkItem] = []
+        workItems.reserveCapacity(recordings.count)
+        for (index, item) in recordings.enumerated() {
+            let metadataSignature = searchIndexSignature(for: item)
+            let cachedEntry = searchIndexCache[item.id].flatMap { entry in
+                entry.metadataSignature == metadataSignature ? entry : nil
             }
 
-            return RecordingSearchQueryWorkItem(
+            workItems.append(RecordingSearchQueryWorkItem(
                 id: item.id,
-                signature: signature,
+                metadataSignature: metadataSignature,
                 metadataText: searchMetadataText(for: item),
-                transcriptURL: transcriptURL(for: item),
-                cachedNormalizedText: cachedNormalizedText
-            )
+                transcriptURL: storedTranscriptURL(for: item),
+                preparesUbiquitousItem: isICloudStorageEnabled,
+                cachedSignature: cachedEntry?.signature,
+                cachedNormalizedText: cachedEntry?.normalizedText
+            ))
+
+            if index.isMultiple(of: 8) {
+                await Task.yield()
+                guard !Task.isCancelled else {
+                    return []
+                }
+            }
         }
 
         let batch = await searchWorker.search(
@@ -2890,10 +3224,11 @@ final class RecordingStore: ObservableObject {
 
         for entry in batch.indexEntries {
             guard let currentItem = recordings.first(where: { $0.id == entry.id }),
-                  searchIndexSignature(for: currentItem) == entry.signature else {
+                  searchIndexSignature(for: currentItem) == entry.metadataSignature else {
                 continue
             }
             searchIndexCache[entry.id] = RecordingSearchIndexCacheEntry(
+                metadataSignature: entry.metadataSignature,
                 signature: entry.signature,
                 normalizedText: entry.normalizedText
             )
@@ -3458,14 +3793,18 @@ final class RecordingStore: ObservableObject {
     }
 
     private func removeRecordingFilesFromAllManagedDirectories(_ item: RecordingItem) throws {
+        try removeRecordingFilesNamed(Array(recordingFileRelativePaths(for: item)))
+    }
+
+    private func recordingFileRelativePaths(for item: RecordingItem) -> Set<String> {
         let assetPaths = item.assets
             .filter(\.isSafeRelativePath)
             .map(\.relativePath)
-        try removeRecordingFilesNamed(Array(Set(assetPaths + [
+        return Set(assetPaths + [
             item.audioFileName,
             item.transcriptFileName,
             Self.geminiTranscriptBackupFileName(for: item.transcriptFileName)
-        ])))
+        ])
     }
 
     private func removeFilesForStableRecordingID(_ id: RecordingItem.ID) throws {
@@ -3696,33 +4035,64 @@ final class RecordingStore: ObservableObject {
     }
 
     private func warmSearchIndexInBackground() {
-        let workItems = recordings.compactMap { item -> RecordingSearchIndexWorkItem? in
-            let signature = searchIndexSignature(for: item)
-            if let cachedEntry = searchIndexCache[item.id],
-               cachedEntry.signature == signature {
-                return nil
-            }
-
-            return RecordingSearchIndexWorkItem(
-                id: item.id,
-                signature: signature,
-                metadataText: searchMetadataText(for: item),
-                transcriptURL: transcriptURL(for: item)
-            )
-        }
-
-        guard !workItems.isEmpty else {
-            return
-        }
-
         searchIndexWarmupTask?.cancel()
         searchIndexWarmupTask = Task(priority: .utility) { [weak self] in
-            let entries = await Task.detached(priority: .utility) {
-                workItems.map { item in
-                    let transcript = (try? String(contentsOf: item.transcriptURL, encoding: .utf8)) ?? ""
+            guard let self else {
+                return
+            }
+
+            var workItems: [RecordingSearchIndexWorkItem] = []
+            workItems.reserveCapacity(self.recordings.count)
+            for (index, item) in self.recordings.enumerated() {
+                guard !Task.isCancelled else {
+                    return
+                }
+
+                let metadataSignature = self.searchIndexSignature(for: item)
+                let cachedEntry = self.searchIndexCache[item.id]
+                workItems.append(
+                    RecordingSearchIndexWorkItem(
+                        id: item.id,
+                        metadataSignature: metadataSignature,
+                        metadataText: self.searchMetadataText(for: item),
+                        transcriptURL: self.storedTranscriptURL(for: item),
+                        preparesUbiquitousItem: self.isICloudStorageEnabled,
+                        cachedSignature: cachedEntry?.metadataSignature == metadataSignature
+                            ? cachedEntry?.signature
+                            : nil
+                    )
+                )
+
+                if index.isMultiple(of: 8) {
+                    await Task.yield()
+                }
+            }
+
+            guard !workItems.isEmpty else {
+                self.searchIndexWarmupTask = nil
+                return
+            }
+
+            let entries: [RecordingSearchIndexWarmupEntry] = await Task.detached(
+                priority: .utility
+            ) { () -> [RecordingSearchIndexWarmupEntry] in
+                workItems.compactMap { item -> RecordingSearchIndexWarmupEntry? in
+                    let signature = recordingSearchContentSignature(
+                        metadataSignature: item.metadataSignature,
+                        transcriptURL: item.transcriptURL,
+                        preparesUbiquitousItem: item.preparesUbiquitousItem
+                    )
+                    guard signature != item.cachedSignature else {
+                        return nil
+                    }
+                    let transcript = loadRecordingSearchTranscript(
+                        from: item.transcriptURL,
+                        preparesUbiquitousItem: item.preparesUbiquitousItem
+                    )
                     return RecordingSearchIndexWarmupEntry(
                         id: item.id,
-                        signature: item.signature,
+                        metadataSignature: item.metadataSignature,
+                        signature: signature,
                         normalizedText: [item.metadataText, transcript]
                             .joined(separator: "\n")
                             .normalizedForRecordingSearch
@@ -3734,23 +4104,22 @@ final class RecordingStore: ObservableObject {
                 return
             }
 
-            await MainActor.run {
-                guard let self else {
-                    return
+            for (index, entry) in entries.enumerated() {
+                guard let currentItem = self.recordings.first(where: { $0.id == entry.id }),
+                      self.searchIndexSignature(for: currentItem) == entry.metadataSignature else {
+                    continue
                 }
+                self.searchIndexCache[entry.id] = RecordingSearchIndexCacheEntry(
+                    metadataSignature: entry.metadataSignature,
+                    signature: entry.signature,
+                    normalizedText: entry.normalizedText
+                )
 
-                for entry in entries {
-                    guard let currentItem = self.recordings.first(where: { $0.id == entry.id }),
-                          self.searchIndexSignature(for: currentItem) == entry.signature else {
-                        continue
-                    }
-                    self.searchIndexCache[entry.id] = RecordingSearchIndexCacheEntry(
-                        signature: entry.signature,
-                        normalizedText: entry.normalizedText
-                    )
+                if index.isMultiple(of: 16) {
+                    await Task.yield()
                 }
-                self.searchIndexWarmupTask = nil
             }
+            self.searchIndexWarmupTask = nil
         }
     }
 
@@ -3787,15 +4156,9 @@ final class RecordingStore: ObservableObject {
             "\(item.keyPoints?.hashValue ?? 0)",
             "\(item.intelligence?.summary.hashValue ?? 0)",
             "\(item.meetingAnalysis?.searchableText.hashValue ?? 0)",
-            "\(item.audioEventAnalysis?.searchableText.hashValue ?? 0)",
-            "\(transcriptModificationTime(for: item))",
+            "\(item.audioEventAnalysis?.hashValue ?? 0)",
             "\(item.importStatus == nil)"
         ].joined(separator: "|")
-    }
-
-    private func transcriptModificationTime(for item: RecordingItem) -> TimeInterval {
-        let url = transcriptURL(for: item)
-        return ((try? url.resourceValues(forKeys: [.contentModificationDateKey]).contentModificationDate) ?? .distantPast).timeIntervalSinceReferenceDate
     }
 
     private static func recordingTitle(for item: RecordingItem) -> String {
@@ -4048,8 +4411,9 @@ extension RecordingStore: RecordingLibraryReading {
         guard asset.isSafeRelativePath else {
             throw RecordingLibraryError.unsafeAssetPath(asset.relativePath)
         }
-        return prepareUbiquitousItemForAccess(
-            recordingsDirectory.appendingPathComponent(asset.relativePath)
+        return await storageWorker.prepareUbiquitousItemForAccess(
+            at: recordingsDirectory.appendingPathComponent(asset.relativePath),
+            isEnabled: isICloudStorageEnabled
         )
     }
 }
@@ -4086,6 +4450,7 @@ private enum RecordingTranscriptEditError: LocalizedError {
 }
 
 private struct RecordingSearchIndexCacheEntry {
+    var metadataSignature: String
     var signature: String
     var normalizedText: String
 }
@@ -4113,22 +4478,27 @@ private struct RecordingICloudSyncStatusWorkItem {
 
 private struct RecordingSearchIndexWorkItem: Sendable {
     var id: RecordingItem.ID
-    var signature: String
+    var metadataSignature: String
     var metadataText: String
     var transcriptURL: URL
+    var preparesUbiquitousItem: Bool
+    var cachedSignature: String?
 }
 
 private struct RecordingSearchIndexWarmupEntry: Sendable {
     var id: RecordingItem.ID
+    var metadataSignature: String
     var signature: String
     var normalizedText: String
 }
 
 private struct RecordingSearchQueryWorkItem: Sendable {
     var id: RecordingItem.ID
-    var signature: String
+    var metadataSignature: String
     var metadataText: String
     var transcriptURL: URL
+    var preparesUbiquitousItem: Bool
+    var cachedSignature: String?
     var cachedNormalizedText: String?
 }
 
@@ -4147,6 +4517,36 @@ private struct RecordingSearchTranscriptLine: Sendable {
 private struct RecordingSearchTranscriptCacheEntry: Sendable {
     var signature: String
     var lines: [RecordingSearchTranscriptLine]
+}
+
+private func loadRecordingSearchTranscript(
+    from url: URL,
+    preparesUbiquitousItem: Bool
+) -> String {
+    if preparesUbiquitousItem,
+       FileManager.default.fileExists(atPath: url.path) {
+        try? FileManager.default.startDownloadingUbiquitousItem(at: url)
+    }
+    return (try? String(contentsOf: url, encoding: .utf8)) ?? ""
+}
+
+private func recordingSearchContentSignature(
+    metadataSignature: String,
+    transcriptURL: URL,
+    preparesUbiquitousItem: Bool
+) -> String {
+    if preparesUbiquitousItem,
+       FileManager.default.fileExists(atPath: transcriptURL.path) {
+        try? FileManager.default.startDownloadingUbiquitousItem(at: transcriptURL)
+    }
+
+    let values = try? transcriptURL.resourceValues(
+        forKeys: [.contentModificationDateKey, .fileSizeKey]
+    )
+    let modificationTime = values?.contentModificationDate?.timeIntervalSinceReferenceDate
+        ?? Date.distantPast.timeIntervalSinceReferenceDate
+    let fileSize = values?.fileSize ?? -1
+    return "\(metadataSignature)|\(modificationTime)|\(fileSize)"
 }
 
 private actor RecordingSearchWorker {
@@ -4168,11 +4568,20 @@ private actor RecordingSearchWorker {
             }
 
             var transcript: String?
+            let signature = recordingSearchContentSignature(
+                metadataSignature: workItem.metadataSignature,
+                transcriptURL: workItem.transcriptURL,
+                preparesUbiquitousItem: workItem.preparesUbiquitousItem
+            )
             let normalizedText: String
-            if let cachedNormalizedText = workItem.cachedNormalizedText {
+            if workItem.cachedSignature == signature,
+               let cachedNormalizedText = workItem.cachedNormalizedText {
                 normalizedText = cachedNormalizedText
             } else {
-                let loadedTranscript = Self.loadTranscript(from: workItem.transcriptURL)
+                let loadedTranscript = Self.loadTranscript(
+                    from: workItem.transcriptURL,
+                    preparesUbiquitousItem: workItem.preparesUbiquitousItem
+                )
                 transcript = loadedTranscript
                 normalizedText = [workItem.metadataText, loadedTranscript]
                     .joined(separator: "\n")
@@ -4180,7 +4589,8 @@ private actor RecordingSearchWorker {
                 indexEntries.append(
                     RecordingSearchIndexWarmupEntry(
                         id: workItem.id,
-                        signature: workItem.signature,
+                        metadataSignature: workItem.metadataSignature,
+                        signature: signature,
                         normalizedText: normalizedText
                     )
                 )
@@ -4192,10 +4602,13 @@ private actor RecordingSearchWorker {
 
             let lines: [RecordingSearchTranscriptLine]
             if let cachedEntry = transcriptCache[workItem.id],
-               cachedEntry.signature == workItem.signature {
+               cachedEntry.signature == signature {
                 lines = cachedEntry.lines
             } else {
-                let loadedTranscript = transcript ?? Self.loadTranscript(from: workItem.transcriptURL)
+                let loadedTranscript = transcript ?? Self.loadTranscript(
+                    from: workItem.transcriptURL,
+                    preparesUbiquitousItem: workItem.preparesUbiquitousItem
+                )
                 lines = StoredTranscriptLine.parse(loadedTranscript).map { line in
                     RecordingSearchTranscriptLine(
                         id: line.id,
@@ -4205,7 +4618,7 @@ private actor RecordingSearchWorker {
                     )
                 }
                 transcriptCache[workItem.id] = RecordingSearchTranscriptCacheEntry(
-                    signature: workItem.signature,
+                    signature: signature,
                     lines: lines
                 )
             }
@@ -4234,8 +4647,14 @@ private actor RecordingSearchWorker {
         )
     }
 
-    private static func loadTranscript(from url: URL) -> String {
-        (try? String(contentsOf: url, encoding: .utf8)) ?? ""
+    private static func loadTranscript(
+        from url: URL,
+        preparesUbiquitousItem: Bool
+    ) -> String {
+        loadRecordingSearchTranscript(
+            from: url,
+            preparesUbiquitousItem: preparesUbiquitousItem
+        )
     }
 }
 
@@ -5458,7 +5877,7 @@ private enum RecordingIntelligenceService {
             debugLog("Text iOS 26 semantic notes request. language=\(languageName), expectedOutputLanguage=\(outputLanguage), transcriptCharacters=\(transcript.count), promptCharacters=\(prompt.count), transcriptPreview=\(debugSnippet(transcript, limit: 1_200))")
             let response = try await session.respond(
                 to: prompt,
-                options: GenerationOptions(
+                options: compatibleGenerationOptions(
                     samplingMode: .greedy,
                     temperature: 0.2,
                     maximumResponseTokens: 180
@@ -5561,7 +5980,7 @@ private enum RecordingIntelligenceService {
             debugLog("Text iOS 26 final summary request. language=\(languageName), expectedOutputLanguage=\(outputLanguage), isRetry=\(previousInvalidSummary != nil), notesCharacters=\(notes.count), promptCharacters=\(prompt.count), notesPreview=\(debugSnippet(notes, limit: 1_000))")
             let response = try await session.respond(
                 to: prompt,
-                options: GenerationOptions(
+                options: compatibleGenerationOptions(
                     samplingMode: .greedy,
                     temperature: 0.2,
                     maximumResponseTokens: 140
@@ -5616,7 +6035,7 @@ private enum RecordingIntelligenceService {
             debugLog("Text iOS 26 title request. language=\(languageName), expectedOutputLanguage=\(outputLanguage), transcriptCharacters=\(transcript.count), promptCharacters=\(prompt.count), transcriptPreview=\(debugSnippet(titleTranscript, limit: 1_200))")
             let response = try await session.respond(
                 to: prompt,
-                options: GenerationOptions(
+                options: compatibleGenerationOptions(
                     samplingMode: .greedy,
                     temperature: 0.2,
                     maximumResponseTokens: 80

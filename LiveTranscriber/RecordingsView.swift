@@ -823,12 +823,14 @@ private struct SummaryAnalysisMenu<LabelContent: View>: View {
 }
 
 struct RecordingsView: View {
+    @Environment(\.accessibilityReduceMotion) private var accessibilityReduceMotion
     @ObservedObject var store: RecordingStore
     @ObservedObject var transcriber: LiveTranscriptionManager
     @Binding var incomingImportURL: URL?
     @Binding var pendingOpenRecordingID: RecordingItem.ID?
     let player: RecordingPlaybackController
     @State private var deleteRequest: RecordingDeleteRequest?
+    @State private var deletingRecordingIDs: Set<RecordingItem.ID> = []
     @State private var analyzingRecordingID: RecordingItem.ID?
     @State private var analysisErrorMessage: String?
     @State private var showsImporter = false
@@ -1163,8 +1165,7 @@ struct RecordingsView: View {
         ) {
             Button(localized(L10n.Common.delete), role: .destructive) {
                 if let request = deleteRequest {
-                    delete(request.item)
-                    deleteRequest = nil
+                    performConfirmedDelete(request.item)
                 }
             }
             Button(localized(L10n.Common.cancel), role: .cancel) {}
@@ -1230,6 +1231,7 @@ struct RecordingsView: View {
                     isQwen3ASRAvailable: isQwen3ASRAvailable,
                     isMOSSLocalAvailable: isMOSSLocalAvailable,
                     analyzingRecordingID: analyzingRecordingID,
+                    deletingRecordingIDs: deletingRecordingIDs,
                     onOpen: { item in
                         openRecording(item)
                     },
@@ -1470,6 +1472,7 @@ struct RecordingsView: View {
             || isTranscriptionRunning
             || transcriber.isRecording
             || transcriber.isPreparing
+        let isDeleting = deletingRecordingIDs.contains(item.id)
 
         return RecordingRow(
             item: item,
@@ -1482,6 +1485,10 @@ struct RecordingsView: View {
         ) {
             openRecording(item, initialTranscriptLineID: searchMatch?.lineID)
         }
+        .opacity(isDeleting ? 0 : 1)
+        .allowsHitTesting(!isDeleting)
+        .accessibilityHidden(isDeleting)
+        .animation(.easeOut(duration: 0.1), value: isDeleting)
         .listRowSeparator(.hidden)
         .listRowBackground(Color.clear)
         .listRowInsets(EdgeInsets(top: 6, leading: 16, bottom: 6, trailing: 16))
@@ -1550,13 +1557,14 @@ struct RecordingsView: View {
                 Label(localized(L10n.Recordings.deleteRecording), systemImage: "trash")
             }
         }
-        .swipeActions(edge: .trailing) {
-            Button(role: .destructive) {
+        .swipeActions(edge: .trailing, allowsFullSwipe: false) {
+            Button {
                 HapticFeedback.play(.deleteRequested)
                 deleteRequest = RecordingDeleteRequest(item: item)
             } label: {
                 Label(localized(L10n.Recordings.deleteRecording), systemImage: "trash")
             }
+            .tint(AppTheme.danger)
         }
         .swipeActions(edge: .leading) {
             if store.summaryProviderAvailability.hasAnyAvailableProvider {
@@ -1788,6 +1796,9 @@ struct RecordingsView: View {
         initialTranscriptLineID: StoredTranscriptLine.ID? = nil
     ) {
         HapticFeedback.play(.navigation)
+        if !transcriber.isRecording, !transcriber.isPreparing {
+            player.prewarmPlaybackSession()
+        }
         navigationPath.append(
             .recording(item.id, transcriptLineID: initialTranscriptLineID)
         )
@@ -1899,6 +1910,48 @@ struct RecordingsView: View {
         HapticFeedback.play(.deleteRequested)
     }
 
+    private func performConfirmedDelete(_ item: RecordingItem) {
+        // Let UIKit retire the alert and any swipe/context-menu snapshot before
+        // SwiftUI starts moving List rows. Updating both in one transaction can
+        // leave the deleted row's snapshot floating over the reflow animation.
+        deleteRequest = nil
+
+        Task { @MainActor in
+            do {
+                try await Task.sleep(
+                    for: accessibilityReduceMotion ? .milliseconds(80) : .milliseconds(220)
+                )
+            } catch {
+                return
+            }
+
+            guard store.recording(withID: item.id) != nil else {
+                return
+            }
+
+            if accessibilityReduceMotion {
+                var transaction = Transaction()
+                transaction.disablesAnimations = true
+                withTransaction(transaction) {
+                    delete(item)
+                }
+                return
+            }
+
+            withAnimation(.easeOut(duration: 0.1)) {
+                _ = deletingRecordingIDs.insert(item.id)
+            }
+            try? await Task.sleep(for: .milliseconds(110))
+
+            withAnimation(.snappy(duration: 0.2, extraBounce: 0)) {
+                delete(item)
+            }
+
+            try? await Task.sleep(for: .milliseconds(220))
+            deletingRecordingIDs.remove(item.id)
+        }
+    }
+
     private func delete(_ item: RecordingItem) {
         do {
             navigationPath.removeAll { destination in
@@ -1910,6 +1963,7 @@ struct RecordingsView: View {
             if analyzingRecordingID == item.id {
                 analyzingRecordingID = nil
             }
+            cachedSearchResults.removeAll { $0.item.id == item.id }
             try store.delete(item)
             HapticFeedback.play(.deleteConfirmed)
         } catch {
@@ -2219,6 +2273,7 @@ private struct RecordingCategoryDetailList: View {
     let isQwen3ASRAvailable: Bool
     let isMOSSLocalAvailable: Bool
     let analyzingRecordingID: RecordingItem.ID?
+    let deletingRecordingIDs: Set<RecordingItem.ID>
     let onOpen: (RecordingItem) -> Void
     let onAnalyze: (RecordingItem, RecordingSummaryProvider) -> Void
     let onDeleteRequest: (RecordingItem) -> Void
@@ -2257,6 +2312,7 @@ private struct RecordingCategoryDetailList: View {
                         || isTranscriptionRunning
                         || transcriber.isRecording
                         || transcriber.isPreparing
+                    let isDeleting = deletingRecordingIDs.contains(item.id)
 
                     RecordingRow(
                         item: item,
@@ -2268,6 +2324,10 @@ private struct RecordingCategoryDetailList: View {
                     ) {
                         onOpen(item)
                     }
+                    .opacity(isDeleting ? 0 : 1)
+                    .allowsHitTesting(!isDeleting)
+                    .accessibilityHidden(isDeleting)
+                    .animation(.easeOut(duration: 0.1), value: isDeleting)
                     .listRowSeparator(.hidden)
                     .listRowBackground(Color.clear)
                     .listRowInsets(EdgeInsets(top: 6, leading: 16, bottom: 6, trailing: 16))
@@ -2336,13 +2396,14 @@ private struct RecordingCategoryDetailList: View {
                             Label(localized(L10n.Recordings.deleteRecording), systemImage: "trash")
                         }
                     }
-                    .swipeActions(edge: .trailing) {
-                        Button(role: .destructive) {
+                    .swipeActions(edge: .trailing, allowsFullSwipe: false) {
+                        Button {
                             HapticFeedback.play(.deleteRequested)
                             onDeleteRequest(item)
                         } label: {
                             Label(localized(L10n.Recordings.deleteRecording), systemImage: "trash")
                         }
+                        .tint(AppTheme.danger)
                     }
                     .swipeActions(edge: .leading) {
                         if store.summaryProviderAvailability.hasAnyAvailableProvider {
@@ -3701,6 +3762,14 @@ private struct PlaybackSyncedTranscriptRows: View {
     }
 }
 
+private enum RecordingAudioPreparationStatus: Equatable {
+    case checking
+    case downloading
+    case preparing
+    case available
+    case failed(String)
+}
+
 struct RecordingDetailView: View {
     let item: RecordingItem
     @ObservedObject var store: RecordingStore
@@ -3731,6 +3800,7 @@ struct RecordingDetailView: View {
     @State private var deleteErrorMessage: String?
     @State private var audioFileInfo: RecordingAudioFileInfo?
     @State private var audioFileInfoError: String?
+    @State private var audioPreparationStatus: RecordingAudioPreparationStatus = .checking
     @State private var isShowingAudioFileInfo = false
     @State private var isShowingAudioEventsSheet = false
     @StateObject private var editLocationProvider = RecordingEditLocationProvider()
@@ -3752,6 +3822,7 @@ struct RecordingDetailView: View {
     @State private var editedTranscriptLineText = ""
     @State private var editedTranscriptLineSpeakerID: String?
     @State private var isSavingTranscriptLineEdit = false
+    @State private var cachedTranscriptText = ""
     @State private var cachedTranscriptLines: [StoredTranscriptLine] = []
     @State private var scrubbedPlaybackTime: TimeInterval?
     @State private var translationConfiguration: TranslationSession.Configuration?
@@ -3773,7 +3844,9 @@ struct RecordingDetailView: View {
     @State private var manualGeminiJSONText = ""
     @State private var manualGeminiImportErrorMessage: String?
     @AppStorage(RecordingSummaryProvider.selectedDefaultsKey) private var selectedSummaryProviderRawValue = RecordingSummaryProvider.automatic.rawValue
+    @AppStorage(ManualGeminiDeveloperConfiguration.enabledDefaultsKey) private var isManualGeminiEnabled = false
     @State private var selectedDetailPage: RecordingDetailPage = .transcript
+    @State private var hasLoadedAIAnalysisPage = false
     @StateObject private var chatEngine = RecordingChatEngine()
 
 
@@ -3800,6 +3873,10 @@ struct RecordingDetailView: View {
                 "\($0.schemaVersion)-\($0.segments.count)-\($0.generatedAt.timeIntervalSinceReferenceDate)"
             } ?? "no-speaker-diarization"
         ].joined(separator: "-")
+    }
+
+    private var playbackCacheIdentifier: String {
+        "\(currentItem.id.uuidString)-\(currentItem.audioFileName)"
     }
 
     private var transcriptSpeakerEditOptions: [TranscriptSpeakerEditOption] {
@@ -3905,11 +3982,13 @@ struct RecordingDetailView: View {
                 .allowsHitTesting(selectedDetailPage == .transcript)
                 .accessibilityHidden(selectedDetailPage != .transcript)
 
-            aiAnalysisPage
-                .opacity(selectedDetailPage == .aiAnalysis ? 1 : 0)
-                .offset(x: selectedDetailPage == .aiAnalysis ? 0 : 44)
-                .allowsHitTesting(selectedDetailPage == .aiAnalysis)
-                .accessibilityHidden(selectedDetailPage != .aiAnalysis)
+            if hasLoadedAIAnalysisPage || selectedDetailPage == .aiAnalysis {
+                aiAnalysisPage
+                    .opacity(selectedDetailPage == .aiAnalysis ? 1 : 0)
+                    .offset(x: selectedDetailPage == .aiAnalysis ? 0 : 44)
+                    .allowsHitTesting(selectedDetailPage == .aiAnalysis)
+                    .accessibilityHidden(selectedDetailPage != .aiAnalysis)
+            }
 
             reminderAddedBanner
                 .padding(.top, 12)
@@ -3942,7 +4021,10 @@ struct RecordingDetailView: View {
                 .ignoresSafeArea(edges: .top)
             }
         }
-        .onChange(of: selectedDetailPage) {
+        .onChange(of: selectedDetailPage) { _, page in
+            if page == .aiAnalysis {
+                hasLoadedAIAnalysisPage = true
+            }
             HapticFeedback.play(.navigation)
         }
         .toolbar(.hidden, for: .tabBar)
@@ -4196,12 +4278,11 @@ struct RecordingDetailView: View {
         }
         .onAppear {
             chatEngine.configure(recordingID: currentItem.id)
-            player.load(item: currentItem, url: store.audioURL(for: currentItem))
             updatePlayerNowPlayingTranscript()
-            Task {
-                store.refreshIntelligenceAvailability()
-                await refreshAudioFileInfo()
-            }
+            store.refreshIntelligenceAvailability()
+        }
+        .task(id: playbackCacheIdentifier) {
+            await preparePlayback()
         }
         .task(id: transcriptCacheIdentifier) {
             await refreshTranscriptCache()
@@ -4367,7 +4448,7 @@ struct RecordingDetailView: View {
     }
 
     private var detailActionsMenu: some View {
-        let transcriptText = store.transcriptText(for: currentItem)
+        let transcriptText = cachedTranscriptText
 
         return Menu {
             Button {
@@ -4450,22 +4531,24 @@ struct RecordingDetailView: View {
             }
             .disabled(currentItem.isTranscriptLocked || isTranscriptionRunning || transcriber.isRecording || transcriber.isPreparing)
 
-            Menu {
-                Button {
-                    shareCurrentAudioWithGeminiApp()
-                } label: {
-                    Label(localized(L10n.Recordings.manualGeminiShareAndCopyPrompt), systemImage: "square.and.arrow.up")
-                }
-                .disabled(isTranscriptionRunning)
+            if isManualGeminiEnabled {
+                Menu {
+                    Button {
+                        shareCurrentAudioWithGeminiApp()
+                    } label: {
+                        Label(localized(L10n.Recordings.manualGeminiShareAndCopyPrompt), systemImage: "square.and.arrow.up")
+                    }
+                    .disabled(isTranscriptionRunning)
 
-                Button {
-                    prepareManualGeminiJSONImport()
+                    Button {
+                        prepareManualGeminiJSONImport()
+                    } label: {
+                        Label(localized(L10n.Recordings.manualGeminiImportJSON), systemImage: "doc.on.clipboard")
+                    }
+                    .disabled(currentItem.isTranscriptLocked || isTranscriptionRunning || transcriber.isRecording || transcriber.isPreparing)
                 } label: {
-                    Label(localized(L10n.Recordings.manualGeminiImportJSON), systemImage: "doc.on.clipboard")
+                    Label(localized(L10n.Recordings.manualGemini), systemImage: "sparkles")
                 }
-                .disabled(currentItem.isTranscriptLocked || isTranscriptionRunning || transcriber.isRecording || transcriber.isPreparing)
-            } label: {
-                Label(localized(L10n.Recordings.manualGemini), systemImage: "sparkles")
             }
 
             if store.summaryProviderAvailability.isGeminiCloudAvailable {
@@ -4616,7 +4699,7 @@ struct RecordingDetailView: View {
             isAvailable: store.summaryProviderAvailability.hasAnyAvailableProvider,
             makeContext: {
                 RecordingChatContext(
-                    transcript: store.transcriptText(for: currentItem),
+                    transcript: cachedTranscriptText,
                     summary: currentItem.intelligence?.summary,
                     languageName: currentItem.localizedLanguageName
                 )
@@ -4650,7 +4733,8 @@ struct RecordingDetailView: View {
                     createdAtText: item.createdAt.formatted(date: .abbreviated, time: .shortened),
                     durationText: TranscriptionLine.formatTimestamp(Double(item.durationSeconds)),
                     languageText: item.localizedLanguageName,
-                    iCloudSyncStatus: iCloudSyncStatus
+                    iCloudSyncStatus: iCloudSyncStatus,
+                    audioPreparationStatus: displayedAudioPreparationStatus
                 )
 
                 if !item.combinedTags.isEmpty
@@ -5148,18 +5232,20 @@ struct RecordingDetailView: View {
                 transcriptSyncControl(scrollProxy: transcriptScrollProxy)
                 playbackSpeedMenu
             }
-
-            if let errorText = player.errorText {
-                Label(errorText, systemImage: "exclamationmark.triangle")
-                    .font(.redditSans(.caption))
-                    .foregroundStyle(AppTheme.warning)
-                    .fixedSize(horizontal: false, vertical: true)
-            }
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 6)
         .frame(maxWidth: .infinity, alignment: .leading)
         .glassEffect(.regular.tint(AppTheme.playbackGlassTint), in: shape)
+    }
+
+    private var displayedAudioPreparationStatus: RecordingAudioPreparationStatus {
+        if case .available = audioPreparationStatus,
+           !player.isLoaded,
+           let errorText = player.errorText {
+            return .failed(errorText)
+        }
+        return audioPreparationStatus
     }
 
     private func transcriptSyncControl(scrollProxy: ScrollViewProxy) -> some View {
@@ -5432,7 +5518,7 @@ struct RecordingDetailView: View {
         do {
             let url = try TranscriptExportService.export(
                 item: currentItem,
-                transcript: store.transcriptText(for: currentItem),
+                transcript: cachedTranscriptText,
                 format: format
             )
             exportShareItem = ShareSheetItem(url: url)
@@ -5957,16 +6043,88 @@ struct RecordingDetailView: View {
         }
     }
 
-    private func refreshAudioFileInfo() async {
+    private func preparePlayback() async {
         let item = currentItem
-        let url = store.audioURL(for: item)
+        audioPreparationStatus = .checking
+        audioFileInfo = nil
+        audioFileInfoError = nil
+
+        do {
+            let url = try await store.prepareAudioURL(for: item) { state in
+                guard currentItem.id == item.id,
+                      currentItem.audioFileName == item.audioFileName else {
+                    return
+                }
+                switch state {
+                case .checking:
+                    audioPreparationStatus = .checking
+                case .downloading:
+                    audioPreparationStatus = .downloading
+                case .available:
+                    audioPreparationStatus = .preparing
+                }
+            }
+            guard !Task.isCancelled,
+                  currentItem.id == item.id,
+                  currentItem.audioFileName == item.audioFileName else {
+                return
+            }
+
+            audioPreparationStatus = .preparing
+            await player.loadPrepared(item: item, url: url)
+            guard !Task.isCancelled,
+                  currentItem.id == item.id,
+                  currentItem.audioFileName == item.audioFileName else {
+                return
+            }
+            guard player.isLoaded,
+                  player.currentItem?.id == item.id else {
+                audioPreparationStatus = .failed(
+                    player.errorText
+                        ?? localizedFormat(
+                            L10n.Recordings.playbackFailedFormat,
+                            String(localized: L10n.Recordings.recordingFileMissing)
+                        )
+                )
+                return
+            }
+
+            audioPreparationStatus = .available
+            updatePlayerNowPlayingTranscript(for: item.id)
+            player.prewarmPlaybackSession()
+            await refreshAudioFileInfo(for: item, at: url)
+        } catch is CancellationError {
+            return
+        } catch {
+            guard currentItem.id == item.id,
+                  currentItem.audioFileName == item.audioFileName else {
+                return
+            }
+            audioPreparationStatus = .failed(error.localizedDescription)
+            audioFileInfoError = error.localizedDescription
+        }
+    }
+
+    private func refreshAudioFileInfo(for item: RecordingItem, at url: URL) async {
+        guard !Task.isCancelled else {
+            return
+        }
         do {
             let info = try await Task.detached(priority: .utility) {
                 try RecordingAudioFileInfo(url: url)
             }.value
+            guard !Task.isCancelled,
+                  currentItem.id == item.id,
+                  currentItem.audioFileName == item.audioFileName else {
+                return
+            }
             audioFileInfo = info
             audioFileInfoError = nil
         } catch {
+            guard currentItem.id == item.id,
+                  currentItem.audioFileName == item.audioFileName else {
+                return
+            }
             audioFileInfo = nil
             audioFileInfoError = localizedFormat(L10n.Recordings.audioInfoReadFailedFormat, error.localizedDescription)
         }
@@ -5974,10 +6132,12 @@ struct RecordingDetailView: View {
 
     private func refreshTranscriptCache() async {
         let item = currentItem
-        let transcriptURL = store.transcriptURL(for: item)
         let speakerDiarization = item.speakerDiarization
+        let text = await store.loadTranscriptText(for: item)
+        guard !Task.isCancelled else {
+            return
+        }
         let lines = await Task.detached(priority: .utility) {
-            let text = (try? String(contentsOf: transcriptURL, encoding: .utf8)) ?? ""
             return StoredTranscriptLine.parse(text, speakerDiarization: speakerDiarization)
         }.value
 
@@ -5986,6 +6146,7 @@ struct RecordingDetailView: View {
             return
         }
 
+        cachedTranscriptText = text
         cachedTranscriptLines = lines
         updatePlayerNowPlayingTranscript()
         translatedTranscriptByLineID = [:]
@@ -6098,8 +6259,10 @@ struct RecordingDetailView: View {
                     (lineID: $0.id, text: $0.spokenText)
                 }
             )
+            let updatedTranscriptText = store.transcriptText(for: updatedItem)
+            cachedTranscriptText = updatedTranscriptText
             cachedTranscriptLines = StoredTranscriptLine.parse(
-                store.transcriptText(for: updatedItem),
+                updatedTranscriptText,
                 speakerDiarization: updatedItem.speakerDiarization
             )
             updatePlayerNowPlayingTranscript()
@@ -6307,8 +6470,9 @@ struct RecordingDetailView: View {
             isShowingRecordingEditSheet = false
             player.load(item: updatedItem, url: store.audioURL(for: updatedItem))
             updatePlayerNowPlayingTranscript(for: updatedItem.id)
+            let updatedAudioURL = store.audioURL(for: updatedItem)
             Task {
-                await refreshAudioFileInfo()
+                await refreshAudioFileInfo(for: updatedItem, at: updatedAudioURL)
                 await refreshTranscriptCache()
             }
         } catch {
@@ -7175,7 +7339,7 @@ private struct RecordingTimelineScrubber: View {
                         .frame(height: trackHeight)
                         .offset(y: trackCenterY - trackHeight / 2)
 
-                    Canvas(opaque: false, rendersAsynchronously: false) { context, _ in
+                    Canvas(opaque: false, rendersAsynchronously: true) { context, _ in
                         for event in audioEvents {
                             let rect = markerRect(
                                 for: event,
@@ -7766,6 +7930,7 @@ private struct RecordingDetailFactsGrid: View {
     let durationText: String
     let languageText: String
     let iCloudSyncStatus: RecordingICloudSyncStatus
+    let audioPreparationStatus: RecordingAudioPreparationStatus
 
     private let columns = [
         GridItem(.flexible(minimum: 0), spacing: 8, alignment: .leading),
@@ -7804,12 +7969,70 @@ private struct RecordingDetailFactsGrid: View {
                 text: languageText,
                 tint: AppTheme.info
             )
-            RecordingDetailFactCell(
-                systemImage: iCloudSyncStatus.systemImage,
-                text: iCloudSyncStatus.displayName,
-                tint: iCloudTint
+            RecordingDetailStorageFactCell(
+                iCloudSyncStatus: iCloudSyncStatus,
+                iCloudTint: iCloudTint,
+                audioPreparationStatus: audioPreparationStatus
             )
         }
+    }
+}
+
+private struct RecordingDetailStorageFactCell: View {
+    let iCloudSyncStatus: RecordingICloudSyncStatus
+    let iCloudTint: Color
+    let audioPreparationStatus: RecordingAudioPreparationStatus
+
+    private var displayText: String {
+        switch audioPreparationStatus {
+        case .downloading:
+            return localized(L10n.Recordings.downloadingRecordingFromICloud)
+        case .failed(let message):
+            return message
+        case .checking, .preparing, .available:
+            return iCloudSyncStatus.displayName
+        }
+    }
+
+    private var displaySystemImage: String {
+        switch audioPreparationStatus {
+        case .downloading:
+            return "icloud.and.arrow.down"
+        case .failed:
+            return "exclamationmark.triangle.fill"
+        case .checking, .preparing, .available:
+            return iCloudSyncStatus.systemImage
+        }
+    }
+
+    private var displayTint: Color {
+        switch audioPreparationStatus {
+        case .downloading:
+            return AppTheme.brand
+        case .failed:
+            return AppTheme.danger
+        case .checking, .preparing, .available:
+            return iCloudTint
+        }
+    }
+
+    var body: some View {
+        HStack(spacing: 7) {
+            Image(systemName: displaySystemImage)
+                .font(.system(size: 12, weight: .semibold))
+                .foregroundStyle(displayTint)
+                .frame(width: 15)
+
+            Text(displayText)
+                .font(.redditSans(.caption, weight: .semibold))
+                .foregroundStyle(.secondary)
+            .lineLimit(1)
+            .minimumScaleFactor(0.72)
+            .allowsTightening(true)
+        }
+        .padding(.horizontal, 10)
+        .frame(maxWidth: .infinity, minHeight: 32, alignment: .leading)
+        .background(AppTheme.cardBackground, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
     }
 }
 

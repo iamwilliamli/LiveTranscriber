@@ -8,119 +8,6 @@ import TranscriberDomain
 
 private let liveTranscriptionLogger = Logger(subsystem: "com.reddownloader.LiveTranscriber", category: "LiveTranscription")
 
-actor AppAudioSessionCoordinator {
-    static let shared = AppAudioSessionCoordinator()
-
-    private var recordingOwner: UUID?
-    private var playbackOwner: UUID?
-
-    func activateRecording(owner: UUID) throws {
-        #if os(iOS)
-        let recordingMode = RecordingAudioSessionMode.defaultMode
-        let session = AVAudioSession.sharedInstance()
-        try session.setCategory(
-            .playAndRecord,
-            mode: recordingMode.audioSessionMode,
-            options: recordingMode.audioSessionOptions
-        )
-
-        if let preferredInputChannelCount = recordingMode.preferredInputChannelCount {
-            do {
-                try session.setPreferredInputNumberOfChannels(preferredInputChannelCount)
-            } catch {
-                liveTranscriptionLogger.debug(
-                    "Preferred input channel count unavailable before activation: \(error.localizedDescription, privacy: .public)"
-                )
-            }
-        }
-
-        try session.setActive(true, options: .notifyOthersOnDeactivation)
-
-        if let preferredInputChannelCount = recordingMode.preferredInputChannelCount,
-           session.inputNumberOfChannels < preferredInputChannelCount {
-            do {
-                try session.setPreferredInputNumberOfChannels(preferredInputChannelCount)
-            } catch {
-                liveTranscriptionLogger.debug(
-                    "Preferred input channel count unavailable after activation: \(error.localizedDescription, privacy: .public)"
-                )
-            }
-        }
-
-        recordingOwner = owner
-        playbackOwner = nil
-
-        let route = session.currentRoute.inputs
-            .map { "\($0.portName) [\($0.portType.rawValue)]" }
-            .joined(separator: ", ")
-        liveTranscriptionLogger.debug(
-            "Recording audio session active route=\(route, privacy: .public) inputChannels=\(session.inputNumberOfChannels, privacy: .public) sampleRate=\(session.sampleRate, privacy: .public)"
-        )
-        #else
-        // macOS has no AVAudioSession; only track exclusive ownership.
-        recordingOwner = owner
-        playbackOwner = nil
-        #endif
-    }
-
-    func deactivateRecording(owner: UUID) {
-        guard recordingOwner == owner else {
-            return
-        }
-
-        recordingOwner = nil
-        guard playbackOwner == nil else {
-            return
-        }
-        #if os(iOS)
-        try? AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
-        #endif
-    }
-
-    func activatePlayback(owner: UUID) throws {
-        guard recordingOwner == nil else {
-            throw AppAudioSessionError.recordingInProgress
-        }
-
-        #if os(iOS)
-        let session = AVAudioSession.sharedInstance()
-        try session.setCategory(
-            .playback,
-            mode: .spokenAudio,
-            policy: .longFormAudio,
-            options: []
-        )
-        try session.setActive(true, options: .notifyOthersOnDeactivation)
-        #endif
-        playbackOwner = owner
-    }
-
-    func deactivatePlayback(owner: UUID) {
-        guard playbackOwner == owner else {
-            return
-        }
-
-        playbackOwner = nil
-        guard recordingOwner == nil else {
-            return
-        }
-        #if os(iOS)
-        try? AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
-        #endif
-    }
-}
-
-private enum AppAudioSessionError: LocalizedError {
-    case recordingInProgress
-
-    var errorDescription: String? {
-        switch self {
-        case .recordingInProgress:
-            return String(localized: L10n.AudioSession.recordingInProgress)
-        }
-    }
-}
-
 struct InputLevelHistorySample: Identifiable, Equatable, Sendable {
     let id: Int
     let level: Float
@@ -372,7 +259,10 @@ final class LiveTranscriptionManager: ObservableObject {
         #endif
     }
 
-    private let audioSessionOwner = UUID()
+    private let audioSessionQueue = DispatchQueue(
+        label: "com.reddownloader.live-transcription.audio-session",
+        qos: .userInitiated
+    )
     private var analyzer: SpeechAnalyzer?
     private var speechTranscriber: SpeechTranscriber?
     private var analyzerPipeline: AnalyzerInputPipeline?
@@ -806,6 +696,17 @@ final class LiveTranscriptionManager: ObservableObject {
         }
     }
 
+    func externalAudioPCMHandler() -> (@Sendable (AVAudioPCMBuffer, AVAudioTime?) -> Void)? {
+        guard recordingInputSource.usesExternalAudio,
+              let captureRecordingPipeline else {
+            return nil
+        }
+
+        return { [weak captureRecordingPipeline] buffer, audioTime in
+            captureRecordingPipeline?.appendExternalPCMBuffer(buffer, audioTime: audioTime)
+        }
+    }
+
     func pauseRecording() async {
         guard isRecording, !isPaused else {
             return
@@ -841,7 +742,10 @@ final class LiveTranscriptionManager: ObservableObject {
     }
 
     @discardableResult
-    func stopRecording(endingLiveActivity: Bool = true) async -> RecordingDraft? {
+    func stopRecording(
+        endingLiveActivity: Bool = true,
+        reportingEmptyInputError: Bool = true
+    ) async -> RecordingDraft? {
         guard isRecording || isPreparing || captureRecordingPipeline != nil || currentAudioURL != nil else {
             return nil
         }
@@ -898,6 +802,7 @@ final class LiveTranscriptionManager: ObservableObject {
         captureRecordingPipeline = nil
         audioWriter = nil
         currentRecordingFormat = nil
+        let finishedInputSource = recordingInputSource
         recordingInputSource = .microphone
 
         let finishedLines = transcriptLines
@@ -933,7 +838,13 @@ final class LiveTranscriptionManager: ObservableObject {
             )
             guard captureFinishSummary.writtenFrameCount > 0 else {
                 try? FileManager.default.removeItem(at: recordingURL)
-                fail(with: String(localized: L10n.SpeechText.cannotReadMicrophone))
+                if reportingEmptyInputError {
+                    fail(
+                        with: finishedInputSource.usesExternalAudio
+                            ? String(localized: L10n.ScreenAudio.noAudioCaptured)
+                            : String(localized: L10n.SpeechText.cannotReadMicrophone)
+                    )
+                }
                 return nil
             }
         }
@@ -1341,7 +1252,47 @@ final class LiveTranscriptionManager: ObservableObject {
     }
 
     private func configureAudioSession() async throws {
-        try await AppAudioSessionCoordinator.shared.activateRecording(owner: audioSessionOwner)
+        #if os(iOS)
+        let recordingMode = RecordingAudioSessionMode.defaultMode
+        let audioSessionMode = recordingMode.audioSessionMode
+        let audioSessionOptions = recordingMode.audioSessionOptions
+        let preferredInputChannelCount = recordingMode.preferredInputChannelCount
+        try await withCheckedThrowingContinuation { continuation in
+            audioSessionQueue.async {
+                do {
+                    let session = AVAudioSession.sharedInstance()
+                    try session.setCategory(
+                        .playAndRecord,
+                        mode: audioSessionMode,
+                        options: audioSessionOptions
+                    )
+                    if let preferredInputChannelCount {
+                        do {
+                            try session.setPreferredInputNumberOfChannels(preferredInputChannelCount)
+                        } catch {
+                            liveTranscriptionLogger.debug(
+                                "Preferred input channel count unavailable before activation: \(error.localizedDescription, privacy: .public)"
+                            )
+                        }
+                    }
+                    try session.setActive(true, options: .notifyOthersOnDeactivation)
+                    if let preferredInputChannelCount,
+                       session.inputNumberOfChannels < preferredInputChannelCount {
+                        do {
+                            try session.setPreferredInputNumberOfChannels(preferredInputChannelCount)
+                        } catch {
+                            liveTranscriptionLogger.debug(
+                                "Preferred input channel count unavailable after activation: \(error.localizedDescription, privacy: .public)"
+                            )
+                        }
+                    }
+                    continuation.resume(returning: ())
+                } catch {
+                    continuation.resume(throwing: error)
+                }
+            }
+        }
+        #endif
     }
 
     private func configureAudioSessionIfNeeded(
@@ -1354,7 +1305,17 @@ final class LiveTranscriptionManager: ObservableObject {
     }
 
     private func deactivateAudioSession() async {
-        await AppAudioSessionCoordinator.shared.deactivateRecording(owner: audioSessionOwner)
+        #if os(iOS)
+        await withCheckedContinuation { continuation in
+            audioSessionQueue.async {
+                try? AVAudioSession.sharedInstance().setActive(
+                    false,
+                    options: .notifyOthersOnDeactivation
+                )
+                continuation.resume(returning: ())
+            }
+        }
+        #endif
     }
 
     private func handleSpeechTranscriptionResult(_ result: SpeechTranscriber.Result) {
@@ -2206,6 +2167,27 @@ private final class CaptureSessionRecordingPipeline: NSObject, AVCaptureAudioDat
         }
     }
 
+    func appendExternalPCMBuffer(
+        _ buffer: AVAudioPCMBuffer,
+        audioTime: AVAudioTime?
+    ) {
+        guard inputMode == .externalSampleBuffers,
+              let copiedBuffer = buffer.deepCopy() else {
+            return
+        }
+
+        sampleQueue.async {
+            guard self.acceptsExternalSampleBuffers, !self.didFinish else {
+                return
+            }
+            let resolvedAudioTime = audioTime ?? AVAudioTime(
+                sampleTime: self.writer.currentFrameCount(),
+                atRate: max(copiedBuffer.format.sampleRate, 1)
+            )
+            self.processPCMBuffer(copiedBuffer, audioTime: resolvedAudioTime)
+        }
+    }
+
     private func configureIfNeeded() throws {
         guard !isConfigured else {
             return
@@ -2274,6 +2256,16 @@ private final class CaptureSessionRecordingPipeline: NSObject, AVCaptureAudioDat
             return
         }
 
+        processPCMBuffer(
+            sourceBuffer,
+            audioTime: Self.audioTime(for: sampleBuffer, format: sourceBuffer.format)
+        )
+    }
+
+    private func processPCMBuffer(
+        _ sourceBuffer: AVAudioPCMBuffer,
+        audioTime: AVAudioTime
+    ) {
         do {
             let recordingBuffer = try recordingConverter.convert(sourceBuffer)
             reportFirstFormatIfNeeded(
@@ -2292,7 +2284,13 @@ private final class CaptureSessionRecordingPipeline: NSObject, AVCaptureAudioDat
 
         do {
             let analyzerBuffer = try analyzerConverter.convert(sourceBuffer)
-            analyzerPipeline?.process(analyzerBuffer, audioTime: Self.audioTime(for: sampleBuffer, format: analyzerBuffer.format))
+            let analyzerAudioTime = AVAudioTime(
+                sampleTime: AVAudioFramePosition(
+                    (Double(audioTime.sampleTime) * analyzerBuffer.format.sampleRate / max(sourceBuffer.format.sampleRate, 1)).rounded()
+                ),
+                atRate: analyzerBuffer.format.sampleRate
+            )
+            analyzerPipeline?.process(analyzerBuffer, audioTime: analyzerAudioTime)
             localWhisperPipeline?.process(analyzerBuffer)
         } catch {
             reportFailureIfNeeded(stage: "analyzer conversion", error: error)
@@ -2794,7 +2792,7 @@ private final class LiveLocalWhisperPipeline: @unchecked Sendable {
     }
 }
 
-private final class AudioFileWriter: @unchecked Sendable {
+final class AudioFileWriter: @unchecked Sendable {
     struct FinishSummary: Sendable {
         let writtenFrameCount: AVAudioFramePosition
     }
@@ -2845,21 +2843,30 @@ private final class AudioFileWriter: @unchecked Sendable {
 
         switch outputFormat {
         case .wav:
+            // Store a conventional 24-bit integer PCM WAVE. The capture
+            // pipeline still supplies planar Float32 client buffers and
+            // ExtAudioFile performs the conversion/interleaving while it
+            // writes. AVAudioFile can read Float32 WAVE files, but AVPlayer on
+            // iOS 27 can reject that container/codec combination even though
+            // the same file looks valid to Core Audio tools.
             return [
                 AVFormatIDKey: kAudioFormatLinearPCM,
                 AVSampleRateKey: sampleRate,
                 AVNumberOfChannelsKey: channelCount,
-                AVLinearPCMBitDepthKey: 32,
-                AVLinearPCMIsFloatKey: true,
+                AVLinearPCMBitDepthKey: 24,
+                AVLinearPCMIsFloatKey: false,
                 AVLinearPCMIsBigEndianKey: false,
-                AVLinearPCMIsNonInterleaved: !inputFormat.isInterleaved
+                AVLinearPCMIsNonInterleaved: false
             ]
         case .m4a:
+            // Do not force one AAC bit rate across every input format. iOS 27
+            // rejects some fixed bit-rate/sample-rate/channel combinations
+            // with kAudioCodecUnsupportedFormatError (OSStatus "!dat").
+            // AVAudioFile selects a supported rate when the key is omitted.
             return [
                 AVFormatIDKey: kAudioFormatMPEG4AAC,
                 AVSampleRateKey: sampleRate,
-                AVNumberOfChannelsKey: channelCount,
-                AVEncoderBitRateKey: min(max(channelCount, 1), 2) * 64_000
+                AVNumberOfChannelsKey: channelCount
             ]
         }
     }

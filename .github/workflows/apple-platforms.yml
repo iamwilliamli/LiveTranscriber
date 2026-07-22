@@ -89,6 +89,7 @@ jobs:
           -workspace LiveTranscriber.xcworkspace
           -scheme LiveTranscriberMac
           -destination 'platform=macOS,arch=arm64'
+          -skipPackagePluginValidation
           CODE_SIGNING_ALLOWED=NO
           -quiet
           test

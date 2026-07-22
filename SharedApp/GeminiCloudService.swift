@@ -111,6 +111,10 @@ enum GeminiCloudConfiguration {
     }
 }
 
+enum ManualGeminiDeveloperConfiguration {
+    static let enabledDefaultsKey = "gemini.manual.developer.enabled"
+}
+
 struct GeminiTokenUsage: Sendable {
     var inputTokens: Int64
     var outputTokens: Int64

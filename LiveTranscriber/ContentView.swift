@@ -3,7 +3,10 @@ import SwiftUI
 import UIKit
 
 struct ContentView: View {
-    @StateObject private var transcriber = LiveTranscriptionManager()
+    @StateObject private var transcriber: LiveTranscriptionManager
+    @StateObject private var captionStore: CaptionPresentationStore
+    @StateObject private var systemAudioCoordinator: SystemAudioSessionCoordinator
+    @StateObject private var captionPiPController: CaptionPiPController
     @StateObject private var recordingStore = RecordingStore()
     @State private var recordingPlayer = RecordingPlaybackController()
     @State private var selectedTab: AppTab = .transcribe
@@ -16,6 +19,22 @@ struct ContentView: View {
     @AppStorage(OnboardingState.completedDefaultsKey) private var hasCompletedOnboarding = false
     // Cold-launch only, and never stacked on top of onboarding: evaluated once at scene creation.
     @State private var isShowingLaunchSplash = UserDefaults.standard.bool(forKey: OnboardingState.completedDefaultsKey)
+
+    init() {
+        let transcriber = LiveTranscriptionManager()
+        let captionStore = CaptionPresentationStore()
+        _transcriber = StateObject(wrappedValue: transcriber)
+        _captionStore = StateObject(wrappedValue: captionStore)
+        _systemAudioCoordinator = StateObject(
+            wrappedValue: SystemAudioSessionCoordinator(
+                transcriber: transcriber,
+                captionStore: captionStore
+            )
+        )
+        _captionPiPController = StateObject(
+            wrappedValue: CaptionPiPController(store: captionStore)
+        )
+    }
 
     var body: some View {
         Group {
@@ -115,6 +134,9 @@ struct ContentView: View {
                     TranscriptionView(
                         transcriber: transcriber,
                         recordingStore: recordingStore,
+                        systemAudioCoordinator: systemAudioCoordinator,
+                        captionStore: captionStore,
+                        captionPiPController: captionPiPController,
                         externalPendingRecordingDraft: $pendingRecordingDraftFromLiveActivity
                     )
                 }
