@@ -246,7 +246,7 @@ enum L10n {
         static let selectSharedContent = L10n.resource("screen_audio.action.select_content", defaultValue: "Choose Audio to Share", comment: "Action label for the ScreenCaptureKit content sharing picker.")
         static let openPiP = L10n.resource("screen_audio.action.open_pip", defaultValue: "Open Caption PiP", comment: "Button title for starting caption picture in picture.")
         static let closePiP = L10n.resource("screen_audio.action.close_pip", defaultValue: "Close Caption PiP", comment: "Button title for stopping caption picture in picture.")
-        static let broadcastPickerHint = L10n.resource("screen_audio.broadcast_picker_hint", defaultValue: "Tap the broadcast button, choose Live Transcriber, then start the broadcast and switch to the app you want to caption.", comment: "Instructions for starting ReplayKit screen-audio capture.")
+        static let broadcastPickerHint = L10n.resource("screen_audio.broadcast_picker_hint", defaultValue: "Tap the bottom Screen Audio button, choose Live Transcriber, start the broadcast, then switch to the app you want to caption.", comment: "Instructions for starting ReplayKit screen-audio capture.")
         static let replayKitStopHint = L10n.resource("screen_audio.stop_hint", defaultValue: "Stopping the caption window does not stop the system broadcast. End the broadcast from the system recording control, then save here.", comment: "Instructions distinguishing PiP from ReplayKit broadcast stop.")
         static let privacyNote = L10n.resource("screen_audio.privacy_note", defaultValue: "Only audio made available by the shared app is captured. Microphone input is off by default. Get participant consent before recording.", comment: "Screen-audio privacy and consent note.")
         static let waitingForSpeech = L10n.resource("screen_audio.caption.waiting_for_speech", defaultValue: "Waiting for speech…", comment: "Caption placeholder before speech is recognized.")
@@ -270,6 +270,10 @@ enum L10n {
         static let captureFailed = L10n.resource("screen_audio.error.capture_failed", defaultValue: "Screen-audio capture failed.", comment: "Generic screen-audio capture failure.")
         static let pipUnsupported = L10n.resource("screen_audio.error.pip_unsupported", defaultValue: "Picture in Picture is not supported on this device.", comment: "Error shown when caption PiP is unsupported.")
         static let pipNotReady = L10n.resource("screen_audio.error.pip_not_ready", defaultValue: "Caption Picture in Picture is not ready yet. Keep the preview visible and try again.", comment: "Error shown when caption PiP cannot start yet.")
+        static let pipPixelBufferFailedFormat = L10n.resource("screen_audio.error.pip_pixel_buffer.format", defaultValue: "Could not create caption pixel buffer (%d).", comment: "Caption PiP rendering error. Parameter: Core Video status code.")
+        static let pipFormatDescriptionFailedFormat = L10n.resource("screen_audio.error.pip_format_description.format", defaultValue: "Could not create caption format description (%d).", comment: "Caption PiP rendering error. Parameter: Core Media status code.")
+        static let pipSampleBufferFailedFormat = L10n.resource("screen_audio.error.pip_sample_buffer.format", defaultValue: "Could not create caption sample buffer (%d).", comment: "Caption PiP rendering error. Parameter: Core Media status code.")
+        static let pipRenderingContextFailed = L10n.resource("screen_audio.error.pip_rendering_context", defaultValue: "Could not create caption rendering context.", comment: "Caption PiP rendering context creation error.")
     }
 
     enum TranscriptionBackend {
@@ -472,6 +476,7 @@ enum L10n {
         static let analysisFailed = L10n.resource("recordings.analysis_failed", defaultValue: "Analysis Failed", comment: "Alert title for analysis failure.")
         static let importFailed = L10n.resource("recordings.import_failed", defaultValue: "Import Failed", comment: "Alert title for import failure.")
         static let transcriptionFailed = L10n.resource("recordings.transcription_failed", defaultValue: "Transcription Failed", comment: "Alert title for transcription failure.")
+        static let stopTranscription = L10n.resource("recordings.stop_transcription", defaultValue: "Stop Transcription", comment: "Accessibility label and tooltip for stopping an in-progress recording transcription.")
         static let deleteRecording = L10n.resource("recordings.delete_recording", defaultValue: "Delete Recording", comment: "Delete recording action or alert title.")
         static let deleteConfirmationFormat = L10n.resource("recordings.delete_confirmation.format", defaultValue: "Delete %@?", comment: "Delete recording confirmation. Parameter: recording filename.")
         static let deleteFailed = L10n.resource("recordings.delete_failed", defaultValue: "Delete Failed", comment: "Alert title for delete failure.")

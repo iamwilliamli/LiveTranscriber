@@ -19,6 +19,7 @@
 		1C00237BA674A270F0023AF4 /* LaunchSplashView.swift in Sources */ = {isa = PBXBuildFile; fileRef = DCD310802F05ACE62EAF695A /* LaunchSplashView.swift */; };
 		22ECDECB72EB03E2230B2DFD /* AppPasteboard.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10B228C7B70D6BB5EE753FC /* AppPasteboard.swift */; };
 		2662A54E72C5F33E6824BF5C /* AppleSpeechTranscriptionSupport.swift in Sources */ = {isa = PBXBuildFile; fileRef = B8F96DA3E91DB04C2401E630 /* AppleSpeechTranscriptionSupport.swift */; };
+		280B1A95004B4D8EDD0E40D1 /* InfoPlist.strings in Resources */ = {isa = PBXBuildFile; fileRef = BFE7AE3A85F94327A148CD2F /* InfoPlist.strings */; };
 		378E609572DC557F4E2FC46F /* MacTranscriptionView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 323A0326604C5A12F31ABB3B /* MacTranscriptionView.swift */; };
 		38893A4A3DBC5792C0333BE0 /* MacRecordingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 714575939423F5BA991563BA /* MacRecordingsView.swift */; };
 		3A90821B0C625F2AA882457B /* TranscriptionLanguage.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5B2CF7C10055A32435E64EF0 /* TranscriptionLanguage.swift */; };
@@ -115,6 +116,7 @@
 		17725894D745821199272623 /* MacSettingsPanes.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MacSettingsPanes.swift; sourceTree = "<group>"; };
 		197463093921BB48BFE55B44 /* RedditSans-Medium.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = "RedditSans-Medium.ttf"; sourceTree = "<group>"; };
 		1BBEA8E293C582A020907DD2 /* AppleTranslationLanguages.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppleTranslationLanguages.swift; sourceTree = "<group>"; };
+		1EBC0FBA631E2D2DF8583810 /* en */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = en; path = en.lproj/InfoPlist.strings; sourceTree = "<group>"; };
 		2573CED1409B57C23CF777E9 /* nl */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = nl; path = nl.lproj/MacSemantic.strings; sourceTree = "<group>"; };
 		2634230B9223CBD4060D96FF /* MacRecordingDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MacRecordingDetailView.swift; sourceTree = "<group>"; };
 		2CD443BE33B5872DCA9D6A95 /* TranscriptContextBuilder.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TranscriptContextBuilder.swift; sourceTree = "<group>"; };
@@ -131,8 +133,10 @@
 		3E875DC34E4CFCFA93ED9E10 /* LiveTranscriptionBackend.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LiveTranscriptionBackend.swift; sourceTree = "<group>"; };
 		466356653C892FD9590537B6 /* AppTheme.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppTheme.swift; sourceTree = "<group>"; };
 		46DF79EEE4BC0337420BCC2A /* llama.xcframework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.xcframework; name = llama.xcframework; path = ../Vendor/llama.xcframework; sourceTree = "<group>"; };
+		52C8CBA6E2EEAA0838015861 /* zh-Hant */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = "zh-Hant"; path = "zh-Hant.lproj/InfoPlist.strings"; sourceTree = "<group>"; };
 		54A6E46F200495AC436B4897 /* RedditSans-Italic.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = "RedditSans-Italic.ttf"; sourceTree = "<group>"; };
 		5805E62E121A727BEB2A9857 /* TranscriptLineEditSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TranscriptLineEditSheet.swift; sourceTree = "<group>"; };
+		589D35F251B9B40FE28E8593 /* ja */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = ja; path = ja.lproj/InfoPlist.strings; sourceTree = "<group>"; };
 		5B2CF7C10055A32435E64EF0 /* TranscriptionLanguage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TranscriptionLanguage.swift; sourceTree = "<group>"; };
 		653A4BB489ACC6BB81951AB3 /* LiveTranscriptionManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LiveTranscriptionManager.swift; sourceTree = "<group>"; };
 		66384B5ECE8C6C51E8E1F064 /* MOSSLocalTranscription.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MOSSLocalTranscription.swift; sourceTree = "<group>"; };
@@ -150,6 +154,7 @@
 		95B06ABA88BA86F5E3A5D1C5 /* MacMOSSSmokeTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MacMOSSSmokeTests.swift; sourceTree = "<group>"; };
 		962AE5C628777B10D5FB4979 /* EmptyStateView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EmptyStateView.swift; sourceTree = "<group>"; };
 		995F7E6F291E47A390D6D53D /* MacL10n.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MacL10n.swift; sourceTree = "<group>"; };
+		9CF0C5E306CA7745CAFCCD5A /* zh-Hans */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = "zh-Hans"; path = "zh-Hans.lproj/InfoPlist.strings"; sourceTree = "<group>"; };
 		9D9AFFD255F38840CA2F5FF9 /* MacSystemAudioCaptureTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MacSystemAudioCaptureTests.swift; sourceTree = "<group>"; };
 		A0D6A7590E00F79DE4B86AD8 /* MacAppRouterTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MacAppRouterTests.swift; sourceTree = "<group>"; };
 		A2EE057ED5E1300279BA44EC /* MacRecordingSheets.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MacRecordingSheets.swift; sourceTree = "<group>"; };
@@ -165,10 +170,12 @@
 		B2E20A2F0A072F466C62C4BF /* TranscriberDomain */ = {isa = PBXFileReference; lastKnownFileType = folder; name = TranscriberDomain; path = ../Packages/TranscriberDomain; sourceTree = SOURCE_ROOT; };
 		B3CEF0BB0D8D8128DE026B34 /* MacCaptureAudioWriter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MacCaptureAudioWriter.swift; sourceTree = "<group>"; };
 		B4CF3033EA3598315C13DF00 /* RedditSans-SemiBold.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = "RedditSans-SemiBold.ttf"; sourceTree = "<group>"; };
+		B62CB57FCE56F5217ABBA821 /* de */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = de; path = de.lproj/InfoPlist.strings; sourceTree = "<group>"; };
 		B6F6F8EFBE4AB3DB79F81588 /* GeminiCloudService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GeminiCloudService.swift; sourceTree = "<group>"; };
 		B8F96DA3E91DB04C2401E630 /* AppleSpeechTranscriptionSupport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppleSpeechTranscriptionSupport.swift; sourceTree = "<group>"; };
 		C437BFE70454DFFDA1E94003 /* RecordingStorageWorkerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecordingStorageWorkerTests.swift; sourceTree = "<group>"; };
 		C62296427DC5E4E11DAC202A /* LocalSummaryIntelligence.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocalSummaryIntelligence.swift; sourceTree = "<group>"; };
+		C75D9E83AB42B80EAF6FEA7B /* nl */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = nl; path = nl.lproj/InfoPlist.strings; sourceTree = "<group>"; };
 		CAFCE71198AAEBE50E67E8CB /* LocalLlamaBridge.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = LocalLlamaBridge.h; sourceTree = "<group>"; };
 		D00F7A96162B638213442082 /* AppTypography.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppTypography.swift; sourceTree = "<group>"; };
 		D471B7868A541A254688AC61 /* LocalWhisperBridge.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = LocalWhisperBridge.m; sourceTree = "<group>"; };
@@ -307,6 +314,7 @@
 		F16802B07198599B7DC545CF /* Resources */ = {
 			isa = PBXGroup;
 			children = (
+				BFE7AE3A85F94327A148CD2F /* InfoPlist.strings */,
 				7AF55B353C179CF630BDE263 /* MacSemantic.strings */,
 			);
 			path = Resources;
@@ -472,6 +480,7 @@
 				0F5B86DB607D461623B6A372 /* Assets.xcassets in Resources */,
 				8B831D851B5DB9D56E9F784E /* AudioEvents.xcstrings in Resources */,
 				BD32F984379697536A4029D2 /* Baloo2-Variable.ttf in Resources */,
+				280B1A95004B4D8EDD0E40D1 /* InfoPlist.strings in Resources */,
 				D5A0805603A42E66EA5EE367 /* MacSemantic.strings in Resources */,
 				E5BAC530D885C2F780653BDA /* RedditSans-Bold.ttf in Resources */,
 				D4A4FBDBB3766F983C4245E6 /* RedditSans-Italic.ttf in Resources */,
@@ -570,6 +579,19 @@
 				D6410950D8C1AB32F36D4512 /* zh-Hant */,
 			);
 			name = MacSemantic.strings;
+			sourceTree = "<group>";
+		};
+		BFE7AE3A85F94327A148CD2F /* InfoPlist.strings */ = {
+			isa = PBXVariantGroup;
+			children = (
+				B62CB57FCE56F5217ABBA821 /* de */,
+				1EBC0FBA631E2D2DF8583810 /* en */,
+				589D35F251B9B40FE28E8593 /* ja */,
+				C75D9E83AB42B80EAF6FEA7B /* nl */,
+				9CF0C5E306CA7745CAFCCD5A /* zh-Hans */,
+				52C8CBA6E2EEAA0838015861 /* zh-Hant */,
+			);
+			name = InfoPlist.strings;
 			sourceTree = "<group>";
 		};
 /* End PBXVariantGroup section */

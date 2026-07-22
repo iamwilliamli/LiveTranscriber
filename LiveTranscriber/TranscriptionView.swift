@@ -454,24 +454,6 @@ struct TranscriptionView: View {
                 .accessibilityLabel(Text(L10n.ScreenAudio.title))
 
             HStack(spacing: 10) {
-                if systemAudioCoordinator.requiresReplayKitPicker,
-                   systemAudioCoordinator.state.isActive {
-                    HStack(spacing: 8) {
-                        ReplayKitBroadcastPicker()
-                            .frame(width: 44, height: 44)
-
-                        Text(L10n.ScreenAudio.startBroadcast)
-                            .font(.redditSans(.caption, weight: .semibold))
-                            .foregroundStyle(.primary)
-                            .lineLimit(2)
-                    }
-                    .padding(.trailing, 10)
-                    .background(AppTheme.brand.opacity(0.10), in: Capsule())
-                    .overlay {
-                        Capsule().stroke(AppTheme.brand.opacity(0.20), lineWidth: 1)
-                    }
-                }
-
                 Button {
                     Task {
                         if captionPiPController.isActive {
@@ -768,27 +750,45 @@ struct TranscriptionView: View {
                 .accessibilityHidden(true)
 
             if transcriber.isRecording {
-                HStack(spacing: 8) {
-                    if showsPauseControl {
-                        FloatingIconControlButton(
-                            titleResource: transcriber.isPaused
-                                ? L10n.Transcription.resume
-                                : L10n.Transcription.pause,
-                            systemImage: transcriber.isPaused ? "play.fill" : "pause.fill",
-                            tint: .primary,
-                            background: Color.secondary.opacity(0.14)
-                        ) {
-                            togglePause()
-                        }
-                    }
+                Group {
+                    if isAwaitingReplayKitBroadcastApproval {
+                        ZStack {
+                            Image(systemName: "rectangle.on.rectangle.angled")
+                                .font(.system(size: 20, weight: .semibold))
+                                .foregroundStyle(.white)
+                                .frame(width: 48, height: 48)
+                                .background(AppTheme.brand, in: Circle())
 
-                    FloatingIconControlButton(
-                        titleResource: L10n.Transcription.stop,
-                        systemImage: "stop.fill",
-                        tint: .white,
-                        background: AppTheme.danger
-                    ) {
-                        stopRecording()
+                            ReplayKitBroadcastPicker()
+                                .frame(width: 64, height: 64)
+                        }
+                        .frame(width: 64, height: 64)
+                        .contentShape(Circle())
+                        .accessibilityLabel(Text(L10n.ScreenAudio.startBroadcast))
+                    } else {
+                        HStack(spacing: 8) {
+                            if showsPauseControl {
+                                FloatingIconControlButton(
+                                    titleResource: transcriber.isPaused
+                                        ? L10n.Transcription.resume
+                                        : L10n.Transcription.pause,
+                                    systemImage: transcriber.isPaused ? "play.fill" : "pause.fill",
+                                    tint: .primary,
+                                    background: Color.secondary.opacity(0.14)
+                                ) {
+                                    togglePause()
+                                }
+                            }
+
+                            FloatingIconControlButton(
+                                titleResource: L10n.Transcription.stop,
+                                systemImage: "stop.fill",
+                                tint: .white,
+                                background: AppTheme.danger
+                            ) {
+                                stopRecording()
+                            }
+                        }
                     }
                 }
                 .transition(.opacity.combined(with: .scale(scale: 0.90)))
@@ -867,6 +867,11 @@ struct TranscriptionView: View {
 
     private var showsPauseControl: Bool {
         !(isScreenAudioMode && systemAudioCoordinator.backend == .replayKitCompatibility)
+    }
+
+    private var isAwaitingReplayKitBroadcastApproval: Bool {
+        systemAudioCoordinator.requiresReplayKitPicker
+            && systemAudioCoordinator.state == .awaitingUserApproval
     }
 
     private var activeRecorderDockWidth: CGFloat {

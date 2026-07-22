@@ -3,6 +3,23 @@ import Foundation
 import TranscriberDomain
 import zlib
 
+private final class LocalWhisperCancellationFlag: @unchecked Sendable {
+    private let lock = NSLock()
+    private var value = false
+
+    var isCancelled: Bool {
+        lock.lock()
+        defer { lock.unlock() }
+        return value
+    }
+
+    func cancel() {
+        lock.lock()
+        value = true
+        lock.unlock()
+    }
+}
+
 enum LocalWhisperTranscriptionService {
     static let availableModels: [LocalWhisperModel] = [
         LocalWhisperModel(
@@ -106,9 +123,18 @@ enum LocalWhisperTranscriptionService {
         let modelURL = try modelURL(for: model ?? LocalWhisperModelManager.selectedModel)
         progressHandler(0.1)
 
-        let samples = try await Task.detached(priority: .userInitiated) {
+        let conversionTask = Task.detached(priority: .userInitiated) {
             try LocalWhisperAudioConverter.floatPCM16kMonoSamples(from: audioURL)
-        }.value
+        }
+        let samples = try await withTaskCancellationHandler(
+            operation: {
+                try await conversionTask.value
+            },
+            onCancel: {
+                conversionTask.cancel()
+            }
+        )
+        try Task.checkCancellation()
 
         guard !samples.isEmpty else {
             throw LocalWhisperTranscriptionError.emptyAudio
@@ -116,15 +142,28 @@ enum LocalWhisperTranscriptionService {
 
         progressHandler(0.25)
         let languageCode = languageCode(for: language)
-        let lines = try await Task.detached(priority: .userInitiated) {
+        let cancellationFlag = LocalWhisperCancellationFlag()
+        let transcriptionTask = Task.detached(priority: .userInitiated) {
             try transcribeWithWhisperBridge(
                 samples: samples,
                 modelURL: modelURL,
                 languageCode: languageCode
             ) { progress in
                 progressHandler(0.25 + progress * 0.65)
+            } cancellationHandler: {
+                cancellationFlag.isCancelled
             }
-        }.value
+        }
+        let lines = try await withTaskCancellationHandler(
+            operation: {
+                try await transcriptionTask.value
+            },
+            onCancel: {
+                cancellationFlag.cancel()
+                transcriptionTask.cancel()
+            }
+        )
+        try Task.checkCancellation()
 
         progressHandler(0.95)
         guard !lines.isEmpty else {
@@ -1219,6 +1258,8 @@ enum LocalWhisperAudioConverter {
 
         var isFinished = false
         while !isFinished {
+            try Task.checkCancellation()
+
             guard let outputBuffer = AVAudioPCMBuffer(
                 pcmFormat: outputFormat,
                 frameCapacity: outputFrameCapacity
@@ -1264,7 +1305,8 @@ private func transcribeWithWhisperBridge(
     samples: [Float],
     modelURL: URL,
     languageCode: String,
-    progressHandler: @escaping @Sendable (Double) -> Void = { _ in }
+    progressHandler: @escaping @Sendable (Double) -> Void = { _ in },
+    cancellationHandler: @escaping @Sendable () -> Bool
 ) throws -> [TranscriptionLine] {
     let sampleData = samples.withUnsafeBufferPointer { buffer -> Data in
         guard let baseAddress = buffer.baseAddress else {
@@ -1278,7 +1320,8 @@ private func transcribeWithWhisperBridge(
         modelPath: modelURL.path,
         languageCode: languageCode.isEmpty ? "auto" : languageCode,
         useCoreMLEncoder: LocalWhisperModelManager.isCoreMLEncoderLoadingEnabled,
-        progressHandler: progressHandler
+        progressHandler: progressHandler,
+        cancellationHandler: cancellationHandler
     )
 
     return segments.compactMap { segment in

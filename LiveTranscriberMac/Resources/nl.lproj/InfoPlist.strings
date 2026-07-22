@@ -1,0 +1,8 @@
+"CFBundleDisplayName" = "Live Transcriptie";
+"CFBundleName" = "Live Transcriptie";
+"CFBundleTypeName" = "Audio- of video-opname";
+"NSLocationWhenInUseUsageDescription" = "Live Transcriber kan je huidige locatie aan een opname toevoegen wanneer je ervoor kiest die op te nemen.";
+"NSMicrophoneUsageDescription" = "Live Transcriber gebruikt de microfoon voor live transcriptie en wanneer je ervoor kiest je stem in een opname op te nemen.";
+"NSRemindersFullAccessUsageDescription" = "Live Transcriber voegt de door jou gekozen actiepunten uit vergaderingen toe aan Herinneringen.";
+"NSScreenCaptureUsageDescription" = "Live Transcriber neemt alleen systeemaudio op van het scherm, de app of het venster dat je selecteert.";
+"NSSpeechRecognitionUsageDescription" = "Live Transcriber transcribeert je opnamen op deze Mac met spraakherkenning van Apple.";

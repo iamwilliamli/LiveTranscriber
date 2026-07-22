@@ -1522,8 +1522,13 @@ struct RecordingsView: View {
             isAnalyzing: analyzingRecordingID == item.id,
             canGenerateIntelligence: store.intelligenceAvailability.isAvailable,
             searchMatch: searchMatch,
+            canTerminateTranscription: store.canTerminateTranscription(for: item.id),
             onDismissImportStatus: {
                 store.dismissFailedImportStatus(for: item.id)
+            },
+            onTerminateTranscription: {
+                HapticFeedback.play(.warning)
+                store.terminateTranscription(for: item.id)
             }
         ) {
             openRecording(item, initialTranscriptLineID: searchMatch?.lineID)
@@ -1873,6 +1878,8 @@ struct RecordingsView: View {
             do {
                 try await store.retranscribe(item, language: language)
                 HapticFeedback.play(.retranscribeComplete)
+            } catch is CancellationError {
+                return
             } catch {
                 transcriptionErrorMessage = error.localizedDescription
                 HapticFeedback.play(.failure)
@@ -1895,6 +1902,8 @@ struct RecordingsView: View {
             do {
                 try await store.retranscribeWithLocalWhisper(item, language: language, model: model)
                 HapticFeedback.play(.retranscribeComplete)
+            } catch is CancellationError {
+                return
             } catch {
                 transcriptionErrorMessage = error.localizedDescription
                 HapticFeedback.play(.failure)
@@ -1920,6 +1929,8 @@ struct RecordingsView: View {
                     language: TranscriptionLanguage(id: item.languageID)
                 )
                 HapticFeedback.play(.retranscribeComplete)
+            } catch is CancellationError {
+                return
             } catch {
                 transcriptionErrorMessage = error.localizedDescription
                 HapticFeedback.play(.failure)
@@ -1942,6 +1953,8 @@ struct RecordingsView: View {
             do {
                 try await store.retranscribeWithMOSS(item)
                 HapticFeedback.play(.retranscribeComplete)
+            } catch is CancellationError {
+                return
             } catch {
                 transcriptionErrorMessage = error.localizedDescription
                 HapticFeedback.play(.failure)
@@ -2366,8 +2379,13 @@ private struct RecordingCategoryDetailList: View {
                         item: item,
                         isAnalyzing: analyzingRecordingID == item.id,
                         canGenerateIntelligence: store.intelligenceAvailability.isAvailable,
+                        canTerminateTranscription: store.canTerminateTranscription(for: item.id),
                         onDismissImportStatus: {
                             store.dismissFailedImportStatus(for: item.id)
+                        },
+                        onTerminateTranscription: {
+                            HapticFeedback.play(.warning)
+                            store.terminateTranscription(for: item.id)
                         }
                     ) {
                         onOpen(item)
@@ -3318,7 +3336,9 @@ private struct RecordingRow: View {
     let isAnalyzing: Bool
     let canGenerateIntelligence: Bool
     var searchMatch: RecordingTranscriptSearchMatch? = nil
+    let canTerminateTranscription: Bool
     let onDismissImportStatus: () -> Void
+    let onTerminateTranscription: () -> Void
     let onOpen: () -> Void
 
     private var isTranscriptionRunning: Bool {
@@ -3369,6 +3389,11 @@ private struct RecordingRow: View {
                         RecordingFailedImportStatusRow(
                             message: importStatus.message,
                             onDismiss: onDismissImportStatus
+                        )
+                    } else if canTerminateTranscription {
+                        RecordingActiveImportStatusRow(
+                            status: importStatus,
+                            onTerminate: onTerminateTranscription
                         )
                     } else {
                         ProgressView(value: importStatus.progress)
@@ -5486,8 +5511,13 @@ struct RecordingDetailView: View {
             if let importStatus = item.importStatus {
                 RecordingImportStatusDetail(
                     status: importStatus,
+                    canTerminateTranscription: store.canTerminateTranscription(for: item.id),
                     onDismiss: {
                         store.dismissFailedImportStatus(for: item.id)
+                    },
+                    onTerminate: {
+                        HapticFeedback.play(.warning)
+                        store.terminateTranscription(for: item.id)
                     }
                 )
             }
@@ -6038,6 +6068,8 @@ struct RecordingDetailView: View {
             do {
                 try await store.retranscribe(item, language: language)
                 HapticFeedback.play(.retranscribeComplete)
+            } catch is CancellationError {
+                return
             } catch {
                 transcriptionErrorMessage = error.localizedDescription
                 HapticFeedback.play(.failure)
@@ -6059,6 +6091,8 @@ struct RecordingDetailView: View {
             do {
                 try await store.processWithGeminiCloud(item)
                 HapticFeedback.play(.retranscribeComplete)
+            } catch is CancellationError {
+                return
             } catch {
                 transcriptionErrorMessage = error.localizedDescription
                 HapticFeedback.play(.failure)
@@ -6092,6 +6126,8 @@ struct RecordingDetailView: View {
             do {
                 try await store.retranscribeWithLocalWhisper(item, language: language, model: model)
                 HapticFeedback.play(.retranscribeComplete)
+            } catch is CancellationError {
+                return
             } catch {
                 transcriptionErrorMessage = error.localizedDescription
                 HapticFeedback.play(.failure)
@@ -6118,6 +6154,8 @@ struct RecordingDetailView: View {
                     language: TranscriptionLanguage(id: item.languageID)
                 )
                 HapticFeedback.play(.retranscribeComplete)
+            } catch is CancellationError {
+                return
             } catch {
                 transcriptionErrorMessage = error.localizedDescription
                 HapticFeedback.play(.failure)
@@ -6141,6 +6179,8 @@ struct RecordingDetailView: View {
             do {
                 try await store.retranscribeWithMOSS(item)
                 HapticFeedback.play(.retranscribeComplete)
+            } catch is CancellationError {
+                return
             } catch {
                 transcriptionErrorMessage = error.localizedDescription
                 HapticFeedback.play(.failure)
@@ -7354,7 +7394,9 @@ private extension View {
 
 private struct RecordingImportStatusDetail: View {
     let status: RecordingImportStatus
+    let canTerminateTranscription: Bool
     let onDismiss: () -> Void
+    let onTerminate: () -> Void
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
@@ -7362,6 +7404,11 @@ private struct RecordingImportStatusDetail: View {
                 RecordingFailedImportStatusRow(
                     message: status.message,
                     onDismiss: onDismiss
+                )
+            } else if canTerminateTranscription {
+                RecordingActiveImportStatusRow(
+                    status: status,
+                    onTerminate: onTerminate
                 )
             } else {
                 ProgressView(value: status.progress)
@@ -7396,20 +7443,60 @@ private struct RecordingFailedImportStatusRow: View {
     }
 }
 
+private struct RecordingActiveImportStatusRow: View {
+    let status: RecordingImportStatus
+    let onTerminate: () -> Void
+
+    var body: some View {
+        HStack(alignment: .center, spacing: 10) {
+            VStack(alignment: .leading, spacing: 6) {
+                ProgressView(value: status.progress)
+                    .progressViewStyle(.linear)
+
+                Label(status.message, systemImage: "waveform")
+                    .font(.redditSans(.caption, weight: .semibold))
+                    .foregroundStyle(AppTheme.info)
+                    .lineLimit(2)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+
+            RecordingStatusDismissButton(
+                tint: AppTheme.info,
+                accessibilityLabel: L10n.Recordings.stopTranscription,
+                action: onTerminate
+            )
+        }
+        .frame(minHeight: 30)
+    }
+}
+
 private struct RecordingStatusDismissButton: View {
+    let tint: Color
+    let accessibilityLabel: LocalizedStringResource
     let action: () -> Void
+
+    init(
+        tint: Color = AppTheme.warning,
+        accessibilityLabel: LocalizedStringResource = L10n.Common.close,
+        action: @escaping () -> Void
+    ) {
+        self.tint = tint
+        self.accessibilityLabel = accessibilityLabel
+        self.action = action
+    }
 
     var body: some View {
         Button(action: action) {
             Image(systemName: "xmark")
                 .font(.system(size: 11, weight: .bold))
-                .foregroundStyle(AppTheme.warning)
+                .foregroundStyle(tint)
                 .frame(width: 30, height: 30)
-                .background(AppTheme.warning.opacity(0.12), in: Circle())
+                .background(tint.opacity(0.12), in: Circle())
                 .contentShape(Circle())
         }
         .buttonStyle(.plain)
-        .accessibilityLabel(Text(L10n.Common.close))
+        .accessibilityLabel(Text(accessibilityLabel))
     }
 }
 

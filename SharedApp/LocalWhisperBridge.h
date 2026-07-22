@@ -16,6 +16,7 @@ NS_ASSUME_NONNULL_BEGIN
 @end
 
 typedef void (^LocalWhisperBridgeProgressHandler)(double progress);
+typedef BOOL (^LocalWhisperBridgeCancellationHandler)(void);
 
 @interface LocalWhisperBridge : NSObject
 
@@ -24,8 +25,9 @@ typedef void (^LocalWhisperBridgeProgressHandler)(double progress);
                                                         languageCode:(NSString *)languageCode
                                                     useCoreMLEncoder:(BOOL)useCoreMLEncoder
                                                      progressHandler:(nullable LocalWhisperBridgeProgressHandler)progressHandler
+                                                 cancellationHandler:(nullable LocalWhisperBridgeCancellationHandler)cancellationHandler
                                                                error:(NSError **)error
-    NS_SWIFT_NAME(transcribeSamples(_:modelPath:languageCode:useCoreMLEncoder:progressHandler:));
+    NS_SWIFT_NAME(transcribeSamples(_:modelPath:languageCode:useCoreMLEncoder:progressHandler:cancellationHandler:));
 
 @end
 

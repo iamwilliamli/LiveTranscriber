@@ -1,0 +1,8 @@
+"CFBundleDisplayName" = "Live-Transkription";
+"CFBundleName" = "Live-Transkription";
+"CFBundleTypeName" = "Audio- oder Videoaufnahme";
+"NSLocationWhenInUseUsageDescription" = "Live Transcriber kann deinen aktuellen Standort an eine Aufnahme anhängen, wenn du ihn hinzufügen möchtest.";
+"NSMicrophoneUsageDescription" = "Live Transcriber verwendet das Mikrofon für Live-Transkription und wenn du deine Stimme in eine Aufnahme einbeziehen möchtest.";
+"NSRemindersFullAccessUsageDescription" = "Live Transcriber fügt die von dir ausgewählten Aufgaben aus Besprechungen zu Erinnerungen hinzu.";
+"NSScreenCaptureUsageDescription" = "Live Transcriber zeichnet Systemaudio nur von dem Display, der App oder dem Fenster auf, das du auswählst.";
+"NSSpeechRecognitionUsageDescription" = "Live Transcriber transkribiert deine Aufnahmen auf diesem Mac mit der Spracherkennung von Apple.";

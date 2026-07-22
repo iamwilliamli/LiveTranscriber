@@ -279,18 +279,38 @@ struct MacRecordingsView: View {
             ScrollView {
                 LazyVStack(spacing: 10) {
                     ForEach(filteredRecordings) { item in
-                        Button {
-                            selectedRecordingID = item.id
-                        } label: {
-                            MacRecordingListRow(
-                                item: item,
-                                isSelected: selectedRecordingID == item.id
+                        ZStack(alignment: .bottomTrailing) {
+                            Button {
+                                selectedRecordingID = item.id
+                            } label: {
+                                MacRecordingListRow(
+                                    item: item,
+                                    isSelected: selectedRecordingID == item.id
+                                )
+                            }
+                            .buttonStyle(MacRecordingCardButtonStyle())
+                            .accessibilityAddTraits(
+                                selectedRecordingID == item.id ? .isSelected : []
                             )
+
+                            if item.importStatus?.isFailed == true {
+                                MacRecordingStatusButton(
+                                    tint: AppTheme.warning,
+                                    accessibilityLabel: L10n.Common.close
+                                ) {
+                                    store.dismissFailedImportStatus(for: item.id)
+                                }
+                                .padding(12)
+                            } else if store.canTerminateTranscription(for: item.id) {
+                                MacRecordingStatusButton(
+                                    tint: AppTheme.info,
+                                    accessibilityLabel: L10n.Recordings.stopTranscription
+                                ) {
+                                    store.terminateTranscription(for: item.id)
+                                }
+                                .padding(12)
+                            }
                         }
-                        .buttonStyle(MacRecordingCardButtonStyle())
-                        .accessibilityAddTraits(
-                            selectedRecordingID == item.id ? .isSelected : []
-                        )
                     }
                 }
                 .padding(.horizontal, 12)
@@ -792,6 +812,7 @@ private struct MacRecordingListRow: View {
                     .font(.redditSans(.caption))
                     .foregroundStyle(AppTheme.danger)
                     .lineLimit(2)
+                    .padding(.trailing, 32)
                 } else {
                     VStack(alignment: .leading, spacing: 3) {
                         ProgressView(value: importStatus.progress)
@@ -800,6 +821,7 @@ private struct MacRecordingListRow: View {
                             .foregroundStyle(AppTheme.info)
                             .lineLimit(1)
                     }
+                    .padding(.trailing, 32)
                 }
             } else if let summary = item.intelligence?.summary, !summary.isEmpty {
                 Text(verbatim: summary)
@@ -855,6 +877,25 @@ private struct MacRecordingListRow: View {
                 .frame(height: 25)
                 .background(Color.secondary.opacity(0.10), in: Capsule())
         }
+    }
+}
+
+private struct MacRecordingStatusButton: View {
+    let tint: Color
+    let accessibilityLabel: LocalizedStringResource
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            Image(systemName: "xmark")
+                .font(.system(size: 10, weight: .bold))
+                .foregroundStyle(tint)
+                .frame(width: 26, height: 26)
+                .background(tint.opacity(0.12), in: Circle())
+        }
+        .buttonStyle(.plain)
+        .help(String(localized: accessibilityLabel))
+        .accessibilityLabel(Text(accessibilityLabel))
     }
 }
 

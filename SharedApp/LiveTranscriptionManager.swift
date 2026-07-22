@@ -2787,7 +2787,10 @@ private final class LiveLocalWhisperPipeline: @unchecked Sendable {
             modelPath: modelURL.path,
             languageCode: languageCode.isEmpty ? "auto" : languageCode,
             useCoreMLEncoder: useCoreMLEncoder,
-            progressHandler: nil
+            progressHandler: nil,
+            cancellationHandler: {
+                self.cancelled
+            }
         )
     }
 }

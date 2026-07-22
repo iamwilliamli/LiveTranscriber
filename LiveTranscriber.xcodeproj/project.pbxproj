@@ -97,6 +97,8 @@
 		8C0000000000000000000011 /* SharedAudioChunkProducer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8C0000000000000000001011 /* SharedAudioChunkProducer.swift */; };
 		8C0000000000000000000012 /* SharedAudioChunkTransport.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8C0000000000000000001002 /* SharedAudioChunkTransport.swift */; };
 		8C0000000000000000000013 /* LiveTranscriberBroadcastExtension.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = 8C0000000000000000001014 /* LiveTranscriberBroadcastExtension.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+		8C0000000000000000000030 /* InfoPlist.strings in Resources */ = {isa = PBXBuildFile; fileRef = 8C0000000000000000003030 /* InfoPlist.strings */; };
+		8C0000000000000000000031 /* Semantic.xcstrings in Resources */ = {isa = PBXBuildFile; fileRef = 7B0000000000000000001022 /* Semantic.xcstrings */; };
 		8C0000000000000000000020 /* SharedAudioChunkQueueTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8C0000000000000000001020 /* SharedAudioChunkQueueTests.swift */; };
 		8C0000000000000000000021 /* SystemAudioSessionStateTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8C0000000000000000001021 /* SystemAudioSessionStateTests.swift */; };
 		8C0000000000000000000022 /* CaptionSnapshotTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8C0000000000000000001022 /* CaptionSnapshotTests.swift */; };
@@ -260,6 +262,12 @@
 		8C0000000000000000001012 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		8C0000000000000000001013 /* LiveTranscriberBroadcastExtension.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = LiveTranscriberBroadcastExtension.entitlements; sourceTree = "<group>"; };
 		8C0000000000000000001014 /* LiveTranscriberBroadcastExtension.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = LiveTranscriberBroadcastExtension.appex; sourceTree = BUILT_PRODUCTS_DIR; };
+		8C0000000000000000001030 /* en */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = en; path = en.lproj/InfoPlist.strings; sourceTree = "<group>"; };
+		8C0000000000000000001031 /* de */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = de; path = de.lproj/InfoPlist.strings; sourceTree = "<group>"; };
+		8C0000000000000000001032 /* ja */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = ja; path = ja.lproj/InfoPlist.strings; sourceTree = "<group>"; };
+		8C0000000000000000001033 /* nl */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = nl; path = nl.lproj/InfoPlist.strings; sourceTree = "<group>"; };
+		8C0000000000000000001034 /* zh-Hans */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = "zh-Hans"; path = "zh-Hans.lproj/InfoPlist.strings"; sourceTree = "<group>"; };
+		8C0000000000000000001035 /* zh-Hant */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = "zh-Hant"; path = "zh-Hant.lproj/InfoPlist.strings"; sourceTree = "<group>"; };
 		8C0000000000000000001020 /* SharedAudioChunkQueueTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SharedAudioChunkQueueTests.swift; sourceTree = "<group>"; };
 		8C0000000000000000001021 /* SystemAudioSessionStateTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SystemAudioSessionStateTests.swift; sourceTree = "<group>"; };
 		8C0000000000000000001022 /* CaptionSnapshotTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CaptionSnapshotTests.swift; sourceTree = "<group>"; };
@@ -479,6 +487,7 @@
 			children = (
 				8C0000000000000000001010 /* SampleHandler.swift */,
 				8C0000000000000000001011 /* SharedAudioChunkProducer.swift */,
+				8C0000000000000000003030 /* InfoPlist.strings */,
 				8C0000000000000000001012 /* Info.plist */,
 				8C0000000000000000001013 /* LiveTranscriberBroadcastExtension.entitlements */,
 			);
@@ -698,6 +707,8 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				8C0000000000000000000030 /* InfoPlist.strings in Resources */,
+				8C0000000000000000000031 /* Semantic.xcstrings in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -859,6 +870,19 @@
 				7B00000000000000000010D9 /* de */,
 				7B00000000000000000010DA /* nl */,
 				7B00000000000000000010DB /* ja */,
+			);
+			name = InfoPlist.strings;
+			sourceTree = "<group>";
+		};
+		8C0000000000000000003030 /* InfoPlist.strings */ = {
+			isa = PBXVariantGroup;
+			children = (
+				8C0000000000000000001030 /* en */,
+				8C0000000000000000001031 /* de */,
+				8C0000000000000000001032 /* ja */,
+				8C0000000000000000001033 /* nl */,
+				8C0000000000000000001034 /* zh-Hans */,
+				8C0000000000000000001035 /* zh-Hant */,
 			);
 			name = InfoPlist.strings;
 			sourceTree = "<group>";

@@ -21,9 +21,19 @@ enum SharedAudioTransportError: LocalizedError {
     var errorDescription: String? {
         switch self {
         case .appGroupUnavailable:
-            return "The shared screen-audio container is unavailable."
+            return String(localized: LocalizedStringResource(
+                "screen_audio.error.app_group",
+                defaultValue: "The shared screen-audio container is unavailable. Check the App Group capability and signing profile.",
+                table: "Semantic",
+                comment: "Error shown when the ReplayKit App Group container is unavailable."
+            ))
         case .invalidAudioChunk:
-            return "The shared screen-audio chunk is invalid."
+            return String(localized: LocalizedStringResource(
+                "screen_audio.error.invalid_chunk",
+                defaultValue: "A screen-audio chunk could not be decoded.",
+                table: "Semantic",
+                comment: "Error shown for a corrupt shared PCM chunk."
+            ))
         }
     }
 }
@@ -202,6 +212,20 @@ final class SharedAudioChunkDirectory: @unchecked Sendable {
             try fileManager.removeItem(at: url)
         }
         try? removeActiveMetadata(ifSessionID: sessionID)
+    }
+
+    /// Removes a completed session that cannot belong to a newly-started
+    /// consumer. Without this cleanup, the iOS 26 ReplayKit path can observe the
+    /// previous broadcast's `.finished`/`.failed` marker and immediately stop a
+    /// new recording before the broadcast picker countdown has completed.
+    func removeTerminalActiveSession() throws {
+        guard let metadata = try loadActiveMetadata() else { return }
+        switch metadata.state {
+        case .finished, .failed:
+            try removeSession(metadata.sessionID)
+        case .waitingForAudio, .capturing, .paused:
+            break
+        }
     }
 
     func cleanupExpiredSessions(

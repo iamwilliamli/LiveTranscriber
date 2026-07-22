@@ -1090,24 +1090,82 @@
     },
     "control.quick_recording.description" : {
       "comment" : "Description of the macOS quick recording shortcut.",
-      "extractionState" : "extracted_with_value",
       "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Öffnet Live Transcriber und startet die Aufnahme."
+          }
+        },
         "en" : {
           "stringUnit" : {
-            "state" : "new",
+            "state" : "translated",
             "value" : "Open Live Transcriber and start recording."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Live Transcriberを開いて録音を開始します。"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Open Live Transcriber en start de opname."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "打开 Live Transcriber 并开始录音。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "開啟 Live Transcriber 並開始錄音。"
           }
         }
       }
     },
     "control.quick_recording.start" : {
       "comment" : "Shortcuts short title for starting a recording on macOS.\nmacOS shortcut action that opens Live Transcriber and starts recording.",
-      "extractionState" : "extracted_with_value",
       "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Aufnahme starten"
+          }
+        },
         "en" : {
           "stringUnit" : {
-            "state" : "new",
+            "state" : "translated",
             "value" : "Start Recording"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "録音を開始"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Opname starten"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "开始录音"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "開始錄音"
           }
         }
       }
@@ -1115,10 +1173,28 @@
     "gemini_cloud.api_key" : {
       "extractionState" : "manual",
       "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Gemini-API-Schlüssel"
+          }
+        },
         "en" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "Gemini API Key"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Gemini APIキー"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Gemini API-sleutel"
           }
         },
         "zh-Hans" : {
@@ -1138,10 +1214,28 @@
     "gemini_cloud.api_key.clear" : {
       "extractionState" : "manual",
       "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Gemini-API-Schlüssel löschen"
+          }
+        },
         "en" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "Clear Gemini API Key"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Gemini APIキーを削除"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Gemini API-sleutel wissen"
           }
         },
         "zh-Hans" : {
@@ -1161,10 +1255,28 @@
     "gemini_cloud.api_key.description" : {
       "extractionState" : "manual",
       "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Der Schlüssel wird im Schlüsselbund gespeichert und von diesem Gerät direkt für die Verbindung mit der Gemini API von Google verwendet."
+          }
+        },
         "en" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "The key is stored in Keychain and used directly by this device to connect to Google's Gemini API."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "キーはキーチェーンに保存され、このデバイスからGoogleのGemini APIへ直接接続するために使用されます。"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "De sleutel wordt in Sleutelhanger bewaard en rechtstreeks door dit apparaat gebruikt om verbinding te maken met de Gemini API van Google."
           }
         },
         "zh-Hans" : {
@@ -1184,7 +1296,25 @@
     "gemini_cloud.api_key.prompt" : {
       "extractionState" : "manual",
       "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "AIza..."
+          }
+        },
         "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "AIza..."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "AIza..."
+          }
+        },
+        "nl" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "AIza..."
@@ -1207,10 +1337,28 @@
     "gemini_cloud.available" : {
       "extractionState" : "manual",
       "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Gemini Cloud bereit"
+          }
+        },
         "en" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "Gemini Cloud Ready"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Gemini Cloudの準備完了"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Gemini Cloud gereed"
           }
         },
         "zh-Hans" : {
@@ -1230,10 +1378,28 @@
     "gemini_cloud.available.detail" : {
       "extractionState" : "manual",
       "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Für ausdrücklich ausgewählte Cloud-Verarbeitung ist ein Gemini-API-Schlüssel eingerichtet."
+          }
+        },
         "en" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "A Gemini API key is configured for explicitly selected cloud processing."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "明示的に選択したクラウド処理用のGemini APIキーが設定されています。"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Er is een Gemini API-sleutel ingesteld voor expliciet geselecteerde cloudverwerking."
           }
         },
         "zh-Hans" : {
@@ -1253,10 +1419,28 @@
     "gemini_cloud.error.audio_too_large" : {
       "extractionState" : "manual",
       "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Die Aufnahme ist zu groß für den Gemini-Dateiupload."
+          }
+        },
         "en" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "The recording is too large for Gemini file upload."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "録音が大きすぎるためGeminiにアップロードできません。"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "De opname is te groot om naar Gemini te uploaden."
           }
         },
         "zh-Hans" : {
@@ -1276,10 +1460,28 @@
     "gemini_cloud.error.audio_unavailable" : {
       "extractionState" : "manual",
       "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Das Audio der Aufnahme ist nicht verfügbar oder leer."
+          }
+        },
         "en" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "The recording audio is unavailable or empty."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "録音音声を利用できないか、音声が空です。"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "De audio van de opname is niet beschikbaar of leeg."
           }
         },
         "zh-Hans" : {
@@ -1299,10 +1501,28 @@
     "gemini_cloud.error.backup_unavailable" : {
       "extractionState" : "manual",
       "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Das vor der Gemini-Verarbeitung gespeicherte Transkript ist nicht mehr verfügbar."
+          }
+        },
         "en" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "The transcript saved before Gemini processing is no longer available."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Gemini処理前に保存された文字起こしは利用できなくなりました。"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Het transcript dat vóór de Gemini-verwerking is bewaard, is niet meer beschikbaar."
           }
         },
         "zh-Hans" : {
@@ -1322,10 +1542,28 @@
     "gemini_cloud.error.disabled" : {
       "extractionState" : "manual",
       "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Aktiviere zuerst Gemini Cloud unter Einstellungen > Transkription > Gemini Cloud."
+          }
+        },
         "en" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "Turn on Gemini Cloud in Settings > Transcription > Gemini Cloud first."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "まず「設定」>「文字起こし」>「Gemini Cloud」でGemini Cloudをオンにしてください。"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Schakel eerst Gemini Cloud in via Instellingen > Transcriptie > Gemini Cloud."
           }
         },
         "zh-Hans" : {
@@ -1345,10 +1583,28 @@
     "gemini_cloud.error.empty_response" : {
       "extractionState" : "manual",
       "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Gemini hat keine verwendbare Antwort zurückgegeben."
+          }
+        },
         "en" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "Gemini did not return a usable response."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Geminiから使用可能な応答が返されませんでした。"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Gemini heeft geen bruikbaar antwoord teruggestuurd."
           }
         },
         "zh-Hans" : {
@@ -1368,10 +1624,28 @@
     "gemini_cloud.error.empty_transcript" : {
       "extractionState" : "manual",
       "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Gemini hat keinen Transkripttext zurückgegeben."
+          }
+        },
         "en" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "Gemini did not return any transcript text."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Geminiから文字起こしテキストが返されませんでした。"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Gemini heeft geen transcripttekst teruggestuurd."
           }
         },
         "zh-Hans" : {
@@ -1391,10 +1665,28 @@
     "gemini_cloud.error.file_processing_failed" : {
       "extractionState" : "manual",
       "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Gemini konnte die hochgeladene Audiodatei nicht verarbeiten."
+          }
+        },
         "en" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "Gemini could not process the uploaded audio file."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Geminiはアップロードされた音声ファイルを処理できませんでした。"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Gemini kon het geüploade audiobestand niet verwerken."
           }
         },
         "zh-Hans" : {
@@ -1414,10 +1706,28 @@
     "gemini_cloud.error.file_processing_timeout" : {
       "extractionState" : "manual",
       "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bei der Vorbereitung der hochgeladenen Audiodatei hat Gemini das Zeitlimit überschritten."
+          }
+        },
         "en" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "Gemini timed out while preparing the uploaded audio file."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "アップロードされた音声ファイルの準備中にGeminiがタイムアウトしました。"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Gemini heeft tijdens het voorbereiden van het geüploade audiobestand de tijdslimiet overschreden."
           }
         },
         "zh-Hans" : {
@@ -1437,10 +1747,28 @@
     "gemini_cloud.error.invalid_configuration" : {
       "extractionState" : "manual",
       "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Gemini Cloud ist nicht richtig konfiguriert."
+          }
+        },
         "en" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "Gemini Cloud is not configured correctly."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Gemini Cloudが正しく設定されていません。"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Gemini Cloud is niet correct geconfigureerd."
           }
         },
         "zh-Hans" : {
@@ -1460,10 +1788,28 @@
     "gemini_cloud.error.invalid_manual_transcript_json" : {
       "extractionState" : "manual",
       "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Das eingefügte Gemini-JSON konnte nicht importiert werden. Kopiere das vollständige JSON-Objekt und versuche es erneut."
+          }
+        },
         "en" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "The pasted Gemini JSON could not be imported. Copy the complete JSON object and try again."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "貼り付けたGemini JSONを読み込めませんでした。完全なJSONオブジェクトをコピーして、もう一度お試しください。"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "De geplakte Gemini-JSON kon niet worden geïmporteerd. Kopieer het volledige JSON-object en probeer het opnieuw."
           }
         },
         "zh-Hans" : {
@@ -1483,10 +1829,28 @@
     "gemini_cloud.error.invalid_response" : {
       "extractionState" : "manual",
       "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Gemini hat eine Antwort zurückgegeben, die die App nicht lesen konnte."
+          }
+        },
         "en" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "Gemini returned a response the app could not read."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Geminiからアプリが読み取れない応答が返されました。"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Gemini heeft een antwoord teruggestuurd dat de app niet kon lezen."
           }
         },
         "zh-Hans" : {
@@ -1506,10 +1870,28 @@
     "gemini_cloud.error.keychain_unavailable" : {
       "extractionState" : "manual",
       "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Auf den Gemini-API-Schlüssel im Schlüsselbund konnte nicht zugegriffen werden."
+          }
+        },
         "en" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "The Gemini API key could not be accessed in Keychain."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "キーチェーン内のGemini APIキーにアクセスできませんでした。"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "De Gemini API-sleutel in Sleutelhanger kon niet worden geopend."
           }
         },
         "zh-Hans" : {
@@ -1529,10 +1911,28 @@
     "gemini_cloud.error.missing_api_key" : {
       "extractionState" : "manual",
       "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Füge zuerst unter Einstellungen > Transkription > Gemini Cloud einen Gemini-API-Schlüssel hinzu."
+          }
+        },
         "en" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "Add a Gemini API key in Settings > Transcription > Gemini Cloud first."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "まず「設定」>「文字起こし」>「Gemini Cloud」でGemini APIキーを追加してください。"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Voeg eerst een Gemini API-sleutel toe via Instellingen > Transcriptie > Gemini Cloud."
           }
         },
         "zh-Hans" : {
@@ -1552,10 +1952,28 @@
     "gemini_cloud.error.request_failed.format" : {
       "extractionState" : "manual",
       "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Gemini-Anfrage fehlgeschlagen (HTTP %d)."
+          }
+        },
         "en" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "Gemini request failed (HTTP %d)."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Geminiリクエストに失敗しました（HTTP %d）。"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Gemini-verzoek mislukt (HTTP %d)."
           }
         },
         "zh-Hans" : {
@@ -1575,10 +1993,28 @@
     "gemini_cloud.error.unsupported_audio" : {
       "extractionState" : "manual",
       "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Die Aufnahme konnte nicht in ein von Gemini unterstütztes Audioformat umgewandelt werden."
+          }
+        },
         "en" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "The recording could not be converted to a Gemini-supported audio format."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "録音をGeminiが対応する音声形式に変換できませんでした。"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "De opname kon niet worden omgezet naar een door Gemini ondersteund audioformaat."
           }
         },
         "zh-Hans" : {
@@ -1598,10 +2034,28 @@
     "gemini_cloud.manual_upload.description" : {
       "extractionState" : "manual",
       "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Gemini erhält Audio und den aktuellen Transkriptentwurf erst, nachdem du für eine gespeicherte Aufnahme „Mit Gemini Cloud verarbeiten“ bestätigst. Im automatischen Modus werden niemals Inhalte hochgeladen."
+          }
+        },
         "en" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "Gemini receives audio and the current transcript draft only after you confirm Process with Gemini Cloud for a saved recording. Automatic mode never uploads content."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "保存済みの録音で「Gemini Cloudで処理」を確定した場合にのみ、音声と現在の文字起こし下書きがGeminiに送信されます。自動モードでコンテンツがアップロードされることはありません。"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Gemini ontvangt de audio en de huidige transcriptversie pas nadat je ‘Verwerken met Gemini Cloud’ voor een bewaarde opname bevestigt. In de automatische modus wordt nooit inhoud geüpload."
           }
         },
         "zh-Hans" : {
@@ -1621,10 +2075,28 @@
     "gemini_cloud.provider.detail" : {
       "extractionState" : "manual",
       "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Verwende Gemini für Cloud-Zusammenfassungen, Besprechungsanalysen und Fragen zu Aufnahmen. Audio wird nur über die ausdrücklich gewählte Gemini-Aktion für Aufnahmen hochgeladen."
+          }
+        },
         "en" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "Use Gemini for cloud summaries, meeting analysis, and recording questions. Audio is uploaded only through the explicit Gemini recording action."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "クラウド要約、会議分析、録音に関する質問にGeminiを使用します。音声は、明示的に選択したGeminiの録音アクションからのみアップロードされます。"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Gebruik Gemini voor cloudsamenvattingen, vergaderanalyse en vragen over opnamen. Audio wordt alleen geüpload via de expliciete Gemini-actie voor opnamen."
           }
         },
         "zh-Hans" : {
@@ -1644,7 +2116,25 @@
     "gemini_cloud.provider.title" : {
       "extractionState" : "manual",
       "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Gemini Cloud"
+          }
+        },
         "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Gemini Cloud"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Gemini Cloud"
+          }
+        },
+        "nl" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "Gemini Cloud"
@@ -1667,10 +2157,28 @@
     "gemini_cloud.settings.api_configuration" : {
       "extractionState" : "manual",
       "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "API-Konfiguration"
+          }
+        },
         "en" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "API Configuration"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "API設定"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "API-configuratie"
           }
         },
         "zh-Hans" : {
@@ -1690,10 +2198,28 @@
     "gemini_cloud.settings.cloud_model_title" : {
       "extractionState" : "manual",
       "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cloud-Modell"
+          }
+        },
         "en" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "Cloud Model"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "クラウドモデル"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cloudmodel"
           }
         },
         "zh-Hans" : {
@@ -1713,10 +2239,28 @@
     "gemini_cloud.settings.control_title" : {
       "extractionState" : "manual",
       "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cloud-Zugriff"
+          }
+        },
         "en" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "Cloud Access"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "クラウドアクセス"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cloudtoegang"
           }
         },
         "zh-Hans" : {
@@ -1736,10 +2280,28 @@
     "gemini_cloud.settings.enable" : {
       "extractionState" : "manual",
       "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Gemini Cloud aktivieren"
+          }
+        },
         "en" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "Enable Gemini Cloud"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Gemini Cloudを有効にする"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Gemini Cloud inschakelen"
           }
         },
         "zh-Hans" : {
@@ -1759,10 +2321,28 @@
     "gemini_cloud.settings.enable.description" : {
       "extractionState" : "manual",
       "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Erlaube ausdrücklich ausgewählte Gemini-Aktionen für Transkription und intelligente Verarbeitung. Der automatische Modus bleibt vollständig lokal."
+          }
+        },
         "en" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "Allow explicitly selected Gemini transcription and intelligence actions. Automatic mode remains local-only."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "明示的に選択したGeminiの文字起こしとインテリジェンス機能を許可します。自動モードは引き続き完全にローカルで動作します。"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sta expliciet geselecteerde Gemini-acties voor transcriptie en intelligente verwerking toe. De automatische modus blijft volledig lokaal."
           }
         },
         "zh-Hans" : {
@@ -1782,10 +2362,28 @@
     "gemini_cloud.settings.error_title" : {
       "extractionState" : "manual",
       "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Gemini-Einstellungen fehlgeschlagen"
+          }
+        },
         "en" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "Gemini Settings Failed"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Gemini設定に失敗"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Gemini-instellingen mislukt"
           }
         },
         "zh-Hans" : {
@@ -1805,10 +2403,28 @@
     "gemini_cloud.settings.not_ready" : {
       "extractionState" : "manual",
       "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Aktiviere Gemini Cloud und füge einen API-Schlüssel hinzu, bevor du es verwendest."
+          }
+        },
         "en" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "Turn on Gemini Cloud and add an API key before using it."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "使用する前にGemini CloudをオンにしてAPIキーを追加してください。"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Schakel Gemini Cloud in en voeg een API-sleutel toe voordat je het gebruikt."
           }
         },
         "zh-Hans" : {
@@ -1828,10 +2444,28 @@
     "gemini_cloud.settings.ready" : {
       "extractionState" : "manual",
       "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Gemini Cloud ist aktiviert und ein API-Schlüssel ist eingerichtet."
+          }
+        },
         "en" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "Gemini Cloud is enabled and an API key is configured."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Gemini Cloudが有効で、APIキーが設定されています。"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Gemini Cloud is ingeschakeld en er is een API-sleutel ingesteld."
           }
         },
         "zh-Hans" : {
@@ -1851,10 +2485,28 @@
     "gemini_cloud.settings.status.needs_api_key" : {
       "extractionState" : "manual",
       "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "API-Schlüssel erforderlich"
+          }
+        },
         "en" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "API Key Needed"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "APIキーが必要"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "API-sleutel vereist"
           }
         },
         "zh-Hans" : {
@@ -1874,10 +2526,28 @@
     "gemini_cloud.settings.status.off" : {
       "extractionState" : "manual",
       "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Aus"
+          }
+        },
         "en" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "Off"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "オフ"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Uit"
           }
         },
         "zh-Hans" : {
@@ -1897,10 +2567,28 @@
     "gemini_cloud.settings.status.on" : {
       "extractionState" : "manual",
       "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ein"
+          }
+        },
         "en" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "On"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "オン"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Aan"
           }
         },
         "zh-Hans" : {
@@ -1920,10 +2608,28 @@
     "gemini_cloud.settings.submenu_description" : {
       "extractionState" : "manual",
       "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Gemini aktivieren, den API-Schlüssel verwalten und die Token-Nutzung prüfen."
+          }
+        },
         "en" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "Enable Gemini, manage the API key, and review token usage."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Geminiの有効化、APIキーの管理、トークン使用量の確認を行います。"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Schakel Gemini in, beheer de API-sleutel en bekijk het tokengebruik."
           }
         },
         "zh-Hans" : {
@@ -1943,7 +2649,25 @@
     "gemini_cloud.settings.title" : {
       "extractionState" : "manual",
       "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Gemini Cloud"
+          }
+        },
         "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Gemini Cloud"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Gemini Cloud"
+          }
+        },
+        "nl" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "Gemini Cloud"
@@ -1966,10 +2690,28 @@
     "gemini_cloud.usage.cached_tokens" : {
       "extractionState" : "manual",
       "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Zwischengespeicherte Tokens"
+          }
+        },
         "en" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "Cached Tokens"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "キャッシュ済みトークン"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tokens in cache"
           }
         },
         "zh-Hans" : {
@@ -1989,10 +2731,28 @@
     "gemini_cloud.usage.input_tokens" : {
       "extractionState" : "manual",
       "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Eingabe-Tokens"
+          }
+        },
         "en" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "Input Tokens"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "入力トークン"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Invoertokens"
           }
         },
         "zh-Hans" : {
@@ -2012,10 +2772,28 @@
     "gemini_cloud.usage.last_request" : {
       "extractionState" : "manual",
       "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tokens der letzten Anfrage"
+          }
+        },
         "en" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "Last Request Tokens"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "前回のリクエストのトークン"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tokens van laatste verzoek"
           }
         },
         "zh-Hans" : {
@@ -2035,10 +2813,28 @@
     "gemini_cloud.usage.local_description" : {
       "extractionState" : "manual",
       "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Gezählt werden nur Gemini-Anfragen dieser App auf diesem Gerät. Abrechnung und Kontingent in Google AI Studio bleiben maßgeblich."
+          }
+        },
         "en" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "Counts only Gemini requests made by this app on this device. Google AI Studio billing and quota remain authoritative."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "このデバイス上でこのアプリが行ったGeminiリクエストのみを集計します。請求と割り当てはGoogle AI Studioの情報が正式です。"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Telt alleen Gemini-verzoeken die deze app op dit apparaat heeft gedaan. Facturering en quota in Google AI Studio blijven leidend."
           }
         },
         "zh-Hans" : {
@@ -2058,7 +2854,25 @@
     "gemini_cloud.usage.model" : {
       "extractionState" : "manual",
       "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Modell"
+          }
+        },
         "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Model"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "モデル"
+          }
+        },
+        "nl" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "Model"
@@ -2081,10 +2895,28 @@
     "gemini_cloud.usage.output_tokens" : {
       "extractionState" : "manual",
       "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ausgabe-Tokens"
+          }
+        },
         "en" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "Output Tokens"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "出力トークン"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Uitvoertokens"
           }
         },
         "zh-Hans" : {
@@ -2104,10 +2936,28 @@
     "gemini_cloud.usage.requests" : {
       "extractionState" : "manual",
       "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Anfragen"
+          }
+        },
         "en" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "Requests"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "リクエスト"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Verzoeken"
           }
         },
         "zh-Hans" : {
@@ -2127,10 +2977,28 @@
     "gemini_cloud.usage.reset" : {
       "extractionState" : "manual",
       "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Lokale Nutzung zurücksetzen"
+          }
+        },
         "en" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "Reset Local Usage"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ローカル使用量をリセット"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Lokaal gebruik opnieuw instellen"
           }
         },
         "zh-Hans" : {
@@ -2150,10 +3018,28 @@
     "gemini_cloud.usage.thought_tokens" : {
       "extractionState" : "manual",
       "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Denk-Tokens"
+          }
+        },
         "en" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "Thinking Tokens"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "思考トークン"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Denktokens"
           }
         },
         "zh-Hans" : {
@@ -2173,10 +3059,28 @@
     "gemini_cloud.usage.title" : {
       "extractionState" : "manual",
       "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Token-Nutzung"
+          }
+        },
         "en" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "Token Usage"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "トークン使用量"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tokengebruik"
           }
         },
         "zh-Hans" : {
@@ -2196,10 +3100,28 @@
     "gemini_cloud.usage.total_tokens" : {
       "extractionState" : "manual",
       "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tokens insgesamt"
+          }
+        },
         "en" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "Total Tokens"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "合計トークン"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Totaal aantal tokens"
           }
         },
         "zh-Hans" : {
@@ -2219,10 +3141,28 @@
     "gemini_cloud.usage.updated.format" : {
       "extractionState" : "manual",
       "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Zuletzt aktualisiert: %@"
+          }
+        },
         "en" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "Last updated: %@"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "最終更新：%@"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Laatst bijgewerkt: %@"
           }
         },
         "zh-Hans" : {
@@ -3834,10 +4774,28 @@
     "import.status.analyzing_with_gemini" : {
       "extractionState" : "manual",
       "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Gemini analysiert"
+          }
+        },
         "en" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "Gemini is analyzing"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Geminiが分析中"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Gemini analyseert"
           }
         },
         "zh-Hans" : {
@@ -3983,10 +4941,28 @@
     "import.status.preparing_gemini" : {
       "extractionState" : "manual",
       "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Für Gemini vorbereiten"
+          }
+        },
         "en" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "Preparing for Gemini"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Gemini用に準備中"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Voorbereiden op Gemini"
           }
         },
         "zh-Hans" : {
@@ -4090,10 +5066,28 @@
     "import.status.transcribing_with_gemini" : {
       "extractionState" : "manual",
       "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Gemini transkribiert"
+          }
+        },
         "en" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "Gemini is transcribing"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Geminiが文字起こし中"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Gemini transcribeert"
           }
         },
         "zh-Hans" : {
@@ -4113,10 +5107,28 @@
     "import.status.uploading_to_gemini" : {
       "extractionState" : "manual",
       "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Zu Gemini hochladen"
+          }
+        },
         "en" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "Uploading to Gemini"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Geminiにアップロード中"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Uploaden naar Gemini"
           }
         },
         "zh-Hans" : {
@@ -9219,10 +10231,28 @@
       "comment" : "Local MOSS empty audio error.",
       "extractionState" : "manual",
       "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Die Audiodatei enthält keine Samples zum Transkribieren."
+          }
+        },
         "en" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "The audio file has no samples to transcribe."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "音声ファイルに文字起こし可能なサンプルがありません。"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Het audiobestand bevat geen samples om te transcriberen."
           }
         },
         "zh-Hans" : {
@@ -9243,10 +10273,28 @@
       "comment" : "Local MOSS empty transcript error.",
       "extractionState" : "manual",
       "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "MOSS hat in dieser Aufnahme keine transkribierbare Sprache erkannt."
+          }
+        },
         "en" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "MOSS did not detect transcribable speech in this recording."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "MOSSはこの録音で文字起こし可能な音声を検出できませんでした。"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "MOSS heeft in deze opname geen transcribeerbare spraak gedetecteerd."
           }
         },
         "zh-Hans" : {
@@ -9267,10 +10315,28 @@
       "comment" : "Error when the downloaded local MOSS model is incomplete.",
       "extractionState" : "manual",
       "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Der Download des MOSS-Modells ist unvollständig. Lade das Modell erneut herunter."
+          }
+        },
         "en" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "The MOSS model download is incomplete. Try downloading the model again."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "MOSSモデルのダウンロードが不完全です。もう一度モデルをダウンロードしてください。"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "De download van het MOSS-model is onvolledig. Download het model opnieuw."
           }
         },
         "zh-Hans" : {
@@ -9291,10 +10357,28 @@
       "comment" : "Error when local MOSS transcription starts without model files.",
       "extractionState" : "manual",
       "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Lade vor der lokalen Sprechererkennung unter Einstellungen MOSS Multi-Speaker herunter."
+          }
+        },
         "en" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "Download MOSS Multi-Speaker in Settings before using local speaker recognition."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ローカル話者認識を使用する前に、設定でMOSS Multi-Speakerをダウンロードしてください。"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Download MOSS Multi-Speaker in Instellingen voordat je lokale sprekerherkenning gebruikt."
           }
         },
         "zh-Hans" : {
@@ -9315,10 +10399,28 @@
       "comment" : "Error when local MOSS model storage is unavailable.",
       "extractionState" : "manual",
       "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Die App konnte nicht auf den Speicher für MOSS-Modelle zugreifen."
+          }
+        },
         "en" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "The app could not access MOSS model storage."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "アプリはMOSSモデルの保存領域にアクセスできませんでした。"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "De app kon geen toegang krijgen tot de opslag voor MOSS-modellen."
           }
         },
         "zh-Hans" : {
@@ -9381,10 +10483,28 @@
       "comment" : "Settings button to delete local MOSS model files.",
       "extractionState" : "manual",
       "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Modell-Download löschen"
+          }
+        },
         "en" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "Delete Model Download"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "モデルのダウンロードを削除"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Modeldownload verwijderen"
           }
         },
         "zh-Hans" : {
@@ -9405,10 +10525,28 @@
       "comment" : "Alert title when deleting local MOSS model files fails.",
       "extractionState" : "manual",
       "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "MOSS konnte nicht gelöscht werden"
+          }
+        },
         "en" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "MOSS Delete Failed"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "MOSSの削除に失敗"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Verwijderen van MOSS mislukt"
           }
         },
         "zh-Hans" : {
@@ -9429,10 +10567,28 @@
       "comment" : "Description of local MOSS capabilities and resource usage in Settings.",
       "extractionState" : "manual",
       "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Lokale Transkription nach der Aufnahme mit Zeitstempeln und Trennung mehrerer Sprecher. Das 4-Bit-Modell benötigt etwa 1 GB Speicherplatz und während der Ausführung viel Arbeitsspeicher."
+          }
+        },
         "en" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "On-device post-recording transcription with timestamps and multiple-speaker separation. The 4-bit model needs about 1 GB of storage and substantial memory while running."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "録音後にデバイス上で処理し、タイムスタンプと複数話者の分離に対応します。4ビットモデルには約1 GBのストレージが必要で、実行中は多くのメモリを使用します。"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Transcriptie na de opname op het apparaat, met tijdstempels en scheiding van meerdere sprekers. Het 4-bits model heeft ongeveer 1 GB opslagruimte en tijdens het gebruik veel geheugen nodig."
           }
         },
         "zh-Hans" : {
@@ -9453,10 +10609,28 @@
       "comment" : "Settings button to download the local MOSS model.",
       "extractionState" : "manual",
       "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "MOSS-Modell laden"
+          }
+        },
         "en" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "Download MOSS Model"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "MOSSモデルをダウンロード"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "MOSS-model downloaden"
           }
         },
         "zh-Hans" : {
@@ -9477,10 +10651,28 @@
       "comment" : "Alert title when the local MOSS model download fails.",
       "extractionState" : "manual",
       "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "MOSS-Download fehlgeschlagen"
+          }
+        },
         "en" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "MOSS Download Failed"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "MOSSのダウンロードに失敗"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Downloaden van MOSS mislukt"
           }
         },
         "zh-Hans" : {
@@ -9501,10 +10693,28 @@
       "comment" : "Local MOSS downloaded model detail. Parameter: installed size.",
       "extractionState" : "manual",
       "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Das Mehrsprechermodell ist auf diesem Gerät gespeichert (%@)."
+          }
+        },
         "en" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "The multi-speaker model is stored on this device (%@)."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "複数話者モデルはこのデバイスに保存されています（%@）。"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Het model voor meerdere sprekers is op dit apparaat bewaard (%@)."
           }
         },
         "zh-Hans" : {
@@ -9525,10 +10735,28 @@
       "comment" : "Local MOSS model download progress. Parameter: percent complete.",
       "extractionState" : "manual",
       "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Wird geladen: %.0f%%"
+          }
+        },
         "en" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "Downloading %.0f%%"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ダウンロード中 %.0f%%"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Downloaden: %.0f%%"
           }
         },
         "zh-Hans" : {
@@ -9549,10 +10777,28 @@
       "comment" : "Local MOSS missing model detail. Parameter: expected download size.",
       "extractionState" : "manual",
       "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Lade etwa %@ herunter, bevor du die lokale Mehrsprecher-Transkription verwendest."
+          }
+        },
         "en" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "Download about %@ before using local multi-speaker transcription."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ローカル複数話者文字起こしを使用する前に、約%@をダウンロードしてください。"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Download ongeveer %@ voordat je lokale transcriptie met meerdere sprekers gebruikt."
           }
         },
         "zh-Hans" : {
@@ -9573,10 +10819,28 @@
       "comment" : "Display name of the on-device MOSS model.",
       "extractionState" : "manual",
       "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "MOSS Transcribe Diarize 4-Bit"
+          }
+        },
         "en" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "MOSS Transcribe Diarize 4-bit"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "MOSS Transcribe Diarize 4ビット"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "MOSS Transcribe Diarize 4-bits"
           }
         },
         "zh-Hans" : {
@@ -9597,10 +10861,28 @@
       "comment" : "Local MOSS status when the model has not been downloaded.",
       "extractionState" : "manual",
       "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nicht installiert"
+          }
+        },
         "en" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "Not Installed"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "未インストール"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Niet geïnstalleerd"
           }
         },
         "zh-Hans" : {
@@ -9621,10 +10903,28 @@
       "comment" : "Local MOSS partial model download detail. Parameter: current stored size.",
       "extractionState" : "manual",
       "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Der Modell-Download ist unvollständig (%@ gespeichert). Setze den Download fort oder lösche ihn."
+          }
+        },
         "en" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "The model download is incomplete (%@ stored). Resume the download or delete it."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "モデルのダウンロードが不完全です（%@保存済み）。ダウンロードを再開するか削除してください。"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "De modeldownload is onvolledig (%@ bewaard). Hervat de download of verwijder deze."
           }
         },
         "zh-Hans" : {
@@ -9645,10 +10945,28 @@
       "comment" : "Local MOSS status when all required model files are available.",
       "extractionState" : "manual",
       "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bereit"
+          }
+        },
         "en" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "Ready"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "準備完了"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Gereed"
           }
         },
         "zh-Hans" : {
@@ -9669,10 +10987,28 @@
       "comment" : "Settings metric title for local MOSS model status.",
       "extractionState" : "manual",
       "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Modellstatus"
+          }
+        },
         "en" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "Model Status"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "モデルの状態"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Modelstatus"
           }
         },
         "zh-Hans" : {
@@ -9693,7 +11029,25 @@
       "comment" : "Settings title for the local MOSS transcription and speaker diarization model.",
       "extractionState" : "manual",
       "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "MOSS Multi-Speaker"
+          }
+        },
         "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "MOSS Multi-Speaker"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "MOSS Multi-Speaker"
+          }
+        },
+        "nl" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "MOSS Multi-Speaker"
@@ -9717,10 +11071,28 @@
       "comment" : "Settings navigation subtitle for the local MOSS model.",
       "extractionState" : "manual",
       "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Lokale Mehrsprecher-Transkription laden und verwalten"
+          }
+        },
         "en" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "Download and manage local multi-speaker transcription"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ローカル複数話者文字起こしをダウンロードして管理"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Lokale transcriptie met meerdere sprekers downloaden en beheren"
           }
         },
         "zh-Hans" : {
@@ -11125,10 +12497,28 @@
       "comment" : "Qwen3-ASR empty audio error.",
       "extractionState" : "manual",
       "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Die Audiodatei enthält keine Samples zum Transkribieren."
+          }
+        },
         "en" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "The audio file has no samples to transcribe."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "音声ファイルに文字起こし可能なサンプルがありません。"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Het audiobestand bevat geen samples om te transcriberen."
           }
         },
         "zh-Hans" : {
@@ -11149,10 +12539,28 @@
       "comment" : "Qwen3-ASR empty transcript error.",
       "extractionState" : "manual",
       "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Qwen3-ASR hat in dieser Aufnahme keine transkribierbare Sprache erkannt."
+          }
+        },
         "en" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "Qwen3-ASR did not detect transcribable speech in this recording."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Qwen3-ASRはこの録音で文字起こし可能な音声を検出できませんでした。"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Qwen3-ASR heeft in deze opname geen transcribeerbare spraak gedetecteerd."
           }
         },
         "zh-Hans" : {
@@ -11173,10 +12581,28 @@
       "comment" : "Error when the downloaded Qwen3-ASR model is incomplete.",
       "extractionState" : "manual",
       "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Der Qwen3-ASR-Download ist unvollständig. Lade das Modell erneut herunter."
+          }
+        },
         "en" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "The Qwen3-ASR download is incomplete. Try downloading the model again."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Qwen3-ASRのダウンロードが不完全です。もう一度モデルをダウンロードしてください。"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "De download van Qwen3-ASR is onvolledig. Download het model opnieuw."
           }
         },
         "zh-Hans" : {
@@ -11197,10 +12623,28 @@
       "comment" : "Error when Qwen3-ASR transcription starts without model files.",
       "extractionState" : "manual",
       "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Lade vor der lokalen Qwen-Transkription unter Einstellungen Qwen3-ASR herunter."
+          }
+        },
         "en" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "Download Qwen3-ASR in Settings before using local Qwen transcription."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ローカルQwen文字起こしを使用する前に、設定でQwen3-ASRをダウンロードしてください。"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Download Qwen3-ASR in Instellingen voordat je lokale Qwen-transcriptie gebruikt."
           }
         },
         "zh-Hans" : {
@@ -11221,10 +12665,28 @@
       "comment" : "Error when Qwen3-ASR model storage is unavailable.",
       "extractionState" : "manual",
       "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Die App konnte nicht auf den Modellspeicher zugreifen."
+          }
+        },
         "en" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "The app could not access model storage."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "アプリはモデルの保存領域にアクセスできませんでした。"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "De app kon geen toegang krijgen tot de modelopslag."
           }
         },
         "zh-Hans" : {
@@ -11287,10 +12749,28 @@
       "comment" : "Settings button to delete Qwen3-ASR model files.",
       "extractionState" : "manual",
       "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Modell-Download löschen"
+          }
+        },
         "en" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "Delete Model Download"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "モデルのダウンロードを削除"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Modeldownload verwijderen"
           }
         },
         "zh-Hans" : {
@@ -11311,10 +12791,28 @@
       "comment" : "Alert title when deleting Qwen3-ASR model files fails.",
       "extractionState" : "manual",
       "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Qwen3-ASR konnte nicht gelöscht werden"
+          }
+        },
         "en" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "Qwen3-ASR Delete Failed"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Qwen3-ASRの削除に失敗"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Verwijderen van Qwen3-ASR mislukt"
           }
         },
         "zh-Hans" : {
@@ -11335,10 +12833,28 @@
       "comment" : "Description of Qwen3-ASR capabilities in Settings.",
       "extractionState" : "manual",
       "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Lokale Transkription nach der Aufnahme mit mehrsprachiger Erkennung und audiobasierten Zeitstempeln. Eine Sprechertrennung ist nicht enthalten."
+          }
+        },
         "en" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "On-device post-recording transcription with multilingual recognition and audio-based timestamps. Speaker separation is not included."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "多言語認識と音声ベースのタイムスタンプに対応した、録音後のデバイス上文字起こしです。話者分離には対応していません。"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Transcriptie na de opname op het apparaat, met meertalige herkenning en tijdstempels op basis van audio. Sprekerscheiding is niet inbegrepen."
           }
         },
         "zh-Hans" : {
@@ -11359,10 +12875,28 @@
       "comment" : "Settings button to download Qwen3-ASR.",
       "extractionState" : "manual",
       "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Qwen3-ASR laden"
+          }
+        },
         "en" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "Download Qwen3-ASR"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Qwen3-ASRをダウンロード"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Qwen3-ASR downloaden"
           }
         },
         "zh-Hans" : {
@@ -11383,10 +12917,28 @@
       "comment" : "Alert title when Qwen3-ASR model download fails.",
       "extractionState" : "manual",
       "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Qwen3-ASR-Download fehlgeschlagen"
+          }
+        },
         "en" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "Qwen3-ASR Download Failed"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Qwen3-ASRのダウンロードに失敗"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Downloaden van Qwen3-ASR mislukt"
           }
         },
         "zh-Hans" : {
@@ -11407,10 +12959,28 @@
       "comment" : "Qwen3-ASR downloaded model detail. Parameter: installed size.",
       "extractionState" : "manual",
       "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Das Modell ist auf diesem Gerät gespeichert (%@)."
+          }
+        },
         "en" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "The model is stored on this device (%@)."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "モデルはこのデバイスに保存されています（%@）。"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Het model is op dit apparaat bewaard (%@)."
           }
         },
         "zh-Hans" : {
@@ -11431,10 +13001,28 @@
       "comment" : "Qwen3-ASR model download progress. Parameter: percent complete.",
       "extractionState" : "manual",
       "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Wird geladen: %.0f%%"
+          }
+        },
         "en" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "Downloading %.0f%%"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ダウンロード中 %.0f%%"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Downloaden: %.0f%%"
           }
         },
         "zh-Hans" : {
@@ -11455,10 +13043,28 @@
       "comment" : "Qwen3-ASR missing model detail. Parameter: expected download size.",
       "extractionState" : "manual",
       "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Lade etwa %@ herunter, bevor du die Qwen3-ASR-Transkription verwendest."
+          }
+        },
         "en" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "Download about %@ before using Qwen3-ASR transcription."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Qwen3-ASR文字起こしを使用する前に、約%@をダウンロードしてください。"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Download ongeveer %@ voordat je Qwen3-ASR-transcriptie gebruikt."
           }
         },
         "zh-Hans" : {
@@ -11479,10 +13085,28 @@
       "comment" : "Display name of the on-device Qwen3-ASR model.",
       "extractionState" : "manual",
       "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Qwen3-ASR 0,6B 4-Bit"
+          }
+        },
         "en" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "Qwen3-ASR 0.6B 4-bit"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Qwen3-ASR 0.6B 4ビット"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Qwen3-ASR 0,6B 4-bits"
           }
         },
         "zh-Hans" : {
@@ -11503,10 +13127,28 @@
       "comment" : "Qwen3-ASR status when the model has not been downloaded.",
       "extractionState" : "manual",
       "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nicht installiert"
+          }
+        },
         "en" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "Not Installed"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "未インストール"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Niet geïnstalleerd"
           }
         },
         "zh-Hans" : {
@@ -11527,10 +13169,28 @@
       "comment" : "Qwen3-ASR partial model download detail. Parameter: current stored size.",
       "extractionState" : "manual",
       "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Der Modell-Download ist unvollständig (%@ gespeichert). Setze den Download fort oder lösche ihn."
+          }
+        },
         "en" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "The model download is incomplete (%@ stored). Resume the download or delete it."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "モデルのダウンロードが不完全です（%@保存済み）。ダウンロードを再開するか削除してください。"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "De modeldownload is onvolledig (%@ bewaard). Hervat de download of verwijder deze."
           }
         },
         "zh-Hans" : {
@@ -11551,10 +13211,28 @@
       "comment" : "Qwen3-ASR status when all required model files are available.",
       "extractionState" : "manual",
       "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bereit"
+          }
+        },
         "en" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "Ready"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "準備完了"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Gereed"
           }
         },
         "zh-Hans" : {
@@ -11575,10 +13253,28 @@
       "comment" : "Settings metric title for Qwen3-ASR model status.",
       "extractionState" : "manual",
       "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Modellstatus"
+          }
+        },
         "en" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "Model Status"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "モデルの状態"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Modelstatus"
           }
         },
         "zh-Hans" : {
@@ -11599,7 +13295,25 @@
       "comment" : "Settings title for the Qwen3-ASR transcription model.",
       "extractionState" : "manual",
       "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Qwen3-ASR"
+          }
+        },
         "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Qwen3-ASR"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Qwen3-ASR"
+          }
+        },
+        "nl" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "Qwen3-ASR"
@@ -11623,10 +13337,28 @@
       "comment" : "Settings navigation subtitle for Qwen3-ASR.",
       "extractionState" : "manual",
       "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Lokales Transkriptionsmodell laden und verwalten"
+          }
+        },
         "en" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "Download and manage the on-device transcription model"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "デバイス上の文字起こしモデルをダウンロードして管理"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Het transcriptiemodel op het apparaat downloaden en beheren"
           }
         },
         "zh-Hans" : {
@@ -17901,10 +19633,28 @@
     "recordings.gemini.manual.clipboard_empty" : {
       "extractionState" : "manual",
       "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Die Zwischenablage enthält keinen Text."
+          }
+        },
         "en" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "The clipboard does not contain text."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "クリップボードにテキストがありません。"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Het klembord bevat geen tekst."
           }
         },
         "zh-Hans" : {
@@ -17924,10 +19674,28 @@
     "recordings.gemini.manual.import_instructions" : {
       "extractionState" : "manual",
       "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Kopiere die vollständige JSON-Antwort von Gemini und füge sie unten ein. Dieser Ablauf verwendet weder den Gemini-API-Schlüssel dieser App noch deren Token-Zähler. Beim Import werden Transkript und Sprecherbezeichnungen ersetzt, nachdem eine wiederherstellbare Kopie des aktuellen Transkripts gespeichert wurde."
+          }
+        },
         "en" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "Copy Gemini's complete JSON response, then paste it below. This workflow does not use this app's Gemini API key or token counter. Importing replaces the transcript and speaker labels after saving a restorable copy of the current transcript."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Geminiの完全なJSON応答をコピーして、下に貼り付けてください。この手順では、このアプリのGemini APIキーやトークンカウンターは使用しません。読み込むと、現在の文字起こしの復元可能なコピーを保存した後、文字起こしと話者ラベルが置き換えられます。"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Kopieer het volledige JSON-antwoord van Gemini en plak het hieronder. Deze werkwijze gebruikt niet de Gemini API-sleutel of tokenteller van deze app. Bij import worden het transcript en de sprekerlabels vervangen nadat een herstelbare kopie van het huidige transcript is bewaard."
           }
         },
         "zh-Hans" : {
@@ -17947,10 +19715,28 @@
     "recordings.gemini.manual.import_json" : {
       "extractionState" : "manual",
       "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Gemini-JSON importieren"
+          }
+        },
         "en" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "Import Gemini JSON"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Gemini JSONを読み込む"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Gemini-JSON importeren"
           }
         },
         "zh-Hans" : {
@@ -17970,10 +19756,28 @@
     "recordings.gemini.manual.import_transcript" : {
       "extractionState" : "manual",
       "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Transkript importieren"
+          }
+        },
         "en" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "Import Transcript"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "文字起こしを読み込む"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Transcript importeren"
           }
         },
         "zh-Hans" : {
@@ -17993,10 +19797,28 @@
     "recordings.gemini.manual.json_placeholder" : {
       "extractionState" : "manual",
       "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Vollständiges JSON-Objekt hier einfügen"
+          }
+        },
         "en" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "Paste the complete JSON object here"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "完全なJSONオブジェクトをここに貼り付け"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Plak hier het volledige JSON-object"
           }
         },
         "zh-Hans" : {
@@ -18016,10 +19838,28 @@
     "recordings.gemini.manual.paste_clipboard" : {
       "extractionState" : "manual",
       "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Aus Zwischenablage einfügen"
+          }
+        },
         "en" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "Paste from Clipboard"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "クリップボードから貼り付け"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Plakken vanaf klembord"
           }
         },
         "zh-Hans" : {
@@ -18039,10 +19879,28 @@
     "recordings.gemini.manual.share_and_copy_prompt" : {
       "extractionState" : "manual",
       "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Audio teilen und Prompt kopieren"
+          }
+        },
         "en" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "Share Audio & Copy Prompt"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "音声を共有してプロンプトをコピー"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Audio delen en prompt kopiëren"
           }
         },
         "zh-Hans" : {
@@ -18062,10 +19920,28 @@
     "recordings.gemini.manual.title" : {
       "extractionState" : "manual",
       "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Gemini-App (manuell)"
+          }
+        },
         "en" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "Gemini App (Manual)"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Geminiアプリ（手動）"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Gemini-app (handmatig)"
           }
         },
         "zh-Hans" : {
@@ -18085,10 +19961,28 @@
     "recordings.gemini.process" : {
       "extractionState" : "manual",
       "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mit Gemini Cloud verarbeiten"
+          }
+        },
         "en" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "Process with Gemini Cloud"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Gemini Cloudで処理"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Verwerken met Gemini Cloud"
           }
         },
         "zh-Hans" : {
@@ -18108,10 +20002,28 @@
     "recordings.gemini.process_confirmation" : {
       "extractionState" : "manual",
       "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dadurch werden das Audio der Aufnahme und der aktuelle Transkriptentwurf zu Gemini hochgeladen. Das Transkript wird erst nach erfolgreicher Transkription ersetzt; anschließend werden eine Zusammenfassung und Besprechungsinformationen erstellt. Eine wiederherstellbare Kopie des aktuellen Transkripts bleibt erhalten."
+          }
+        },
         "en" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "This uploads the recording audio and current transcript draft to Gemini, replaces the transcript only after transcription succeeds, and generates summary and meeting intelligence. A restorable copy of the current transcript is kept."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "録音音声と現在の文字起こし下書きをGeminiにアップロードします。文字起こしが成功した場合にのみ置き換え、要約と会議インテリジェンスを生成します。現在の文字起こしの復元可能なコピーは保持されます。"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Hiermee worden de audio van de opname en de huidige transcriptversie naar Gemini geüpload. Het transcript wordt pas vervangen nadat de transcriptie is geslaagd; daarna worden een samenvatting en vergaderinformatie gemaakt. Er blijft een herstelbare kopie van het huidige transcript bewaard."
           }
         },
         "zh-Hans" : {
@@ -18131,10 +20043,28 @@
     "recordings.gemini.restore" : {
       "extractionState" : "manual",
       "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Transkript wiederherstellen"
+          }
+        },
         "en" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "Restore Transcript"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "文字起こしを復元"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Transcript herstellen"
           }
         },
         "zh-Hans" : {
@@ -18154,10 +20084,28 @@
     "recordings.gemini.restore_before" : {
       "extractionState" : "manual",
       "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Transkript vor Gemini wiederherstellen"
+          }
+        },
         "en" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "Restore Transcript Before Gemini"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Gemini処理前の文字起こしを復元"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Transcript van vóór Gemini herstellen"
           }
         },
         "zh-Hans" : {
@@ -18177,10 +20125,28 @@
     "recordings.gemini.restore_confirmation" : {
       "extractionState" : "manual",
       "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Das aktuelle Transkript durch die vor der Gemini-Verarbeitung gespeicherte Kopie ersetzen? Die aktuelle Gemini-Zusammenfassung und Besprechungsanalyse werden gelöscht."
+          }
+        },
         "en" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "Replace the current transcript with the copy saved before Gemini processing? Current Gemini summary and meeting analysis will be cleared."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "現在の文字起こしをGemini処理前に保存されたコピーに置き換えますか？現在のGemini要約と会議分析は消去されます。"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Het huidige transcript vervangen door de kopie die vóór de Gemini-verwerking is bewaard? De huidige Gemini-samenvatting en vergaderanalyse worden gewist."
           }
         },
         "zh-Hans" : {
@@ -18200,10 +20166,28 @@
     "recordings.gemini.upload_and_process" : {
       "extractionState" : "manual",
       "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Hochladen und verarbeiten"
+          }
+        },
         "en" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "Upload and Process"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "アップロードして処理"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Uploaden en verwerken"
           }
         },
         "zh-Hans" : {
@@ -20147,6 +22131,174 @@
         }
       }
     },
+    "recordings.playback.file_status.downloading" : {
+      "comment" : "Playback status while downloading recording audio from iCloud.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Aufnahme wird aus iCloud geladen …"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Downloading recording from iCloud…"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "録音をiCloudからダウンロード中…"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Opname downloaden uit iCloud…"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "正在从 iCloud 下载录音…"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "正在從 iCloud 下載錄音…"
+          }
+        }
+      }
+    },
+    "recordings.playback.icloud_download_failed.format" : {
+      "comment" : "Error downloading a recording from iCloud. Parameter: error description.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Die Aufnahme konnte nicht aus iCloud geladen werden: %@"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Could not download the recording from iCloud: %@"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "iCloudから録音をダウンロードできませんでした：%@"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "De opname kon niet uit iCloud worden gedownload: %@"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "无法从 iCloud 下载录音：%@"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "無法從 iCloud 下載錄音：%@"
+          }
+        }
+      }
+    },
+    "recordings.playback.icloud_download_timed_out" : {
+      "comment" : "Error shown when an iCloud recording download does not finish in time.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Der iCloud-Download dauert zu lange. Überprüfe deine Verbindung und versuche es erneut."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The iCloud download is taking too long. Check your connection and try again."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "iCloudからのダウンロードに時間がかかりすぎています。接続を確認して、もう一度お試しください。"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Het downloaden uit iCloud duurt te lang. Controleer je verbinding en probeer het opnieuw."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "iCloud 下载时间过长。请检查网络连接后重试。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "iCloud 下載時間過長。請檢查網路連線後再試一次。"
+          }
+        }
+      }
+    },
+    "recordings.playback.icloud_status_failed.format" : {
+      "comment" : "Error checking iCloud recording metadata. Parameter: error description.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Die iCloud-Datei konnte nicht überprüft werden: %@"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Could not check the iCloud file: %@"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "iCloudファイルを確認できませんでした：%@"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Het iCloud-bestand kon niet worden gecontroleerd: %@"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "无法检查 iCloud 文件：%@"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "無法檢查 iCloud 檔案：%@"
+          }
+        }
+      }
+    },
     "recordings.playback.pause" : {
       "comment" : "Playback pause button accessibility label.",
       "extractionState" : "stale",
@@ -20857,6 +23009,48 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "分享轉錄文字"
+          }
+        }
+      }
+    },
+    "recordings.stop_transcription" : {
+      "comment" : "Accessibility label and tooltip for stopping an in-progress recording transcription.",
+      "extractionState" : "stale",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Transkription stoppen"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Stop Transcription"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "文字起こしを停止"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Transcriptie stoppen"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "终止转录"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "終止轉錄"
           }
         }
       }
@@ -22117,6 +24311,1602 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "請等待翻譯完成後再生成智慧摘要"
+          }
+        }
+      }
+    },
+    "screen_audio.action.close_pip" : {
+      "comment" : "Button title for stopping caption picture in picture.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Untertitel-Bild-in-Bild schließen"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Close Caption PiP"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "字幕のピクチャ・イン・ピクチャを閉じる"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ondertiteling in beeld-in-beeld sluiten"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "关闭字幕画中画"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "關閉字幕子母畫面"
+          }
+        }
+      }
+    },
+    "screen_audio.action.open_pip" : {
+      "comment" : "Button title for starting caption picture in picture.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Untertitel-Bild-in-Bild öffnen"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Open Caption PiP"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "字幕のピクチャ・イン・ピクチャを開く"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ondertiteling in beeld-in-beeld openen"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "打开字幕画中画"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "開啟字幕子母畫面"
+          }
+        }
+      }
+    },
+    "screen_audio.action.select_content" : {
+      "comment" : "Action label for the ScreenCaptureKit content sharing picker.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Audio zum Teilen auswählen"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Choose Audio to Share"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "共有する音声を選択"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Audio kiezen om te delen"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "选择要共享的音频"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "選擇要共享的音訊"
+          }
+        }
+      }
+    },
+    "screen_audio.action.start_broadcast" : {
+      "comment" : "Action label for the ReplayKit system broadcast picker.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Systemübertragung starten"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Start System Broadcast"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "システム配信を開始"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Systeemuitzending starten"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "开始系统广播"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "開始系統廣播"
+          }
+        }
+      }
+    },
+    "screen_audio.backend.compatibility" : {
+      "comment" : "ReplayKit screen-audio backend display name.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "iOS 26-Kompatibilität"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "iOS 26 Compatibility"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "iOS 26互換"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "iOS 26-compatibiliteit"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "iOS 26 兼容模式"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "iOS 26 相容模式"
+          }
+        }
+      }
+    },
+    "screen_audio.backend.native" : {
+      "comment" : "ScreenCaptureKit screen-audio backend display name.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nativ unter iOS 27"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "iOS 27 Native"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "iOS 27ネイティブ"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Native iOS 27"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "iOS 27 原生模式"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "iOS 27 原生模式"
+          }
+        }
+      }
+    },
+    "screen_audio.broadcast_picker_hint" : {
+      "comment" : "Instructions for starting ReplayKit screen-audio capture.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tippe unten auf die Taste „Bildschirmaudio“, wähle „Live Transcriber“, starte die Übertragung und wechsle dann zu der App, deren Audio du transkribieren möchtest."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tap the bottom Screen Audio button, choose Live Transcriber, start the broadcast, then switch to the app you want to caption."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "画面下部の「画面の音声」ボタンをタップして「Live Transcriber」を選び、配信を開始してから字幕を表示したいアプリに切り替えてください。"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tik onderaan op de knop ‘Schermgeluid’, kies ‘Live Transcriber’, start de uitzending en ga vervolgens naar de app die je van ondertiteling wilt voorzien."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "轻点底部的“屏幕音频”按钮，选择“Live Transcriber”并开始广播，然后切换到需要生成字幕的 App。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "點一下底部的「螢幕音訊」按鈕，選擇「Live Transcriber」並開始廣播，然後切換到需要產生字幕的 App。"
+          }
+        }
+      }
+    },
+    "screen_audio.caption.waiting_for_speech" : {
+      "comment" : "Caption placeholder before speech is recognized.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Warten auf Sprache …"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Waiting for speech…"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "音声を待っています…"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Wachten op spraak…"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "正在等待语音…"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "正在等待語音…"
+          }
+        }
+      }
+    },
+    "screen_audio.caption.waiting_for_translation" : {
+      "comment" : "Caption placeholder before a translation is available.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Warten auf Übersetzung …"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Waiting for translation…"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "翻訳を待っています…"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Wachten op vertaling…"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "正在等待翻译…"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "正在等待翻譯…"
+          }
+        }
+      }
+    },
+    "screen_audio.error.app_group" : {
+      "comment" : "Error shown when the ReplayKit App Group container is unavailable.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Der gemeinsam genutzte Container für Bildschirmaudio ist nicht verfügbar. Überprüfe die App-Group-Funktion und das Signaturprofil."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The shared screen-audio container is unavailable. Check the App Group capability and signing profile."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "共有の画面音声コンテナを利用できません。App Group機能と署名プロファイルを確認してください。"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "De gedeelde container voor schermgeluid is niet beschikbaar. Controleer de App Group-capaciteit en het ondertekeningsprofiel."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "共享屏幕音频容器不可用。请检查 App Group 功能和签名描述文件。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "共享螢幕音訊容器無法使用。請檢查 App Group 功能和簽署描述檔。"
+          }
+        }
+      }
+    },
+    "screen_audio.error.capture_failed" : {
+      "comment" : "Generic screen-audio capture failure.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Die Aufnahme von Bildschirmaudio ist fehlgeschlagen."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Screen-audio capture failed."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "画面音声の収録に失敗しました。"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Opnemen van schermgeluid is mislukt."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "屏幕音频采集失败。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "螢幕音訊擷取失敗。"
+          }
+        }
+      }
+    },
+    "screen_audio.error.capture_unavailable" : {
+      "comment" : "Error shown when the system content sharing picker is unavailable.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Das Teilen von Systeminhalten ist derzeit nicht verfügbar."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "System content sharing is unavailable right now."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "現在、システムコンテンツの共有を利用できません。"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Het delen van systeeminhoud is momenteel niet beschikbaar."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "系统内容共享目前不可用。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "系統內容共享目前無法使用。"
+          }
+        }
+      }
+    },
+    "screen_audio.error.invalid_chunk" : {
+      "comment" : "Error shown for a corrupt shared PCM chunk.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ein Abschnitt des Bildschirmaudios konnte nicht decodiert werden."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "A screen-audio chunk could not be decoded."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "画面音声のチャンクをデコードできませんでした。"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Een fragment van het schermgeluid kon niet worden gedecodeerd."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "无法解码屏幕音频片段。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "無法解碼螢幕音訊片段。"
+          }
+        }
+      }
+    },
+    "screen_audio.error.no_audio" : {
+      "comment" : "Error shown when screen-audio capture receives no valid audio.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Es wurde kein Bildschirmaudio erfasst. Starte die Systemübertragung und spiele ungeschütztes Audio in der geteilten App ab."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No screen audio was captured. Start the system broadcast and play unprotected audio in the shared app."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "画面の音声を収録できませんでした。システム配信を開始し、共有中のアプリで保護されていない音声を再生してください。"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Er is geen schermgeluid opgenomen. Start de systeemuitzending en speel onbeveiligde audio af in de gedeelde app."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "未采集到屏幕音频。请开始系统广播，并在共享 App 中播放未受保护的音频。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "未擷取到螢幕音訊。請開始系統廣播，並在共享 App 中播放未受保護的音訊。"
+          }
+        }
+      }
+    },
+    "screen_audio.error.pip_format_description.format" : {
+      "comment" : "Caption PiP rendering error. Parameter: Core Media status code.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Die Untertitel-Formatbeschreibung konnte nicht erstellt werden (%d)."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Could not create caption format description (%d)."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "字幕のフォーマット記述を作成できませんでした（%d）。"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "De opmaakbeschrijving voor ondertiteling kon niet worden gemaakt (%d)."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "无法创建字幕格式描述（%d）。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "無法建立字幕格式描述（%d）。"
+          }
+        }
+      }
+    },
+    "screen_audio.error.pip_not_ready" : {
+      "comment" : "Error shown when caption PiP cannot start yet.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Untertitel-Bild-in-Bild ist noch nicht bereit. Lass die Vorschau sichtbar und versuche es erneut."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Caption Picture in Picture is not ready yet. Keep the preview visible and try again."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "字幕のピクチャ・イン・ピクチャはまだ準備できていません。プレビューを表示したまま、もう一度お試しください。"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ondertiteling in beeld-in-beeld is nog niet gereed. Laat de voorvertoning zichtbaar en probeer het opnieuw."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "字幕画中画尚未准备好。请保持预览可见，然后重试。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "字幕子母畫面尚未準備好。請讓預覽保持顯示，然後再試一次。"
+          }
+        }
+      }
+    },
+    "screen_audio.error.pip_pixel_buffer.format" : {
+      "comment" : "Caption PiP rendering error. Parameter: Core Video status code.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Der Untertitel-Pixelpuffer konnte nicht erstellt werden (%d)."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Could not create caption pixel buffer (%d)."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "字幕のピクセルバッファを作成できませんでした（%d）。"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "De pixelbuffer voor ondertiteling kon niet worden gemaakt (%d)."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "无法创建字幕像素缓冲区（%d）。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "無法建立字幕像素緩衝區（%d）。"
+          }
+        }
+      }
+    },
+    "screen_audio.error.pip_rendering_context" : {
+      "comment" : "Caption PiP rendering context creation error.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Der Untertitel-Rendering-Kontext konnte nicht erstellt werden."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Could not create caption rendering context."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "字幕のレンダリングコンテキストを作成できませんでした。"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "De rendercontext voor ondertiteling kon niet worden gemaakt."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "无法创建字幕渲染上下文。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "無法建立字幕算繪環境。"
+          }
+        }
+      }
+    },
+    "screen_audio.error.pip_sample_buffer.format" : {
+      "comment" : "Caption PiP rendering error. Parameter: Core Media status code.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Der Untertitel-Samplepuffer konnte nicht erstellt werden (%d)."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Could not create caption sample buffer (%d)."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "字幕のサンプルバッファを作成できませんでした（%d）。"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "De samplebuffer voor ondertiteling kon niet worden gemaakt (%d)."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "无法创建字幕样本缓冲区（%d）。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "無法建立字幕樣本緩衝區（%d）。"
+          }
+        }
+      }
+    },
+    "screen_audio.error.pip_unsupported" : {
+      "comment" : "Error shown when caption PiP is unsupported.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bild-in-Bild wird auf diesem Gerät nicht unterstützt."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Picture in Picture is not supported on this device."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "このデバイスはピクチャ・イン・ピクチャに対応していません。"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Beeld-in-beeld wordt niet ondersteund op dit apparaat."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "此设备不支持画中画。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "此裝置不支援子母畫面。"
+          }
+        }
+      }
+    },
+    "screen_audio.error.prepare" : {
+      "comment" : "Error shown when the shared transcription pipeline cannot start.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Die Transkription von Bildschirmaudio konnte nicht vorbereitet werden."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Could not prepare screen-audio transcription."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "画面音声の文字起こしを準備できませんでした。"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Transcriptie van schermgeluid kon niet worden voorbereid."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "无法准备屏幕音频转录。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "無法準備螢幕音訊轉錄。"
+          }
+        }
+      }
+    },
+    "screen_audio.error.unsupported" : {
+      "comment" : "Error shown when a screen-audio backend is unavailable.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dieses Backend für Bildschirmaudio ist unter dieser iOS-Version nicht verfügbar."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "This screen-audio backend is unavailable on this iOS version."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "このiOSバージョンでは、この画面音声バックエンドを利用できません。"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Deze backend voor schermgeluid is niet beschikbaar in deze iOS-versie."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "此 iOS 版本不支持此屏幕音频后端。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "此 iOS 版本不支援此螢幕音訊後端。"
+          }
+        }
+      }
+    },
+    "screen_audio.heartbeat.format" : {
+      "comment" : "Screen-audio heartbeat timestamp. Parameter: formatted timestamp.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Letzte Audioverbindung: %@"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Last audio link: %@"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "最後の音声リンク：%@"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Laatste audioverbinding: %@"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "上次音频连接：%@"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "上次音訊連線：%@"
+          }
+        }
+      }
+    },
+    "screen_audio.heartbeat.none" : {
+      "comment" : "Screen-audio status before receiving a heartbeat.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Noch keine Audioverbindung"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No audio link yet"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "音声リンクはまだありません"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nog geen audioverbinding"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "尚无音频连接"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "尚無音訊連線"
+          }
+        }
+      }
+    },
+    "screen_audio.heartbeat.now" : {
+      "comment" : "Screen-audio heartbeat status when recently updated.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Audioverbindung aktiv"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Audio link active"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "音声リンクが有効です"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Audioverbinding actief"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "音频连接已启用"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "音訊連線已啟用"
+          }
+        }
+      }
+    },
+    "screen_audio.input_source" : {
+      "comment" : "Label for choosing the live transcription audio input source.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Audioeingang"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Audio Input"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "音声入力"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Audio-invoer"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "音频输入"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "音訊輸入"
+          }
+        }
+      }
+    },
+    "screen_audio.input.microphone" : {
+      "comment" : "Microphone input source option.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mikrofon"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Microphone"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "マイク"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Microfoon"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "麦克风"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "麥克風"
+          }
+        }
+      }
+    },
+    "screen_audio.input.screen_audio" : {
+      "comment" : "System or other-app audio input source option.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bildschirmaudio"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Screen Audio"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "画面の音声"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Schermgeluid"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "屏幕音频"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "螢幕音訊"
+          }
+        }
+      }
+    },
+    "screen_audio.privacy_note" : {
+      "comment" : "Screen-audio privacy and consent note.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Es wird nur Audio erfasst, das von der geteilten App bereitgestellt wird. Das Mikrofon ist standardmäßig ausgeschaltet. Hole vor der Aufnahme die Zustimmung aller Beteiligten ein."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Only audio made available by the shared app is captured. Microphone input is off by default. Get participant consent before recording."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "共有中のアプリから提供された音声のみを収録します。マイク入力はデフォルトでオフです。録音前に参加者の同意を得てください。"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Alleen audio die door de gedeelde app beschikbaar wordt gesteld, wordt opgenomen. Microfooninvoer staat standaard uit. Vraag deelnemers om toestemming voordat je opneemt."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "仅录制共享 App 提供的音频。麦克风输入默认关闭。录制前请征得参与者同意。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "只會錄製共享 App 提供的音訊。麥克風輸入預設為關閉。錄製前請先取得參與者同意。"
+          }
+        }
+      }
+    },
+    "screen_audio.status.approval" : {
+      "comment" : "Screen-audio session status while the system picker is open.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Auf Freigabe warten"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Waiting for Approval"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "承認を待っています"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Wachten op toestemming"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "正在等待授权"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "正在等待授權"
+          }
+        }
+      }
+    },
+    "screen_audio.status.capturing" : {
+      "comment" : "Screen-audio active capture status.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Aufnahme läuft"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Capturing"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "収録中"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Opnemen"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "正在采集"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "正在擷取"
+          }
+        }
+      }
+    },
+    "screen_audio.status.failed" : {
+      "comment" : "Screen-audio failed status.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Aufnahme fehlgeschlagen"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Capture Failed"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "収録に失敗"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Opnemen mislukt"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "采集失败"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "擷取失敗"
+          }
+        }
+      }
+    },
+    "screen_audio.status.paused" : {
+      "comment" : "Screen-audio paused status.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Übertragung pausiert"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Broadcast Paused"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "配信を一時停止中"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Uitzending gepauzeerd"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "广播已暂停"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "廣播已暫停"
+          }
+        }
+      }
+    },
+    "screen_audio.status.ready" : {
+      "comment" : "Screen-audio session idle status.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bereit"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ready"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "準備完了"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Gereed"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "就绪"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "就緒"
+          }
+        }
+      }
+    },
+    "screen_audio.status.stopping" : {
+      "comment" : "Screen-audio stopping status.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Wird gestoppt"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Stopping"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "停止中"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Stoppen"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "正在停止"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "正在停止"
+          }
+        }
+      }
+    },
+    "screen_audio.status.waiting" : {
+      "comment" : "Screen-audio status before another app emits audio.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Auf Audio warten"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Waiting for Audio"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "音声を待っています"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Wachten op audio"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "正在等待音频"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "正在等待音訊"
+          }
+        }
+      }
+    },
+    "screen_audio.stop_hint" : {
+      "comment" : "Instructions distinguishing PiP from ReplayKit broadcast stop.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Durch das Schließen des Untertitelfensters wird die Systemübertragung nicht beendet. Beende die Übertragung über die Systemsteuerung für Aufnahmen und speichere sie anschließend hier."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Stopping the caption window does not stop the system broadcast. End the broadcast from the system recording control, then save here."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "字幕ウインドウを閉じてもシステム配信は停止しません。システムの収録コントロールから配信を終了し、ここで保存してください。"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Het sluiten van het ondertitelvenster stopt de systeemuitzending niet. Stop de uitzending via de systeemopnamebediening en sla de opname daarna hier op."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "关闭字幕窗口不会停止系统广播。请从系统录制控制中结束广播，然后在此保存。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "關閉字幕視窗不會停止系統廣播。請從系統錄製控制中結束廣播，然後在此儲存。"
+          }
+        }
+      }
+    },
+    "screen_audio.title" : {
+      "comment" : "Title for the iOS screen-audio transcription mode.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bildschirmaudio"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Screen Audio"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "画面の音声"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Schermgeluid"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "屏幕音频"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "螢幕音訊"
           }
         }
       }

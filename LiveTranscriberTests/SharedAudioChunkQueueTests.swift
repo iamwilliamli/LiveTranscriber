@@ -96,6 +96,36 @@ final class SharedAudioChunkQueueTests: XCTestCase {
         XCTAssertThrowsError(try SystemAudioPCMNormalizer.buffer(from: Data([0x01, 0x02])))
     }
 
+    func testTerminalActiveSessionIsRemovedBeforeStartingANewConsumer() throws {
+        var metadata = try directory.beginSession()
+        metadata.state = .finished
+        try directory.writeMetadata(metadata)
+
+        try directory.removeTerminalActiveSession()
+
+        XCTAssertNil(try directory.loadActiveMetadata())
+        XCTAssertFalse(
+            FileManager.default.fileExists(
+                atPath: directory.sessionDirectoryURL(for: metadata.sessionID).path
+            )
+        )
+    }
+
+    func testRunningActiveSessionIsPreservedForConsumerReconnection() throws {
+        var metadata = try directory.beginSession()
+        metadata.state = .capturing
+        try directory.writeMetadata(metadata)
+
+        try directory.removeTerminalActiveSession()
+
+        XCTAssertEqual(try directory.loadActiveMetadata(), metadata)
+        XCTAssertTrue(
+            FileManager.default.fileExists(
+                atPath: directory.sessionDirectoryURL(for: metadata.sessionID).path
+            )
+        )
+    }
+
     func testTransportPCMUses48kStereoFloatInsideAppAndInterleavedInt16OnDisk() throws {
         let format = SystemAudioPCMNormalizer.targetFormat
         XCTAssertEqual(format.commonFormat, .pcmFormatFloat32)

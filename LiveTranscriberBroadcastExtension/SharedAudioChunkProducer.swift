@@ -28,8 +28,19 @@ final class SharedAudioChunkProducer: @unchecked Sendable {
     }
 
     func append(_ sampleBuffer: CMSampleBuffer) {
+        // ReplayKit owns sampleBuffer and may recycle its backing storage as soon as
+        // processSampleBuffer(_:with:) returns. Copy the PCM while the callback is
+        // still active, then do conversion and App Group I/O on our serial queue.
+        let ownedBuffer: AVAudioPCMBuffer
+        do {
+            ownedBuffer = try SystemAudioPCMNormalizer.makePCMBuffer(from: sampleBuffer)
+        } catch {
+            recordDroppedSample(error.localizedDescription)
+            return
+        }
+
         queue.async { [weak self] in
-            self?.appendOnQueue(sampleBuffer)
+            self?.appendOnQueue(ownedBuffer)
         }
     }
 
@@ -56,11 +67,11 @@ final class SharedAudioChunkProducer: @unchecked Sendable {
         }
     }
 
-    private func appendOnQueue(_ sampleBuffer: CMSampleBuffer) {
+    private func appendOnQueue(_ inputBuffer: AVAudioPCMBuffer) {
         guard var metadata else { return }
 
         do {
-            let normalizedBuffer = try normalizer.normalize(sampleBuffer)
+            let normalizedBuffer = try normalizer.normalize(inputBuffer)
             let data = try SystemAudioPCMNormalizer.data(from: normalizedBuffer)
             let sequence = nextSequence
             let committed = try directory.commitChunk(
@@ -85,6 +96,17 @@ final class SharedAudioChunkProducer: @unchecked Sendable {
             metadata.errorMessage = error.localizedDescription
             metadata.heartbeat = Date()
             try? directory.writeMetadata(metadata)
+            self.metadata = metadata
+        }
+    }
+
+    private func recordDroppedSample(_ message: String) {
+        queue.async { [weak self] in
+            guard let self, var metadata = self.metadata else { return }
+            metadata.droppedChunkCount &+= 1
+            metadata.errorMessage = message
+            metadata.heartbeat = Date()
+            try? self.directory.writeMetadata(metadata)
             self.metadata = metadata
         }
     }

@@ -200,9 +200,18 @@ enum Qwen3ASRTranscriptionService {
             }
         } else {
             progressHandler(0.03)
-            let samples = try await Task.detached(priority: .userInitiated) {
+            let conversionTask = Task.detached(priority: .userInitiated) {
                 try LocalWhisperAudioConverter.floatPCM16kMonoSamples(from: audioURL)
-            }.value
+            }
+            let samples = try await withTaskCancellationHandler(
+                operation: {
+                    try await conversionTask.value
+                },
+                onCancel: {
+                    conversionTask.cancel()
+                }
+            )
+            try Task.checkCancellation()
 
             guard !samples.isEmpty else {
                 throw Qwen3ASRTranscriptionError.emptyAudio

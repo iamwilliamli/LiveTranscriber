@@ -6,19 +6,56 @@ import SwiftUI
 struct ReplayKitBroadcastPicker: UIViewRepresentable {
     static let extensionBundleIdentifier = "com.iamwilliamli.LiveTranscriber.BroadcastUpload"
 
-    func makeUIView(context: Context) -> RPSystemBroadcastPickerView {
-        let picker = RPSystemBroadcastPickerView(frame: .zero)
-        picker.preferredExtension = Self.extensionBundleIdentifier
-        picker.showsMicrophoneButton = false
-        picker.tintColor = UIColor(AppTheme.brand)
-        picker.backgroundColor = .clear
-        return picker
+    func makeUIView(context: Context) -> ReplayKitBroadcastPickerContainerView {
+        let container = ReplayKitBroadcastPickerContainerView(
+            frame: CGRect(x: 0, y: 0, width: 180, height: 44)
+        )
+        configure(container.picker)
+        return container
     }
 
-    func updateUIView(_ picker: RPSystemBroadcastPickerView, context: Context) {
+    func updateUIView(_ container: ReplayKitBroadcastPickerContainerView, context: Context) {
+        configure(container.picker)
+        container.setNeedsLayout()
+    }
+
+    private func configure(_ picker: RPSystemBroadcastPickerView) {
         picker.preferredExtension = Self.extensionBundleIdentifier
         picker.showsMicrophoneButton = false
-        picker.tintColor = UIColor(AppTheme.brand)
+        // TranscriptionView supplies the visible label. Keep the native picker
+        // transparent so its system-owned button can cover the complete capsule.
+        picker.tintColor = .clear
+        picker.backgroundColor = .clear
+    }
+}
+
+final class ReplayKitBroadcastPickerContainerView: UIView {
+    let picker: RPSystemBroadcastPickerView
+
+    override init(frame: CGRect) {
+        picker = RPSystemBroadcastPickerView(frame: frame)
+        super.init(frame: frame)
+        backgroundColor = .clear
+        addSubview(picker)
+    }
+
+    @available(*, unavailable)
+    required init?(coder: NSCoder) {
+        fatalError("init(coder:) has not been implemented")
+    }
+
+    override func layoutSubviews() {
+        super.layoutSubviews()
+        picker.frame = bounds
+
+        // On iOS 26 the picker creates its private button using the initial
+        // frame. SwiftUI can resize the representable later without resizing
+        // that button, leaving a visible control that cannot be tapped. Keep the
+        // system button aligned with the full SwiftUI-provided hit target.
+        for subview in picker.subviews {
+            subview.frame = picker.bounds
+            subview.autoresizingMask = [.flexibleWidth, .flexibleHeight]
+        }
     }
 }
 
@@ -73,9 +110,16 @@ final class SharedAudioChunkConsumer: @unchecked Sendable {
 
     func start() throws {
         try directory.prepare()
+        try directory.removeTerminalActiveSession()
         try directory.cleanupExpiredSessions()
         queue.sync {
             guard !isRunning else { return }
+            activeSessionID = nil
+            lastState = nil
+            expectedSequence = nil
+            consumedFrameCount = 0
+            diagnostics = SystemAudioDiagnostics()
+            didEmitFinished = false
             isRunning = true
             let timer = DispatchSource.makeTimerSource(queue: queue)
             timer.schedule(deadline: .now(), repeating: .milliseconds(40), leeway: .milliseconds(10))

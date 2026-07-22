@@ -526,13 +526,22 @@ private enum CaptionRenderingError: LocalizedError {
     var errorDescription: String? {
         switch self {
         case .pixelBufferCreationFailed(let status):
-            return "Could not create caption pixel buffer (\(status))."
+            return String(
+                format: String(localized: L10n.ScreenAudio.pipPixelBufferFailedFormat),
+                Int(status)
+            )
         case .formatDescriptionCreationFailed(let status):
-            return "Could not create caption format description (\(status))."
+            return String(
+                format: String(localized: L10n.ScreenAudio.pipFormatDescriptionFailedFormat),
+                Int(status)
+            )
         case .sampleBufferCreationFailed(let status):
-            return "Could not create caption sample buffer (\(status))."
+            return String(
+                format: String(localized: L10n.ScreenAudio.pipSampleBufferFailedFormat),
+                Int(status)
+            )
         case .contextCreationFailed:
-            return "Could not create caption rendering context."
+            return String(localized: L10n.ScreenAudio.pipRenderingContextFailed)
         }
     }
 }

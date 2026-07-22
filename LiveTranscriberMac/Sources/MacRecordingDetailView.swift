@@ -729,8 +729,33 @@ struct MacRecordingDetailView: View {
                             }
                             .buttonStyle(.plain)
                             .help(String(localized: L10n.Common.close))
+                            .accessibilityLabel(Text(L10n.Common.close))
                         }
                         .font(.redditSans(.caption, weight: .semibold))
+                    } else if store.canTerminateTranscription(for: currentItem.id) {
+                        HStack(alignment: .center, spacing: 10) {
+                            VStack(alignment: .leading, spacing: 6) {
+                                ProgressView(value: importStatus.progress)
+                                    .tint(AppTheme.brand)
+                                Text(verbatim: importStatus.message)
+                                    .font(.redditSans(.caption, weight: .semibold))
+                                    .foregroundStyle(.secondary)
+                            }
+                            .frame(maxWidth: .infinity, alignment: .leading)
+
+                            Button {
+                                store.terminateTranscription(for: currentItem.id)
+                            } label: {
+                                Image(systemName: "xmark")
+                                    .font(.system(size: 10, weight: .bold))
+                                    .foregroundStyle(AppTheme.info)
+                                    .frame(width: 26, height: 26)
+                                    .background(AppTheme.info.opacity(0.12), in: Circle())
+                            }
+                            .buttonStyle(.plain)
+                            .help(String(localized: L10n.Recordings.stopTranscription))
+                            .accessibilityLabel(Text(L10n.Recordings.stopTranscription))
+                        }
                     } else {
                         VStack(alignment: .leading, spacing: 6) {
                             ProgressView(value: importStatus.progress)
@@ -1386,6 +1411,8 @@ struct MacRecordingDetailView: View {
             do {
                 try await operation()
                 await loadTranscript()
+            } catch is CancellationError {
+                return
             } catch {
                 actionErrorMessage = error.localizedDescription
             }

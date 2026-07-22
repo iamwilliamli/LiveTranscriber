@@ -1,0 +1,8 @@
+"CFBundleDisplayName" = "实时转录";
+"CFBundleName" = "实时转录";
+"CFBundleTypeName" = "音频或视频录音";
+"NSLocationWhenInUseUsageDescription" = "当你选择添加位置时，Live Transcriber 可将你的当前位置附加到录音。";
+"NSMicrophoneUsageDescription" = "Live Transcriber 会在实时转录以及你选择将自己的声音加入录音时使用麦克风。";
+"NSRemindersFullAccessUsageDescription" = "Live Transcriber 会将你选择的会议行动项添加到提醒事项。";
+"NSScreenCaptureUsageDescription" = "Live Transcriber 只会录制你所选显示器、App 或窗口中的系统音频。";
+"NSSpeechRecognitionUsageDescription" = "Live Transcriber 使用 Apple 语音识别在这台 Mac 上转录你的录音。";

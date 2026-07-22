@@ -1518,6 +1518,12 @@ enum RecordingStoragePreference {
     }
 }
 
+private struct ActiveRecordingTranscriptionOperation {
+    let id: UUID
+    var isCancellationRequested: Bool
+    let cancel: @Sendable () -> Void
+}
+
 @MainActor
 final class RecordingStore: ObservableObject {
     private static let initialSummaryProviderAvailability = RecordingSummaryProviderAvailability.current()
@@ -1561,6 +1567,7 @@ final class RecordingStore: ObservableObject {
     private var searchIndexWarmupTask: Task<Void, Never>?
     private var iCloudSyncStatusRefreshTask: Task<Void, Never>?
     private var spotlightIndexTask: Task<Void, Never>?
+    private var activeTranscriptionOperations: [RecordingItem.ID: ActiveRecordingTranscriptionOperation] = [:]
     private var preparedRecordingsDirectoryPaths = Set<String>()
 
     private var applicationSupportDirectory: URL {
@@ -2043,51 +2050,67 @@ final class RecordingStore: ObservableObject {
                 recordings[index].durationSeconds = preparedAudio.durationSeconds
                 try persist()
             }
-            updateImportStatus(for: item.id, progress: 0.08, message: String(localized: L10n.Import.preparingTranscription), shouldPersist: true)
-            let lines: [TranscriptionLine]
-            if let localWhisperModel {
-                lines = try await LocalWhisperTranscriptionService.transcribe(
-                    audioURL: preparedAudio.url,
-                    language: language,
-                    model: localWhisperModel
-                ) { [weak self] progress in
-                    Task { @MainActor in
-                        self?.updateImportStatus(
-                            for: item.id,
-                            progress: 0.1 + progress * 0.78,
-                            message: String(localized: L10n.Import.transcribing)
-                        )
+            try await runTrackedTranscription(for: item.id) { [self] operationID in
+                self.updateImportStatus(
+                    for: item.id,
+                    progress: 0.08,
+                    message: String(localized: L10n.Import.preparingTranscription),
+                    shouldPersist: true,
+                    operationID: operationID
+                )
+                let lines: [TranscriptionLine]
+                if let localWhisperModel {
+                    lines = try await LocalWhisperTranscriptionService.transcribe(
+                        audioURL: preparedAudio.url,
+                        language: language,
+                        model: localWhisperModel
+                    ) { [weak self] progress in
+                        Task { @MainActor in
+                            self?.updateImportStatus(
+                                for: item.id,
+                                progress: 0.1 + progress * 0.78,
+                                message: String(localized: L10n.Import.transcribing),
+                                operationID: operationID
+                            )
+                        }
+                    }
+                } else {
+                    lines = try await self.importWorker.transcribe(
+                        audioURL: preparedAudio.url,
+                        language: language
+                    ) { [weak self] progress in
+                        Task { @MainActor in
+                            self?.updateImportStatus(
+                                for: item.id,
+                                progress: 0.1 + progress * 0.78,
+                                message: String(localized: L10n.Import.transcribing),
+                                operationID: operationID
+                            )
+                        }
                     }
                 }
-            } else {
-                lines = try await importWorker.transcribe(
-                    audioURL: preparedAudio.url,
-                    language: language
-                ) { [weak self] progress in
-                    Task { @MainActor in
-                        self?.updateImportStatus(
-                            for: item.id,
-                            progress: 0.1 + progress * 0.78,
-                            message: String(localized: L10n.Import.transcribing)
-                        )
-                    }
+                try self.ensureTranscriptionOperationIsActive(
+                    for: item.id,
+                    operationID: operationID
+                )
+                guard let index = self.recordings.firstIndex(where: { $0.id == item.id }) else {
+                    throw RecordingImportError.saveFailed
                 }
+                guard !self.recordings[index].isTranscriptLocked else {
+                    throw RecordingTranscriptEditError.transcriptLocked
+                }
+                try lines.timedTranscriptText.write(to: targetTranscriptURL, atomically: true, encoding: .utf8)
+                self.recordings[index].durationSeconds = (try? Self.durationSeconds(for: preparedAudio.url)) ?? self.recordings[index].durationSeconds
+                self.recordings[index].transcriptPreview = lines.plainTranscriptText
+                self.recordings[index].lineCount = lines.count
+                self.recordings[index].intelligence = nil
+                self.recordings[index].meetingAnalysis = nil
+                self.recordings[index].speakerDiarization = nil
+                self.recordings[index].importStatus = nil
+                try self.persist()
             }
-            guard let index = recordings.firstIndex(where: { $0.id == item.id }) else {
-                throw RecordingImportError.saveFailed
-            }
-            guard !recordings[index].isTranscriptLocked else {
-                throw RecordingTranscriptEditError.transcriptLocked
-            }
-            try lines.timedTranscriptText.write(to: targetTranscriptURL, atomically: true, encoding: .utf8)
-            recordings[index].durationSeconds = (try? Self.durationSeconds(for: preparedAudio.url)) ?? recordings[index].durationSeconds
-            recordings[index].transcriptPreview = lines.plainTranscriptText
-            recordings[index].lineCount = lines.count
-            recordings[index].intelligence = nil
-            recordings[index].meetingAnalysis = nil
-            recordings[index].speakerDiarization = nil
-            recordings[index].importStatus = nil
-            try persist()
+        } catch is CancellationError {
+            throw CancellationError()
         } catch {
             markImportFailed(for: item.id, message: error.localizedDescription)
             throw error
@@ -2104,37 +2127,52 @@ final class RecordingStore: ObservableObject {
 
         let audioURL = audioURL(for: item)
         let transcriptURL = transcriptURL(for: item)
-        updateImportStatus(for: item.id, progress: 0.04, message: String(localized: L10n.Import.preparingTranscription), shouldPersist: true)
 
         do {
-            let lines = try await importWorker.transcribe(
-                audioURL: audioURL,
-                language: language
-            ) { [weak self] progress in
-                Task { @MainActor in
-                    self?.updateImportStatus(
-                        for: item.id,
-                        progress: 0.08 + progress * 0.9,
-                        message: String(localized: L10n.Import.transcribing)
-                    )
+            try await runTrackedTranscription(for: item.id) { [self] operationID in
+                self.updateImportStatus(
+                    for: item.id,
+                    progress: 0.04,
+                    message: String(localized: L10n.Import.preparingTranscription),
+                    shouldPersist: true,
+                    operationID: operationID
+                )
+                let lines = try await self.importWorker.transcribe(
+                    audioURL: audioURL,
+                    language: language
+                ) { [weak self] progress in
+                    Task { @MainActor in
+                        self?.updateImportStatus(
+                            for: item.id,
+                            progress: 0.08 + progress * 0.9,
+                            message: String(localized: L10n.Import.transcribing),
+                            operationID: operationID
+                        )
+                    }
                 }
+                try self.ensureTranscriptionOperationIsActive(
+                    for: item.id,
+                    operationID: operationID
+                )
+                guard let index = self.recordings.firstIndex(where: { $0.id == item.id }) else {
+                    throw RecordingImportError.saveFailed
+                }
+                guard !self.recordings[index].isTranscriptLocked else {
+                    throw RecordingTranscriptEditError.transcriptLocked
+                }
+                try lines.timedTranscriptText.write(to: transcriptURL, atomically: true, encoding: .utf8)
+                self.recordings[index].languageID = language.id
+                self.recordings[index].languageName = language.displayName
+                self.recordings[index].transcriptPreview = lines.plainTranscriptText
+                self.recordings[index].lineCount = lines.count
+                self.recordings[index].intelligence = nil
+                self.recordings[index].meetingAnalysis = nil
+                self.recordings[index].speakerDiarization = nil
+                self.recordings[index].importStatus = nil
+                try self.persist()
             }
-            guard let index = recordings.firstIndex(where: { $0.id == item.id }) else {
-                throw RecordingImportError.saveFailed
-            }
-            guard !recordings[index].isTranscriptLocked else {
-                throw RecordingTranscriptEditError.transcriptLocked
-            }
-            try lines.timedTranscriptText.write(to: transcriptURL, atomically: true, encoding: .utf8)
-            recordings[index].languageID = language.id
-            recordings[index].languageName = language.displayName
-            recordings[index].transcriptPreview = lines.plainTranscriptText
-            recordings[index].lineCount = lines.count
-            recordings[index].intelligence = nil
-            recordings[index].meetingAnalysis = nil
-            recordings[index].speakerDiarization = nil
-            recordings[index].importStatus = nil
-            try persist()
+        } catch is CancellationError {
+            throw CancellationError()
         } catch {
             markImportFailed(for: item.id, message: error.localizedDescription)
             throw error
@@ -2150,38 +2188,53 @@ final class RecordingStore: ObservableObject {
 
         let audioURL = audioURL(for: item)
         let transcriptURL = transcriptURL(for: item)
-        updateImportStatus(for: item.id, progress: 0.04, message: String(localized: L10n.Import.preparingTranscription), shouldPersist: true)
 
         do {
-            let lines = try await LocalWhisperTranscriptionService.transcribe(
-                audioURL: audioURL,
-                language: language,
-                model: model
-            ) { [weak self] progress in
-                Task { @MainActor in
-                    self?.updateImportStatus(
-                        for: item.id,
-                        progress: 0.04 + progress * 0.9,
-                        message: String(localized: L10n.Import.transcribing)
-                    )
+            try await runTrackedTranscription(for: item.id) { [self] operationID in
+                self.updateImportStatus(
+                    for: item.id,
+                    progress: 0.04,
+                    message: String(localized: L10n.Import.preparingTranscription),
+                    shouldPersist: true,
+                    operationID: operationID
+                )
+                let lines = try await LocalWhisperTranscriptionService.transcribe(
+                    audioURL: audioURL,
+                    language: language,
+                    model: model
+                ) { [weak self] progress in
+                    Task { @MainActor in
+                        self?.updateImportStatus(
+                            for: item.id,
+                            progress: 0.04 + progress * 0.9,
+                            message: String(localized: L10n.Import.transcribing),
+                            operationID: operationID
+                        )
+                    }
                 }
+                try self.ensureTranscriptionOperationIsActive(
+                    for: item.id,
+                    operationID: operationID
+                )
+                guard let index = self.recordings.firstIndex(where: { $0.id == item.id }) else {
+                    throw RecordingImportError.saveFailed
+                }
+                guard !self.recordings[index].isTranscriptLocked else {
+                    throw RecordingTranscriptEditError.transcriptLocked
+                }
+                try lines.timedTranscriptText.write(to: transcriptURL, atomically: true, encoding: .utf8)
+                self.recordings[index].languageID = language.id
+                self.recordings[index].languageName = language.displayName
+                self.recordings[index].transcriptPreview = lines.plainTranscriptText
+                self.recordings[index].lineCount = lines.count
+                self.recordings[index].intelligence = nil
+                self.recordings[index].meetingAnalysis = nil
+                self.recordings[index].speakerDiarization = nil
+                self.recordings[index].importStatus = nil
+                try self.persist()
             }
-            guard let index = recordings.firstIndex(where: { $0.id == item.id }) else {
-                throw RecordingImportError.saveFailed
-            }
-            guard !recordings[index].isTranscriptLocked else {
-                throw RecordingTranscriptEditError.transcriptLocked
-            }
-            try lines.timedTranscriptText.write(to: transcriptURL, atomically: true, encoding: .utf8)
-            recordings[index].languageID = language.id
-            recordings[index].languageName = language.displayName
-            recordings[index].transcriptPreview = lines.plainTranscriptText
-            recordings[index].lineCount = lines.count
-            recordings[index].intelligence = nil
-            recordings[index].meetingAnalysis = nil
-            recordings[index].speakerDiarization = nil
-            recordings[index].importStatus = nil
-            try persist()
+        } catch is CancellationError {
+            throw CancellationError()
         } catch {
             markImportFailed(for: item.id, message: error.localizedDescription)
             throw error
@@ -2196,42 +2249,52 @@ final class RecordingStore: ObservableObject {
 
         let audioURL = audioURL(for: item)
         let transcriptURL = transcriptURL(for: item)
-        updateImportStatus(
-            for: item.id,
-            progress: 0.04,
-            message: String(localized: L10n.Import.preparingTranscription),
-            shouldPersist: true
-        )
 
         do {
-            let lines = try await Qwen3ASRTranscriptionService.transcribe(
-                audioURL: audioURL,
-                language: language
-            ) { [weak self] progress in
-                Task { @MainActor in
-                    self?.updateImportStatus(
-                        for: item.id,
-                        progress: 0.04 + progress * 0.9,
-                        message: String(localized: L10n.Import.transcribing)
-                    )
+            try await runTrackedTranscription(for: item.id) { [self] operationID in
+                self.updateImportStatus(
+                    for: item.id,
+                    progress: 0.04,
+                    message: String(localized: L10n.Import.preparingTranscription),
+                    shouldPersist: true,
+                    operationID: operationID
+                )
+                let lines = try await Qwen3ASRTranscriptionService.transcribe(
+                    audioURL: audioURL,
+                    language: language
+                ) { [weak self] progress in
+                    Task { @MainActor in
+                        self?.updateImportStatus(
+                            for: item.id,
+                            progress: 0.04 + progress * 0.9,
+                            message: String(localized: L10n.Import.transcribing),
+                            operationID: operationID
+                        )
+                    }
                 }
+                try self.ensureTranscriptionOperationIsActive(
+                    for: item.id,
+                    operationID: operationID
+                )
+                guard let index = self.recordings.firstIndex(where: { $0.id == item.id }) else {
+                    throw RecordingImportError.saveFailed
+                }
+                guard !self.recordings[index].isTranscriptLocked else {
+                    throw RecordingTranscriptEditError.transcriptLocked
+                }
+                try lines.timedTranscriptText.write(to: transcriptURL, atomically: true, encoding: .utf8)
+                self.recordings[index].languageID = language.id
+                self.recordings[index].languageName = language.displayName
+                self.recordings[index].transcriptPreview = lines.plainTranscriptText
+                self.recordings[index].lineCount = lines.count
+                self.recordings[index].intelligence = nil
+                self.recordings[index].meetingAnalysis = nil
+                self.recordings[index].speakerDiarization = nil
+                self.recordings[index].importStatus = nil
+                try self.persist()
             }
-            guard let index = recordings.firstIndex(where: { $0.id == item.id }) else {
-                throw RecordingImportError.saveFailed
-            }
-            guard !recordings[index].isTranscriptLocked else {
-                throw RecordingTranscriptEditError.transcriptLocked
-            }
-            try lines.timedTranscriptText.write(to: transcriptURL, atomically: true, encoding: .utf8)
-            recordings[index].languageID = language.id
-            recordings[index].languageName = language.displayName
-            recordings[index].transcriptPreview = lines.plainTranscriptText
-            recordings[index].lineCount = lines.count
-            recordings[index].intelligence = nil
-            recordings[index].meetingAnalysis = nil
-            recordings[index].speakerDiarization = nil
-            recordings[index].importStatus = nil
-            try persist()
+        } catch is CancellationError {
+            throw CancellationError()
         } catch {
             markImportFailed(for: item.id, message: error.localizedDescription)
             throw error
@@ -2243,48 +2306,58 @@ final class RecordingStore: ObservableObject {
 
         let audioURL = audioURL(for: item)
         let transcriptURL = transcriptURL(for: item)
-        updateImportStatus(
-            for: item.id,
-            progress: 0.04,
-            message: String(localized: L10n.Import.preparingTranscription),
-            shouldPersist: true
-        )
 
         do {
-            let result = try await MOSSRecordingTranscriber().transcribe(
-                RecordingTranscriptionRequest(
-                    sourceURL: audioURL,
-                    languageIdentifier: item.languageID
+            try await runTrackedTranscription(for: item.id) { [self] operationID in
+                self.updateImportStatus(
+                    for: item.id,
+                    progress: 0.04,
+                    message: String(localized: L10n.Import.preparingTranscription),
+                    shouldPersist: true,
+                    operationID: operationID
                 )
-            ) { [weak self] progress in
-                Task { @MainActor in
-                    self?.updateImportStatus(
-                        for: item.id,
-                        progress: 0.04 + progress.fractionCompleted * 0.9,
-                        message: String(localized: L10n.Import.transcribing)
+                let result = try await MOSSRecordingTranscriber().transcribe(
+                    RecordingTranscriptionRequest(
+                        sourceURL: audioURL,
+                        languageIdentifier: item.languageID
                     )
+                ) { [weak self] progress in
+                    Task { @MainActor in
+                        self?.updateImportStatus(
+                            for: item.id,
+                            progress: 0.04 + progress.fractionCompleted * 0.9,
+                            message: String(localized: L10n.Import.transcribing),
+                            operationID: operationID
+                        )
+                    }
                 }
-            }
-            guard let index = recordings.firstIndex(where: { $0.id == item.id }) else {
-                throw RecordingImportError.saveFailed
-            }
-            guard !recordings[index].isTranscriptLocked else {
-                throw RecordingTranscriptEditError.transcriptLocked
-            }
+                try self.ensureTranscriptionOperationIsActive(
+                    for: item.id,
+                    operationID: operationID
+                )
+                guard let index = self.recordings.firstIndex(where: { $0.id == item.id }) else {
+                    throw RecordingImportError.saveFailed
+                }
+                guard !self.recordings[index].isTranscriptLocked else {
+                    throw RecordingTranscriptEditError.transcriptLocked
+                }
 
-            try result.lines.timedTranscriptText.write(
-                to: transcriptURL,
-                atomically: true,
-                encoding: .utf8
-            )
-            recordings[index].transcriptPreview = result.lines.plainTranscriptText
-            recordings[index].lineCount = result.lines.count
-            recordings[index].intelligence = nil
-            recordings[index].meetingAnalysis = nil
-            recordings[index].speakerDiarization = result.speakerDiarization
-            recordings[index].importStatus = nil
-            searchIndexCache[item.id] = nil
-            try persist()
+                try result.lines.timedTranscriptText.write(
+                    to: transcriptURL,
+                    atomically: true,
+                    encoding: .utf8
+                )
+                self.recordings[index].transcriptPreview = result.lines.plainTranscriptText
+                self.recordings[index].lineCount = result.lines.count
+                self.recordings[index].intelligence = nil
+                self.recordings[index].meetingAnalysis = nil
+                self.recordings[index].speakerDiarization = result.speakerDiarization
+                self.recordings[index].importStatus = nil
+                self.searchIndexCache[item.id] = nil
+                try self.persist()
+            }
+        } catch is CancellationError {
+            throw CancellationError()
         } catch {
             markImportFailed(for: item.id, message: error.localizedDescription)
             throw error
@@ -2303,88 +2376,105 @@ final class RecordingStore: ObservableObject {
         let existingTranscript = transcriptText(for: currentItem)
         let measuredDuration = (try? Self.durationSeconds(for: sourceAudioURL)) ?? 0
         let durationSeconds = max(Double(currentItem.durationSeconds), Double(measuredDuration))
-        updateImportStatus(
-            for: currentItem.id,
-            progress: 0.02,
-            message: String(localized: L10n.Import.preparingGemini),
-            shouldPersist: true
-        )
 
         do {
-            let transcription = try await GeminiCloudService.transcribeRecording(
-                audioURL: sourceAudioURL,
-                languageName: currentItem.localizedLanguageName,
-                durationSeconds: durationSeconds,
-                apiKey: apiKey
-            ) { [weak self] progress in
-                Task { @MainActor in
-                    self?.updateGeminiProgress(for: currentItem.id, progress: progress)
-                }
-            }
-
-            guard let index = recordings.firstIndex(where: { $0.id == currentItem.id }) else {
-                throw RecordingImportError.saveFailed
-            }
-            guard !recordings[index].isTranscriptLocked else {
-                throw RecordingTranscriptEditError.transcriptLocked
-            }
-
-            let backupURL = geminiTranscriptBackupURL(for: recordings[index])
-            if !existingTranscript.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
-               !fileManager.fileExists(atPath: backupURL.path) {
-                try existingTranscript.write(to: backupURL, atomically: true, encoding: .utf8)
-            }
-
-            try transcription.lines.timedTranscriptText.write(
-                to: targetTranscriptURL,
-                atomically: true,
-                encoding: .utf8
-            )
-            recordings[index].durationSeconds = max(currentItem.durationSeconds, measuredDuration)
-            recordings[index].transcriptPreview = transcription.lines.plainTranscriptText
-            recordings[index].lineCount = transcription.lines.count
-            recordings[index].intelligence = nil
-            recordings[index].meetingAnalysis = nil
-            recordings[index].speakerDiarization = transcription.diarization
-            recordings[index].importStatus = RecordingImportStatus(
-                progress: 0.78,
-                message: String(localized: L10n.Import.analyzingWithGemini),
-                isFailed: false
-            )
-            searchIndexCache[currentItem.id] = nil
-            try persist()
-
-            let plainTranscript = transcription.lines.plainTranscriptText
-            let intelligenceLanguageName = transcription.detectedLanguage
-                ?? currentItem.localizedLanguageName
-            async let intelligenceResult = try? GeminiCloudService.generateIntelligence(
-                transcript: plainTranscript,
-                languageName: intelligenceLanguageName,
-                apiKey: apiKey
-            )
-            async let meetingResult = try? GeminiCloudService.generateMeetingAnalysis(
-                transcript: plainTranscript,
-                languageName: intelligenceLanguageName,
-                apiKey: apiKey
-            )
-            let (intelligence, meetingAnalysis) = await (intelligenceResult, meetingResult)
-
-            guard let finalIndex = recordings.firstIndex(where: { $0.id == currentItem.id }) else {
-                return
-            }
-            if let intelligence {
-                recordings[finalIndex].intelligence = intelligence
-                recordings[finalIndex].manualTags = RecordingItem.mergedTags(
-                    recordings[finalIndex].manualTags ?? [],
-                    intelligence.tags
+            try await runTrackedTranscription(for: currentItem.id) { [self] operationID in
+                self.updateImportStatus(
+                    for: currentItem.id,
+                    progress: 0.02,
+                    message: String(localized: L10n.Import.preparingGemini),
+                    shouldPersist: true,
+                    operationID: operationID
                 )
+                let transcription = try await GeminiCloudService.transcribeRecording(
+                    audioURL: sourceAudioURL,
+                    languageName: currentItem.localizedLanguageName,
+                    durationSeconds: durationSeconds,
+                    apiKey: apiKey
+                ) { [weak self] progress in
+                    Task { @MainActor in
+                        self?.updateGeminiProgress(
+                            for: currentItem.id,
+                            progress: progress,
+                            operationID: operationID
+                        )
+                    }
+                }
+
+                try self.ensureTranscriptionOperationIsActive(
+                    for: currentItem.id,
+                    operationID: operationID
+                )
+                guard let index = self.recordings.firstIndex(where: { $0.id == currentItem.id }) else {
+                    throw RecordingImportError.saveFailed
+                }
+                guard !self.recordings[index].isTranscriptLocked else {
+                    throw RecordingTranscriptEditError.transcriptLocked
+                }
+
+                let backupURL = self.geminiTranscriptBackupURL(for: self.recordings[index])
+                if !existingTranscript.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
+                   !self.fileManager.fileExists(atPath: backupURL.path) {
+                    try existingTranscript.write(to: backupURL, atomically: true, encoding: .utf8)
+                }
+
+                try transcription.lines.timedTranscriptText.write(
+                    to: targetTranscriptURL,
+                    atomically: true,
+                    encoding: .utf8
+                )
+                self.recordings[index].durationSeconds = max(currentItem.durationSeconds, measuredDuration)
+                self.recordings[index].transcriptPreview = transcription.lines.plainTranscriptText
+                self.recordings[index].lineCount = transcription.lines.count
+                self.recordings[index].intelligence = nil
+                self.recordings[index].meetingAnalysis = nil
+                self.recordings[index].speakerDiarization = transcription.diarization
+                self.recordings[index].importStatus = RecordingImportStatus(
+                    progress: 0.78,
+                    message: String(localized: L10n.Import.analyzingWithGemini),
+                    isFailed: false
+                )
+                self.searchIndexCache[currentItem.id] = nil
+                try self.persist()
+
+                let plainTranscript = transcription.lines.plainTranscriptText
+                let intelligenceLanguageName = transcription.detectedLanguage
+                    ?? currentItem.localizedLanguageName
+                async let intelligenceResult = try? GeminiCloudService.generateIntelligence(
+                    transcript: plainTranscript,
+                    languageName: intelligenceLanguageName,
+                    apiKey: apiKey
+                )
+                async let meetingResult = try? GeminiCloudService.generateMeetingAnalysis(
+                    transcript: plainTranscript,
+                    languageName: intelligenceLanguageName,
+                    apiKey: apiKey
+                )
+                let (intelligence, meetingAnalysis) = await (intelligenceResult, meetingResult)
+
+                try self.ensureTranscriptionOperationIsActive(
+                    for: currentItem.id,
+                    operationID: operationID
+                )
+                guard let finalIndex = self.recordings.firstIndex(where: { $0.id == currentItem.id }) else {
+                    return
+                }
+                if let intelligence {
+                    self.recordings[finalIndex].intelligence = intelligence
+                    self.recordings[finalIndex].manualTags = RecordingItem.mergedTags(
+                        self.recordings[finalIndex].manualTags ?? [],
+                        intelligence.tags
+                    )
+                }
+                if let meetingAnalysis {
+                    self.recordings[finalIndex].meetingAnalysis = meetingAnalysis
+                }
+                self.recordings[finalIndex].importStatus = nil
+                self.searchIndexCache[currentItem.id] = nil
+                try self.persist()
             }
-            if let meetingAnalysis {
-                recordings[finalIndex].meetingAnalysis = meetingAnalysis
-            }
-            recordings[finalIndex].importStatus = nil
-            searchIndexCache[currentItem.id] = nil
-            try persist()
+        } catch is CancellationError {
+            throw CancellationError()
         } catch {
             markImportFailed(for: currentItem.id, message: error.localizedDescription)
             throw error
@@ -2469,9 +2559,122 @@ final class RecordingStore: ObservableObject {
         return recordings[index]
     }
 
+    func canTerminateTranscription(for id: RecordingItem.ID) -> Bool {
+        guard let operation = activeTranscriptionOperations[id] else {
+            return false
+        }
+        return !operation.isCancellationRequested
+    }
+
+    func terminateTranscription(for id: RecordingItem.ID) {
+        guard var operation = activeTranscriptionOperations[id],
+              !operation.isCancellationRequested else {
+            return
+        }
+
+        operation.isCancellationRequested = true
+        activeTranscriptionOperations[id] = operation
+        clearRunningImportStatus(for: id)
+        operation.cancel()
+    }
+
+    private func runTrackedTranscription<Output: Sendable>(
+        for id: RecordingItem.ID,
+        operation: @escaping @MainActor (UUID) async throws -> Output
+    ) async throws -> Output {
+        guard activeTranscriptionOperations[id] == nil else {
+            throw CancellationError()
+        }
+
+        let operationID = UUID()
+        let task = Task<Output, Error> {
+            try await operation(operationID)
+        }
+        activeTranscriptionOperations[id] = ActiveRecordingTranscriptionOperation(
+            id: operationID,
+            isCancellationRequested: false,
+            cancel: {
+                task.cancel()
+            }
+        )
+
+        do {
+            let result = try await withTaskCancellationHandler(
+                operation: {
+                    try await task.value
+                },
+                onCancel: {
+                    task.cancel()
+                }
+            )
+            let cancellationRequested = task.isCancelled
+                || activeTranscriptionOperations[id]?.isCancellationRequested == true
+            removeActiveTranscriptionOperation(for: id, operationID: operationID)
+            clearRunningImportStatus(for: id)
+            if cancellationRequested {
+                throw CancellationError()
+            }
+            return result
+        } catch {
+            let cancellationRequested = error is CancellationError
+                || task.isCancelled
+                || activeTranscriptionOperations[id]?.isCancellationRequested == true
+            removeActiveTranscriptionOperation(for: id, operationID: operationID)
+            if cancellationRequested {
+                clearRunningImportStatus(for: id)
+            }
+            if cancellationRequested {
+                throw CancellationError()
+            }
+            throw error
+        }
+    }
+
+    private func ensureTranscriptionOperationIsActive(
+        for id: RecordingItem.ID,
+        operationID: UUID
+    ) throws {
+        try Task.checkCancellation()
+        guard let operation = activeTranscriptionOperations[id],
+              operation.id == operationID,
+              !operation.isCancellationRequested else {
+            throw CancellationError()
+        }
+    }
+
+    private func isTranscriptionOperationActive(
+        for id: RecordingItem.ID,
+        operationID: UUID
+    ) -> Bool {
+        guard let operation = activeTranscriptionOperations[id] else {
+            return false
+        }
+        return operation.id == operationID && !operation.isCancellationRequested
+    }
+
+    private func removeActiveTranscriptionOperation(
+        for id: RecordingItem.ID,
+        operationID: UUID
+    ) {
+        guard activeTranscriptionOperations[id]?.id == operationID else {
+            return
+        }
+        activeTranscriptionOperations[id] = nil
+    }
+
+    private func clearRunningImportStatus(for id: RecordingItem.ID) {
+        guard let index = recordings.firstIndex(where: { $0.id == id }),
+              recordings[index].importStatus?.isFailed == false else {
+            return
+        }
+        recordings[index].importStatus = nil
+        try? persist()
+    }
+
     private func updateGeminiProgress(
         for id: RecordingItem.ID,
-        progress: GeminiCloudProcessingProgress
+        progress: GeminiCloudProcessingProgress,
+        operationID: UUID
     ) {
         let message: String
         switch progress.stage {
@@ -2484,15 +2687,25 @@ final class RecordingStore: ObservableObject {
         case .analyzing:
             message = String(localized: L10n.Import.analyzingWithGemini)
         }
-        updateImportStatus(for: id, progress: progress.fraction, message: message)
+        updateImportStatus(
+            for: id,
+            progress: progress.fraction,
+            message: message,
+            operationID: operationID
+        )
     }
 
     private func updateImportStatus(
         for id: RecordingItem.ID,
         progress: Double,
         message: String,
-        shouldPersist: Bool = false
+        shouldPersist: Bool = false,
+        operationID: UUID? = nil
     ) {
+        if let operationID,
+           !isTranscriptionOperationActive(for: id, operationID: operationID) {
+            return
+        }
         guard let index = recordings.firstIndex(where: { $0.id == id }) else {
             return
         }

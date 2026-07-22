@@ -171,6 +171,11 @@ static void LTWhisperProgressCallback(struct whisper_context *ctx, struct whispe
     progressHandler(normalizedProgress);
 }
 
+static bool LTWhisperAbortCallback(void *user_data) {
+    LocalWhisperBridgeCancellationHandler cancellationHandler = (__bridge LocalWhisperBridgeCancellationHandler)user_data;
+    return cancellationHandler != nil && cancellationHandler();
+}
+
 @implementation LocalWhisperBridgeSegment
 
 - (instancetype)initWithStartSeconds:(NSTimeInterval)startSeconds
@@ -340,6 +345,7 @@ static NSString *LTWhisperModelPathForCoreMLEncoderPreference(NSString *modelPat
                                               languageCode:(NSString *)languageCode
                                          useCoreMLEncoder:(BOOL)useCoreMLEncoder
                                            progressHandler:(LocalWhisperBridgeProgressHandler)progressHandler
+                                       cancellationHandler:(LocalWhisperBridgeCancellationHandler)cancellationHandler
                                                      error:(NSError **)error {
     if (samples.length == 0 || samples.length % sizeof(float) != 0) {
         if (error != NULL) {
@@ -394,10 +400,17 @@ static NSString *LTWhisperModelPathForCoreMLEncoderPreference(NSString *modelPat
     params.split_on_word = true;
     params.language = languageCode.length > 0 ? languageCode.UTF8String : "auto";
     params.detect_language = languageCode.length == 0 || [languageCode isEqualToString:@"auto"];
+    __attribute__((objc_precise_lifetime))
     LocalWhisperBridgeProgressHandler progressHandlerCopy = [progressHandler copy];
     if (progressHandlerCopy != nil) {
         params.progress_callback = LTWhisperProgressCallback;
         params.progress_callback_user_data = (__bridge void *)progressHandlerCopy;
+    }
+    __attribute__((objc_precise_lifetime))
+    LocalWhisperBridgeCancellationHandler cancellationHandlerCopy = [cancellationHandler copy];
+    if (cancellationHandlerCopy != nil) {
+        params.abort_callback = LTWhisperAbortCallback;
+        params.abort_callback_user_data = (__bridge void *)cancellationHandlerCopy;
     }
 
     int result = runtime.full(context, params, samples.bytes, (int)sampleCount);
