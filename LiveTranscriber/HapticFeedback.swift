@@ -44,21 +44,48 @@ enum HapticFeedback {
         return generator
     }()
 
-    private static let impactGenerators: [UIImpactFeedbackGenerator.FeedbackStyle: UIImpactFeedbackGenerator] = {
-        var values: [UIImpactFeedbackGenerator.FeedbackStyle: UIImpactFeedbackGenerator] = [:]
-        for style in [
-            UIImpactFeedbackGenerator.FeedbackStyle.light,
-            .medium,
-            .heavy,
-            .soft,
-            .rigid
-        ] {
-            let generator = UIImpactFeedbackGenerator(style: style)
-            generator.prepare()
-            values[style] = generator
+    // Keep each style lazy and independent. The previous dictionary created
+    // and prepared all five generators the first time any impact was used,
+    // putting unnecessary Core Haptics setup directly on the first tap.
+    private static let lightImpactGenerator = makeImpactGenerator(style: .light)
+    private static let mediumImpactGenerator = makeImpactGenerator(style: .medium)
+    private static let heavyImpactGenerator = makeImpactGenerator(style: .heavy)
+    private static let softImpactGenerator = makeImpactGenerator(style: .soft)
+    private static let rigidImpactGenerator = makeImpactGenerator(style: .rigid)
+
+    /// Warms the exact generator needed for an anticipated interaction without
+    /// installing another gesture recognizer in the control's input path.
+    static func prepare(_ event: Event) {
+        switch event {
+        case .navigation, .primaryAction, .importStart, .retranscribeStart:
+            impactGenerator(for: .medium).prepare()
+        case .tabSelection:
+            selectionGenerator.prepare()
+            impactGenerator(for: .light).prepare()
+        case .menuSelection, .timelineSeek:
+            selectionGenerator.prepare()
+        case .recordingStart:
+            impactGenerator(for: .rigid).prepare()
+            impactGenerator(for: .soft).prepare()
+        case .recordingResume, .deleteRequested:
+            impactGenerator(for: .rigid).prepare()
+        case .recordingPause, .importQueued:
+            impactGenerator(for: .soft).prepare()
+        case .recordingStop, .deleteConfirmed:
+            impactGenerator(for: .heavy).prepare()
+            if event == .recordingStop {
+                impactGenerator(for: .soft).prepare()
+            }
+        case .playbackToggle, .copy:
+            impactGenerator(for: .light).prepare()
+        case .analysisStart:
+            impactGenerator(for: .soft).prepare()
+            impactGenerator(for: .light).prepare()
+        case .recordingSaved, .importComplete, .retranscribeComplete,
+             .analysisComplete, .blocked, .warning, .failure:
+            notificationGenerator.prepare()
         }
-        return values
-    }()
+    }
 
     static func play(_ event: Event) {
         guard shouldPlay(event) else {
@@ -164,8 +191,36 @@ enum HapticFeedback {
     }
 
     private static func impact(_ style: UIImpactFeedbackGenerator.FeedbackStyle, intensity: CGFloat) {
-        impactGenerators[style]?.impactOccurred(intensity: normalizedIntensity(intensity))
-        impactGenerators[style]?.prepare()
+        let generator = impactGenerator(for: style)
+        generator.impactOccurred(intensity: normalizedIntensity(intensity))
+        generator.prepare()
+    }
+
+    private static func makeImpactGenerator(
+        style: UIImpactFeedbackGenerator.FeedbackStyle
+    ) -> UIImpactFeedbackGenerator {
+        let generator = UIImpactFeedbackGenerator(style: style)
+        generator.prepare()
+        return generator
+    }
+
+    private static func impactGenerator(
+        for style: UIImpactFeedbackGenerator.FeedbackStyle
+    ) -> UIImpactFeedbackGenerator {
+        switch style {
+        case .light:
+            lightImpactGenerator
+        case .medium:
+            mediumImpactGenerator
+        case .heavy:
+            heavyImpactGenerator
+        case .soft:
+            softImpactGenerator
+        case .rigid:
+            rigidImpactGenerator
+        @unknown default:
+            mediumImpactGenerator
+        }
     }
 
     private static func delayedImpact(
@@ -450,6 +505,52 @@ private struct InteractiveNavigationPopGestureObserver: UIViewRepresentable {
     }
 }
 
+/// Observes the navigation controller lifecycle without installing another
+/// gesture recognizer. The system back button starts removing its destination
+/// before SwiftUI updates the bound NavigationPath, so this is the earliest
+/// reliable point to keep the pop haptic aligned with the transition.
+private struct NavigationPopLifecycleObserver: UIViewControllerRepresentable {
+    let onWillPop: () -> Void
+
+    func makeUIViewController(context: Context) -> ObserverViewController {
+        let viewController = ObserverViewController()
+        viewController.onWillPop = onWillPop
+        return viewController
+    }
+
+    func updateUIViewController(
+        _ uiViewController: ObserverViewController,
+        context: Context
+    ) {
+        uiViewController.onWillPop = onWillPop
+    }
+
+    @MainActor
+    final class ObserverViewController: UIViewController {
+        var onWillPop: (() -> Void)?
+
+        override func loadView() {
+            let view = UIView(frame: .zero)
+            view.isUserInteractionEnabled = false
+            view.backgroundColor = .clear
+            self.view = view
+        }
+
+        override func viewWillDisappear(_ animated: Bool) {
+            super.viewWillDisappear(animated)
+
+            var ancestor = parent
+            while let viewController = ancestor {
+                if viewController.isMovingFromParent {
+                    onWillPop?()
+                    return
+                }
+                ancestor = viewController.parent
+            }
+        }
+    }
+}
+
 extension View {
     func onInteractiveNavigationPopGesture(
         onBegan: @escaping () -> Void,
@@ -463,6 +564,15 @@ extension View {
             .frame(width: 0, height: 0)
             .allowsHitTesting(false)
             .accessibilityHidden(true)
+        }
+    }
+
+    func onNavigationPopWillBegin(_ action: @escaping () -> Void) -> some View {
+        background(alignment: .topLeading) {
+            NavigationPopLifecycleObserver(onWillPop: action)
+                .frame(width: 0, height: 0)
+                .allowsHitTesting(false)
+                .accessibilityHidden(true)
         }
     }
 }

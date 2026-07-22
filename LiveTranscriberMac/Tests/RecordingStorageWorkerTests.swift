@@ -235,6 +235,31 @@ final class RecordingStorageWorkerTests: XCTestCase {
     }
 
     @MainActor
+    func testPlaybackPreparationUsesBoundedTwoHundredMillisecondWindow() {
+        XCTAssertEqual(
+            RecordingPlaybackController.playbackPreparationFrameCount(
+                remainingFrames: 172_800_000,
+                sampleRate: 48_000
+            ),
+            9_600
+        )
+        XCTAssertEqual(
+            RecordingPlaybackController.playbackPreparationFrameCount(
+                remainingFrames: 4_800,
+                sampleRate: 48_000
+            ),
+            4_800
+        )
+        XCTAssertEqual(
+            RecordingPlaybackController.playbackPreparationFrameCount(
+                remainingFrames: 0,
+                sampleRate: 48_000
+            ),
+            0
+        )
+    }
+
+    @MainActor
     func testPlaybackControllerPlaysExistingFloatWAVThroughAVAudioFile() async throws {
         let root = FileManager.default.temporaryDirectory.appendingPathComponent(
             "PlaybackCompatibilityTests-\(UUID().uuidString)",
@@ -278,7 +303,7 @@ final class RecordingStorageWorkerTests: XCTestCase {
         legacyWriter = nil
 
         let controller = RecordingPlaybackController()
-        controller.load(url: sourceURL)
+        await controller.load(url: sourceURL)
         XCTAssertTrue(controller.isLoaded)
         XCTAssertNil(controller.errorText)
         XCTAssertEqual(controller.duration, 1, accuracy: 0.001)
@@ -286,8 +311,21 @@ final class RecordingStorageWorkerTests: XCTestCase {
         controller.play()
         try await Task.sleep(for: .milliseconds(100))
         XCTAssertTrue(controller.isPlaying)
+        controller.seek(to: 0.5)
+        try await Task.sleep(for: .milliseconds(100))
+        XCTAssertTrue(controller.isPlaying)
         controller.pause()
-        XCTAssertGreaterThan(controller.currentTime, 0)
+        XCTAssertGreaterThanOrEqual(controller.currentTime, 0.49)
+        controller.unload()
+        XCTAssertFalse(controller.isLoaded)
+        XCTAssertNil(controller.currentItem)
+
+        // A new detail can begin loading immediately after navigation. The
+        // controller must await the queued teardown instead of racing the old
+        // AVAudioPlayerNode from MainActor.
+        await controller.load(url: sourceURL)
+        XCTAssertTrue(controller.isLoaded)
+        XCTAssertNil(controller.errorText)
         controller.unload()
     }
 }

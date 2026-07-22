@@ -21,6 +21,7 @@ final class RecordingPlaybackController: ObservableObject {
 
     private static let playbackGainDecibels: Float = 3
     private static let playbackUITickMilliseconds = 250
+    private static let playbackPreparationDuration: TimeInterval = 0.2
     private static let logger = Logger(subsystem: "com.reddownloader.LiveTranscriber", category: "RecordingPlayback")
     static let availablePlaybackRates: [Float] = [0.75, 1, 1.25, 1.5, 2]
 
@@ -34,6 +35,7 @@ final class RecordingPlaybackController: ObservableObject {
     private let sourceMixerNode = AVAudioMixerNode()
     private let timePitchUnit = AVAudioUnitTimePitch()
     private let gainUnit = AVAudioUnitEQ(numberOfBands: 1)
+    private let audioCommandExecutor = RecordingPlaybackAudioCommandExecutor()
     private let audioSessionQueue = DispatchQueue(
         label: "com.reddownloader.live-transcriber.playback-session",
         qos: .userInitiated
@@ -42,7 +44,7 @@ final class RecordingPlaybackController: ObservableObject {
     private var connectedFileFormat: AVAudioFormat?
     private var playbackTimerTask: Task<Void, Never>?
     private var sampleRate: Double = 44_100
-    private var scheduledStartFrame: AVAudioFramePosition = 0
+    private var scheduledStartTime: TimeInterval = 0
     private var playbackScheduleID = 0
     private var playbackCommandID = 0
     private var hasScheduledPlayback = false
@@ -55,6 +57,10 @@ final class RecordingPlaybackController: ObservableObject {
     private var isPlaybackSessionActive = false
     private var playbackSessionActivationTask: Task<Void, Error>?
     private var playbackSessionGeneration = 0
+    private var transportCleanupTask: Task<Void, Never>?
+    private var transportCleanupGeneration = 0
+    private var transportLoadCommandID: Int?
+    private var isTransportReconfiguring = false
 
     init() {
         configurePersistentPlaybackGraph()
@@ -92,9 +98,24 @@ final class RecordingPlaybackController: ObservableObject {
             return
         }
 
-        resetPlaybackState(deactivateSession: false)
+        await waitForPendingTransportCleanup()
+        guard !Task.isCancelled else {
+            return
+        }
+
+        if currentItem != nil || audioFile != nil || isLoaded {
+            if let resetTask = resetPlaybackState(deactivateSession: false) {
+                await resetTask.value
+            }
+            guard !Task.isCancelled else {
+                return
+            }
+        }
+
+        playbackCommandID += 1
+        let commandID = playbackCommandID
         currentItem = item
-        loadAudioFile(at: url)
+        await loadAudioFile(at: url, commandID: commandID)
     }
 
     func setNowPlayingTranscript(
@@ -122,40 +143,106 @@ final class RecordingPlaybackController: ObservableObject {
         updateNowPlayingInfo()
     }
 
-    func load(url: URL) {
-        resetPlaybackState(deactivateSession: false)
-        loadAudioFile(at: url)
-    }
-
-    private func loadAudioFile(at url: URL) {
-        errorText = nil
-
-        guard FileManager.default.fileExists(atPath: url.path),
-              FileManager.default.isReadableFile(atPath: url.path) else {
-            errorText = localized(L10n.Recordings.recordingFileMissing)
-            Self.logger.error(
-                "[RecordingPlayback] load.file-unavailable file=\(url.lastPathComponent, privacy: .public)"
-            )
+    func load(url: URL) async {
+        await waitForPendingTransportCleanup()
+        guard !Task.isCancelled else {
             return
         }
 
-        do {
+        if currentItem != nil || audioFile != nil || isLoaded {
+            if let resetTask = resetPlaybackState(deactivateSession: false) {
+                await resetTask.value
+            }
+            guard !Task.isCancelled else {
+                return
+            }
+        }
+
+        playbackCommandID += 1
+        let commandID = playbackCommandID
+        await loadAudioFile(at: url, commandID: commandID)
+    }
+
+    private func loadAudioFile(at url: URL, commandID: Int) async {
+        errorText = nil
+        transportLoadCommandID = commandID
+
+        let engine = audioEngine
+        let node = playerNode
+        let sourceMixer = sourceMixerNode
+        let previousFormat = connectedFileFormat
+        let command = RecordingPlaybackAudioCommand<RecordingPlaybackPreparedAudioFile> {
+            guard FileManager.default.fileExists(atPath: url.path),
+                  FileManager.default.isReadableFile(atPath: url.path) else {
+                throw RecordingPlaybackAudioLoadError.fileUnavailable
+            }
+
             let file = try AVAudioFile(forReading: url)
             guard file.length > 0, file.fileFormat.sampleRate > 0 else {
                 throw CocoaError(.fileReadCorruptFile)
             }
+
+            let processingFormat = file.processingFormat
+            let shouldReconnect = previousFormat != processingFormat
+            node.stop()
+            node.reset()
+            if shouldReconnect {
+                engine.disconnectNodeOutput(node)
+                engine.connect(node, to: sourceMixer, format: processingFormat)
+            }
+            engine.prepare()
+
+            return RecordingPlaybackPreparedAudioFile(
+                file: file,
+                processingFormat: processingFormat,
+                didReconnect: shouldReconnect,
+                fileFormatDescription: String(describing: file.fileFormat),
+                processingFormatDescription: String(describing: processingFormat)
+            )
+        }
+
+        do {
+            let preparedFile = try await audioCommandExecutor.execute(command)
+            if transportLoadCommandID == commandID {
+                transportLoadCommandID = nil
+            }
+            if preparedFile.didReconnect {
+                connectedFileFormat = preparedFile.processingFormat
+            }
+            guard !Task.isCancelled, commandID == playbackCommandID else {
+                return
+            }
+
+            let file = preparedFile.file
             audioFile = file
             sampleRate = file.fileFormat.sampleRate
             duration = sampleRate > 0 ? Double(file.length) / sampleRate : 0
-            try configurePlaybackEngine(format: file.processingFormat)
             currentTime = 0
             isLoaded = true
             updateNowPlayingInfo()
             updateRemoteCommandAvailability(isEnabled: true)
             Self.logger.info(
-                "[RecordingPlayback] load.ready file=\(url.lastPathComponent, privacy: .public) frames=\(file.length, privacy: .public) duration=\(self.duration, privacy: .public) fileFormat=\(String(describing: file.fileFormat), privacy: .public) processingFormat=\(String(describing: file.processingFormat), privacy: .public)"
+                "[RecordingPlayback] load.ready file=\(url.lastPathComponent, privacy: .public) frames=\(file.length, privacy: .public) duration=\(self.duration, privacy: .public) fileFormat=\(preparedFile.fileFormatDescription, privacy: .public) processingFormat=\(preparedFile.processingFormatDescription, privacy: .public)"
+            )
+        } catch RecordingPlaybackAudioLoadError.fileUnavailable {
+            if transportLoadCommandID == commandID {
+                transportLoadCommandID = nil
+            }
+            guard commandID == playbackCommandID else {
+                return
+            }
+            errorText = localized(L10n.Recordings.recordingFileMissing)
+            updateRemoteCommandAvailability(isEnabled: false)
+            Self.logger.error(
+                "[RecordingPlayback] load.file-unavailable file=\(url.lastPathComponent, privacy: .public)"
             )
         } catch {
+            if transportLoadCommandID == commandID {
+                transportLoadCommandID = nil
+            }
+            guard commandID == playbackCommandID else {
+                return
+            }
             errorText = localizedFormat(L10n.Recordings.playbackFailedFormat, error.localizedDescription)
             updateRemoteCommandAvailability(isEnabled: false)
             Self.logger.error(
@@ -199,7 +286,7 @@ final class RecordingPlaybackController: ObservableObject {
                 }
 
                 beginReceivingRemoteControlEventsIfNeeded()
-                try startPlaybackEngineIfNeeded()
+                try await startPlaybackEngineIfNeeded()
                 guard commandID == playbackCommandID, isLoaded else {
                     return
                 }
@@ -209,13 +296,19 @@ final class RecordingPlaybackController: ObservableObject {
                     needsPlaybackReschedule = true
                 }
                 if !hasScheduledPlayback || needsPlaybackReschedule {
-                    schedulePlayback(from: currentTime)
+                    await schedulePlayback(from: currentTime)
                 }
                 guard commandID == playbackCommandID, isLoaded else {
                     return
                 }
 
-                playerNode.play()
+                let node = playerNode
+                try await performAudioCommand {
+                    node.play()
+                }
+                guard commandID == playbackCommandID, isLoaded else {
+                    return
+                }
                 isPlaying = true
                 startTimer()
                 updateNowPlayingInfo()
@@ -255,9 +348,38 @@ final class RecordingPlaybackController: ObservableObject {
         if isPlaying {
             playbackCommandID += 1
             let commandID = playbackCommandID
-            schedulePlayback(from: clampedTime)
-            if commandID == playbackCommandID {
-                playerNode.play()
+            isTransportReconfiguring = true
+            Task { [weak self] in
+                guard let self,
+                      commandID == self.playbackCommandID,
+                      self.isLoaded else {
+                    return
+                }
+                await self.schedulePlayback(from: clampedTime)
+                guard commandID == self.playbackCommandID,
+                      self.isLoaded,
+                      self.isPlaying else {
+                    return
+                }
+                do {
+                    let node = self.playerNode
+                    try await self.performAudioCommand {
+                        node.play()
+                    }
+                    guard commandID == self.playbackCommandID else {
+                        return
+                    }
+                    self.isTransportReconfiguring = false
+                } catch {
+                    guard commandID == self.playbackCommandID else {
+                        return
+                    }
+                    self.isTransportReconfiguring = false
+                    self.errorText = localizedFormat(
+                        L10n.Recordings.playbackStartFailedFormat,
+                        error.localizedDescription
+                    )
+                }
             }
         }
         updateNowPlayingInfo()
@@ -284,24 +406,38 @@ final class RecordingPlaybackController: ObservableObject {
     }
 
     func unload() {
-        resetPlaybackState(deactivateSession: true)
+        guard currentItem != nil || audioFile != nil || isLoaded || isPlaying else {
+            return
+        }
+        _ = resetPlaybackState(deactivateSession: true)
     }
 
-    private func resetPlaybackState(deactivateSession: Bool) {
+    @discardableResult
+    private func resetPlaybackState(deactivateSession: Bool) -> Task<Void, Never>? {
         playbackCommandID += 1
         playbackScheduleID += 1
-        playerNode.stop()
-        playerNode.reset()
+        transportCleanupGeneration += 1
+        let cleanupGeneration = transportCleanupGeneration
+        let retainedAudioFile = audioFile
+        let shouldResetTransport = retainedAudioFile != nil
+            || isLoaded
+            || hasScheduledPlayback
+            || transportLoadCommandID != nil
+        let engine = audioEngine
+        let node = playerNode
+
         audioFile = nil
         currentItem = nil
         hasScheduledPlayback = false
         needsPlaybackReschedule = true
+        isTransportReconfiguring = false
         nowPlayingTranscriptRecordingID = nil
         nowPlayingTranscriptCues = []
         lastPublishedNowPlayingTitle = nil
         isLoaded = false
         isPlaying = false
         currentTime = 0
+        scheduledStartTime = 0
         duration = 0
         stopTimer()
         clearNowPlayingInfo()
@@ -309,15 +445,51 @@ final class RecordingPlaybackController: ObservableObject {
         endReceivingRemoteControlEventsIfNeeded()
 
         if deactivateSession {
-            // Keep the graph and its nodes alive, but stop rendering while the
-            // detail screen is gone. This avoids AVAudioEngine deallocation on
-            // the main actor and makes the next file a cheap reconnect.
-            audioEngine.pause()
+            // The graph stays allocated for reuse. Its hardware stop runs in
+            // the serialized command below, outside the navigation update.
             playbackSessionGeneration += 1
             playbackSessionActivationTask?.cancel()
             playbackSessionActivationTask = nil
             isPlaybackSessionActive = false
-            requestPlaybackSessionDeactivation()
+        }
+
+        guard shouldResetTransport else {
+            if deactivateSession {
+                requestPlaybackSessionDeactivation()
+            }
+            return nil
+        }
+
+        let command = RecordingPlaybackAudioCommand<Void> {
+            // Keep the file alive until AVAudioPlayerNode has released its
+            // scheduled secondary reader. These calls can synchronously wait
+            // on AVAudioSession/XPC on iOS, so they must not run on MainActor.
+            _ = retainedAudioFile
+            if deactivateSession {
+                engine.pause()
+            }
+            node.stop()
+            node.reset()
+        }
+        let executor = audioCommandExecutor
+        let cleanupTask = Task { [weak self] in
+            try? await executor.execute(command)
+            guard let self,
+                  cleanupGeneration == self.transportCleanupGeneration else {
+                return
+            }
+            self.transportCleanupTask = nil
+            if deactivateSession {
+                self.requestPlaybackSessionDeactivation()
+            }
+        }
+        transportCleanupTask = cleanupTask
+        return cleanupTask
+    }
+
+    private func waitForPendingTransportCleanup() async {
+        if let transportCleanupTask {
+            await transportCleanupTask.value
         }
     }
 
@@ -334,7 +506,7 @@ final class RecordingPlaybackController: ObservableObject {
                 guard self.isLoaded else {
                     return
                 }
-                try self.startPlaybackEngineIfNeeded()
+                try await self.startPlaybackEngineIfNeeded()
             } catch is CancellationError {
                 return
             } catch {
@@ -411,33 +583,23 @@ final class RecordingPlaybackController: ObservableObject {
         audioEngine.connect(gainUnit, to: audioEngine.mainMixerNode, format: nil)
     }
 
-    private func configurePlaybackEngine(format: AVAudioFormat) throws {
-        playerNode.stop()
-        playerNode.reset()
-
-        if connectedFileFormat != format {
-            audioEngine.disconnectNodeOutput(playerNode)
-            audioEngine.connect(playerNode, to: sourceMixerNode, format: format)
-            connectedFileFormat = format
+    private func startPlaybackEngineIfNeeded() async throws {
+        let engine = audioEngine
+        try await performAudioCommand {
+            guard !engine.isRunning else {
+                return
+            }
+            try engine.start()
         }
-        audioEngine.prepare()
     }
 
-    private func startPlaybackEngineIfNeeded() throws {
-        guard !audioEngine.isRunning else {
-            return
-        }
-        try audioEngine.start()
-    }
-
-    private func schedulePlayback(from time: TimeInterval) {
+    private func schedulePlayback(from time: TimeInterval) async {
         guard let audioFile else {
             return
         }
 
         playbackScheduleID += 1
         let completionID = playbackScheduleID
-        playerNode.stop()
         hasScheduledPlayback = false
 
         let startFrame = framePosition(for: time)
@@ -447,18 +609,22 @@ final class RecordingPlaybackController: ObservableObject {
             return
         }
 
-        scheduledStartFrame = startFrame
-        currentTime = Double(startFrame) / sampleRate
+        // Audio must be scheduled on an integer frame, but transcript
+        // timestamps are logical times that may fall between frames. Keep the
+        // requested time as the UI timeline origin so converting the floored
+        // frame back to seconds cannot momentarily select the previous line.
+        scheduledStartTime = min(max(time, 0), duration)
+        currentTime = scheduledStartTime
         needsPlaybackReschedule = false
         hasScheduledPlayback = true
-        let frameCount = AVAudioFrameCount(min(remainingFrames, AVAudioFramePosition(AVAudioFrameCount.max)))
-        playerNode.scheduleSegment(
-            audioFile,
-            startingFrame: startFrame,
-            frameCount: frameCount,
-            at: nil,
-            completionCallbackType: .dataPlayedBack
-        ) { [weak self] callbackType in
+        let scheduledFrameCount = AVAudioFrameCount(
+            min(remainingFrames, AVAudioFramePosition(AVAudioFrameCount.max))
+        )
+        let preparationFrameCount = Self.playbackPreparationFrameCount(
+            remainingFrames: remainingFrames,
+            sampleRate: sampleRate
+        )
+        let completionHandler: (AVAudioPlayerNodeCompletionCallbackType) -> Void = { [weak self] callbackType in
             Task { @MainActor in
                 guard let self,
                       callbackType == .dataPlayedBack,
@@ -469,7 +635,51 @@ final class RecordingPlaybackController: ObservableObject {
                 self.finishPlayback()
             }
         }
-        playerNode.prepare(withFrameCount: frameCount)
+        let node = playerNode
+        try? await performAudioCommand {
+            node.stop()
+            node.reset()
+            node.scheduleSegment(
+                audioFile,
+                startingFrame: startFrame,
+                frameCount: scheduledFrameCount,
+                at: nil,
+                completionCallbackType: .dataPlayedBack
+            ) { callbackType in
+                completionHandler(callbackType)
+            }
+            // scheduleSegment streams the complete remaining segment.
+            // Preparing only a short fixed window avoids reserving buffers
+            // for millions of frames on long recordings.
+            if preparationFrameCount > 0 {
+                node.prepare(withFrameCount: preparationFrameCount)
+            }
+        }
+    }
+
+    private func performAudioCommand(
+        _ operation: @escaping () throws -> Void
+    ) async throws {
+        let command = RecordingPlaybackAudioCommand<Void>(operation: operation)
+        try await audioCommandExecutor.execute(command)
+    }
+
+    static func playbackPreparationFrameCount(
+        remainingFrames: AVAudioFramePosition,
+        sampleRate: Double
+    ) -> AVAudioFrameCount {
+        guard remainingFrames > 0, sampleRate.isFinite, sampleRate > 0 else {
+            return 0
+        }
+
+        let maximumFrameCount = AVAudioFramePosition(AVAudioFrameCount.max)
+        let targetFrameCount = AVAudioFramePosition(
+            min(
+                max((sampleRate * playbackPreparationDuration).rounded(.up), 1),
+                Double(AVAudioFrameCount.max)
+            )
+        )
+        return AVAudioFrameCount(min(min(remainingFrames, targetFrameCount), maximumFrameCount))
     }
 
     private func framePosition(for time: TimeInterval) -> AVAudioFramePosition {
@@ -483,24 +693,34 @@ final class RecordingPlaybackController: ObservableObject {
 
     private func currentPlaybackTime() -> TimeInterval {
         guard isPlaying,
+              !isTransportReconfiguring,
               sampleRate > 0,
               let nodeTime = playerNode.lastRenderTime,
               let playerTime = playerNode.playerTime(forNodeTime: nodeTime) else {
             return currentTime
         }
 
+        // A newly started player node can briefly report a negative sample
+        // time before its scheduled segment reaches the render timeline. That
+        // is preroll, not an actual seek backwards, so keep the requested UI
+        // time until the node begins reporting samples from the new segment.
+        guard playerTime.sampleTime >= 0 else {
+            return currentTime
+        }
+
         let playedFrames = AVAudioFramePosition(playerTime.sampleTime)
-        let frame = min(max(scheduledStartFrame + playedFrames, 0), audioFile?.length ?? scheduledStartFrame)
-        return min(Double(frame) / sampleRate, duration)
+        return min(
+            scheduledStartTime + Double(playedFrames) / sampleRate,
+            duration
+        )
     }
 
     private func finishPlayback() {
         playbackCommandID += 1
         playbackScheduleID += 1
-        playerNode.stop()
-        playerNode.reset()
         hasScheduledPlayback = false
         needsPlaybackReschedule = true
+        isTransportReconfiguring = false
         currentTime = duration
         isPlaying = false
         stopTimer()
@@ -762,6 +982,51 @@ final class RecordingPlaybackController: ObservableObject {
 
         let formattedDate = item.createdAt.formatted(date: .abbreviated, time: .shortened)
         return "\(item.localizedLanguageName) · \(formattedDate)"
+    }
+}
+
+private enum RecordingPlaybackAudioLoadError: Error {
+    case fileUnavailable
+}
+
+private struct RecordingPlaybackPreparedAudioFile: @unchecked Sendable {
+    let file: AVAudioFile
+    let processingFormat: AVAudioFormat
+    let didReconnect: Bool
+    let fileFormatDescription: String
+    let processingFormatDescription: String
+}
+
+private final class RecordingPlaybackAudioCommand<Output: Sendable>: @unchecked Sendable {
+    private let operation: () throws -> Output
+
+    init(operation: @escaping () throws -> Output) {
+        self.operation = operation
+    }
+
+    func execute() throws -> Output {
+        try operation()
+    }
+}
+
+private final class RecordingPlaybackAudioCommandExecutor: @unchecked Sendable {
+    private let queue = DispatchQueue(
+        label: "com.reddownloader.live-transcriber.playback-transport",
+        qos: .userInitiated
+    )
+
+    func execute<Output: Sendable>(
+        _ command: RecordingPlaybackAudioCommand<Output>
+    ) async throws -> Output {
+        try await withCheckedThrowingContinuation { continuation in
+            queue.async {
+                do {
+                    continuation.resume(returning: try command.execute())
+                } catch {
+                    continuation.resume(throwing: error)
+                }
+            }
+        }
     }
 }
 

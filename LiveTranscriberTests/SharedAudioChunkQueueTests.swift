@@ -204,7 +204,7 @@ final class SharedAudioChunkQueueTests: XCTestCase {
     }
 
     @MainActor
-    func testPlaybackControllerLoadsExistingFloatWAVThroughAVAudioFile() throws {
+    func testPlaybackControllerLoadsExistingFloatWAVThroughAVAudioFile() async throws {
         let format = SystemAudioPCMNormalizer.targetFormat
         let outputURL = rootURL.appendingPathComponent("existing-float.wav")
         var writer: AVAudioFile? = try AVAudioFile(
@@ -229,7 +229,7 @@ final class SharedAudioChunkQueueTests: XCTestCase {
         writer = nil
 
         let controller = RecordingPlaybackController()
-        controller.load(url: outputURL)
+        await controller.load(url: outputURL)
         XCTAssertTrue(controller.isLoaded)
         XCTAssertNil(controller.errorText)
         XCTAssertEqual(controller.duration, 0.1, accuracy: 0.001)

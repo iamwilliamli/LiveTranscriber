@@ -854,6 +854,7 @@ struct RecordingsView: View {
     @State private var isUpdatingSearchResults = false
     @State private var searchRevision = 0
     @State private var navigationPath: [RecordingNavigationDestination] = []
+    @State private var navigationPopHasPlayedHaptic = false
     @State private var isShowingNewCategorySheet = false
     @State private var newCategoryName = ""
     @State private var newCategoryErrorMessage: String?
@@ -894,19 +895,37 @@ struct RecordingsView: View {
     }
 
     private var categoryFolders: [RecordingCategoryFolder] {
-        var folders = categoryNames.map { categoryName in
-            RecordingCategoryFolder(
+        let names = categoryNames
+        let appearances = categoryAppearances
+        var countsByCategoryKey: [String: Int] = [:]
+        countsByCategoryKey.reserveCapacity(names.count)
+        for categoryName in names {
+            countsByCategoryKey[categoryName.normalizedForRecordingSearch] = 0
+        }
+
+        var uncategorizedCount = 0
+        for recording in store.recordings {
+            guard let categoryName = recording.categoryName else {
+                uncategorizedCount += 1
+                continue
+            }
+            let key = categoryName.normalizedForRecordingSearch
+            if countsByCategoryKey[key] != nil {
+                countsByCategoryKey[key, default: 0] += 1
+            }
+        }
+
+        var folders = names.map { categoryName in
+            let key = categoryName.normalizedForRecordingSearch
+            return RecordingCategoryFolder(
                 id: categoryName,
                 name: categoryName,
-                count: store.recordings.filter {
-                    $0.categoryName?.normalizedForRecordingSearch == categoryName.normalizedForRecordingSearch
-                }.count,
+                count: countsByCategoryKey[key, default: 0],
                 isUncategorized: false,
-                appearance: categoryAppearances[categoryName.normalizedForRecordingSearch] ?? .defaultValue
+                appearance: appearances[key] ?? .defaultValue
             )
         }
 
-        let uncategorizedCount = store.recordings.filter { $0.categoryName == nil }.count
         if uncategorizedCount > 0 {
             folders.append(
                 RecordingCategoryFolder(
@@ -946,9 +965,24 @@ struct RecordingsView: View {
                 .navigationDestination(for: RecordingNavigationDestination.self) { destination in
                     navigationDestinationView(for: destination)
                 }
-                .onInteractiveNavigationPopGesture {
-                    HapticFeedback.play(.navigation)
-                }
+                .onInteractiveNavigationPopGesture(
+                    onBegan: {
+                        playNavigationPopHapticIfNeeded()
+                    },
+                    onCancelled: {
+                        navigationPopHasPlayedHaptic = false
+                    }
+                )
+        }
+        .onChange(of: navigationPath.count) { oldCount, newCount in
+            guard newCount < oldCount else {
+                return
+            }
+            if navigationPopHasPlayedHaptic {
+                navigationPopHasPlayedHaptic = false
+            } else {
+                HapticFeedback.play(.navigation)
+            }
         }
         .searchable(
             text: $searchText,
@@ -967,6 +1001,7 @@ struct RecordingsView: View {
             consumePendingOpenRecordingIDIfNeeded()
         }
         .onAppear {
+            HapticFeedback.prepare(.navigation)
             consumeIncomingImportURLIfNeeded()
             consumePendingOpenRecordingIDIfNeeded()
             Task {
@@ -1257,6 +1292,9 @@ struct RecordingsView: View {
                         addRecordingsCategoryTarget = folder
                     }
                 )
+                .onNavigationPopWillBegin {
+                    playNavigationPopHapticIfNeeded()
+                }
             } else {
                 EmptyStateView(icon: "folder", titleResource: L10n.Recordings.noRecordings)
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -1275,6 +1313,9 @@ struct RecordingsView: View {
                     isMOSSLocalAvailable: isMOSSLocalAvailable,
                     initialTranscriptLineID: transcriptLineID
                 )
+                .onNavigationPopWillBegin {
+                    playNavigationPopHapticIfNeeded()
+                }
             } else {
                 EmptyStateView(icon: "exclamationmark.triangle", titleResource: L10n.Recordings.noRecordings)
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -1285,6 +1326,8 @@ struct RecordingsView: View {
 
     @ViewBuilder
     private var recordingsList: some View {
+        let folders = categoryFolders
+
         List {
             if let videoImportProgressState {
                 VideoImportProgressRow(state: videoImportProgressState)
@@ -1314,13 +1357,13 @@ struct RecordingsView: View {
                         )
                     }
                 }
-            } else if categoryFolders.isEmpty && videoImportProgressState == nil {
+            } else if folders.isEmpty && videoImportProgressState == nil {
                 EmptyStateView(icon: "folder", titleResource: L10n.Recordings.noRecordings)
                     .frame(maxWidth: .infinity, minHeight: 320)
                     .listRowSeparator(.hidden)
                     .listRowBackground(Color.clear)
             } else {
-                ForEach(categoryFolders) { folder in
+                ForEach(folders) { folder in
                     categoryFolderRow(folder)
                 }
             }
@@ -1796,12 +1839,17 @@ struct RecordingsView: View {
         initialTranscriptLineID: StoredTranscriptLine.ID? = nil
     ) {
         HapticFeedback.play(.navigation)
-        if !transcriber.isRecording, !transcriber.isPreparing {
-            player.prewarmPlaybackSession()
-        }
         navigationPath.append(
             .recording(item.id, transcriptLineID: initialTranscriptLineID)
         )
+    }
+
+    private func playNavigationPopHapticIfNeeded() {
+        guard !navigationPopHasPlayedHaptic else {
+            return
+        }
+        navigationPopHasPlayedHaptic = true
+        HapticFeedback.play(.navigation)
     }
 
     private func consumePendingOpenRecordingIDIfNeeded() {
@@ -3696,8 +3744,12 @@ private struct RecordingPlaybackAmbientBackground: View {
 }
 
 private struct PlaybackSyncedTranscriptRows: View {
+    private static let initialRenderCount = 80
+    private static let subsequentRenderCount = 240
+
     let recordingID: RecordingItem.ID
     let lines: [StoredTranscriptLine]
+    let initialLineID: StoredTranscriptLine.ID?
     let speakerByID: [String: TranscriptSpeakerPresentation]
     let showsSpeakerDistinction: Bool
     let translatedTranscriptByLineID: [StoredTranscriptLine.ID: String]
@@ -3707,10 +3759,21 @@ private struct PlaybackSyncedTranscriptRows: View {
     let onEdit: (StoredTranscriptLine) -> Void
 
     @State private var currentLineID: StoredTranscriptLine.ID?
+    @State private var renderedLineCount = 0
+
+    private var renderRevision: String {
+        [
+            recordingID.uuidString,
+            String(lines.count),
+            lines.first?.id ?? "none",
+            lines.last?.id ?? "none",
+            initialLineID ?? "none"
+        ].joined(separator: "-")
+    }
 
     var body: some View {
         LazyVStack(alignment: .leading, spacing: 8) {
-            ForEach(lines) { line in
+            ForEach(lines.prefix(renderedLineCount)) { line in
                 StoredTranscriptLineRow(
                     line: line,
                     speaker: showsSpeakerDistinction ? line.speaker.flatMap { speakerByID[$0] } : nil,
@@ -3744,6 +3807,45 @@ private struct PlaybackSyncedTranscriptRows: View {
                 return
             }
             updateCurrentLine(at: player.currentTime)
+        }
+        .task(id: renderRevision) {
+            await renderLinesInBatches()
+        }
+    }
+
+    private func renderLinesInBatches() async {
+        let requiredLineCount = initialLineID.flatMap { lineID in
+            lines.firstIndex(where: { $0.id == lineID }).map { $0 + 1 }
+        } ?? 0
+        let firstCount = min(
+            lines.count,
+            max(Self.initialRenderCount, requiredLineCount)
+        )
+        publishRenderedLineCount(firstCount)
+
+        while renderedLineCount < lines.count {
+            do {
+                try await Task.sleep(for: .milliseconds(16))
+            } catch {
+                return
+            }
+            guard !Task.isCancelled else {
+                return
+            }
+            publishRenderedLineCount(
+                min(lines.count, renderedLineCount + Self.subsequentRenderCount)
+            )
+        }
+    }
+
+    private func publishRenderedLineCount(_ count: Int) {
+        guard count != renderedLineCount else {
+            return
+        }
+        var transaction = Transaction()
+        transaction.disablesAnimations = true
+        withTransaction(transaction) {
+            renderedLineCount = count
         }
     }
 
@@ -3824,6 +3926,7 @@ struct RecordingDetailView: View {
     @State private var isSavingTranscriptLineEdit = false
     @State private var cachedTranscriptText = ""
     @State private var cachedTranscriptLines: [StoredTranscriptLine] = []
+    @State private var cachedTranscriptSpeakers: [TranscriptSpeakerPresentation] = []
     @State private var scrubbedPlaybackTime: TimeInterval?
     @State private var translationConfiguration: TranslationSession.Configuration?
     @State private var selectedTranslationLanguage: TranscriptionLanguage?
@@ -3880,7 +3983,7 @@ struct RecordingDetailView: View {
     }
 
     private var transcriptSpeakerEditOptions: [TranscriptSpeakerEditOption] {
-        TranscriptSpeakerPresentation.makePresentations(for: cachedTranscriptLines).map { speaker in
+        cachedTranscriptSpeakers.map { speaker in
             TranscriptSpeakerEditOption(
                 id: speaker.id,
                 displayName: speaker.displayName,
@@ -3890,7 +3993,7 @@ struct RecordingDetailView: View {
     }
 
     private var newTranscriptSpeakerEditOption: TranscriptSpeakerEditOption {
-        let presentations = TranscriptSpeakerPresentation.makePresentations(for: cachedTranscriptLines)
+        let presentations = cachedTranscriptSpeakers
         let comparisonKeys = Set(presentations.map { speaker in
             speaker.id.folding(
                 options: [.caseInsensitive, .diacriticInsensitive, .widthInsensitive],
@@ -4277,6 +4380,7 @@ struct RecordingDetailView: View {
                 .ignoresSafeArea()
         }
         .onAppear {
+            HapticFeedback.prepare(.navigation)
             chatEngine.configure(recordingID: currentItem.id)
             updatePlayerNowPlayingTranscript()
             store.refreshIntelligenceAvailability()
@@ -4642,7 +4746,7 @@ struct RecordingDetailView: View {
         ScrollViewReader { scrollProxy in
             ZStack {
                 ScrollView {
-                    VStack(alignment: .leading, spacing: 16) {
+                    LazyVStack(alignment: .leading, spacing: 16) {
                         header
                         if currentItem.keyPoints != nil {
                             keyPointsCard
@@ -5347,7 +5451,7 @@ struct RecordingDetailView: View {
     private var transcript: some View {
         let item = currentItem
         let lines = cachedTranscriptLines
-        let speakers = TranscriptSpeakerPresentation.makePresentations(for: lines)
+        let speakers = cachedTranscriptSpeakers
         let speakerByID = Dictionary(uniqueKeysWithValues: speakers.map { ($0.id, $0) })
         let showsSpeakerDistinction = speakers.count > 1
 
@@ -5398,6 +5502,7 @@ struct RecordingDetailView: View {
                 PlaybackSyncedTranscriptRows(
                     recordingID: item.id,
                     lines: lines,
+                    initialLineID: initialTranscriptScrollTarget,
                     speakerByID: speakerByID,
                     showsSpeakerDistinction: showsSpeakerDistinction,
                     translatedTranscriptByLineID: translatedTranscriptByLineID,
@@ -6146,8 +6251,14 @@ struct RecordingDetailView: View {
             return
         }
 
-        cachedTranscriptText = text
-        cachedTranscriptLines = lines
+        let speakers = TranscriptSpeakerPresentation.makePresentations(for: lines)
+        var transaction = Transaction()
+        transaction.disablesAnimations = true
+        withTransaction(transaction) {
+            cachedTranscriptText = text
+            cachedTranscriptLines = lines
+            cachedTranscriptSpeakers = speakers
+        }
         updatePlayerNowPlayingTranscript()
         translatedTranscriptByLineID = [:]
         translatedTranscriptCache = translatedTranscriptCache.filter { key, _ in
@@ -6260,10 +6371,14 @@ struct RecordingDetailView: View {
                 }
             )
             let updatedTranscriptText = store.transcriptText(for: updatedItem)
-            cachedTranscriptText = updatedTranscriptText
-            cachedTranscriptLines = StoredTranscriptLine.parse(
+            let updatedLines = StoredTranscriptLine.parse(
                 updatedTranscriptText,
                 speakerDiarization: updatedItem.speakerDiarization
+            )
+            cachedTranscriptText = updatedTranscriptText
+            cachedTranscriptLines = updatedLines
+            cachedTranscriptSpeakers = TranscriptSpeakerPresentation.makePresentations(
+                for: updatedLines
             )
             updatePlayerNowPlayingTranscript()
             clearTranscriptTranslationState()

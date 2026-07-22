@@ -1,3 +1,5 @@
+import AVFAudio
+import Combine
 import TranscriberDomain
 import XCTest
 @testable import LiveTranscriber
@@ -50,5 +52,103 @@ final class CaptionSnapshotTests: XCTestCase {
 
         XCTAssertEqual(store.snapshot.originalText, "Keep me")
         XCTAssertEqual(store.snapshot.sessionState, .paused)
+    }
+}
+
+@MainActor
+final class RecordingPlaybackTimelineTests: XCTestCase {
+    func testStartingPlaybackAfterSeekDoesNotPublishEarlierTime() async throws {
+        let url = FileManager.default.temporaryDirectory
+            .appendingPathComponent("playback-timeline-\(UUID().uuidString).wav")
+        defer { try? FileManager.default.removeItem(at: url) }
+        try writeSilentWAV(to: url, duration: 7)
+
+        let controller = RecordingPlaybackController()
+        await controller.load(url: url)
+        XCTAssertTrue(controller.isLoaded)
+
+        controller.seek(to: 5.16)
+        var observedTimes: [TimeInterval] = []
+        let observation = controller.$currentTime.sink { time in
+            observedTimes.append(time)
+        }
+
+        controller.play()
+        try await Task.sleep(for: .milliseconds(600))
+        controller.pause()
+        withExtendedLifetime(observation) {}
+
+        XCTAssertFalse(observedTimes.isEmpty)
+        XCTAssertGreaterThanOrEqual(
+            observedTimes.min() ?? 0,
+            5.159,
+            "Published playback times: \(observedTimes)"
+        )
+        controller.unload()
+    }
+
+    func testResumingAtNewSeekDoesNotRepublishPreviousPlaybackPosition() async throws {
+        let url = FileManager.default.temporaryDirectory
+            .appendingPathComponent("playback-resume-timeline-\(UUID().uuidString).wav")
+        defer { try? FileManager.default.removeItem(at: url) }
+        try writeSilentWAV(to: url, duration: 45)
+
+        let controller = RecordingPlaybackController()
+        await controller.load(url: url)
+        XCTAssertTrue(controller.isLoaded)
+
+        let transcriptLines = StoredTranscriptLine.parse(
+            "[00:17:50] Previous line\n[00:37:80] Selected line"
+        )
+        let previousLineID = try XCTUnwrap(transcriptLines.first?.id)
+        let selectedLine = try XCTUnwrap(transcriptLines.last)
+
+        controller.seek(to: transcriptLines[0].startSeconds)
+        controller.play()
+        try await Task.sleep(for: .milliseconds(350))
+        controller.pause()
+
+        controller.seek(to: selectedLine.startSeconds)
+        var observedTimes: [TimeInterval] = []
+        var observedLineIDs: [StoredTranscriptLine.ID] = []
+        let observation = controller.$currentTime.sink { time in
+            observedTimes.append(time)
+            if let lineID = StoredTranscriptLine.currentLineID(in: transcriptLines, time: time) {
+                observedLineIDs.append(lineID)
+            }
+        }
+
+        controller.play()
+        try await Task.sleep(for: .milliseconds(600))
+        controller.pause()
+        withExtendedLifetime(observation) {}
+
+        XCTAssertFalse(observedTimes.isEmpty)
+        XCTAssertFalse(
+            observedLineIDs.contains(previousLineID),
+            "Highlighted transcript lines: \(observedLineIDs); published times: \(observedTimes)"
+        )
+        XCTAssertTrue(observedLineIDs.contains(selectedLine.id))
+        XCTAssertGreaterThanOrEqual(
+            observedTimes.min() ?? 0,
+            selectedLine.startSeconds,
+            "Published playback times: \(observedTimes)"
+        )
+        controller.unload()
+    }
+
+    private func writeSilentWAV(to url: URL, duration: TimeInterval) throws {
+        let sampleRate = 44_100.0
+        let format = try XCTUnwrap(
+            AVAudioFormat(standardFormatWithSampleRate: sampleRate, channels: 1)
+        )
+        let frameCount = AVAudioFrameCount(duration * sampleRate)
+        let buffer = try XCTUnwrap(
+            AVAudioPCMBuffer(pcmFormat: format, frameCapacity: frameCount)
+        )
+        buffer.frameLength = frameCount
+
+        let file = try AVAudioFile(forWriting: url, settings: format.settings)
+        try file.write(from: buffer)
     }
 }
