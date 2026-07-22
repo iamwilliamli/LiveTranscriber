@@ -23,6 +23,21 @@ struct RecordingDraft {
     var lines: [TranscriptionLine]
 }
 
+struct RecordingSearchResult: Identifiable, Equatable, Sendable {
+    let recordingID: RecordingItem.ID
+    let transcriptMatch: RecordingSearchTranscriptMatch?
+
+    var id: RecordingItem.ID {
+        recordingID
+    }
+}
+
+struct RecordingSearchTranscriptMatch: Equatable, Sendable {
+    let lineID: StoredTranscriptLine.ID
+    let timeText: String
+    let text: String
+}
+
 struct RecordingItem: Identifiable, Codable, Hashable {
     var id: UUID
     var createdAt: Date
@@ -958,6 +973,225 @@ private struct MergedRecordingResult {
     var inferredItemIDs: Set<RecordingItem.ID>
 }
 
+struct RecordingStorageFileDiscoveryRequirements: Sendable, Equatable {
+    var needsTranscript: Bool
+    var needsDuration: Bool
+
+    mutating func formUnion(_ other: Self) {
+        needsTranscript = needsTranscript || other.needsTranscript
+        needsDuration = needsDuration || other.needsDuration
+    }
+}
+
+struct RecordingStorageFileSnapshot: Sendable, Equatable {
+    var url: URL
+    var creationDate: Date?
+    var contentModificationDate: Date?
+    var transcript: String?
+    var durationSeconds: Int?
+}
+
+/// Owns potentially blocking file-system and iCloud container work so a
+/// RecordingStore can stay MainActor-isolated without freezing SwiftUI.
+actor RecordingStorageWorker {
+    typealias ICloudContainerResolver = @Sendable (String) -> URL?
+
+    nonisolated private static let logger = Logger(
+        subsystem: "com.reddownloader.LiveTranscriber",
+        category: "RecordingStorageWorker"
+    )
+
+    private let fileManager = FileManager.default
+    private let iCloudContainerResolver: ICloudContainerResolver
+
+    init(
+        iCloudContainerResolver: @escaping ICloudContainerResolver = { identifier in
+            FileManager.default.url(forUbiquityContainerIdentifier: identifier)
+        }
+    ) {
+        self.iCloudContainerResolver = iCloudContainerResolver
+    }
+
+    func resolveICloudContainer(identifier: String) -> URL? {
+        iCloudContainerResolver(identifier)
+    }
+
+    func prepareRecordingsDirectory(
+        at destinationDirectory: URL,
+        migrationSources: [URL],
+        audioFileExtensions: Set<String>
+    ) throws {
+        try fileManager.createDirectory(
+            at: destinationDirectory,
+            withIntermediateDirectories: true
+        )
+
+        for sourceDirectory in Self.uniqueDirectories(migrationSources)
+        where sourceDirectory.standardizedFileURL.path
+            != destinationDirectory.standardizedFileURL.path {
+            try migrateRecordingFiles(
+                from: sourceDirectory,
+                to: destinationDirectory,
+                audioFileExtensions: audioFileExtensions
+            )
+        }
+    }
+
+    func firstReadableData(at urls: [URL]) throws -> Data? {
+        for url in urls where fileManager.fileExists(atPath: url.path) {
+            return try Data(contentsOf: url)
+        }
+        return nil
+    }
+
+    func discoverRecordingFiles(
+        at directory: URL,
+        audioFileExtensions: Set<String>,
+        requirementsByFileName: [String: RecordingStorageFileDiscoveryRequirements],
+        tombstonedIDs: Set<UUID>
+    ) throws -> [RecordingStorageFileSnapshot] {
+        let fileURLs = try fileManager.contentsOfDirectory(
+            at: directory,
+            includingPropertiesForKeys: [
+                .creationDateKey,
+                .contentModificationDateKey,
+                .isRegularFileKey,
+            ],
+            options: [.skipsHiddenFiles]
+        )
+
+        return fileURLs.compactMap { fileURL in
+            let fileExtension = fileURL.pathExtension.lowercased()
+            guard audioFileExtensions.contains(fileExtension),
+                  !fileURL.lastPathComponent.hasPrefix(".") else {
+                return nil
+            }
+
+            let storageID = UUID(
+                uuidString: fileURL.deletingPathExtension().lastPathComponent
+            )
+            guard storageID.map({ !tombstonedIDs.contains($0) }) ?? true else {
+                return nil
+            }
+
+            let values = try? fileURL.resourceValues(
+                forKeys: [.creationDateKey, .contentModificationDateKey]
+            )
+            let requirements = requirementsByFileName[fileURL.lastPathComponent]
+                ?? RecordingStorageFileDiscoveryRequirements(
+                    needsTranscript: true,
+                    needsDuration: true
+                )
+            let transcript: String?
+            if requirements.needsTranscript {
+                let transcriptURL = directory.appendingPathComponent(
+                    fileURL.deletingPathExtension().lastPathComponent + ".txt"
+                )
+                transcript = (try? String(contentsOf: transcriptURL, encoding: .utf8)) ?? ""
+            } else {
+                transcript = nil
+            }
+
+            let durationSeconds: Int?
+            if requirements.needsDuration {
+                durationSeconds = (try? RecordingStore.durationSeconds(for: fileURL)) ?? 0
+            } else {
+                durationSeconds = nil
+            }
+
+            return RecordingStorageFileSnapshot(
+                url: fileURL,
+                creationDate: values?.creationDate,
+                contentModificationDate: values?.contentModificationDate,
+                transcript: transcript,
+                durationSeconds: durationSeconds
+            )
+        }
+    }
+
+    func removeFiles(
+        matchingStorageStems storageStems: Set<String>,
+        in directories: [URL]
+    ) {
+        guard !storageStems.isEmpty else {
+            return
+        }
+
+        for directory in Self.uniqueDirectories(directories) {
+            guard let urls = try? fileManager.contentsOfDirectory(
+                at: directory,
+                includingPropertiesForKeys: nil,
+                options: [.skipsHiddenFiles]
+            ) else {
+                continue
+            }
+
+            for url in urls {
+                let lowercasedName = url.lastPathComponent.lowercased()
+                let storageStem = lowercasedName
+                    .split(separator: ".", maxSplits: 1)
+                    .first
+                    .map(String.init)
+                guard storageStem.map(storageStems.contains) == true else {
+                    continue
+                }
+                do {
+                    try fileManager.removeItem(at: url)
+                } catch {
+                    Self.logger.error(
+                        "Tombstoned file cleanup failed file=\(url.lastPathComponent, privacy: .private) error=\(error.localizedDescription, privacy: .public)"
+                    )
+                }
+            }
+        }
+    }
+
+    private func migrateRecordingFiles(
+        from sourceDirectory: URL,
+        to destinationDirectory: URL,
+        audioFileExtensions: Set<String>
+    ) throws {
+        guard fileManager.fileExists(atPath: sourceDirectory.path) else {
+            return
+        }
+
+        let fileURLs = try fileManager.contentsOfDirectory(
+            at: sourceDirectory,
+            includingPropertiesForKeys: [.isRegularFileKey],
+            options: [.skipsHiddenFiles]
+        )
+
+        for sourceURL in fileURLs {
+            let fileExtension = sourceURL.pathExtension.lowercased()
+            guard audioFileExtensions.contains(fileExtension) || fileExtension == "txt" else {
+                continue
+            }
+
+            let destinationURL = destinationDirectory.appendingPathComponent(
+                sourceURL.lastPathComponent
+            )
+            guard !fileManager.fileExists(atPath: destinationURL.path) else {
+                continue
+            }
+
+            do {
+                try fileManager.copyItem(at: sourceURL, to: destinationURL)
+            } catch {
+                Self.logger.error(
+                    "Migration copy failed file=\(sourceURL.lastPathComponent, privacy: .private) ext=\(fileExtension, privacy: .public) error=\(error.localizedDescription, privacy: .public)"
+                )
+            }
+        }
+    }
+
+    private static func uniqueDirectories(_ directories: [URL]) -> [URL] {
+        var seen = Set<String>()
+        return directories.filter { directory in
+            seen.insert(directory.standardizedFileURL.path).inserted
+        }
+    }
+}
+
 enum RecordingStoragePreference {
     static let iCloudStorageEnabledDefaultsKey = "RecordingStore.iCloudStorageEnabled"
 
@@ -976,6 +1210,7 @@ final class RecordingStore: ObservableObject {
     @Published private var iCloudSyncStatusCache: [RecordingItem.ID: RecordingICloudSyncStatus] = [:]
     @Published private(set) var isICloudStorageEnabled: Bool = false
     @Published private(set) var isStorageLocationChanging = false
+    @Published private var cachedICloudContainerURL: URL?
 
     private static let logger = Logger(subsystem: "com.reddownloader.LiveTranscriber", category: "RecordingStore")
     nonisolated private static let iCloudLogger = Logger(subsystem: "com.reddownloader.LiveTranscriber", category: "ICloudSync")
@@ -988,6 +1223,8 @@ final class RecordingStore: ObservableObject {
 
     private let fileManager = FileManager.default
     private let userDefaults: UserDefaults
+    private let storageWorker: RecordingStorageWorker
+    private let searchWorker = RecordingSearchWorker()
     private var modelContainer: ModelContainer?
     private let encoder: JSONEncoder = {
         let encoder = JSONEncoder()
@@ -1006,6 +1243,7 @@ final class RecordingStore: ObservableObject {
     private var searchIndexWarmupTask: Task<Void, Never>?
     private var iCloudSyncStatusRefreshTask: Task<Void, Never>?
     private var spotlightIndexTask: Task<Void, Never>?
+    private var preparedRecordingsDirectoryPaths = Set<String>()
 
     private var applicationSupportDirectory: URL {
         fileManager.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
@@ -1022,12 +1260,8 @@ final class RecordingStore: ObservableObject {
 
     private let importWorker = RecordingStoreImportWorker()
 
-    private var iCloudContainerURL: URL? {
-        fileManager.url(forUbiquityContainerIdentifier: Self.iCloudContainerIdentifier)
-    }
-
     private var availableICloudRecordingsDirectory: URL? {
-        iCloudContainerURL?.appendingPathComponent("Data/Recordings", isDirectory: true)
+        cachedICloudContainerURL?.appendingPathComponent("Data/Recordings", isDirectory: true)
     }
 
     private var iCloudRecordingsDirectory: URL? {
@@ -1036,8 +1270,8 @@ final class RecordingStore: ObservableObject {
 
     private var legacyICloudRecordingsDirectories: [URL] {
         [
-            iCloudContainerURL?.appendingPathComponent("Recordings", isDirectory: true),
-            iCloudContainerURL?.appendingPathComponent("Documents/Recordings", isDirectory: true)
+            cachedICloudContainerURL?.appendingPathComponent("Recordings", isDirectory: true),
+            cachedICloudContainerURL?.appendingPathComponent("Documents/Recordings", isDirectory: true)
         ].compactMap { $0 }
     }
 
@@ -1125,8 +1359,12 @@ final class RecordingStore: ObservableObject {
             && !userDefaults.bool(forKey: Self.legacyICloudDefaultMigrationDefaultsKey)
     }
 
-    init(userDefaults: UserDefaults = .standard) {
+    init(
+        userDefaults: UserDefaults = .standard,
+        storageWorker: RecordingStorageWorker = RecordingStorageWorker()
+    ) {
         self.userDefaults = userDefaults
+        self.storageWorker = storageWorker
         isICloudStorageEnabled = RecordingStoragePreference.isICloudStorageEnabled(in: userDefaults)
         deletedRecordingTombstones = Self.loadDeletedRecordingTombstones(from: userDefaults)
         configureModelContainer()
@@ -1155,10 +1393,30 @@ final class RecordingStore: ObservableObject {
     func reload(synchronizeMetadata: Bool = true) async {
         refreshIntelligenceAvailability()
         do {
-            try ensureRecordingsDirectory()
-            retryTombstonedFileCleanup()
-            let indexedRecordings = try loadIndexedRecordings()
-            let mergedResult = try mergedRecordings(with: indexedRecordings)
+            let previousDirectory = recordingsDirectory
+            if isICloudStorageEnabled || shouldMigrateLegacyICloudDefaultStorage {
+                await refreshICloudContainerURL()
+            }
+            let destinationDirectory = recordingsDirectory
+            try await prepareRecordingsDirectory(
+                at: destinationDirectory,
+                additionalMigrationSource: previousDirectory.path == destinationDirectory.path
+                    ? nil
+                    : previousDirectory
+            )
+            await retryTombstonedFileCleanup()
+            let indexedRecordings = try await loadIndexedRecordings()
+            let requirements = recordingDiscoveryRequirements(for: indexedRecordings)
+            let discoveredFiles = try await storageWorker.discoverRecordingFiles(
+                at: destinationDirectory,
+                audioFileExtensions: Self.audioFileExtensions,
+                requirementsByFileName: requirements,
+                tombstonedIDs: Set(deletedRecordingTombstones.keys)
+            )
+            let mergedResult = mergedRecordings(
+                with: indexedRecordings,
+                discoveredFiles: discoveredFiles
+            )
             inferredRecordingIDs = mergedResult.inferredItemIDs
             recordings = mergedResult.items
                 .map(resolvingCategoryReference)
@@ -1199,31 +1457,45 @@ final class RecordingStore: ObservableObject {
         }
 
         isStorageLocationChanging = true
+        defer {
+            isStorageLocationChanging = false
+        }
+
+        if enabled || isICloudStorageEnabled {
+            await refreshICloudContainerURL()
+        }
+
         let previousDirectory = recordingsDirectory
+        let destinationDirectory = enabled
+            ? (availableICloudRecordingsDirectory ?? localRecordingsDirectory)
+            : localRecordingsDirectory
         let currentRecordings = recordings
 
-        userDefaults.set(enabled, forKey: RecordingStoragePreference.iCloudStorageEnabledDefaultsKey)
-        isICloudStorageEnabled = enabled
-
         do {
-            try ensureRecordingsDirectory()
-            let destinationDirectory = recordingsDirectory
-            if previousDirectory.path != destinationDirectory.path {
-                try migrateRecordingFiles(from: previousDirectory, to: destinationDirectory)
-            }
+            try await prepareRecordingsDirectory(
+                at: destinationDirectory,
+                additionalMigrationSource: previousDirectory.path == destinationDirectory.path
+                    ? nil
+                    : previousDirectory
+            )
+
+            userDefaults.set(
+                enabled,
+                forKey: RecordingStoragePreference.iCloudStorageEnabledDefaultsKey
+            )
+            isICloudStorageEnabled = enabled
 
             if !currentRecordings.isEmpty {
                 recordings = currentRecordings
                 try persist()
             }
-
         } catch {
             Self.logger.error("Storage location switch failed: \(error.localizedDescription, privacy: .public)")
+            return
         }
 
         RecordingMetadataCloudSync.shared.setEnabled(enabled)
         await reload()
-        isStorageLocationChanging = false
     }
 
     @discardableResult
@@ -1238,7 +1510,7 @@ final class RecordingStore: ObservableObject {
         location: RecordingLocation? = nil
     ) async -> RecordingItem? {
         do {
-            try ensureRecordingsDirectory()
+            try await prepareActiveRecordingsDirectory()
 
             let recordingID = UUID()
             let baseName = try uniqueBaseName(forProposedName: preferredName, fallbackDate: draft.startedAt)
@@ -1314,7 +1586,7 @@ final class RecordingStore: ObservableObject {
         videoProgressHandler: (@MainActor @Sendable (Double) -> Void)?
     ) async throws -> RecordingItem {
         let language = TranscriptionLanguage(id: TranscriptionLanguage.defaultLanguageID)
-        try ensureRecordingsDirectory()
+        try await prepareActiveRecordingsDirectory()
 
         let createdAt = Date()
         let recordingID = UUID()
@@ -1406,7 +1678,7 @@ final class RecordingStore: ObservableObject {
         language: TranscriptionLanguage,
         localWhisperModel: LocalWhisperModel? = nil
     ) async throws -> RecordingItem {
-        try ensureRecordingsDirectory()
+        try await prepareActiveRecordingsDirectory()
 
         let createdAt = Date()
         let recordingID = UUID()
@@ -2440,15 +2712,19 @@ final class RecordingStore: ObservableObject {
     }
 
     func assetURLs(for item: RecordingItem) -> [URL] {
+        storedAssetURLs(for: item).map(prepareUbiquitousItemForAccess)
+    }
+
+    /// Produces paths without touching ubiquitous-item state. Status polling
+    /// must remain observational and must not start downloading every asset.
+    private func storedAssetURLs(for item: RecordingItem) -> [URL] {
         var seenPaths = Set<String>()
         return item.assets.compactMap { asset in
             guard asset.isSafeRelativePath,
                   seenPaths.insert(asset.relativePath).inserted else {
                 return nil
             }
-            return prepareUbiquitousItemForAccess(
-                recordingsDirectory.appendingPathComponent(asset.relativePath)
-            )
+            return recordingsDirectory.appendingPathComponent(asset.relativePath)
         }
     }
 
@@ -2516,7 +2792,7 @@ final class RecordingStore: ObservableObject {
         let workItems = recordings.map {
             RecordingICloudSyncStatusWorkItem(
                 id: $0.id,
-                fileURLs: assetURLs(for: $0)
+                fileURLs: storedAssetURLs(for: $0)
             )
         }
 
@@ -2577,6 +2853,53 @@ final class RecordingStore: ObservableObject {
             normalizedText: normalizedText
         )
         return normalizedText
+    }
+
+    func searchRecordings(matching query: String) async -> [RecordingSearchResult] {
+        let normalizedQuery = query.normalizedForRecordingSearch
+        guard !normalizedQuery.isEmpty else {
+            return []
+        }
+
+        let workItems = recordings.map { item in
+            let signature = searchIndexSignature(for: item)
+            let cachedNormalizedText: String?
+            if let cachedEntry = searchIndexCache[item.id],
+               cachedEntry.signature == signature {
+                cachedNormalizedText = cachedEntry.normalizedText
+            } else {
+                cachedNormalizedText = nil
+            }
+
+            return RecordingSearchQueryWorkItem(
+                id: item.id,
+                signature: signature,
+                metadataText: searchMetadataText(for: item),
+                transcriptURL: transcriptURL(for: item),
+                cachedNormalizedText: cachedNormalizedText
+            )
+        }
+
+        let batch = await searchWorker.search(
+            normalizedQuery: normalizedQuery,
+            workItems: workItems
+        )
+        guard !Task.isCancelled else {
+            return []
+        }
+
+        for entry in batch.indexEntries {
+            guard let currentItem = recordings.first(where: { $0.id == entry.id }),
+                  searchIndexSignature(for: currentItem) == entry.signature else {
+                continue
+            }
+            searchIndexCache[entry.id] = RecordingSearchIndexCacheEntry(
+                signature: entry.signature,
+                normalizedText: entry.normalizedText
+            )
+        }
+
+        return batch.results
     }
 
     func shareURLs(for item: RecordingItem) -> [URL] {
@@ -2825,18 +3148,79 @@ final class RecordingStore: ObservableObject {
         )
     }
 
-    private func ensureRecordingsDirectory() throws {
-        try fileManager.createDirectory(at: recordingsDirectory, withIntermediateDirectories: true)
-        try migrateLegacyRecordingFilesIfNeeded()
+    private func refreshICloudContainerURL() async {
+        cachedICloudContainerURL = await storageWorker.resolveICloudContainer(
+            identifier: Self.iCloudContainerIdentifier
+        )
     }
 
-    private func loadIndexedRecordings() throws -> [RecordingItem] {
+    private func prepareActiveRecordingsDirectory() async throws {
+        let previousDirectory = recordingsDirectory
+        if isICloudStorageEnabled {
+            await refreshICloudContainerURL()
+        }
+        let destinationDirectory = recordingsDirectory
+        try await prepareRecordingsDirectory(
+            at: destinationDirectory,
+            additionalMigrationSource: previousDirectory.path == destinationDirectory.path
+                ? nil
+                : previousDirectory
+        )
+    }
+
+    private func prepareRecordingsDirectory(
+        at destinationDirectory: URL,
+        additionalMigrationSource: URL? = nil
+    ) async throws {
+        let standardizedDestinationPath = destinationDirectory.standardizedFileURL.path
+        let needsLegacyMigration = !preparedRecordingsDirectoryPaths.contains(
+            standardizedDestinationPath
+        )
+        var migrationSources: [URL] = []
+        if needsLegacyMigration {
+            migrationSources = [legacyLocalRecordingsDirectory, localRecordingsDirectory]
+                + legacyICloudRecordingsDirectories
+        }
+        if let additionalMigrationSource {
+            migrationSources.append(additionalMigrationSource)
+        }
+
+        let migratesLegacyICloudDefault = shouldMigrateLegacyICloudDefaultStorage
+            && availableICloudRecordingsDirectory?.standardizedFileURL.path
+                != standardizedDestinationPath
+        if migratesLegacyICloudDefault,
+           let sourceDirectory = availableICloudRecordingsDirectory {
+            migrationSources.append(sourceDirectory)
+        }
+
+        try await storageWorker.prepareRecordingsDirectory(
+            at: destinationDirectory,
+            migrationSources: migrationSources,
+            audioFileExtensions: Self.audioFileExtensions
+        )
+        preparedRecordingsDirectoryPaths.insert(standardizedDestinationPath)
+
+        if migratesLegacyICloudDefault {
+            userDefaults.set(true, forKey: Self.legacyICloudDefaultMigrationDefaultsKey)
+        }
+    }
+
+    /// Synchronous callers only need the active directory to exist. Legacy
+    /// migration is deliberately handled by the async storage worker above.
+    private func ensureRecordingsDirectory() throws {
+        try fileManager.createDirectory(
+            at: recordingsDirectory,
+            withIntermediateDirectories: true
+        )
+    }
+
+    private func loadIndexedRecordings() async throws -> [RecordingItem] {
         let swiftDataItems = try loadSwiftDataRecordings()
         if !swiftDataItems.isEmpty {
             return swiftDataItems
         }
 
-        let legacyItems = try loadLegacyJSONRecordings()
+        let legacyItems = try await loadLegacyJSONRecordings()
         if !legacyItems.isEmpty {
             try persist(legacyItems)
         }
@@ -2854,29 +3238,39 @@ final class RecordingStore: ObservableObject {
         return try context.fetch(descriptor).map(\.item)
     }
 
-    private func loadLegacyJSONRecordings() throws -> [RecordingItem] {
-        for indexURL in legacyIndexURLs where fileManager.fileExists(atPath: indexURL.path) {
-            let data = try Data(contentsOf: indexURL)
-            return try decoder.decode([RecordingItem].self, from: data)
+    private func loadLegacyJSONRecordings() async throws -> [RecordingItem] {
+        guard let data = try await storageWorker.firstReadableData(at: legacyIndexURLs) else {
+            return []
         }
-        return []
+        return try decoder.decode([RecordingItem].self, from: data)
     }
 
-    private func mergedRecordings(with indexedRecordings: [RecordingItem]) throws -> MergedRecordingResult {
-        let fileURLs = try fileManager.contentsOfDirectory(
-            at: recordingsDirectory,
-            includingPropertiesForKeys: [.creationDateKey, .contentModificationDateKey, .isRegularFileKey],
-            options: [.skipsHiddenFiles]
-        )
-        let audioFileURLs = fileURLs.filter { fileURL in
-            let fileExtension = fileURL.pathExtension.lowercased()
-            let storageID = UUID(uuidString: fileURL.deletingPathExtension().lastPathComponent)
-            let isTombstoned = storageID.map { deletedRecordingTombstones[$0] != nil } ?? false
-            return Self.audioFileExtensions.contains(fileExtension)
-                && fileURL.lastPathComponent.hasPrefix(".") == false
-                && !isTombstoned
+    private func recordingDiscoveryRequirements(
+        for indexedRecordings: [RecordingItem]
+    ) -> [String: RecordingStorageFileDiscoveryRequirements] {
+        var requirementsByFileName: [String: RecordingStorageFileDiscoveryRequirements] = [:]
+        for item in indexedRecordings {
+            let requirements = RecordingStorageFileDiscoveryRequirements(
+                needsTranscript: item.transcriptPreview
+                    .trimmingCharacters(in: .whitespacesAndNewlines)
+                    .isEmpty || item.lineCount <= 0,
+                needsDuration: item.durationSeconds <= 0
+            )
+            if var existing = requirementsByFileName[item.audioFileName] {
+                existing.formUnion(requirements)
+                requirementsByFileName[item.audioFileName] = existing
+            } else {
+                requirementsByFileName[item.audioFileName] = requirements
+            }
         }
-        let availableAudioFileNames = Set(audioFileURLs.map(\.lastPathComponent))
+        return requirementsByFileName
+    }
+
+    private func mergedRecordings(
+        with indexedRecordings: [RecordingItem],
+        discoveredFiles: [RecordingStorageFileSnapshot]
+    ) -> MergedRecordingResult {
+        let availableAudioFileNames = Set(discoveredFiles.map { $0.url.lastPathComponent })
         var itemsByAudioFileName: [String: RecordingItem] = [:]
         var inferredItemIDs = Set<RecordingItem.ID>()
 
@@ -2905,13 +3299,14 @@ final class RecordingStore: ObservableObject {
             }
         }
 
-        for fileURL in audioFileURLs {
-            if var existing = itemsByAudioFileName[fileURL.lastPathComponent] {
-                existing = refreshedItem(existing, audioURL: fileURL)
-                itemsByAudioFileName[fileURL.lastPathComponent] = existing
+        for discoveredFile in discoveredFiles {
+            let fileName = discoveredFile.url.lastPathComponent
+            if var existing = itemsByAudioFileName[fileName] {
+                existing = refreshedItem(existing, discoveredFile: discoveredFile)
+                itemsByAudioFileName[fileName] = existing
             } else {
-                let item = inferredItem(for: fileURL)
-                itemsByAudioFileName[fileURL.lastPathComponent] = item
+                let item = inferredItem(for: discoveredFile)
+                itemsByAudioFileName[fileName] = item
                 inferredItemIDs.insert(item.id)
             }
         }
@@ -2994,36 +3389,41 @@ final class RecordingStore: ObservableObject {
         return score
     }
 
-    private func refreshedItem(_ item: RecordingItem, audioURL: URL) -> RecordingItem {
+    private func refreshedItem(
+        _ item: RecordingItem,
+        discoveredFile: RecordingStorageFileSnapshot
+    ) -> RecordingItem {
         var refreshed = item
         if refreshed.transcriptPreview.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-            || refreshed.lineCount <= 0 {
-            let transcript = transcriptText(for: item)
+            || refreshed.lineCount <= 0,
+           let transcript = discoveredFile.transcript {
             refreshed.transcriptPreview = transcript.plainTranscriptTextForIntelligence
             refreshed.lineCount = transcript.transcriptLineCount
         }
         if refreshed.durationSeconds <= 0,
-           let duration = try? Self.durationSeconds(for: audioURL) {
+           let duration = discoveredFile.durationSeconds {
             refreshed.durationSeconds = duration
         }
         return refreshed
     }
 
-    private func inferredItem(for audioURL: URL) -> RecordingItem {
+    private func inferredItem(
+        for discoveredFile: RecordingStorageFileSnapshot
+    ) -> RecordingItem {
+        let audioURL = discoveredFile.url
         let fileBaseName = audioURL.deletingPathExtension().lastPathComponent
         let createdAt = Self.dateFromDefaultBaseName(fileBaseName)
-            ?? (try? audioURL.resourceValues(forKeys: [.creationDateKey, .contentModificationDateKey]).creationDate)
-            ?? (try? audioURL.resourceValues(forKeys: [.contentModificationDateKey]).contentModificationDate)
+            ?? discoveredFile.creationDate
+            ?? discoveredFile.contentModificationDate
             ?? Date()
         let transcriptFileName = audioURL.deletingPathExtension().lastPathComponent + ".txt"
-        let transcriptURL = recordingsDirectory.appendingPathComponent(transcriptFileName)
-        let transcript = (try? String(contentsOf: transcriptURL, encoding: .utf8)) ?? ""
+        let transcript = discoveredFile.transcript ?? ""
         let language = TranscriptionLanguage(id: TranscriptionLanguage.defaultLanguageID)
 
         return RecordingItem(
             id: UUID(uuidString: fileBaseName) ?? UUID(),
             createdAt: createdAt,
-            durationSeconds: (try? Self.durationSeconds(for: audioURL)) ?? 0,
+            durationSeconds: discoveredFile.durationSeconds ?? 0,
             languageID: language.id,
             languageName: language.displayName,
             displayName: UUID(uuidString: fileBaseName) == nil
@@ -3055,54 +3455,6 @@ final class RecordingStore: ObservableObject {
         formatter.locale = Locale(identifier: "en_US_POSIX")
         formatter.dateFormat = "yyyyMMdd_HHmmss"
         return formatter.date(from: timestamp)
-    }
-
-    private func migrateLegacyRecordingFilesIfNeeded() throws {
-        let destinationDirectory = recordingsDirectory
-        let sourceDirectories = ([legacyLocalRecordingsDirectory, localRecordingsDirectory] + legacyICloudRecordingsDirectories)
-            .filter { $0.path != destinationDirectory.path }
-        for sourceDirectory in sourceDirectories {
-            try migrateRecordingFiles(from: sourceDirectory, to: destinationDirectory)
-        }
-
-        if shouldMigrateLegacyICloudDefaultStorage,
-           let sourceDirectory = availableICloudRecordingsDirectory,
-           sourceDirectory.path != destinationDirectory.path {
-            try migrateRecordingFiles(from: sourceDirectory, to: destinationDirectory)
-            userDefaults.set(true, forKey: Self.legacyICloudDefaultMigrationDefaultsKey)
-        }
-    }
-
-    private func migrateRecordingFiles(from sourceDirectory: URL, to destinationDirectory: URL) throws {
-        guard fileManager.fileExists(atPath: sourceDirectory.path) else {
-            return
-        }
-
-        let fileURLs = try fileManager.contentsOfDirectory(
-            at: sourceDirectory,
-            includingPropertiesForKeys: [.isRegularFileKey],
-            options: [.skipsHiddenFiles]
-        )
-
-        for sourceURL in fileURLs {
-            let fileExtension = sourceURL.pathExtension.lowercased()
-            guard Self.audioFileExtensions.contains(fileExtension) || fileExtension == "txt" else {
-                continue
-            }
-
-            let destinationURL = destinationDirectory.appendingPathComponent(sourceURL.lastPathComponent)
-            guard !fileManager.fileExists(atPath: destinationURL.path) else {
-                continue
-            }
-
-            do {
-                try fileManager.copyItem(at: sourceURL, to: destinationURL)
-            } catch {
-                Self.iCloudLogger.error(
-                    "migration-copy-failed file=\(sourceURL.lastPathComponent, privacy: .private) ext=\(fileExtension, privacy: .public) error=\(error.localizedDescription, privacy: .public)"
-                )
-            }
-        }
     }
 
     private func removeRecordingFilesFromAllManagedDirectories(_ item: RecordingItem) throws {
@@ -3137,29 +3489,12 @@ final class RecordingStore: ObservableObject {
         try removeRecordingFilesNamed(Array(fileNames))
     }
 
-    private func retryTombstonedFileCleanup() {
+    private func retryTombstonedFileCleanup() async {
         let stems = Set(deletedRecordingTombstones.keys.map { $0.uuidString.lowercased() })
-        guard !stems.isEmpty else {
-            return
-        }
-        var fileNames = Set<String>()
-        for directory in managedRecordingsDirectories {
-            guard let urls = try? fileManager.contentsOfDirectory(
-                at: directory,
-                includingPropertiesForKeys: nil,
-                options: [.skipsHiddenFiles]
-            ) else {
-                continue
-            }
-            for url in urls {
-                let lowercasedName = url.lastPathComponent.lowercased()
-                let storageStem = lowercasedName.split(separator: ".", maxSplits: 1).first.map(String.init)
-                if storageStem.map(stems.contains) == true {
-                    fileNames.insert(url.lastPathComponent)
-                }
-            }
-        }
-        try? removeRecordingFilesNamed(Array(fileNames))
+        await storageWorker.removeFiles(
+            matchingStorageStems: stems,
+            in: managedRecordingsDirectories
+        )
     }
 
     private func addDeletedRecordingTombstone(id: RecordingItem.ID) {
@@ -3371,19 +3706,7 @@ final class RecordingStore: ObservableObject {
             return RecordingSearchIndexWorkItem(
                 id: item.id,
                 signature: signature,
-                metadataText: [
-                    item.displayName,
-                    item.audioFileName,
-                    item.assets.map(\.relativePath).joined(separator: " "),
-                    item.localizedLanguageName,
-                    item.languageName,
-                    item.transcriptPreview,
-                    item.combinedTags.joined(separator: " "),
-                    item.projectName ?? "",
-                    item.keyPoints ?? "",
-                    item.intelligence?.summary ?? "",
-                    item.meetingAnalysis?.searchableText ?? ""
-                ].joined(separator: "\n"),
+                metadataText: searchMetadataText(for: item),
                 transcriptURL: transcriptURL(for: item)
             )
         }
@@ -3429,6 +3752,23 @@ final class RecordingStore: ObservableObject {
                 self.searchIndexWarmupTask = nil
             }
         }
+    }
+
+    private func searchMetadataText(for item: RecordingItem) -> String {
+        [
+            item.displayName,
+            item.audioFileName,
+            item.assets.map(\.relativePath).joined(separator: " "),
+            item.localizedLanguageName,
+            item.languageName,
+            item.transcriptPreview,
+            item.combinedTags.joined(separator: " "),
+            item.projectName ?? "",
+            item.keyPoints ?? "",
+            item.intelligence?.summary ?? "",
+            item.meetingAnalysis?.searchableText ?? "",
+            item.audioEventAnalysis?.searchableText ?? ""
+        ].joined(separator: "\n")
     }
 
     private func searchIndexSignature(for item: RecordingItem) -> String {
@@ -3771,17 +4111,132 @@ private struct RecordingICloudSyncStatusWorkItem {
     var fileURLs: [URL]
 }
 
-private struct RecordingSearchIndexWorkItem {
+private struct RecordingSearchIndexWorkItem: Sendable {
     var id: RecordingItem.ID
     var signature: String
     var metadataText: String
     var transcriptURL: URL
 }
 
-private struct RecordingSearchIndexWarmupEntry {
+private struct RecordingSearchIndexWarmupEntry: Sendable {
     var id: RecordingItem.ID
     var signature: String
     var normalizedText: String
+}
+
+private struct RecordingSearchQueryWorkItem: Sendable {
+    var id: RecordingItem.ID
+    var signature: String
+    var metadataText: String
+    var transcriptURL: URL
+    var cachedNormalizedText: String?
+}
+
+private struct RecordingSearchQueryBatch: Sendable {
+    var results: [RecordingSearchResult]
+    var indexEntries: [RecordingSearchIndexWarmupEntry]
+}
+
+private struct RecordingSearchTranscriptLine: Sendable {
+    var id: StoredTranscriptLine.ID
+    var timeText: String
+    var text: String
+    var normalizedText: String
+}
+
+private struct RecordingSearchTranscriptCacheEntry: Sendable {
+    var signature: String
+    var lines: [RecordingSearchTranscriptLine]
+}
+
+private actor RecordingSearchWorker {
+    private var transcriptCache: [RecordingItem.ID: RecordingSearchTranscriptCacheEntry] = [:]
+
+    func search(
+        normalizedQuery: String,
+        workItems: [RecordingSearchQueryWorkItem]
+    ) -> RecordingSearchQueryBatch {
+        let currentIDs = Set(workItems.map(\.id))
+        transcriptCache = transcriptCache.filter { currentIDs.contains($0.key) }
+
+        var results: [RecordingSearchResult] = []
+        var indexEntries: [RecordingSearchIndexWarmupEntry] = []
+
+        for workItem in workItems {
+            guard !Task.isCancelled else {
+                break
+            }
+
+            var transcript: String?
+            let normalizedText: String
+            if let cachedNormalizedText = workItem.cachedNormalizedText {
+                normalizedText = cachedNormalizedText
+            } else {
+                let loadedTranscript = Self.loadTranscript(from: workItem.transcriptURL)
+                transcript = loadedTranscript
+                normalizedText = [workItem.metadataText, loadedTranscript]
+                    .joined(separator: "\n")
+                    .normalizedForRecordingSearch
+                indexEntries.append(
+                    RecordingSearchIndexWarmupEntry(
+                        id: workItem.id,
+                        signature: workItem.signature,
+                        normalizedText: normalizedText
+                    )
+                )
+            }
+
+            guard normalizedText.contains(normalizedQuery) else {
+                continue
+            }
+
+            let lines: [RecordingSearchTranscriptLine]
+            if let cachedEntry = transcriptCache[workItem.id],
+               cachedEntry.signature == workItem.signature {
+                lines = cachedEntry.lines
+            } else {
+                let loadedTranscript = transcript ?? Self.loadTranscript(from: workItem.transcriptURL)
+                lines = StoredTranscriptLine.parse(loadedTranscript).map { line in
+                    RecordingSearchTranscriptLine(
+                        id: line.id,
+                        timeText: line.timeText,
+                        text: line.text,
+                        normalizedText: "[\(line.timeText)] \(line.text)".normalizedForRecordingSearch
+                    )
+                }
+                transcriptCache[workItem.id] = RecordingSearchTranscriptCacheEntry(
+                    signature: workItem.signature,
+                    lines: lines
+                )
+            }
+
+            let transcriptMatch = lines.first { line in
+                line.normalizedText.contains(normalizedQuery)
+            }.map { line in
+                RecordingSearchTranscriptMatch(
+                    lineID: line.id,
+                    timeText: line.timeText,
+                    text: line.text
+                )
+            }
+
+            results.append(
+                RecordingSearchResult(
+                    recordingID: workItem.id,
+                    transcriptMatch: transcriptMatch
+                )
+            )
+        }
+
+        return RecordingSearchQueryBatch(
+            results: results,
+            indexEntries: indexEntries
+        )
+    }
+
+    private static func loadTranscript(from url: URL) -> String {
+        (try? String(contentsOf: url, encoding: .utf8)) ?? ""
+    }
 }
 
 private struct RecordingSpotlightIndexWorkItem: Sendable {

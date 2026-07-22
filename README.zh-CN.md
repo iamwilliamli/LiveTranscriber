@@ -195,14 +195,16 @@ LiveTranscriber 默认按本地优先设计。
   test
 ```
 
-两个命令都使用 Xcode 标准的增量 DerivedData 目录。日常开发请打开 `LiveTranscriber.xcworkspace`。真机测试需要配置 signing team，并启用 iCloud 和 Live Activity 相关 capabilities；macOS App ID 也需要关联现有 iCloud container。
+两个命令都使用 Xcode 标准的增量 DerivedData 目录。iOS 和 macOS 开发统一打开根目录的 `LiveTranscriber.xcworkspace`，然后选择 `LiveTranscriber` scheme 运行 iOS，或选择 `LiveTranscriberMac` scheme 运行 macOS。这个 workspace 同时管理两个 app 工程，并把它们引用的本地 Swift Package 解析为同一个 package graph。真机测试需要配置 signing team，并启用 iCloud 和 Live Activity 相关 capabilities；macOS App ID 也需要关联现有 iCloud container。
 
 ## 项目结构
 
 - `LiveTranscriber/`：主 iOS app target。
+- `LiveTranscriber.xcworkspace`：iOS 与 macOS 工程的唯一 Xcode 入口。
 - `LiveTranscriberWidget/`：锁屏、灵动岛和桌面组件扩展。
 - `LiveTranscriberMac/`：原生 macOS app；工程由目录中的 `project.yml` 生成。
 - `Packages/TranscriberDomain/`：跨平台录音模型和平台无关的 service 边界。
+- `Packages/Qwen3Speech/`：固定版本的 Qwen3 ASR、VAD 和音频运行时精简子集，包含 Mac Archive 兼容层。
 - `Vendor/`：内置 whisper.cpp 和 llama.cpp XCFramework。
 - `docs/`：工程文档。
 - `DEVELOPMENT_NOTES.md`：开发记录和实现细节。

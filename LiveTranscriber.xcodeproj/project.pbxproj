@@ -491,7 +491,7 @@
 			);
 			mainGroup = 7B0000000000000000003001;
 			packageReferences = (
-				7B000000000000000000B001 /* XCRemoteSwiftPackageReference "speech-swift" */,
+				7B000000000000000000B001 /* XCLocalSwiftPackageReference "Packages/Qwen3Speech" */,
 				7B000000000000000000B005 /* XCLocalSwiftPackageReference "Vendor/MLXAudioMOSS" */,
 				7B000000000000000000B008 /* XCLocalSwiftPackageReference "Packages/TranscriberDomain" */,
 			);
@@ -1014,6 +1014,10 @@
 /* End XCConfigurationList section */
 
 /* Begin XCLocalSwiftPackageReference section */
+		7B000000000000000000B001 /* XCLocalSwiftPackageReference "Packages/Qwen3Speech" */ = {
+			isa = XCLocalSwiftPackageReference;
+			relativePath = Packages/Qwen3Speech;
+		};
 		7B000000000000000000B005 /* XCLocalSwiftPackageReference "Vendor/MLXAudioMOSS" */ = {
 			isa = XCLocalSwiftPackageReference;
 			relativePath = Vendor/MLXAudioMOSS;
@@ -1024,31 +1028,20 @@
 		};
 /* End XCLocalSwiftPackageReference section */
 
-/* Begin XCRemoteSwiftPackageReference section */
-		7B000000000000000000B001 /* XCRemoteSwiftPackageReference "speech-swift" */ = {
-			isa = XCRemoteSwiftPackageReference;
-			repositoryURL = "https://github.com/soniqo/speech-swift";
-			requirement = {
-				kind = revision;
-				revision = a7fd06d6f68f167203fb995f7bdb8bc9ed10c179;
-			};
-		};
-/* End XCRemoteSwiftPackageReference section */
-
 /* Begin XCSwiftPackageProductDependency section */
 		7B000000000000000000B002 /* Qwen3ASR */ = {
 			isa = XCSwiftPackageProductDependency;
-			package = 7B000000000000000000B001 /* XCRemoteSwiftPackageReference "speech-swift" */;
+			package = 7B000000000000000000B001 /* XCLocalSwiftPackageReference "Packages/Qwen3Speech" */;
 			productName = Qwen3ASR;
 		};
 		7B000000000000000000B003 /* SpeechVAD */ = {
 			isa = XCSwiftPackageProductDependency;
-			package = 7B000000000000000000B001 /* XCRemoteSwiftPackageReference "speech-swift" */;
+			package = 7B000000000000000000B001 /* XCLocalSwiftPackageReference "Packages/Qwen3Speech" */;
 			productName = SpeechVAD;
 		};
 		7B000000000000000000B004 /* AudioCommon */ = {
 			isa = XCSwiftPackageProductDependency;
-			package = 7B000000000000000000B001 /* XCRemoteSwiftPackageReference "speech-swift" */;
+			package = 7B000000000000000000B001 /* XCLocalSwiftPackageReference "Packages/Qwen3Speech" */;
 			productName = AudioCommon;
 		};
 		7B000000000000000000B006 /* MLXAudioSTT */ = {

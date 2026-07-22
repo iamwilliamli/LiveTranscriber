@@ -9,7 +9,9 @@ options:
 
 settings:
   base:
+    ARCHS: arm64
     DEVELOPMENT_TEAM: F8M4T754W4
+    "EXCLUDED_ARCHS[sdk=macosx*]": x86_64
     SWIFT_VERSION: "5.0"
     MACOSX_DEPLOYMENT_TARGET: "26.0"
 
@@ -18,14 +20,14 @@ packages:
     path: ../Packages/TranscriberDomain
   MLXAudioMOSS:
     path: ../Vendor/MLXAudioMOSS
-  speech-swift:
-    url: https://github.com/soniqo/speech-swift
-    revision: a7fd06d6f68f167203fb995f7bdb8bc9ed10c179
+  Qwen3Speech:
+    path: ../Packages/Qwen3Speech
 
 targets:
   LiveTranscriberMac:
     type: application
     platform: macOS
+    productName: Live Transcriber
     deploymentTarget: "26.0"
     sources:
       - path: Sources
@@ -55,11 +57,11 @@ targets:
         product: MLXAudioCore
       - package: MLXAudioMOSS
         product: MLXAudioSTT
-      - package: speech-swift
+      - package: Qwen3Speech
         product: AudioCommon
-      - package: speech-swift
+      - package: Qwen3Speech
         product: Qwen3ASR
-      - package: speech-swift
+      - package: Qwen3Speech
         product: SpeechVAD
       - framework: ../Vendor/whisper.xcframework
         embed: true
@@ -81,7 +83,7 @@ targets:
           - "$(inherited)"
           - "@executable_path/../Frameworks"
         MARKETING_VERSION: 1.0
-        PRODUCT_BUNDLE_IDENTIFIER: com.iamwilliamli.LiveTranscriber.mac
+        PRODUCT_BUNDLE_IDENTIFIER: com.iamwilliamli.LiveTranscriber
         PRODUCT_MODULE_NAME: LiveTranscriberMac
         PRODUCT_NAME: Live Transcriber
         SWIFT_EMIT_LOC_STRINGS: YES

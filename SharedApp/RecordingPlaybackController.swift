@@ -644,11 +644,15 @@ struct RetroRecordingDisplay: View {
 
     private let displayRed = Color(red: 0.94, green: 0.08, blue: 0.13)
 
+    private var effectiveDuration: TimeInterval {
+        player.duration > 0 ? player.duration : duration
+    }
+
     private func playbackProgress(for currentTime: TimeInterval) -> CGFloat {
-        guard duration > 0 else {
+        guard effectiveDuration > 0 else {
             return 0
         }
-        return CGFloat(min(max(currentTime / duration, 0), 1))
+        return CGFloat(min(max(currentTime / effectiveDuration, 0), 1))
     }
 
     var body: some View {
@@ -689,7 +693,7 @@ struct RetroRecordingDisplay: View {
                 ) { _ in
                     let currentTime = min(
                         max(scrubbedTime ?? player.presentationTime(), 0),
-                        duration
+                        effectiveDuration
                     )
 
                     VStack(spacing: 8) {
@@ -704,7 +708,7 @@ struct RetroRecordingDisplay: View {
 
                         RetroDotMatrixTime(
                             text: Self.displayTimestamp(currentTime),
-                            accessibilityText: "\(TranscriptionLine.formatTimestamp(currentTime)) / \(TranscriptionLine.formatTimestamp(duration))"
+                            accessibilityText: "\(TranscriptionLine.formatTimestamp(currentTime)) / \(TranscriptionLine.formatTimestamp(effectiveDuration))"
                         )
                         .frame(maxWidth: .infinity)
                         .frame(height: 40)

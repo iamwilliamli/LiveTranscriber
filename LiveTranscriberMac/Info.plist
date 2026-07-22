@@ -9,9 +9,7 @@
 	<key>CFBundleDisplayName</key>
 	<string>Live Transcriber</string>
 	<key>CFBundleIconFile</key>
-	<string>AppIcon</string>
-	<key>CFBundleIconName</key>
-	<string>AppIcon</string>
+	<string>AppIcon.icns</string>
 	<key>CFBundleDocumentTypes</key>
 	<array>
 		<dict>
@@ -46,7 +44,7 @@
 	<array>
 		<dict>
 			<key>CFBundleURLName</key>
-			<string>com.iamwilliamli.LiveTranscriber.mac</string>
+			<string>$(PRODUCT_BUNDLE_IDENTIFIER)</string>
 			<key>CFBundleURLSchemes</key>
 			<array>
 				<string>livetranscriber</string>

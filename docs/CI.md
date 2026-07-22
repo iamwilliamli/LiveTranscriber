@@ -16,7 +16,7 @@ GitHub's hosted macOS image currently provides Xcode 26, while this repository a
 
 ## Local verification
 
-Open `LiveTranscriber.xcworkspace`, or run these commands from the repository root. Do not set a temporary `-derivedDataPath`; Xcode's standard DerivedData directory preserves the same incremental behavior as the app.
+Open the root `LiveTranscriber.xcworkspace` for both iOS and macOS, or run these commands from the repository root. Switch schemes to choose the platform. Do not set a temporary `-derivedDataPath`; Xcode's standard DerivedData directory preserves the same incremental behavior as the app.
 
 ```sh
 /Applications/Xcode-beta.app/Contents/Developer/usr/bin/xcodebuild \
@@ -39,13 +39,18 @@ Open `LiveTranscriber.xcworkspace`, or run these commands from the repository ro
   /usr/bin/xcrun swift test \
   --package-path Packages/TranscriberDomain \
   --scratch-path "$HOME/Library/Developer/Xcode/DerivedData/TranscriberDomain-SwiftPM"
+
+/usr/bin/env DEVELOPER_DIR=/Applications/Xcode-beta.app/Contents/Developer \
+  /usr/bin/xcrun swift test \
+  --package-path Packages/Qwen3Speech \
+  --scratch-path "$HOME/Library/Developer/Xcode/DerivedData/Qwen3Speech-SwiftPM"
 ```
 
 Unsigned builds verify compilation and unit behavior only. Before release, smoke-test microphone recording on iPhone and ScreenCaptureKit capture on a signed Mac because TCC permissions, iCloud containers, audio devices, and capture selection cannot be validated reliably in hosted CI.
 
 ## Xcode package resolution
 
-Always open `LiveTranscriber.xcworkspace`, not either `.xcodeproj` on its own. Both app projects consume the local `Packages/TranscriberDomain` package, and the workspace is the source of truth for resolving those shared products.
+Use the root `LiveTranscriber.xcworkspace` for both apps. It contains `LiveTranscriber.xcodeproj` and `LiveTranscriberMac/LiveTranscriberMac.xcodeproj`; Xcode resolves their common local dependencies (`Packages/TranscriberDomain`, `Packages/Qwen3Speech`, and `Vendor/MLXAudioMOSS`) once in the workspace package graph.
 
 If Xcode reports `Missing package product 'TranscriberDomain'` or `Missing package product 'TranscriberCore'`, first let its current package operation finish, then use **File > Packages > Resolve Package Versions**. The equivalent command is:
 
@@ -56,4 +61,4 @@ If Xcode reports `Missing package product 'TranscriberDomain'` or `Missing packa
   -scheme LiveTranscriberMac
 ```
 
-This preserves Xcode's standard incremental DerivedData. If the issue navigator still shows the old error after resolution succeeds, close the project window and reopen `LiveTranscriber.xcworkspace`; clearing all DerivedData should not be the first recovery step.
+This preserves Xcode's standard incremental DerivedData. If the issue navigator still shows an old package error after resolution succeeds, close standalone project or legacy workspace windows and reopen only the root workspace; clearing all DerivedData should not be the first recovery step.

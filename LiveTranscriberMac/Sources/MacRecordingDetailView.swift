@@ -1286,7 +1286,7 @@ struct MacRecordingDetailView: View {
             }
         } label: {
             Label {
-                Text(L10n.Recordings.retranscribe)
+                Text(L10n.Recordings.transcribeMenu)
             } icon: {
                 Image(systemName: "arrow.triangle.2.circlepath")
             }

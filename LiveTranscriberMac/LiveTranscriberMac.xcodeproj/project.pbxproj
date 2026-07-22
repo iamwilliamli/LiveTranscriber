@@ -36,6 +36,7 @@
 		73158A59C5EB49DCDDAE0DF1 /* MacAppRouterTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0D6A7590E00F79DE4B86AD8 /* MacAppRouterTests.swift */; };
 		73589EA76D788F22CA0A8F01 /* RedditSans-SemiBold.ttf in Resources */ = {isa = PBXBuildFile; fileRef = B4CF3033EA3598315C13DF00 /* RedditSans-SemiBold.ttf */; };
 		76ECF1CA59BEF12A813E83F7 /* llama.xcframework in Frameworks */ = {isa = PBXBuildFile; fileRef = 46DF79EEE4BC0337420BCC2A /* llama.xcframework */; };
+		78EB372E9A0B45E7C86B5F02 /* RecordingStorageWorkerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C437BFE70454DFFDA1E94003 /* RecordingStorageWorkerTests.swift */; };
 		7BD6950FFA57D5E442921E59 /* Qwen3ASR in Frameworks */ = {isa = PBXBuildFile; productRef = 24FE01861B9B42129E29F29E /* Qwen3ASR */; };
 		837CADD96B8AA95E8E38C148 /* Semantic.xcstrings in Resources */ = {isa = PBXBuildFile; fileRef = F0BE2BBE4A046B8C04380F05 /* Semantic.xcstrings */; };
 		838B0BC2E0D44DBEDEA6A2D6 /* RecordingSiriIntegration.swift in Sources */ = {isa = PBXBuildFile; fileRef = B0C92B8BEC17DBD43717E8C5 /* RecordingSiriIntegration.swift */; };
@@ -114,7 +115,6 @@
 		17725894D745821199272623 /* MacSettingsPanes.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MacSettingsPanes.swift; sourceTree = "<group>"; };
 		197463093921BB48BFE55B44 /* RedditSans-Medium.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = "RedditSans-Medium.ttf"; sourceTree = "<group>"; };
 		1BBEA8E293C582A020907DD2 /* AppleTranslationLanguages.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppleTranslationLanguages.swift; sourceTree = "<group>"; };
-		2470C7C27246AF9E5C609031 /* LiveTranscriberMac.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = LiveTranscriberMac.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		2573CED1409B57C23CF777E9 /* nl */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = nl; path = nl.lproj/MacSemantic.strings; sourceTree = "<group>"; };
 		2634230B9223CBD4060D96FF /* MacRecordingDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MacRecordingDetailView.swift; sourceTree = "<group>"; };
 		2CD443BE33B5872DCA9D6A95 /* TranscriptContextBuilder.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TranscriptContextBuilder.swift; sourceTree = "<group>"; };
@@ -141,8 +141,10 @@
 		77CBE83090216D49DB10677A /* RecordingAudioFileInfo.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecordingAudioFileInfo.swift; sourceTree = "<group>"; };
 		7FC9DBD7AC31F9AB4D8DEE4B /* ja */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = ja; path = ja.lproj/MacSemantic.strings; sourceTree = "<group>"; };
 		821E6657F8A5B5C88AB65394 /* zh-Hans */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = "zh-Hans"; path = "zh-Hans.lproj/MacSemantic.strings"; sourceTree = "<group>"; };
+		83ACA4B840CE311852CFC9DC /* Live Transcriber.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "Live Transcriber.app"; sourceTree = BUILT_PRODUCTS_DIR; };
 		84CF7CD42A7125C505E2246F /* AudioEvents.xcstrings */ = {isa = PBXFileReference; lastKnownFileType = text.json.xcstrings; path = AudioEvents.xcstrings; sourceTree = "<group>"; };
 		8E18B1FB714E3FD5FAA005E0 /* RecordingPlaybackController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecordingPlaybackController.swift; sourceTree = "<group>"; };
+		917823D6178F261FE1907EBB /* Qwen3Speech */ = {isa = PBXFileReference; lastKnownFileType = folder; name = Qwen3Speech; path = ../Packages/Qwen3Speech; sourceTree = SOURCE_ROOT; };
 		91EF35227F4AD5063649A3AD /* LocalLlamaBridge.mm */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.objcpp; path = LocalLlamaBridge.mm; sourceTree = "<group>"; };
 		92EDB649F0FE3E9F9AC8E2C0 /* LiveTranscriberMacApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LiveTranscriberMacApp.swift; sourceTree = "<group>"; };
 		95B06ABA88BA86F5E3A5D1C5 /* MacMOSSSmokeTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MacMOSSSmokeTests.swift; sourceTree = "<group>"; };
@@ -165,6 +167,7 @@
 		B4CF3033EA3598315C13DF00 /* RedditSans-SemiBold.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = "RedditSans-SemiBold.ttf"; sourceTree = "<group>"; };
 		B6F6F8EFBE4AB3DB79F81588 /* GeminiCloudService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GeminiCloudService.swift; sourceTree = "<group>"; };
 		B8F96DA3E91DB04C2401E630 /* AppleSpeechTranscriptionSupport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppleSpeechTranscriptionSupport.swift; sourceTree = "<group>"; };
+		C437BFE70454DFFDA1E94003 /* RecordingStorageWorkerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecordingStorageWorkerTests.swift; sourceTree = "<group>"; };
 		C62296427DC5E4E11DAC202A /* LocalSummaryIntelligence.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocalSummaryIntelligence.swift; sourceTree = "<group>"; };
 		CAFCE71198AAEBE50E67E8CB /* LocalLlamaBridge.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = LocalLlamaBridge.h; sourceTree = "<group>"; };
 		D00F7A96162B638213442082 /* AppTypography.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppTypography.swift; sourceTree = "<group>"; };
@@ -230,6 +233,7 @@
 			isa = PBXGroup;
 			children = (
 				3A520A2A6BB86705E9E0E160 /* MLXAudioMOSS */,
+				917823D6178F261FE1907EBB /* Qwen3Speech */,
 				B2E20A2F0A072F466C62C4BF /* TranscriberDomain */,
 			);
 			name = Packages;
@@ -238,7 +242,7 @@
 		26AE504ED635E07D2646A20A /* Products */ = {
 			isa = PBXGroup;
 			children = (
-				2470C7C27246AF9E5C609031 /* LiveTranscriberMac.app */,
+				83ACA4B840CE311852CFC9DC /* Live Transcriber.app */,
 				3D1E550DDA30966FACB8E7BC /* LiveTranscriberMacTests.xctest */,
 			);
 			name = Products;
@@ -250,6 +254,7 @@
 				A0D6A7590E00F79DE4B86AD8 /* MacAppRouterTests.swift */,
 				95B06ABA88BA86F5E3A5D1C5 /* MacMOSSSmokeTests.swift */,
 				9D9AFFD255F38840CA2F5FF9 /* MacSystemAudioCaptureTests.swift */,
+				C437BFE70454DFFDA1E94003 /* RecordingStorageWorkerTests.swift */,
 			);
 			path = Tests;
 			sourceTree = "<group>";
@@ -388,7 +393,7 @@
 				BB48017B57B4962940CBA33F /* SpeechVAD */,
 			);
 			productName = LiveTranscriberMac;
-			productReference = 2470C7C27246AF9E5C609031 /* LiveTranscriberMac.app */;
+			productReference = 83ACA4B840CE311852CFC9DC /* Live Transcriber.app */;
 			productType = "com.apple.product-type.application";
 		};
 		F010A0C149C1874C1983E956 /* LiveTranscriberMacTests */ = {
@@ -444,8 +449,8 @@
 			mainGroup = 67383329FEB00399BAEF0B60;
 			minimizedProjectReferenceProxies = 1;
 			packageReferences = (
-				5EBC4F5F2377AC835601A13D /* XCRemoteSwiftPackageReference "speech-swift" */,
 				339FE1848B032029F78F6B5C /* XCLocalSwiftPackageReference "../Vendor/MLXAudioMOSS" */,
+				915251F70FF4898C32C5E2CA /* XCLocalSwiftPackageReference "../Packages/Qwen3Speech" */,
 				8D4C5B570667A664567F54EB /* XCLocalSwiftPackageReference "../Packages/TranscriberDomain" */,
 			);
 			preferredProjectObjectVersion = 77;
@@ -539,6 +544,7 @@
 				73158A59C5EB49DCDDAE0DF1 /* MacAppRouterTests.swift in Sources */,
 				E9649D3B82A7DC1037BC4FD5 /* MacMOSSSmokeTests.swift in Sources */,
 				487AB650D7DFC5C8F6A89AA6 /* MacSystemAudioCaptureTests.swift in Sources */,
+				78EB372E9A0B45E7C86B5F02 /* RecordingStorageWorkerTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -591,7 +597,7 @@
 				);
 				MACOSX_DEPLOYMENT_TARGET = 26.0;
 				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = com.iamwilliamli.LiveTranscriber.mac;
+				PRODUCT_BUNDLE_IDENTIFIER = com.iamwilliamli.LiveTranscriber;
 				PRODUCT_MODULE_NAME = LiveTranscriberMac;
 				PRODUCT_NAME = "Live Transcriber";
 				SDKROOT = macosx;
@@ -623,7 +629,7 @@
 				);
 				MACOSX_DEPLOYMENT_TARGET = 26.0;
 				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = com.iamwilliamli.LiveTranscriber.mac;
+				PRODUCT_BUNDLE_IDENTIFIER = com.iamwilliamli.LiveTranscriber;
 				PRODUCT_MODULE_NAME = LiveTranscriberMac;
 				PRODUCT_NAME = "Live Transcriber";
 				SDKROOT = macosx;
@@ -655,6 +661,7 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ALWAYS_SEARCH_USER_PATHS = NO;
+				ARCHS = arm64;
 				CLANG_ANALYZER_NONNULL = YES;
 				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
 				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
@@ -689,6 +696,7 @@
 				DEVELOPMENT_TEAM = F8M4T754W4;
 				ENABLE_NS_ASSERTIONS = NO;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				"EXCLUDED_ARCHS[sdk=macosx*]" = x86_64;
 				GCC_C_LANGUAGE_STANDARD = gnu11;
 				GCC_NO_COMMON_BLOCKS = YES;
 				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
@@ -730,6 +738,7 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ALWAYS_SEARCH_USER_PATHS = NO;
+				ARCHS = arm64;
 				CLANG_ANALYZER_NONNULL = YES;
 				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
 				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
@@ -764,6 +773,7 @@
 				DEVELOPMENT_TEAM = F8M4T754W4;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
 				ENABLE_TESTABILITY = YES;
+				"EXCLUDED_ARCHS[sdk=macosx*]" = x86_64;
 				GCC_C_LANGUAGE_STANDARD = gnu11;
 				GCC_DYNAMIC_NO_PIC = NO;
 				GCC_NO_COMMON_BLOCKS = YES;
@@ -831,23 +841,15 @@
 			isa = XCLocalSwiftPackageReference;
 			relativePath = ../Packages/TranscriberDomain;
 		};
-/* End XCLocalSwiftPackageReference section */
-
-/* Begin XCRemoteSwiftPackageReference section */
-		5EBC4F5F2377AC835601A13D /* XCRemoteSwiftPackageReference "speech-swift" */ = {
-			isa = XCRemoteSwiftPackageReference;
-			repositoryURL = "https://github.com/soniqo/speech-swift";
-			requirement = {
-				kind = revision;
-				revision = a7fd06d6f68f167203fb995f7bdb8bc9ed10c179;
-			};
+		915251F70FF4898C32C5E2CA /* XCLocalSwiftPackageReference "../Packages/Qwen3Speech" */ = {
+			isa = XCLocalSwiftPackageReference;
+			relativePath = ../Packages/Qwen3Speech;
 		};
-/* End XCRemoteSwiftPackageReference section */
+/* End XCLocalSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
 		24FE01861B9B42129E29F29E /* Qwen3ASR */ = {
 			isa = XCSwiftPackageProductDependency;
-			package = 5EBC4F5F2377AC835601A13D /* XCRemoteSwiftPackageReference "speech-swift" */;
 			productName = Qwen3ASR;
 		};
 		65A09FC313CDF5F880C7F21A /* MLXAudioCore */ = {
@@ -868,7 +870,6 @@
 		};
 		BB48017B57B4962940CBA33F /* SpeechVAD */ = {
 			isa = XCSwiftPackageProductDependency;
-			package = 5EBC4F5F2377AC835601A13D /* XCRemoteSwiftPackageReference "speech-swift" */;
 			productName = SpeechVAD;
 		};
 		E0B2A813EFB2F988E6C1C94A /* TranscriberDomain */ = {
@@ -877,7 +878,6 @@
 		};
 		E136894C5318D4A1DBE2CB5D /* AudioCommon */ = {
 			isa = XCSwiftPackageProductDependency;
-			package = 5EBC4F5F2377AC835601A13D /* XCRemoteSwiftPackageReference "speech-swift" */;
 			productName = AudioCommon;
 		};
 /* End XCSwiftPackageProductDependency section */

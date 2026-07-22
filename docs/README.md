@@ -9,6 +9,7 @@ This folder contains focused engineering notes for LiveTranscriber. Keep user-fa
 - [Live Activity Design](LIVE_ACTIVITY.md): Lock Screen and Dynamic Island state, layout, and update policy.
 - [Localization](LOCALIZATION.md): Semantic string catalog rules, Swift usage patterns, and steps for adding a new language.
 - [Native macOS Architecture](architecture/macos-foundation.md): Workspace boundaries, shared domain models, storage compatibility, capture pipeline, and branch policy.
+- [Planned iOS Screen Audio and Floating Captions](architecture/ios-screen-audio-captions.md): Future iOS 26 ReplayKit and iOS 27 ScreenCaptureKit capture backends, bilingual Picture in Picture captions, implementation order, and device verification gates.
 - [Continuous Integration](CI.md): iOS, macOS, and shared-package verification lanes plus the Xcode 27 release gate.
 - [Development Notes](../DEVELOPMENT_NOTES.md): Full project log, feature notes, tradeoffs, and TestFlight checklist.
 

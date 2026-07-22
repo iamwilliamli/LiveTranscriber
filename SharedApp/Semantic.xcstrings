@@ -1088,30 +1088,6 @@
         }
       }
     },
-    "control.quick_recording.description" : {
-      "comment" : "Description of the macOS quick recording shortcut.",
-      "extractionState" : "extracted_with_value",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "Open Live Transcriber and start recording."
-          }
-        }
-      }
-    },
-    "control.quick_recording.start" : {
-      "comment" : "Shortcuts short title for starting a recording on macOS.\nmacOS shortcut action that opens Live Transcriber and starts recording.",
-      "extractionState" : "extracted_with_value",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "Start Recording"
-          }
-        }
-      }
-    },
     "gemini_cloud.api_key" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -20899,6 +20875,48 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "錄音檔案"
+          }
+        }
+      }
+    },
+    "recordings.transcribe_menu" : {
+      "comment" : "Menu title for choosing a recording transcription engine.",
+      "extractionState" : "stale",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Transkribieren"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Transcribe"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "文字起こし"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Transcriberen"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "转录"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "轉錄"
           }
         }
       }

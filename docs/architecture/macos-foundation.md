@@ -1,14 +1,16 @@
 # Native macOS foundation
 
-Live Transcriber is managed as one repository with two native application projects in one workspace:
+Live Transcriber is managed as one repository with two native application projects and one root workspace entry point:
 
 - `LiveTranscriber.xcodeproj` owns the existing iOS and Widget targets.
 - `LiveTranscriberMac/LiveTranscriberMac.xcodeproj` owns the native macOS app.
-- `LiveTranscriber.xcworkspace` is the development entry point for both products.
+- `LiveTranscriber.xcworkspace` contains both projects and is the development entry point for both platforms.
 - `TranscriberDomain` owns Foundation-only shared value types.
 - `TranscriberCore` owns Foundation-only service protocols and depends on `TranscriberDomain`.
 
 The macOS app is not a Catalyst target and does not compile the iOS source directory. Platform-independent behavior lives in two shared layers; platform capture and presentation code remain in their respective app targets.
+
+The two app targets remain in separate projects because their lifecycle, entitlements, resources, and platform integrations differ. The root workspace loads both projects and resolves their common local package references as one graph, so day-to-day development and CI can switch platforms by scheme without opening another Xcode container.
 
 ## SharedApp layer
 
@@ -63,7 +65,9 @@ The macOS app compiles the full `SharedApp/` stack and exposes the principal iOS
 
 ## Vendored ggml frameworks
 
-`Vendor/whisper.xcframework` and `Vendor/llama.xcframework` carry iOS device, iOS simulator, and macOS (`macos-arm64_x86_64`) slices built from pinned upstream commits — whisper.cpp `6fc7c33b4c3a2cec83e4b65abd5e96a890480375` and llama.cpp `fdb1db877c526ec90f668eca1b858da5dba85560` — using each repository's `build-xcframework.sh`. The whisper bridge (`SharedApp/LocalWhisperBridge.m`) loads the framework with `dlopen` and mirrors its C structs, so any slice rebuild must come from the same source revision on every platform; the llama bridge compiles against `<llama/llama.h>` directly and degrades to a stub via `__has_include` when the framework is absent.
+`Vendor/whisper.xcframework` and `Vendor/llama.xcframework` carry iOS device, iOS simulator, and Apple-Silicon macOS (`macos-arm64`) slices built from pinned upstream commits — whisper.cpp `6fc7c33b4c3a2cec83e4b65abd5e96a890480375` and llama.cpp `fdb1db877c526ec90f668eca1b858da5dba85560` — using each repository's `build-xcframework.sh`. The macOS slices include UUID-matched dSYMs so App Store Connect can upload symbols from an Archive. The whisper bridge (`SharedApp/LocalWhisperBridge.m`) loads the framework with `dlopen` and mirrors its C structs, so any slice rebuild must come from the same source revision on every platform; the llama bridge compiles against `<llama/llama.h>` directly and degrades to a stub via `__has_include` when the framework is absent.
+
+`Packages/Qwen3Speech` is the app-used source subset of `soniqo/speech-swift` revision `a7fd06d6f68f167203fb995f7bdb8bc9ed10c179`: `AudioCommon`, `MLXCommon`, `Qwen3ASR`, and `SpeechVAD`. It replaces the remote whole-repository dependency so both app projects compile the same pinned code. Xcode's generic macOS Archive action builds Swift Package products for arm64 and x86_64 even though the final app is arm64-only; the package therefore supplies a two-byte IEEE-754 half implementation only for the auxiliary x86_64 compilation path. Apple Silicon runtime code continues to use native `Swift.Float16`.
 
 ## Repository and branch policy
 
@@ -71,7 +75,7 @@ The Mac app is a second product in this repository, not a permanent platform bra
 
 The iOS baseline from before the Mac project is retained as the annotated tag `ios-baseline-before-macos-2026-07-21`. Do not keep a long-running `macOS` branch after this foundation is reviewed: that would make shared-model migrations and fixes drift between two histories.
 
-Pull requests should keep the shared domain, iOS compatibility build, and macOS tests green. A release additionally requires a full Xcode 27 iOS build and signed device smoke tests. iOS and macOS retain separate bundle identifiers, signing/App Store records, versions, and release timing even though their source and recording schema live together.
+Pull requests should keep the shared domain, iOS compatibility build, and macOS tests green. A release additionally requires a full Xcode 27 iOS build and signed device smoke tests. The iOS and macOS app targets share `com.iamwilliamli.LiveTranscriber` and one App Store Connect record for Universal Purchase, while retaining platform-specific builds, metadata, versions, and release timing.
 
 The generated macOS project is defined by `LiveTranscriberMac/project.yml`. Regenerate it with:
 

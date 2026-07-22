@@ -444,6 +444,7 @@ enum L10n {
         static let copyTranscript = L10n.resource("recordings.copy_transcript", defaultValue: "Copy Transcript", comment: "Copy transcript action title.")
         static let generateTagsAndSummary = L10n.resource("recordings.generate_tags_and_summary", defaultValue: "Generate Tags and Summary", comment: "Action title to generate tags and summary.")
         static let analyzeAgain = L10n.resource("recordings.analyze_again", defaultValue: "Analyze Again", comment: "Action title to analyze a recording again.")
+        static let transcribeMenu = L10n.resource("recordings.transcribe_menu", defaultValue: "Transcribe", comment: "Menu title for choosing a recording transcription engine.")
         static let retranscribe = L10n.resource("recordings.retranscribe", defaultValue: "Transcribe with Apple Speech", comment: "Action title to retranscribe a recording using Apple Speech.")
         static let retranscribeWithLocalWhisper = L10n.resource("recordings.retranscribe_local_whisper", defaultValue: "Transcribe with Local Whisper", comment: "Action title to retranscribe a recording with bundled local Whisper.")
         static let retranscribeWithQwen3ASR = L10n.resource("recordings.retranscribe_qwen3_asr", defaultValue: "Transcribe with Qwen3-ASR", comment: "Action title to retranscribe a recording with the on-device Qwen3-ASR model.")

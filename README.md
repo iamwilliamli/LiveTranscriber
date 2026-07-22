@@ -217,14 +217,16 @@ Local Whisper uses model-specific language support:
   test
 ```
 
-Both commands use Xcode's standard incremental DerivedData location. For development, open `LiveTranscriber.xcworkspace`. Device testing requires a signing team with the iCloud and Live Activity capabilities enabled; the macOS App ID must also be associated with the existing iCloud container.
+Both commands use Xcode's standard incremental DerivedData location. Open the root `LiveTranscriber.xcworkspace` for both platforms, then select `LiveTranscriber` for iOS or `LiveTranscriberMac` for macOS. The workspace owns both app projects and resolves their shared local Swift packages as one package graph. Device testing requires a signing team with the iCloud and Live Activity capabilities enabled; the macOS App ID must also be associated with the existing iCloud container.
 
 ## Project Structure
 
 - `LiveTranscriber/`: Main iOS app target.
+- `LiveTranscriber.xcworkspace`: Single Xcode entry point for the iOS and macOS projects.
 - `LiveTranscriberWidget/`: ActivityKit widget extension for Lock Screen and Dynamic Island.
 - `LiveTranscriberMac/`: Native macOS app, generated from its checked-in `project.yml`.
 - `Packages/TranscriberDomain/`: Shared recording models and platform-neutral service boundaries.
+- `Packages/Qwen3Speech/`: Pinned app-used subset of the Qwen3 ASR, VAD, and audio runtime, including Mac archive compatibility.
 - `Vendor/`: Embedded whisper.cpp and llama.cpp XCFrameworks.
 - `docs/`: Focused engineering documents.
 - `DEVELOPMENT_NOTES.md`: Long-form development log and implementation notes.

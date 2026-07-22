@@ -1,4 +1,5 @@
 import AVFoundation
+import AppKit
 import XCTest
 @testable import LiveTranscriberMac
 
@@ -136,5 +137,28 @@ final class MacAppLanguageTests: XCTestCase {
         XCTAssertNil(MacAppLanguage.system.localeIdentifier)
         XCTAssertEqual(MacAppLanguage.simplifiedChinese.localeIdentifier, "zh-Hans")
         XCTAssertEqual(MacAppLanguage.traditionalChinese.localeIdentifier, "zh-Hant")
+    }
+}
+
+final class MacAppIconTests: XCTestCase {
+    func testDebugAppBundleUsesRenderableAssetCatalogIcon() throws {
+        let appBundle = Bundle(for: MacAppRouter.self)
+        XCTAssertEqual(
+            appBundle.object(forInfoDictionaryKey: "CFBundleIconName") as? String,
+            "AppIcon"
+        )
+
+        let iconFile = try XCTUnwrap(
+            appBundle.object(forInfoDictionaryKey: "CFBundleIconFile") as? String
+        )
+        XCTAssertTrue(["AppIcon", "AppIcon.icns"].contains(iconFile))
+
+        let iconURL = try XCTUnwrap(
+            appBundle.url(forResource: "AppIcon", withExtension: "icns")
+        )
+        let iconImage = try XCTUnwrap(NSImage(contentsOf: iconURL))
+        XCTAssertFalse(iconImage.representations.isEmpty)
+        XCTAssertGreaterThan(iconImage.size.width, 0)
+        XCTAssertGreaterThan(iconImage.size.height, 0)
     }
 }

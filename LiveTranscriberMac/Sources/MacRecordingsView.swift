@@ -11,7 +11,7 @@ struct MacRecordingsView: View {
     @ObservedObject var transcriber: LiveTranscriptionManager
     @Binding var selectedRecordingID: RecordingItem.ID?
     @Binding var pendingImportURLs: [URL]
-    @StateObject private var player = RecordingPlaybackController()
+    @State private var player = RecordingPlaybackController()
 
     @State private var searchText = ""
     @State private var categoryFilter: MacRecordingCategoryFilter = .all

@@ -827,7 +827,7 @@ struct RecordingsView: View {
     @ObservedObject var transcriber: LiveTranscriptionManager
     @Binding var incomingImportURL: URL?
     @Binding var pendingOpenRecordingID: RecordingItem.ID?
-    @ObservedObject var player: RecordingPlaybackController
+    let player: RecordingPlaybackController
     @State private var deleteRequest: RecordingDeleteRequest?
     @State private var analyzingRecordingID: RecordingItem.ID?
     @State private var analysisErrorMessage: String?
@@ -848,6 +848,9 @@ struct RecordingsView: View {
     @State private var isMOSSLocalAvailable = MOSSLocalModelManager.currentStatus().isAvailable
     @State private var localWhisperRetranscriptionRequest: LocalWhisperRetranscriptionRequest?
     @State private var searchText = ""
+    @State private var cachedSearchResults: [CachedRecordingSearchResult] = []
+    @State private var isUpdatingSearchResults = false
+    @State private var searchRevision = 0
     @State private var navigationPath: [RecordingNavigationDestination] = []
     @State private var isShowingNewCategorySheet = false
     @State private var newCategoryName = ""
@@ -922,12 +925,8 @@ struct RecordingsView: View {
         }
     }
 
-    private var searchResultRecordings: [RecordingItem] {
-        let query = normalizedSearchText(searchText)
-        guard !query.isEmpty else {
-            return []
-        }
-        return store.recordings.filter { recording($0, matches: query) }
+    private var searchRequest: RecordingSearchRequest {
+        RecordingSearchRequest(query: searchText, revision: searchRevision)
     }
 
     private var isSearchingCategoryRoot: Bool {
@@ -954,6 +953,9 @@ struct RecordingsView: View {
             placement: .navigationBarDrawer(displayMode: .always),
             prompt: Text(L10n.Recordings.searchPrompt)
         )
+        .task(id: searchRequest) {
+            await updateSearchResults(for: searchRequest)
+        }
         .task {
             await transcriber.refreshSupportedLanguages()
             appleSpeechTranscriptionLanguages = await AppleSpeechTranscriptionSupport.supportedLanguages()
@@ -980,6 +982,7 @@ struct RecordingsView: View {
             consumePendingOpenRecordingIDIfNeeded()
         }
         .onChange(of: store.recordings) { _, _ in
+            searchRevision += 1
             consumePendingOpenRecordingIDIfNeeded()
         }
         .fileImporter(
@@ -1290,14 +1293,23 @@ struct RecordingsView: View {
             }
 
             if isSearchingCategoryRoot {
-                if searchResultRecordings.isEmpty && videoImportProgressState == nil {
+                if isUpdatingSearchResults {
+                    ProgressView()
+                        .controlSize(.large)
+                        .frame(maxWidth: .infinity, minHeight: 320)
+                        .listRowSeparator(.hidden)
+                        .listRowBackground(Color.clear)
+                } else if cachedSearchResults.isEmpty && videoImportProgressState == nil {
                     EmptyStateView(icon: "magnifyingglass", titleResource: L10n.Recordings.noSearchResults)
                         .frame(maxWidth: .infinity, minHeight: 320)
                         .listRowSeparator(.hidden)
                         .listRowBackground(Color.clear)
                 } else {
-                    ForEach(searchResultRecordings) { item in
-                        searchResultRecordingRow(item)
+                    ForEach(cachedSearchResults) { result in
+                        searchResultRecordingRow(
+                            result.item,
+                            searchMatch: result.transcriptMatch
+                        )
                     }
                 }
             } else if categoryFolders.isEmpty && videoImportProgressState == nil {
@@ -1449,13 +1461,15 @@ struct RecordingsView: View {
         }
     }
 
-    private func searchResultRecordingRow(_ item: RecordingItem) -> some View {
+    private func searchResultRecordingRow(
+        _ item: RecordingItem,
+        searchMatch: RecordingTranscriptSearchMatch?
+    ) -> some View {
         let isTranscriptionRunning = item.importStatus?.isFailed == false
         let isTranscriptionActionDisabled = item.isTranscriptLocked
             || isTranscriptionRunning
             || transcriber.isRecording
             || transcriber.isPreparing
-        let searchMatch = transcriptSearchMatch(for: item)
 
         return RecordingRow(
             item: item,
@@ -1904,34 +1918,50 @@ struct RecordingsView: View {
         }
     }
 
-    private func recording(_ item: RecordingItem, matches query: String) -> Bool {
-        store.normalizedSearchText(for: item).contains(query)
-    }
-
-    private func transcriptSearchMatch(for item: RecordingItem) -> RecordingTranscriptSearchMatch? {
-        let query = searchText.trimmingCharacters(in: .whitespacesAndNewlines)
-        let normalizedQuery = normalizedSearchText(query)
-        guard !normalizedQuery.isEmpty else {
-            return nil
-        }
-
-        let transcript = store.transcriptText(for: item)
-        guard let line = StoredTranscriptLine.parse(transcript).first(where: { line in
-            normalizedSearchText("[\(line.timeText)] \(line.text)").contains(normalizedQuery)
-        }) else {
-            return nil
-        }
-
-        return RecordingTranscriptSearchMatch(
-            lineID: line.id,
-            timeText: line.timeText,
-            text: line.text,
-            query: query
-        )
-    }
-
     private func normalizedSearchText(_ text: String) -> String {
         text.normalizedForRecordingSearch
+    }
+
+    private func updateSearchResults(for request: RecordingSearchRequest) async {
+        let query = request.query.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !normalizedSearchText(query).isEmpty else {
+            cachedSearchResults = []
+            isUpdatingSearchResults = false
+            return
+        }
+
+        cachedSearchResults = []
+        isUpdatingSearchResults = true
+
+        do {
+            try await Task.sleep(for: .milliseconds(180))
+        } catch {
+            return
+        }
+
+        let results = await store.searchRecordings(matching: query)
+        guard !Task.isCancelled, request == searchRequest else {
+            return
+        }
+
+        cachedSearchResults = results.compactMap { result in
+            guard let item = store.recording(withID: result.recordingID) else {
+                return nil
+            }
+            let transcriptMatch = result.transcriptMatch.map { match in
+                RecordingTranscriptSearchMatch(
+                    lineID: match.lineID,
+                    timeText: match.timeText,
+                    text: match.text,
+                    query: query
+                )
+            }
+            return CachedRecordingSearchResult(
+                item: item,
+                transcriptMatch: transcriptMatch
+            )
+        }
+        isUpdatingSearchResults = false
     }
 
     private func categoryFolder(for id: String) -> RecordingCategoryFolder? {
@@ -2183,7 +2213,7 @@ private struct RecordingCategoryDetailList: View {
     let folder: RecordingCategoryFolder
     @ObservedObject var store: RecordingStore
     @ObservedObject var transcriber: LiveTranscriptionManager
-    @ObservedObject var player: RecordingPlaybackController
+    let player: RecordingPlaybackController
     let downloadedLocalWhisperModels: [LocalWhisperModel]
     let localWhisperLanguageOptionsByModelID: [String: [TranscriptionLanguage]]
     let isQwen3ASRAvailable: Bool
@@ -2777,7 +2807,7 @@ struct RecordingCategoryMenu<MenuLabel: View>: View {
 struct RecordingMapView: View {
     @ObservedObject var store: RecordingStore
     @ObservedObject var transcriber: LiveTranscriptionManager
-    @ObservedObject var player: RecordingPlaybackController
+    let player: RecordingPlaybackController
     @Environment(\.dismiss) private var dismiss
     @State private var selectedPoint: RecordingMapPoint?
     @State private var selectedRecording: RecordingItem?
@@ -3073,6 +3103,20 @@ private extension Double {
     func rounded(toPlaces places: Int) -> Double {
         let divisor = Foundation.pow(10.0, Double(places))
         return (self * divisor).rounded() / divisor
+    }
+}
+
+private struct RecordingSearchRequest: Equatable {
+    let query: String
+    let revision: Int
+}
+
+private struct CachedRecordingSearchResult: Identifiable {
+    let item: RecordingItem
+    let transcriptMatch: RecordingTranscriptSearchMatch?
+
+    var id: RecordingItem.ID {
+        item.id
     }
 }
 
@@ -3549,11 +3593,119 @@ private struct ReminderDraftReviewSheet: View {
     }
 }
 
+private struct RecordingPlaybackObservationBoundary<Content: View>: View {
+    @ObservedObject var player: RecordingPlaybackController
+    private let content: () -> Content
+
+    init(
+        player: RecordingPlaybackController,
+        @ViewBuilder content: @escaping () -> Content
+    ) {
+        self.player = player
+        self.content = content
+    }
+
+    var body: some View {
+        content()
+    }
+}
+
+private struct RecordingPlaybackAmbientBackground: View {
+    @ObservedObject var player: RecordingPlaybackController
+    let recordingID: RecordingItem.ID
+
+    private var ambientState: AmbientActivityState {
+        guard player.isLoaded,
+              player.currentItem?.id == recordingID else {
+            return .standby
+        }
+        guard !player.isPlaying else {
+            return .active
+        }
+
+        let playbackTime = player.currentTime
+        let isBetweenStartAndEnd = playbackTime > 0.05
+            && (player.duration <= 0 || playbackTime < player.duration - 0.05)
+        return isBetweenStartAndEnd ? .paused : .standby
+    }
+
+    var body: some View {
+        AmbientActivityBackground(state: ambientState)
+    }
+}
+
+private struct PlaybackSyncedTranscriptRows: View {
+    let recordingID: RecordingItem.ID
+    let lines: [StoredTranscriptLine]
+    let speakerByID: [String: TranscriptSpeakerPresentation]
+    let showsSpeakerDistinction: Bool
+    let translatedTranscriptByLineID: [StoredTranscriptLine.ID: String]
+    let showsPendingTranslation: Bool
+    let player: RecordingPlaybackController
+    let onSeek: (StoredTranscriptLine) -> Void
+    let onEdit: (StoredTranscriptLine) -> Void
+
+    @State private var currentLineID: StoredTranscriptLine.ID?
+
+    var body: some View {
+        LazyVStack(alignment: .leading, spacing: 8) {
+            ForEach(lines) { line in
+                StoredTranscriptLineRow(
+                    line: line,
+                    speaker: showsSpeakerDistinction ? line.speaker.flatMap { speakerByID[$0] } : nil,
+                    translatedText: translatedTranscriptByLineID[line.id],
+                    isShowingTranslation: showsPendingTranslation
+                        && translatedTranscriptByLineID[line.id] == nil,
+                    isCurrent: line.id == currentLineID,
+                    onTap: {
+                        onSeek(line)
+                    },
+                    onEdit: {
+                        onEdit(line)
+                    }
+                )
+                .id(line.id)
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .onAppear {
+            updateCurrentLine(at: player.currentTime)
+        }
+        .onChange(of: lines) { _, _ in
+            updateCurrentLine(at: player.currentTime)
+        }
+        .onReceive(player.$currentTime) { time in
+            updateCurrentLine(at: time)
+        }
+        .onReceive(player.$currentItem) { loadedItem in
+            guard loadedItem?.id == recordingID else {
+                currentLineID = nil
+                return
+            }
+            updateCurrentLine(at: player.currentTime)
+        }
+    }
+
+    private func updateCurrentLine(at time: TimeInterval) {
+        let nextLineID: StoredTranscriptLine.ID?
+        if player.isLoaded, player.currentItem?.id == recordingID {
+            nextLineID = StoredTranscriptLine.currentLineID(in: lines, time: time)
+        } else {
+            nextLineID = nil
+        }
+
+        guard nextLineID != currentLineID else {
+            return
+        }
+        currentLineID = nextLineID
+    }
+}
+
 struct RecordingDetailView: View {
     let item: RecordingItem
     @ObservedObject var store: RecordingStore
     @ObservedObject var transcriber: LiveTranscriptionManager
-    @ObservedObject var player: RecordingPlaybackController
+    let player: RecordingPlaybackController
     var downloadedLocalWhisperModels: [LocalWhisperModel] = []
     var localWhisperLanguageOptionsByModelID: [String: [TranscriptionLanguage]] = [:]
     var isQwen3ASRAvailable = Qwen3ASRModelManager.currentStatus().isAvailable
@@ -3700,36 +3852,12 @@ struct RecordingDetailView: View {
         return initialTranscriptLineID
     }
 
-    private var initialTranscriptPlaybackTarget: StoredTranscriptLine? {
-        guard player.isLoaded,
-              player.currentItem?.id == currentItem.id,
-              let initialTranscriptLineID else {
-            return nil
-        }
-        return cachedTranscriptLines.first { $0.id == initialTranscriptLineID }
-    }
-
     private var isTranscriptionRunning: Bool {
         currentItem.importStatus?.isFailed == false
     }
 
     private var pendingSpeechLocaleReleaseMessage: String {
         pendingSpeechLocaleReleaseAction?.request.messageText ?? ""
-    }
-
-    private var playbackAmbientState: AmbientActivityState {
-        guard player.isLoaded,
-              player.currentItem?.id == currentItem.id else {
-            return .standby
-        }
-        guard !player.isPlaying else {
-            return .active
-        }
-
-        let playbackTime = player.currentTime
-        let isBetweenStartAndEnd = playbackTime > 0.05
-            && (player.duration <= 0 || playbackTime < player.duration - 0.05)
-        return isBetweenStartAndEnd ? .paused : .standby
     }
 
     @ViewBuilder
@@ -3766,7 +3894,10 @@ struct RecordingDetailView: View {
         // views in a ZStack extend edge-to-edge like the old single page,
         // and keeping both alive preserves scroll and draft state.
         ZStack {
-            AmbientActivityBackground(state: playbackAmbientState)
+            RecordingPlaybackAmbientBackground(
+                player: player,
+                recordingID: currentItem.id
+            )
 
             transcriptPage
                 .opacity(selectedDetailPage == .transcript ? 1 : 0)
@@ -4065,11 +4196,11 @@ struct RecordingDetailView: View {
         }
         .onAppear {
             chatEngine.configure(recordingID: currentItem.id)
+            player.load(item: currentItem, url: store.audioURL(for: currentItem))
+            updatePlayerNowPlayingTranscript()
             Task {
                 store.refreshIntelligenceAvailability()
                 await refreshAudioFileInfo()
-                player.load(item: currentItem, url: store.audioURL(for: currentItem))
-                updatePlayerNowPlayingTranscript()
             }
         }
         .task(id: transcriptCacheIdentifier) {
@@ -4456,14 +4587,10 @@ struct RecordingDetailView: View {
 
                     await Task.yield()
                     scrollTranscript(to: lineID, using: scrollProxy)
-                }
-                .task(id: initialTranscriptPlaybackTarget) {
-                    guard let line = initialTranscriptPlaybackTarget else {
-                        return
+                    if let line = cachedTranscriptLines.first(where: { $0.id == lineID }) {
+                        scrubbedPlaybackTime = nil
+                        player.seek(to: line.startSeconds)
                     }
-
-                    scrubbedPlaybackTime = nil
-                    player.seek(to: line.startSeconds)
                 }
             }
         }
@@ -4507,9 +4634,6 @@ struct RecordingDetailView: View {
     private var header: some View {
         let item = currentItem
         let iCloudSyncStatus = store.iCloudSyncStatus(for: item)
-        let displayDuration = player.duration > 0
-            ? player.duration
-            : Double(item.durationSeconds)
 
         return VStack(alignment: .leading, spacing: 0) {
             RetroRecordingDisplay(
@@ -4518,7 +4642,7 @@ struct RecordingDetailView: View {
                 audioURL: store.audioURL(for: item),
                 player: player,
                 scrubbedTime: scrubbedPlaybackTime,
-                duration: displayDuration
+                duration: Double(item.durationSeconds)
             )
 
             VStack(alignment: .leading, spacing: 10) {
@@ -4938,6 +5062,12 @@ struct RecordingDetailView: View {
     }
 
     private func playerCard(transcriptScrollProxy: ScrollViewProxy) -> some View {
+        RecordingPlaybackObservationBoundary(player: player) {
+            playerCardContent(transcriptScrollProxy: transcriptScrollProxy)
+        }
+    }
+
+    private func playerCardContent(transcriptScrollProxy: ScrollViewProxy) -> some View {
         let shape = RoundedRectangle(cornerRadius: 26, style: .continuous)
         let timeLabelWidth: CGFloat = 56
 
@@ -5131,7 +5261,6 @@ struct RecordingDetailView: View {
     private var transcript: some View {
         let item = currentItem
         let lines = cachedTranscriptLines
-        let currentLineID = StoredTranscriptLine.currentLineID(in: lines, time: player.currentTime)
         let speakers = TranscriptSpeakerPresentation.makePresentations(for: lines)
         let speakerByID = Dictionary(uniqueKeysWithValues: speakers.map { ($0.id, $0) })
         let showsSpeakerDistinction = speakers.count > 1
@@ -5180,25 +5309,23 @@ struct RecordingDetailView: View {
                         .frame(height: 180)
                 }
             } else {
-                LazyVStack(alignment: .leading, spacing: 8) {
-                    ForEach(lines) { line in
-                        StoredTranscriptLineRow(
-                            line: line,
-                            speaker: showsSpeakerDistinction ? line.speaker.flatMap { speakerByID[$0] } : nil,
-                            translatedText: translatedTranscriptByLineID[line.id],
-                            isShowingTranslation: isTranslatingTranscript && selectedTranslationLanguage != nil && translatedTranscriptByLineID[line.id] == nil,
-                            isCurrent: line.id == currentLineID
-                        ) {
-                            HapticFeedback.play(.timelineSeek)
-                            scrubbedPlaybackTime = nil
-                            player.seek(to: line.startSeconds)
-                        } onEdit: {
-                            beginTranscriptLineEdit(line)
-                        }
-                        .id(line.id)
+                PlaybackSyncedTranscriptRows(
+                    recordingID: item.id,
+                    lines: lines,
+                    speakerByID: speakerByID,
+                    showsSpeakerDistinction: showsSpeakerDistinction,
+                    translatedTranscriptByLineID: translatedTranscriptByLineID,
+                    showsPendingTranslation: isTranslatingTranscript && selectedTranslationLanguage != nil,
+                    player: player,
+                    onSeek: { line in
+                        HapticFeedback.play(.timelineSeek)
+                        scrubbedPlaybackTime = nil
+                        player.seek(to: line.startSeconds)
+                    },
+                    onEdit: { line in
+                        beginTranscriptLineEdit(line)
                     }
-                }
-                .frame(maxWidth: .infinity, alignment: .leading)
+                )
             }
         }
         .padding(14)

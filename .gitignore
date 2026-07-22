@@ -7,6 +7,9 @@ xcuserdata/
 *.xccheckout
 *.xcscmblueprint
 
+# Legacy single-project workspace; use the root LiveTranscriber.xcworkspace.
+LiveTranscriberMac.xcworkspace/
+
 # Swift Package Manager
 .build/
 .swiftpm/

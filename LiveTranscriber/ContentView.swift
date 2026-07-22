@@ -5,7 +5,7 @@ import UIKit
 struct ContentView: View {
     @StateObject private var transcriber = LiveTranscriptionManager()
     @StateObject private var recordingStore = RecordingStore()
-    @StateObject private var recordingPlayer = RecordingPlaybackController()
+    @State private var recordingPlayer = RecordingPlaybackController()
     @State private var selectedTab: AppTab = .transcribe
     @State private var incomingRecordingImportURL: URL?
     @State private var pendingOpenRecordingID: RecordingItem.ID?

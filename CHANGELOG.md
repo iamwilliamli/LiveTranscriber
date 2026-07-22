@@ -20,6 +20,7 @@ All notable changes to LiveTranscriber will be documented in this file.
 
 ### Changed
 
+- Configured the native macOS target to share the iOS app's bundle identifier and App Store Connect record for Universal Purchase while retaining separate platform builds.
 - Aligned the macOS Transcribe, Recordings, and Settings workspaces with the iOS visual system: expressive live-recording cards, compact desktop typography, category folders and metadata-rich recording cards, plus an iOS-style settings navigator adapted to a two-column Mac layout.
 - Rebalanced the macOS Recordings split view to preserve a useful library width while constraining the playback content and persistent player to a more comfortable desktop reading width.
 - Rebuilt the macOS recording detail experience around the polished iOS playback design: retro waveform display, persistent glass player, event-aware scrubber, explicit transcript locator, richer metadata and speaker-styled transcript rows; also added configurable MOSS output-token limits and decoder segments up to 20 minutes on Mac.
@@ -37,6 +38,12 @@ All notable changes to LiveTranscriber will be documented in this file.
 
 ### Fixed
 
+- Fixed iCloud storage switches freezing iOS and macOS by moving container resolution, recording migration, directory discovery, legacy-index reads, and tombstone cleanup off the main actor; sync-status polling no longer starts downloading every recording asset.
+- Renamed the macOS recording-engine menu to the concise “Transcribe” while keeping Apple Speech identified inside the submenu.
+- Rebuilt the vendored macOS whisper.cpp and llama.cpp slices as arm64-only frameworks with matching dSYMs so App Store Connect symbol upload no longer reports missing framework UUIDs.
+- Added a pinned, app-scoped Qwen3 speech runtime with an IEEE-754 half-precision compatibility layer so Xcode can compile its auxiliary x86_64 package slice while archiving the Apple-Silicon-only Mac app.
+- Split the iOS and macOS Xcode workspace entry points so Xcode no longer attempts to open the shared local `MLXAudioMOSS` and `TranscriberDomain` packages twice.
+- Fixed the macOS icon pipeline so Debug and Archive products use the asset-catalog `AppIcon` metadata directly, allowing macOS to apply its standard icon mask and effects instead of displaying an opaque legacy image override.
 - Fixed iOS 26 summary generation returning English summaries for Chinese semantic notes by adding explicit expected-output-language prompts, language-script validation, and a retry path.
 - Fixed poor iOS 26 FoundationModels summaries caused by schema/JSON-style prompting that copied or lightly rewrote noisy ASR text.
 - Fixed the iOS 26 runtime dyld crash caused by iOS 27 structured FoundationModels symbols by isolating `@Generable` and `respond(...generating:)` usage in the iOS 27-only helper framework loaded behind an availability check.
