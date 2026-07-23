@@ -264,14 +264,16 @@ struct MacSettingsView: View {
                 .padding(.horizontal, 2)
                 .padding(.bottom, 2)
 
-                ForEach(MacSettingsDestination.allCases) { destination in
+                ForEach(MacSettingsDestination.sidebarDestinations) { destination in
                     Button {
                         selection = destination
                     } label: {
                         MacSettingsNavigationRow(
                             destination: destination,
                             value: value(for: destination),
-                            isSelected: selection == destination
+                            isSelected: destination == .about
+                                ? selection.isAboutDestination
+                                : selection == destination
                         )
                     }
                     .buttonStyle(.plain)
@@ -336,8 +338,11 @@ struct MacSettingsView: View {
             MacPrivacySettingsPane()
         case .developer:
             MacDeveloperSettingsPane()
-        case .help:
-            MacHelpSettingsPane()
+        case .about:
+            MacAboutSettingsPane(
+                openPrivacy: { selection = .privacy },
+                openDeveloperOptions: { selection = .developer }
+            )
         }
     }
 
@@ -357,7 +362,7 @@ struct MacSettingsView: View {
             return String(localized: L10n.Settings.localProcessing)
         case .developer:
             return transcriber.speechPipelineDiagnostics.activePipelineName
-        case .help:
+        case .about:
             let version = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String
             return version.map { "v\($0)" } ?? ""
         }
@@ -372,9 +377,22 @@ private enum MacSettingsDestination: String, CaseIterable, Identifiable {
     case files
     case privacy
     case developer
-    case help
+    case about
 
     var id: Self { self }
+
+    static let sidebarDestinations: [Self] = [
+        .general,
+        .transcription,
+        .recording,
+        .intelligence,
+        .files,
+        .about,
+    ]
+
+    var isAboutDestination: Bool {
+        self == .about || self == .privacy || self == .developer
+    }
 
     var title: LocalizedStringResource {
         switch self {
@@ -385,7 +403,7 @@ private enum MacSettingsDestination: String, CaseIterable, Identifiable {
         case .files: L10n.Settings.files
         case .privacy: L10n.Settings.privacy
         case .developer: L10n.Settings.developerOptions
-        case .help: MacL10n.helpAndFeedback
+        case .about: L10n.Settings.about
         }
     }
 
@@ -398,7 +416,7 @@ private enum MacSettingsDestination: String, CaseIterable, Identifiable {
         case .files: L10n.Settings.storageLocationAndCount
         case .privacy: L10n.Settings.dataBoundariesAndPermissions
         case .developer: L10n.Settings.deviceAndPipelineDiagnostics
-        case .help: L10n.Settings.feedback
+        case .about: L10n.Settings.aboutSubtitle
         }
     }
 
@@ -411,7 +429,7 @@ private enum MacSettingsDestination: String, CaseIterable, Identifiable {
         case .files: "folder"
         case .privacy: "lock.shield"
         case .developer: "wrench.and.screwdriver"
-        case .help: "questionmark.bubble"
+        case .about: "info.circle"
         }
     }
 
@@ -424,7 +442,7 @@ private enum MacSettingsDestination: String, CaseIterable, Identifiable {
         case .files: AppTheme.success
         case .privacy: AppTheme.success
         case .developer: AppTheme.purple
-        case .help: AppTheme.info
+        case .about: AppTheme.brand
         }
     }
 }

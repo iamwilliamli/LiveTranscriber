@@ -26,7 +26,6 @@
 "mac.transcription.translation_unavailable" = "No additional translation languages are available";
 "mac.files.show_audio_in_finder" = "Show Audio in Finder";
 "mac.files.open_recordings_folder" = "Open Recordings Folder";
-"mac.settings.help_and_feedback" = "Help";
 "mac.permissions.status" = "Current Permission Status";
 "mac.permissions.allowed" = "Allowed";
 "mac.permissions.not_requested" = "Not Requested";

@@ -67,6 +67,21 @@ jobs:
           -quiet
           build
 
+      - name: Verify vendored iOS symbols
+        if: matrix.lane == 'ios'
+        shell: bash
+        run: |
+          set -euo pipefail
+          for name in whisper llama; do
+            slice="Vendor/${name}.xcframework/ios-arm64"
+            binary="${slice}/${name}.framework/${name}"
+            dsym="${slice}/dSYMs/${name}.dSYM"
+            binary_uuid="$(xcrun dwarfdump --uuid "${binary}" | awk '{ print $2, $3 }')"
+            dsym_uuid="$(xcrun dwarfdump --uuid "${dsym}" | awk '{ print $2, $3 }')"
+            test "$(lipo -archs "${binary}")" = "arm64"
+            test "${binary_uuid}" = "${dsym_uuid}"
+          done
+
       - name: Verify vendored macOS symbols
         if: matrix.lane == 'macos'
         shell: bash

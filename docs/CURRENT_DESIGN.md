@@ -216,6 +216,8 @@ Privacy shows the app's local live-processing boundary, the explicit saved-recor
 
 Developer Options show device/system information, active speech pipeline, supported pipeline types, and runtime analyzer input format.
 
+About shows the app identity and version, a personalized recording-library count, developer attribution, the local-first privacy promise, public beta feedback, email feedback, and the privacy-policy link.
+
 ## Widgets
 
 The Widget extension contains two surfaces:

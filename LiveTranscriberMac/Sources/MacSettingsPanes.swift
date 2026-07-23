@@ -1414,12 +1414,14 @@ private struct MacPermissionStatusRow: View {
     }
 }
 
-// MARK: - Developer pane
+// MARK: - About pane
 
-struct MacHelpSettingsPane: View {
+struct MacAboutSettingsPane: View {
     private static let publicBetaFeedbackURL = URL(string: "https://t.me/livetranscriber")!
-    private static let privacyPolicyURL = URL(string: "https://iamwilliamli.github.io/LiveTranscriber/privacy/")!
     private static let feedbackRecipient = "lichengqi0805@gmail.com"
+    let openPrivacy: () -> Void
+    let openDeveloperOptions: () -> Void
+    @EnvironmentObject private var recordingStore: RecordingStore
 
     private var appVersionText: String {
         let version = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "?"
@@ -1447,12 +1449,46 @@ struct MacHelpSettingsPane: View {
     var body: some View {
         Form {
             Section {
-                LabeledContent {
-                    Text(verbatim: appVersionText)
-                } label: {
-                    Text(L10n.Settings.version)
+                HStack(alignment: .center, spacing: 18) {
+                    Image(nsImage: NSApp.applicationIconImage)
+                        .resizable()
+                        .scaledToFit()
+                        .frame(width: 72, height: 72)
+
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text(verbatim: "LiveTranscriber")
+                            .font(.redditSans(.title2, weight: .bold))
+                        Text(L10n.Onboarding.heroSplashTitle)
+                            .font(.redditSans(.subheadline, weight: .semibold))
+                            .foregroundStyle(AppTheme.brand)
+                        Text(verbatim: appVersionText)
+                            .font(.redditSans(.caption))
+                            .foregroundStyle(.secondary)
+                    }
                 }
 
+                Text(L10n.Settings.aboutByline)
+                    .font(.redditSans(.subheadline))
+
+                Label(
+                    String(
+                        format: String(localized: L10n.Settings.aboutLibraryCountFormat),
+                        Int64(recordingStore.recordings.count)
+                    ),
+                    systemImage: "waveform"
+                )
+
+                Label {
+                    Text(L10n.Settings.aboutPrivacy)
+                } icon: {
+                    Image(systemName: "lock.shield.fill")
+                        .foregroundStyle(AppTheme.success)
+                }
+            } header: {
+                Text(L10n.Settings.about)
+            }
+
+            Section {
                 Link(destination: Self.publicBetaFeedbackURL) {
                     Label {
                         Text(L10n.Settings.publicBetaFeedback)
@@ -1463,21 +1499,45 @@ struct MacHelpSettingsPane: View {
 
                 Link(destination: feedbackURL) {
                     Label {
-                        Text(L10n.Settings.feedback)
+                        Text(L10n.Settings.emailFeedback)
                     } icon: {
                         Image(systemName: "envelope")
                     }
                 }
+            } header: {
+                Text(L10n.Settings.feedback)
+            }
 
-                Link(destination: Self.privacyPolicyURL) {
-                    Label {
-                        Text(L10n.Settings.privacyPolicy)
-                    } icon: {
-                        Image(systemName: "doc.text")
+            Section {
+                Button(action: openPrivacy) {
+                    HStack {
+                        Label {
+                            Text(L10n.Settings.privacy)
+                        } icon: {
+                            Image(systemName: "lock.shield")
+                        }
+                        Spacer()
+                        Image(systemName: "chevron.right")
+                            .foregroundStyle(.tertiary)
                     }
                 }
+                .buttonStyle(.plain)
+
+                Button(action: openDeveloperOptions) {
+                    HStack {
+                        Label {
+                            Text(L10n.Settings.developerOptions)
+                        } icon: {
+                            Image(systemName: "wrench.and.screwdriver")
+                        }
+                        Spacer()
+                        Image(systemName: "chevron.right")
+                            .foregroundStyle(.tertiary)
+                    }
+                }
+                .buttonStyle(.plain)
             } header: {
-                Text(MacL10n.helpAndFeedback)
+                Text(L10n.Settings.about)
             }
         }
         .formStyle(.grouped)

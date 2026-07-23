@@ -1040,6 +1040,182 @@ private struct RemoteCommandTarget {
     let token: Any
 }
 
+private struct RecordingSummaryWidthPreferenceKey: PreferenceKey {
+    static var defaultValue: CGFloat = 0
+
+    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
+        value = max(value, nextValue())
+    }
+}
+
+struct RecordingSummaryMarquee: View {
+    @Environment(\.accessibilityReduceMotion) private var accessibilityReduceMotion
+    @Environment(\.scenePhase) private var scenePhase
+    @ScaledMetric(relativeTo: .caption2) private var lineHeight: CGFloat = 14
+    @State private var containerWidth: CGFloat = 0
+    @State private var textWidth: CGFloat = 0
+    @State private var animationStart = Date()
+
+    let text: String
+
+    private let gap: CGFloat = 28
+    private let speed: CGFloat = 22
+    private let initialPause: TimeInterval = 1.0
+    private let endPause: TimeInterval = 0.9
+    private let fadeWidth: CGFloat = 9
+
+    private var hasOverflow: Bool {
+        containerWidth > 0 && textWidth > containerWidth + 1
+    }
+
+    private var shouldAnimate: Bool {
+        hasOverflow && !accessibilityReduceMotion
+    }
+
+    var body: some View {
+        GeometryReader { geometry in
+            Group {
+                if shouldAnimate {
+                    TimelineView(
+                        .animation(
+                            minimumInterval: 1.0 / 30.0,
+                            paused: scenePhase != .active
+                        )
+                    ) { timeline in
+                        let offset = marqueeOffset(at: timeline.date)
+
+                        ZStack(alignment: .leading) {
+                            HStack(spacing: gap) {
+                                fixedSummaryText
+                                fixedSummaryText
+                                    .accessibilityHidden(true)
+                            }
+                            .offset(x: -offset)
+                        }
+                        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
+                    }
+                } else if hasOverflow {
+                    Text(text)
+                        .font(.redditSans(.caption2))
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                        .truncationMode(.tail)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                } else {
+                    Text(text)
+                        .font(.redditSans(.caption2))
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                        .truncationMode(.tail)
+                        .frame(maxWidth: .infinity, alignment: .center)
+                }
+            }
+            .frame(
+                width: geometry.size.width,
+                height: geometry.size.height,
+                alignment: hasOverflow ? .leading : .center
+            )
+            .clipped()
+            .mask {
+                Group {
+                    if hasOverflow {
+                        edgeMask
+                    } else {
+                        Rectangle()
+                            .fill(.black)
+                    }
+                }
+                .frame(width: geometry.size.width, height: geometry.size.height)
+            }
+            .onAppear {
+                updateContainerWidth(geometry.size.width)
+            }
+            .onChange(of: geometry.size.width) { _, newWidth in
+                updateContainerWidth(newWidth)
+            }
+        }
+        .frame(height: lineHeight)
+        .background {
+            fixedSummaryText
+                .hidden()
+                .accessibilityHidden(true)
+                .background {
+                    GeometryReader { geometry in
+                        Color.clear.preference(
+                            key: RecordingSummaryWidthPreferenceKey.self,
+                            value: geometry.size.width
+                        )
+                    }
+                }
+        }
+        .onPreferenceChange(RecordingSummaryWidthPreferenceKey.self) { newWidth in
+            guard abs(textWidth - newWidth) > 0.5 else {
+                return
+            }
+            textWidth = newWidth
+            animationStart = Date()
+        }
+        .onChange(of: text) {
+            animationStart = Date()
+        }
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(Text(verbatim: text))
+    }
+
+    private var fixedSummaryText: some View {
+        Text(text)
+            .font(.redditSans(.caption2))
+            .foregroundStyle(.secondary)
+            .lineLimit(1)
+            .fixedSize(horizontal: true, vertical: false)
+    }
+
+    private func marqueeOffset(at date: Date) -> CGFloat {
+        let distance = textWidth + gap
+        guard distance > 0 else {
+            return 0
+        }
+
+        let elapsed = max(date.timeIntervalSince(animationStart), 0)
+        guard elapsed > initialPause else {
+            return 0
+        }
+
+        let travelDuration = TimeInterval(distance / speed)
+        let cycleDuration = travelDuration + endPause
+        let phase = (elapsed - initialPause).truncatingRemainder(dividingBy: cycleDuration)
+        guard phase < travelDuration else {
+            return distance
+        }
+        return CGFloat(phase) * speed
+    }
+
+    private func updateContainerWidth(_ newWidth: CGFloat) {
+        guard abs(containerWidth - newWidth) > 0.5 else {
+            return
+        }
+        containerWidth = newWidth
+        animationStart = Date()
+    }
+
+    private var edgeMask: some View {
+        GeometryReader { geometry in
+            let width = max(geometry.size.width, 1)
+            let fadeFraction = min(fadeWidth / width, 0.5)
+            LinearGradient(
+                stops: [
+                    .init(color: .clear, location: 0),
+                    .init(color: .black, location: fadeFraction),
+                    .init(color: .black, location: 1 - fadeFraction),
+                    .init(color: .clear, location: 1)
+                ],
+                startPoint: .leading,
+                endPoint: .trailing
+            )
+        }
+    }
+}
+
 struct RetroRecordingDisplay: View {
     @State private var waveformSamples: [CGFloat] = []
 

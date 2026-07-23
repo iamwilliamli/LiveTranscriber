@@ -156,11 +156,6 @@ enum MacL10n {
         defaultValue: "Open Recordings Folder",
         comment: "Action that opens the current managed recording directory in Finder."
     )
-    static let helpAndFeedback = resource(
-        "mac.settings.help_and_feedback",
-        defaultValue: "Help",
-        comment: "Settings tab containing feedback and app links."
-    )
     static let permissionStatus = resource(
         "mac.permissions.status",
         defaultValue: "Current Permission Status",

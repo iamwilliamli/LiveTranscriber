@@ -26,7 +26,6 @@
 "mac.transcription.translation_unavailable" = "Er zijn geen extra vertaaltalen beschikbaar";
 "mac.files.show_audio_in_finder" = "Toon audio in Finder";
 "mac.files.open_recordings_folder" = "Open opnamemap";
-"mac.settings.help_and_feedback" = "Help";
 "mac.permissions.status" = "Huidige toegangsstatus";
 "mac.permissions.allowed" = "Toegestaan";
 "mac.permissions.not_requested" = "Niet gevraagd";

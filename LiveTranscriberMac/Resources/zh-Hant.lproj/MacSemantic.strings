@@ -26,7 +26,6 @@
 "mac.transcription.translation_unavailable" = "沒有其他可用的翻譯語言";
 "mac.files.show_audio_in_finder" = "在 Finder 中顯示音訊";
 "mac.files.open_recordings_folder" = "開啟錄音資料夾";
-"mac.settings.help_and_feedback" = "輔助說明";
 "mac.permissions.status" = "目前權限狀態";
 "mac.permissions.allowed" = "已允許";
 "mac.permissions.not_requested" = "尚未要求";

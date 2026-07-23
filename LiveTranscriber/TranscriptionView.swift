@@ -29,6 +29,8 @@ struct TranscriptionView: View {
     @State private var pendingRecordingIntelligence: RecordingIntelligence?
     @State private var pendingRecordingIncludesLocation = false
     @State private var isSavingPendingRecording = false
+    @State private var isStoppingRecording = false
+    @State private var recordingSaveErrorMessage: String?
     @State private var liveTranslationConfiguration: TranslationSession.Configuration?
     @State private var selectedLiveTranslationLanguage: TranscriptionLanguage?
     @State private var translatedLiveTranscriptByLineID: [TranscriptionLine.ID: String] = [:]
@@ -44,7 +46,7 @@ struct TranscriptionView: View {
     @State private var isSavingLiveTranscriptLineEdit = false
 
     private var isCompletingRecording: Bool {
-        pendingRecordingSave != nil || isSavingPendingRecording
+        isStoppingRecording || pendingRecordingSave != nil || isSavingPendingRecording
     }
 
     private var finalTranscriptLines: [TranscriptionLine] {
@@ -186,6 +188,7 @@ struct TranscriptionView: View {
                 includesLocation: $pendingRecordingIncludesLocation,
                 locationProvider: locationProvider,
                 isSaving: isSavingPendingRecording,
+                saveErrorMessage: $recordingSaveErrorMessage,
                 availableCategories: RecordingCategoryCatalog.allNames(recordings: recordingStore.recordings),
                 showsTitleGeneration: recordingStore.intelligenceAvailability.isAvailable,
                 onGenerateTitle: {
@@ -749,7 +752,14 @@ struct TranscriptionView: View {
                 )
                 .accessibilityHidden(true)
 
-            if transcriber.isRecording {
+            if isStoppingRecording {
+                ProgressView()
+                    .tint(.white)
+                    .controlSize(.regular)
+                    .frame(width: 64, height: 64)
+                    .accessibilityLabel(Text(L10n.Transcription.finishingRecording))
+                    .transition(.opacity.combined(with: .scale(scale: 0.90)))
+            } else if transcriber.isRecording {
                 Group {
                     if isAwaitingReplayKitBroadcastApproval {
                         ZStack {
@@ -813,7 +823,12 @@ struct TranscriptionView: View {
                     .frame(width: 64, height: 64)
                     .contentShape(Circle())
                 }
-                .buttonStyle(RecorderPressButtonStyle(pressedScale: 0.94))
+                .buttonStyle(
+                    RecorderPressButtonStyle(
+                        pressedScale: 0.94,
+                        usesHDRPressHighlight: true
+                    )
+                )
                 .disabled(transcriber.isPreparing || isCompletingRecording)
                 .accessibilityLabel(
                     Text(isCompletingRecording ? L10n.Transcription.saveRecording : L10n.Transcription.startRecording)
@@ -875,7 +890,7 @@ struct TranscriptionView: View {
     }
 
     private var activeRecorderDockWidth: CGFloat {
-        transcriber.isRecording && showsPauseControl ? 120 : 64
+        transcriber.isRecording && !isStoppingRecording && showsPauseControl ? 120 : 64
     }
 
     private func startSelectedAudioInput() async {
@@ -899,8 +914,15 @@ struct TranscriptionView: View {
     }
 
     private func stopRecording() {
+        guard !isStoppingRecording else {
+            return
+        }
+        isStoppingRecording = true
         HapticFeedback.play(.recordingStop)
         Task {
+            defer {
+                isStoppingRecording = false
+            }
             let draft: RecordingDraft?
             if isScreenAudioMode || systemAudioCoordinator.state.isActive {
                 captionPiPController.stop()
@@ -917,6 +939,7 @@ struct TranscriptionView: View {
     }
 
     private func presentSaveSheet(for draft: RecordingDraft) {
+        recordingSaveErrorMessage = nil
         pendingRecordingName = RecordingStore.defaultBaseName(for: draft.startedAt)
         pendingRecordingCategory = ""
         pendingRecordingKeyPoints = ""
@@ -943,6 +966,7 @@ struct TranscriptionView: View {
         }
 
         isSavingPendingRecording = true
+        recordingSaveErrorMessage = nil
         Task {
             let location = pendingRecordingIncludesLocation ? locationProvider.recordingLocation : nil
             let intelligence = pendingRecordingIntelligence.map { pendingIntelligence in
@@ -969,6 +993,14 @@ struct TranscriptionView: View {
                 pendingRecordingIntelligence = nil
                 HapticFeedback.play(.recordingSaved)
             } else {
+                let fallbackMessage = localized(L10n.Transcription.saveRecordingFailedMessage)
+                if let reason = recordingStore.lastRecordingSaveErrorMessage?
+                    .trimmingCharacters(in: .whitespacesAndNewlines),
+                   !reason.isEmpty {
+                    recordingSaveErrorMessage = "\(fallbackMessage)\n\n\(reason)"
+                } else {
+                    recordingSaveErrorMessage = fallbackMessage
+                }
                 HapticFeedback.play(.failure)
             }
             isSavingPendingRecording = false
@@ -989,6 +1021,7 @@ struct TranscriptionView: View {
         pendingRecordingTags = []
         pendingRecordingIntelligence = nil
         pendingRecordingIncludesLocation = false
+        recordingSaveErrorMessage = nil
         locationProvider.reset()
         transcriber.clearTranscript()
         HapticFeedback.play(.deleteConfirmed)
@@ -1084,11 +1117,14 @@ struct TranscriptionView: View {
                 translatedLineSignatures: liveTranslatedLineSignatures,
                 isTranslating: isTranslatingLiveTranscript,
                 selectedTranslationLanguage: selectedLiveTranslationLanguage,
-                bottomContentInset: transcriptControlContentInset,
+                isRecording: transcriber.isRecording,
+                isPaused: transcriber.isPaused,
+                isPreparing: transcriber.isPreparing,
                 onEditFinalLine: beginLiveTranscriptLineEdit
             )
         }
-        .padding(14)
+        .padding(.horizontal, 14)
+        .padding(.top, 14)
         .frame(maxWidth: .infinity, alignment: .leading)
         .frame(maxHeight: .infinity)
         .cardSurface()
@@ -1100,10 +1136,6 @@ struct TranscriptionView: View {
 
     private var transcriptControlBottomInset: CGFloat {
         verticalSizeClass == .compact ? 16 : 24
-    }
-
-    private var transcriptControlContentInset: CGFloat {
-        transcriptControlBottomInset + 64
     }
 
     private var liveTranscriptTranslationMenu: some View {
@@ -1635,6 +1667,7 @@ private struct RecordingSaveSheet: View {
     @Binding var includesLocation: Bool
     @ObservedObject var locationProvider: RecordingLocationProvider
     let isSaving: Bool
+    @Binding var saveErrorMessage: String?
     let availableCategories: [String]
     let showsTitleGeneration: Bool
     let onGenerateTitle: () async throws -> RecordingTitleSuggestion
@@ -1656,6 +1689,7 @@ private struct RecordingSaveSheet: View {
                 }
                 .padding(16)
             }
+            .disabled(isSaving)
             .background(AppTheme.groupedBackground.ignoresSafeArea())
             .navigationTitle(localized(L10n.Transcription.saveRecording))
             .navigationBarTitleDisplayMode(.inline)
@@ -1674,8 +1708,12 @@ private struct RecordingSaveSheet: View {
                         onSave()
                     } label: {
                         if isSaving {
-                            ProgressView()
-                                .controlSize(.small)
+                            HStack(spacing: 6) {
+                                ProgressView()
+                                    .controlSize(.small)
+                                Text(L10n.Transcription.savingRecording)
+                                    .font(.redditSans(.subheadline, weight: .semibold))
+                            }
                         } else {
                             Text(L10n.Common.save)
                                 .font(.redditSans(.subheadline, weight: .semibold))
@@ -1699,6 +1737,21 @@ private struct RecordingSaveSheet: View {
             Button(localized(L10n.Common.ok), role: .cancel) {}
         } message: {
             Text(titleGenerationErrorMessage ?? "")
+        }
+        .alert(
+            localized(L10n.Transcription.saveRecordingFailed),
+            isPresented: Binding(
+                get: { saveErrorMessage != nil },
+                set: { isPresented in
+                    if !isPresented {
+                        saveErrorMessage = nil
+                    }
+                }
+            )
+        ) {
+            Button(localized(L10n.Common.ok), role: .cancel) {}
+        } message: {
+            Text(saveErrorMessage ?? localized(L10n.Transcription.saveRecordingFailedMessage))
         }
     }
 
@@ -2247,60 +2300,104 @@ private struct LiveTranscriptLineEditRequest: Identifiable {
 }
 
 private struct LiveTranscriptRows: View {
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @ObservedObject var finalStore: LiveFinalTranscriptStore
     @ObservedObject var interimStore: LiveInterimTranscriptStore
     let translatedTextByLineID: [TranscriptionLine.ID: String]
     let translatedLineSignatures: [TranscriptionLine.ID: String]
     let isTranslating: Bool
     let selectedTranslationLanguage: TranscriptionLanguage?
-    let bottomContentInset: CGFloat
+    let isRecording: Bool
+    let isPaused: Bool
+    let isPreparing: Bool
     let onEditFinalLine: (TranscriptionLine) -> Void
 
     private var totalLineCount: Int {
         finalStore.lines.count + (interimStore.line == nil ? 0 : 1)
     }
 
+    private var emptyStateStatus: LocalizedStringResource {
+        if isPreparing {
+            return L10n.RecordingStatus.startingRecorder
+        }
+        if isRecording {
+            return isPaused
+                ? L10n.RecordingStatus.paused
+                : L10n.RecordingStatus.waitingForSpeech
+        }
+        return L10n.Transcription.startRecording
+    }
+
+    private var animatesEmptyState: Bool {
+        isPreparing || (isRecording && !isPaused)
+    }
+
     var body: some View {
-        if totalLineCount > 0 {
-            ScrollViewReader { scrollProxy in
-                ScrollView {
-                    LazyVStack(alignment: .leading, spacing: 10) {
-                        Color.clear
-                            .frame(height: 1)
-                            .id("transcript-top")
+        ZStack {
+            if totalLineCount > 0 {
+                ScrollViewReader { scrollProxy in
+                    ScrollView {
+                        LazyVStack(alignment: .leading, spacing: 10) {
+                            Color.clear
+                                .frame(height: 1)
+                                .id("transcript-top")
 
-                        LiveInterimTranscriptRow(interimStore: interimStore)
+                            LiveInterimTranscriptRow(
+                                interimStore: interimStore,
+                                isShimmering: isRecording && !isPaused
+                            )
 
-                        LiveFinalTranscriptRows(
-                            finalStore: finalStore,
-                            translatedTextByLineID: translatedTextByLineID,
-                            translatedLineSignatures: translatedLineSignatures,
-                            isTranslating: isTranslating,
-                            selectedTranslationLanguage: selectedTranslationLanguage,
-                            onEdit: onEditFinalLine
+                            LiveFinalTranscriptRows(
+                                finalStore: finalStore,
+                                translatedTextByLineID: translatedTextByLineID,
+                                translatedLineSignatures: translatedLineSignatures,
+                                isTranslating: isTranslating,
+                                selectedTranslationLanguage: selectedTranslationLanguage,
+                                onEdit: onEditFinalLine
+                            )
+                        }
+                        .padding(.vertical, 2)
+                        .frame(maxWidth: .infinity, alignment: .topLeading)
+                    }
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .mask {
+                        LinearGradient(
+                            stops: [
+                                .init(color: .black, location: 0),
+                                .init(color: .black, location: 0.76),
+                                .init(color: .clear, location: 1),
+                            ],
+                            startPoint: .top,
+                            endPoint: .bottom
                         )
                     }
-                    .padding(.vertical, 2)
-                    .padding(.bottom, bottomContentInset)
-                    .frame(maxWidth: .infinity, alignment: .topLeading)
-                }
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
-                .onChange(of: totalLineCount) { _, _ in
-                    withAnimation(.snappy(duration: 0.2)) {
-                        scrollProxy.scrollTo("transcript-top", anchor: .top)
+                    .onChange(of: totalLineCount) { _, _ in
+                        if reduceMotion {
+                            scrollProxy.scrollTo("transcript-top", anchor: .top)
+                        } else {
+                            withAnimation(.snappy(duration: 0.2, extraBounce: 0)) {
+                                scrollProxy.scrollTo("transcript-top", anchor: .top)
+                            }
+                        }
                     }
                 }
+                .transition(.opacity)
+            } else {
+                LiveTranscriptSkeletonView(
+                    isAnimated: animatesEmptyState,
+                    statusText: emptyStateStatus
+                )
+                .transition(.opacity)
             }
-        } else {
-            EmptyStateView(icon: "quote.bubble", titleResource: L10n.Recordings.noText)
-                .frame(maxWidth: .infinity)
-                .frame(maxHeight: .infinity)
         }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .animation(.easeOut(duration: 0.18), value: totalLineCount > 0)
     }
 }
 
 private struct LiveInterimTranscriptRow: View {
     @ObservedObject var interimStore: LiveInterimTranscriptStore
+    let isShimmering: Bool
 
     var body: some View {
         if let line = interimStore.line {
@@ -2308,6 +2405,7 @@ private struct LiveInterimTranscriptRow: View {
                 line: line,
                 translatedText: nil,
                 isShowingTranslation: false,
+                shimmersText: isShimmering,
                 onEdit: nil
             )
         }
@@ -2328,6 +2426,7 @@ private struct LiveFinalTranscriptRows: View {
                 line: line,
                 translatedText: translatedTextByLineID[line.id],
                 isShowingTranslation: isShowingTranslationPlaceholder(for: line),
+                shimmersText: false,
                 onEdit: {
                     onEdit(line)
                 }
@@ -2352,6 +2451,7 @@ private struct TranscriptionLineRow: View {
     let line: TranscriptionLine
     let translatedText: String?
     let isShowingTranslation: Bool
+    let shimmersText: Bool
     let onEdit: (() -> Void)?
 
     var body: some View {
@@ -2364,12 +2464,13 @@ private struct TranscriptionLineRow: View {
                 .background((line.isFinal ? AppTheme.brand : AppTheme.warning).opacity(0.12), in: Capsule())
 
             VStack(alignment: .leading, spacing: 4) {
-                Text(translatedText ?? line.text)
+                Text(displayedText)
                     .font(.redditSans(.body))
                     .foregroundStyle(.primary)
                     .lineSpacing(4)
                     .fixedSize(horizontal: false, vertical: true)
                     .frame(maxWidth: .infinity, alignment: .leading)
+                    .liveTranscriptShimmer(isActive: shimmersText)
 
                 if let translatedText, !translatedText.isEmpty {
                     Text(line.text)
@@ -2404,6 +2505,10 @@ private struct TranscriptionLineRow: View {
             }
         }
         .accessibilityLabel(accessibilityText)
+    }
+
+    private var displayedText: String {
+        translatedText ?? line.text
     }
 
     private var accessibilityText: String {
@@ -2654,9 +2759,33 @@ private struct RecorderPressButtonStyle: ButtonStyle {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.isEnabled) private var isEnabled
     let pressedScale: CGFloat
+    var usesHDRPressHighlight = false
 
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
+            .background {
+                if usesHDRPressHighlight {
+                    Circle()
+                        .fill(AppTheme.hdrDanger)
+                        .overlay {
+                            Circle()
+                                .stroke(AppTheme.hdrWhite.opacity(0.68), lineWidth: 1)
+                        }
+                        .shadow(
+                            color: AppTheme.hdrDanger.opacity(0.62),
+                            radius: 12
+                        )
+                        .opacity(configuration.isPressed && isEnabled ? 1 : 0)
+                        .animation(
+                            reduceMotion
+                                ? nil
+                                : configuration.isPressed
+                                    ? .easeOut(duration: 0.14)
+                                    : .easeInOut(duration: 0.22),
+                            value: configuration.isPressed
+                        )
+                }
+            }
             .scaleEffect(configuration.isPressed && !reduceMotion ? pressedScale : 1)
             .opacity(isEnabled ? (configuration.isPressed ? 0.9 : 1) : 0.58)
             .animation(

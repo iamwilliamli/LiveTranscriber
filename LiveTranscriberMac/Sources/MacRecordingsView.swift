@@ -477,6 +477,11 @@ private struct MacCategoryOrganizer: View {
                         TextField(text: $newName) {
                             Text(L10n.Recordings.categoryNamePlaceholder)
                         }
+                        .textFieldStyle(.plain)
+                        .padding(.horizontal, 12)
+                        .frame(minHeight: 40)
+                        .editorSheetInputSurface()
+
                         Button {
                             createCategory()
                         } label: {
@@ -494,52 +499,73 @@ private struct MacCategoryOrganizer: View {
 
                 Group {
                     if let selectedName {
-                        Form {
-                            TextField(text: $editedName) {
-                                Text(L10n.Recordings.categoryName)
-                            }
+                        ScrollView {
+                            EditorSheetSection(
+                                title: editedName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+                                    ? selectedName
+                                    : editedName,
+                                systemImage: iconName,
+                                tint: iconColor,
+                                detail: String(localized: L10n.Recordings.modifyCategory)
+                            ) {
+                                VStack(alignment: .leading, spacing: 7) {
+                                    Text(L10n.Recordings.categoryName)
+                                        .font(.caption)
+                                        .foregroundStyle(.secondary)
 
-                            Picker(selection: $iconName) {
-                                ForEach(RecordingCategoryAppearance.availableIconNames, id: \.self) { icon in
-                                    Label(icon, systemImage: icon)
-                                        .tag(icon)
+                                    TextField(text: $editedName) {
+                                        Text(L10n.Recordings.categoryName)
+                                    }
+                                    .textFieldStyle(.plain)
+                                    .padding(.horizontal, 13)
+                                    .frame(minHeight: 44)
+                                    .editorSheetInputSurface(tint: iconColor)
                                 }
-                            } label: {
-                                Text(L10n.Recordings.categoryIcon)
-                            }
 
-                            ColorPicker(selection: $iconColor, supportsOpacity: false) {
-                                Text(L10n.Recordings.categoryIconColor)
-                            }
-
-                            if let errorMessage {
-                                Label {
-                                    Text(verbatim: errorMessage)
-                                } icon: {
-                                    Image(systemName: "exclamationmark.triangle")
-                                }
-                                .foregroundStyle(AppTheme.danger)
-                            }
-
-                            HStack {
-                                Button(role: .destructive) {
-                                    categoryPendingDeletion = selectedName
+                                Picker(selection: $iconName) {
+                                    ForEach(RecordingCategoryAppearance.availableIconNames, id: \.self) { icon in
+                                        Label(icon, systemImage: icon)
+                                            .tag(icon)
+                                    }
                                 } label: {
-                                    Text(L10n.Recordings.deleteCategory)
+                                    Text(L10n.Recordings.categoryIcon)
+                                }
+                                .pickerStyle(.menu)
+
+                                ColorPicker(selection: $iconColor, supportsOpacity: false) {
+                                    Text(L10n.Recordings.categoryIconColor)
                                 }
 
-                                Spacer()
-
-                                Button {
-                                    saveCategory(originalName: selectedName)
-                                } label: {
-                                    Text(L10n.Common.save)
+                                if let errorMessage {
+                                    Label {
+                                        Text(verbatim: errorMessage)
+                                    } icon: {
+                                        Image(systemName: "exclamationmark.triangle.fill")
+                                    }
+                                    .foregroundStyle(AppTheme.danger)
                                 }
-                                .buttonStyle(.borderedProminent)
-                                .disabled(editedName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+
+                                HStack {
+                                    Button(role: .destructive) {
+                                        categoryPendingDeletion = selectedName
+                                    } label: {
+                                        Text(L10n.Recordings.deleteCategory)
+                                    }
+
+                                    Spacer()
+
+                                    Button {
+                                        saveCategory(originalName: selectedName)
+                                    } label: {
+                                        Text(L10n.Common.save)
+                                    }
+                                    .buttonStyle(.borderedProminent)
+                                    .disabled(editedName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                                }
                             }
+                            .padding(20)
                         }
-                        .formStyle(.grouped)
+                        .background(AppTheme.groupedBackground)
                     } else {
                         ContentUnavailableView {
                             Label {
@@ -786,20 +812,7 @@ private struct MacRecordingListRow: View {
             MacRecordingMetadataStrip(item: item)
 
             if !item.combinedTags.isEmpty {
-                ScrollView(.horizontal, showsIndicators: false) {
-                    HStack(spacing: 5) {
-                        ForEach(Array(item.combinedTags.prefix(4)), id: \.self) { tag in
-                            Text(verbatim: tag)
-                                .font(.redditSans(.caption2, weight: .semibold))
-                                .foregroundStyle(AppTheme.info)
-                                .lineLimit(1)
-                                .padding(.horizontal, 7)
-                                .frame(height: 20)
-                                .background(AppTheme.info.opacity(0.11), in: Capsule())
-                        }
-                    }
-                }
-                .scrollClipDisabled()
+                MacRecordingTagStrip(tags: Array(item.combinedTags.prefix(4)))
             }
 
             if let importStatus = item.importStatus {
@@ -876,6 +889,82 @@ private struct MacRecordingListRow: View {
                 .padding(.horizontal, 8)
                 .frame(height: 25)
                 .background(Color.secondary.opacity(0.10), in: Capsule())
+        }
+    }
+}
+
+private struct MacRecordingTagStrip: View {
+    private struct EdgeFade: Equatable {
+        var leading: CGFloat = 0
+        var trailing: CGFloat = 0
+    }
+
+    @State private var edgeFade = EdgeFade()
+
+    let tags: [String]
+
+    private static let edgeFadeWidth: CGFloat = 14
+
+    var body: some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: 5) {
+                ForEach(tags, id: \.self) { tag in
+                    Text(verbatim: tag)
+                        .font(.redditSans(.caption2, weight: .semibold))
+                        .foregroundStyle(AppTheme.info)
+                        .lineLimit(1)
+                        .padding(.horizontal, 7)
+                        .frame(height: 20)
+                        .background(AppTheme.info.opacity(0.11), in: Capsule())
+                }
+            }
+        }
+        .onScrollGeometryChange(for: EdgeFade.self) { geometry in
+            let leadingOffset = max(
+                geometry.contentOffset.x + geometry.contentInsets.leading,
+                0
+            )
+            let maximumOffset = max(
+                geometry.contentSize.width
+                    + geometry.contentInsets.leading
+                    + geometry.contentInsets.trailing
+                    - geometry.containerSize.width,
+                0
+            )
+            let trailingOffset = max(maximumOffset - leadingOffset, 0)
+
+            return EdgeFade(
+                leading: min(leadingOffset / Self.edgeFadeWidth, 1),
+                trailing: min(trailingOffset / Self.edgeFadeWidth, 1)
+            )
+        } action: { _, newValue in
+            edgeFade = newValue
+        }
+        .mask {
+            HStack(spacing: 0) {
+                LinearGradient(
+                    colors: [
+                        Color.black.opacity(1 - Double(edgeFade.leading)),
+                        .black
+                    ],
+                    startPoint: .leading,
+                    endPoint: .trailing
+                )
+                .frame(width: Self.edgeFadeWidth)
+
+                Rectangle()
+                    .fill(.black)
+
+                LinearGradient(
+                    colors: [
+                        .black,
+                        Color.black.opacity(1 - Double(edgeFade.trailing))
+                    ],
+                    startPoint: .leading,
+                    endPoint: .trailing
+                )
+                .frame(width: Self.edgeFadeWidth)
+            }
         }
     }
 }

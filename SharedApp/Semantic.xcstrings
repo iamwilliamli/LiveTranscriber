@@ -878,6 +878,48 @@
         }
       }
     },
+    "common.edit" : {
+      "comment" : "Generic edit action title.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bearbeiten"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Edit"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "編集"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bewerken"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "编辑"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "編輯"
+          }
+        }
+      }
+    },
     "common.more" : {
       "comment" : "Accessibility label for a more actions button.",
       "extractionState" : "stale",
@@ -23517,6 +23559,132 @@
         }
       }
     },
+    "recordings.transcript.speaker.name" : {
+      "comment" : "Field title for a transcript speaker's editable name.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sprechername"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Speaker Name"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "話者名"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Naam spreker"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "说话人名称"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "說話者名稱"
+          }
+        }
+      }
+    },
+    "recordings.transcript.speaker.rename" : {
+      "comment" : "Action and sheet title for renaming a speaker throughout one transcript.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sprecher umbenennen"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Rename Speaker"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "話者名を変更"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Spreker hernoemen"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "重命名说话人"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "重新命名說話者"
+          }
+        }
+      }
+    },
+    "recordings.transcript.speaker.rename_detail" : {
+      "comment" : "Explanation in the transcript speaker rename sheet.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dies aktualisiert alle Transkriptsegmente, die diesem Sprecher zugewiesen sind."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "This updates every transcript segment assigned to this speaker."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "この話者に割り当てられたすべての文字起こし区間が更新されます。"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Hiermee worden alle transcriptsegmenten bijgewerkt die aan deze spreker zijn toegewezen."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "这会更新分配给该说话人的所有转录片段。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "這會更新指派給此說話者的所有轉錄片段。"
+          }
+        }
+      }
+    },
     "recordings.transcript.speaker.current_segment_detail" : {
       "comment" : "Explanation below the speaker picker in the transcript segment editor.",
       "extractionState" : "manual",
@@ -23524,37 +23692,37 @@
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Die Sprecheränderung beginnt bei diesem Abschnitt. Wenn derselbe Sprecher direkt danach fortfährt, kannst du sie beim Speichern auf diesen zusammenhängenden Block anwenden."
+            "value" : "Wähle, ob die Änderung nur hier oder auf alle späteren Abschnitte des ursprünglichen Sprechers angewendet wird – auch wenn sie nicht direkt aufeinanderfolgen."
           }
         },
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "The speaker change starts with this segment. If the same speaker continues immediately after it, you can apply the change to that continuous block when saving."
+            "value" : "Choose whether the change applies only here or to every later segment assigned to the original speaker, even when they aren't adjacent."
           }
         },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "話者の変更はこの部分から始まります。同じ話者が直後も連続する場合、保存時にその連続範囲へ適用できます。"
+            "value" : "変更を現在の部分だけに適用するか、隣接していない部分も含め、元の話者が割り当てられた後続のすべての部分に適用するかを選択します。"
           }
         },
         "nl" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "De sprekerwijziging begint bij dit segment. Als dezelfde spreker direct erna doorgaat, kun je de wijziging bij het opslaan op dat aaneengesloten blok toepassen."
+            "value" : "Kies of de wijziging alleen hier geldt of voor alle latere segmenten van de oorspronkelijke spreker, ook als ze niet aaneengesloten zijn."
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "发言人修改从当前片段开始。如果后面紧邻的片段仍是同一发言人，保存时可以选择应用到这段连续范围。"
+            "value" : "选择仅修改当前片段，或修改此时间点之后所有属于原说话人的片段，即使这些片段并不相邻。"
           }
         },
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "發言者修改從目前片段開始。如果後面緊鄰的片段仍是同一發言者，儲存時可以選擇套用到這段連續範圍。"
+            "value" : "選擇僅修改目前片段，或修改此時間點之後所有屬於原說話者的片段，即使這些片段並不相鄰。"
           }
         }
       }
@@ -23728,127 +23896,211 @@
       }
     },
     "recordings.transcript.speaker.propagation.following_action.format" : {
-      "comment" : "Action that applies a speaker change to the current transcript segment and consecutive following matching segments. Parameter: number of following segments.",
+      "comment" : "Option that applies a speaker change to the current transcript segment and every later matching segment. Parameter: number of later matching segments.",
       "extractionState" : "manual",
       "localizations" : {
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Diesen + nächste %d ändern"
+            "value" : "Diesen + spätere mit gleichem Label (%d)"
           }
         },
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Change This + Next %d"
+            "value" : "This + Later with Same Label (%d)"
           }
         },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "現在＋次の%d件を変更"
+            "value" : "現在＋後続の同じラベル（%d件）"
           }
         },
         "nl" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Deze + volgende %d wijzigen"
+            "value" : "Deze + latere met hetzelfde label (%d)"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "修改当前及后续 %d 个"
+            "value" : "当前及之后同标签（%d 个）"
           }
         },
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "修改目前及後續 %d 個"
+            "value" : "目前及之後同標籤（%d 個）"
           }
         }
       }
     },
     "recordings.transcript.speaker.propagation.message.format" : {
-      "comment" : "Confirmation message for applying a speaker change to consecutive following transcript segments. Parameter: number of immediately following matching segments.",
+      "comment" : "Description of later transcript segments affected by a speaker change. Parameter: number of later matching segments.",
       "extractionState" : "manual",
       "localizations" : {
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Die nächsten %d direkt aufeinanderfolgenden Abschnitte haben denselben Sprecher. Die neue Sprecherzuordnung auf diesen zusammenhängenden Block anwenden?"
+            "value" : "%d spätere Abschnitte verwenden den ursprünglichen Sprecher, einschließlich nicht direkt aufeinanderfolgender Abschnitte."
           }
         },
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "The next %d immediately following segments use the same speaker. Apply the new speaker to this continuous block?"
+            "value" : "%d later segments use the original speaker, including non-adjacent segments."
           }
         },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "直後の%d個の連続する部分も同じ話者です。新しい話者をこの連続範囲に適用しますか？"
+            "value" : "隣接していない部分を含む後続の%d件で、元の話者が使用されています。"
           }
         },
         "nl" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "De volgende %d direct aaneengesloten segmenten hebben dezelfde spreker. De nieuwe spreker op dit aaneengesloten blok toepassen?"
+            "value" : "%d latere segmenten gebruiken de oorspronkelijke spreker, inclusief niet-aaneengesloten segmenten."
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "后面紧邻的 %d 个连续片段仍是同一发言人。要把新的发言人应用到这段连续范围吗？"
+            "value" : "之后有 %d 个片段属于原说话人，其中也包括不相邻的片段。"
           }
         },
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "後面緊鄰的 %d 個連續片段仍是同一發言者。要把新的發言者套用到這段連續範圍嗎？"
+            "value" : "之後有 %d 個片段屬於原說話者，其中也包括不相鄰的片段。"
           }
         }
       }
     },
     "recordings.transcript.speaker.propagation.title" : {
-      "comment" : "Confirmation title shown after changing the speaker of a transcript segment when immediately following segments have the same original speaker.",
+      "comment" : "Field title for choosing the range affected by a speaker change.",
       "extractionState" : "manual",
       "localizations" : {
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Aufeinanderfolgende Sprechersegmente aktualisieren?"
+            "value" : "Sprecheränderung anwenden"
           }
         },
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Update consecutive speaker segments?"
+            "value" : "Apply Speaker Change"
           }
         },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "連続する話者部分も変更しますか？"
+            "value" : "話者変更の適用範囲"
           }
         },
         "nl" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Aaneengesloten sprekersegmenten bijwerken?"
+            "value" : "Sprekerwijziging toepassen"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "同时修改连续的发言人片段？"
+            "value" : "说话人修改范围"
           }
         },
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "同時修改連續的發言者片段？"
+            "value" : "說話者修改範圍"
+          }
+        }
+      }
+    },
+    "recordings.transcript.speakers.edit" : {
+      "comment" : "Title for the list editor that renames every speaker in one transcript.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sprecher bearbeiten"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Edit Speakers"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "話者を編集"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sprekers bewerken"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "编辑说话人"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "編輯說話者"
+          }
+        }
+      }
+    },
+    "recordings.transcript.speakers.edit_detail" : {
+      "comment" : "Explanation in the transcript speaker list editor.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Änderungen gelten für alle Transkriptabschnitte, die dem jeweiligen Sprecher zugeordnet sind."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Changes apply to every transcript segment assigned to each speaker."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "変更は各話者に割り当てられたすべての文字起こし部分に適用されます。"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Wijzigingen gelden voor alle transcriptsegmenten die aan elke spreker zijn toegewezen."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "更改会应用到分配给每位说话人的所有转录片段。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "變更會套用至分配給每位說話者的所有轉錄片段。"
           }
         }
       }
@@ -25951,6 +26203,216 @@
         }
       }
     },
+    "settings.about" : {
+      "comment" : "Settings page title for app information and feedback.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Über"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "About"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "このアプリについて"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Info"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "关于"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "關於"
+          }
+        }
+      }
+    },
+    "settings.about.byline" : {
+      "comment" : "Personal developer byline shown on the About page.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mit Sorgfalt entwickelt von William Li."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Made with care by William Li."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "William Liが心を込めて開発しました。"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Met zorg gemaakt door William Li."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "由 William Li 用心打造。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "由 William Li 用心打造。"
+          }
+        }
+      }
+    },
+    "settings.about.library_count.format" : {
+      "comment" : "Personalized About-page message. Parameter: recording count.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Deine Mediathek enthält %lld Aufnahmen. Danke, dass du diesen Ort zu deinem machst."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Your library holds %lld recordings. Thanks for making this space yours."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ライブラリには%lld件の録音があります。あなたらしく使ってくれてありがとうございます。"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Je bibliotheek bevat %lld opnamen. Bedankt dat je deze plek eigen maakt."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "你的资料库里已有 %lld 段录音。谢谢你把这里变成自己的声音空间。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "你的資料庫裡已有 %lld 段錄音。謝謝你把這裡變成自己的聲音空間。"
+          }
+        }
+      }
+    },
+    "settings.about.privacy" : {
+      "comment" : "Short privacy promise on the About page.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Deine Aufnahmen gehören dir. LiveTranscriber arbeitet lokal und kommt ohne Werbung oder Tracking aus."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Your recordings are yours. LiveTranscriber is local-first, with no ads or tracking."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "録音はあなたのものです。LiveTranscriberはローカル処理を優先し、広告やトラッキングを行いません。"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Je opnamen zijn van jou. LiveTranscriber werkt lokaal en bevat geen advertenties of tracking."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "你的录音只属于你。LiveTranscriber 坚持本地优先，不含广告与追踪。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "你的錄音只屬於你。LiveTranscriber 堅持本機優先，不含廣告與追蹤。"
+          }
+        }
+      }
+    },
+    "settings.about.subtitle" : {
+      "comment" : "Subtitle for the About row in Settings.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "App-Infos, Datenschutz und Entwickleroptionen"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "App info, privacy, and developer options"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "アプリ情報、プライバシー、開発者向けオプション"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "App-info, privacy en ontwikkelaarsopties"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "应用信息、隐私与开发者选项"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "App 資訊、隱私與開發者選項"
+          }
+        }
+      }
+    },
     "settings.advanced_model" : {
       "comment" : "Developer settings metric title.",
       "extractionState" : "stale",
@@ -26367,6 +26829,48 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "裝置"
+          }
+        }
+      }
+    },
+    "settings.email_feedback" : {
+      "comment" : "Settings row title for sending feedback by email.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Feedback per E-Mail"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Email Feedback"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "メールでフィードバック"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Feedback via e-mail"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "邮件反馈"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "電子郵件意見回饋"
           }
         }
       }
@@ -32133,6 +32637,48 @@
         }
       }
     },
+    "transcription.finishing_recording" : {
+      "comment" : "Accessibility label while recorded audio and transcript are being finalized before the save sheet appears.",
+      "extractionState" : "stale",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Aufnahme wird abgeschlossen"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Finishing Recording"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "録音を終了処理中"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Opname afronden"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "正在完成录音"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "正在完成錄音"
+          }
+        }
+      }
+    },
     "transcription.generate_title_tags_accessibility" : {
       "comment" : "Accessibility label for title, summary, and tag generation button.",
       "extractionState" : "stale",
@@ -32343,6 +32889,90 @@
         }
       }
     },
+    "transcription.save_recording_failed" : {
+      "comment" : "Alert title when an unsaved recording could not be saved.",
+      "extractionState" : "stale",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Aufnahme konnte nicht gespeichert werden"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Couldn't Save Recording"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "録音を保存できませんでした"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Opname kon niet worden bewaard"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "无法保存录音"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "無法儲存錄音"
+          }
+        }
+      }
+    },
+    "transcription.save_recording_failed.message" : {
+      "comment" : "Fallback alert message when an unsaved recording could not be saved.",
+      "extractionState" : "stale",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Die ungespeicherte Aufnahme ist weiterhin verfügbar. Prüfe den verfügbaren Speicherplatz und versuche es erneut."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The unsaved recording is still available. Check available storage and try again."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "未保存の録音はそのまま残っています。空き容量を確認して、もう一度お試しください。"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "De niet-bewaarde opname is nog beschikbaar. Controleer de beschikbare opslagruimte en probeer het opnieuw."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "未保存的录音仍然保留。请检查可用存储空间后重试。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "未儲存的錄音仍會保留。請檢查可用儲存空間後再試一次。"
+          }
+        }
+      }
+    },
     "transcription.saved.format" : {
       "comment" : "Saved recording banner. Parameter: recording name.",
       "extractionState" : "stale",
@@ -32381,6 +33011,48 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "已儲存：%@"
+          }
+        }
+      }
+    },
+    "transcription.saving_recording" : {
+      "comment" : "Save button status while a recording is being saved.",
+      "extractionState" : "stale",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Wird gespeichert…"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Saving…"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "保存中…"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bewaren…"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "正在保存…"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "正在儲存…"
           }
         }
       }

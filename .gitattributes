@@ -1,0 +1,1 @@
+Vendor/**/*.dSYM/Contents/Resources/DWARF/* filter=lfs diff=lfs merge=lfs -text

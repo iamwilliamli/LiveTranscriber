@@ -111,7 +111,6 @@
 	<array>
 		<string>audio</string>
 		<string>remote-notification</string>
-		<string>screen-capture</string>
 	</array>
 	<key>UILaunchScreen</key>
 	<dict>

@@ -35,6 +35,35 @@ private var systemSeparatorColor: Color {
     #endif
 }
 
+private func hdrThemeColor(
+    red: CGFloat,
+    green: CGFloat,
+    blue: CGFloat,
+    linearExposure: CGFloat
+) -> Color {
+    #if canImport(UIKit)
+    return Color(
+        UIColor(
+            red: red,
+            green: green,
+            blue: blue,
+            alpha: 1,
+            linearExposure: linearExposure
+        )
+    )
+    #else
+    return Color(
+        nsColor: NSColor(
+            red: red,
+            green: green,
+            blue: blue,
+            alpha: 1,
+            linearExposure: linearExposure
+        )
+    )
+    #endif
+}
+
 enum AppTheme {
     static let navigationBarCornerRadius: CGFloat = 28
     static let cornerRadius = navigationBarCornerRadius
@@ -49,6 +78,9 @@ enum AppTheme {
     static let warning = Color(red: 0.93, green: 0.58, blue: 0.12)
     static let danger = Color(red: 0.86, green: 0.18, blue: 0.18)
     static let purple = Color(red: 0.47, green: 0.34, blue: 0.86)
+    static let hdrWhite = hdrThemeColor(red: 1, green: 1, blue: 1, linearExposure: 1.75)
+    static let hdrBrand = hdrThemeColor(red: 1, green: 0.30, blue: 0.14, linearExposure: 1.60)
+    static let hdrDanger = hdrThemeColor(red: 0.90, green: 0.16, blue: 0.16, linearExposure: 1.60)
 
     #if canImport(UIKit)
     static let groupedBackground = Color(UIColor { traits in

@@ -768,7 +768,12 @@ struct MacTranscriptionView: View {
                     .frame(width: 64, height: 64)
                     .contentShape(Circle())
                 }
-                .buttonStyle(MacRecorderPressButtonStyle(pressedScale: 0.94))
+                .buttonStyle(
+                    MacRecorderPressButtonStyle(
+                        pressedScale: 0.94,
+                        usesHDRPressHighlight: true
+                    )
+                )
                 .disabled(transcriber.isPreparing || systemAudioCapture.phase == .starting)
                 .keyboardShortcut("r", modifiers: [.command])
                 .accessibilityLabel(Text(L10n.Transcription.startRecording))
@@ -1670,9 +1675,33 @@ private struct MacRecorderPressButtonStyle: ButtonStyle {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.isEnabled) private var isEnabled
     let pressedScale: CGFloat
+    var usesHDRPressHighlight = false
 
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
+            .background {
+                if usesHDRPressHighlight {
+                    Circle()
+                        .fill(AppTheme.hdrDanger)
+                        .overlay {
+                            Circle()
+                                .stroke(AppTheme.hdrWhite.opacity(0.68), lineWidth: 1)
+                        }
+                        .shadow(
+                            color: AppTheme.hdrDanger.opacity(0.62),
+                            radius: 12
+                        )
+                        .opacity(configuration.isPressed && isEnabled ? 1 : 0)
+                        .animation(
+                            reduceMotion
+                                ? nil
+                                : configuration.isPressed
+                                    ? .easeOut(duration: 0.14)
+                                    : .easeInOut(duration: 0.22),
+                            value: configuration.isPressed
+                        )
+                }
+            }
             .scaleEffect(configuration.isPressed && !reduceMotion ? pressedScale : 1)
             .opacity(isEnabled ? (configuration.isPressed ? 0.9 : 1) : 0.58)
             .animation(
@@ -1731,6 +1760,7 @@ private struct MacLiveTranscriptList: View {
                             translatedText: nil,
                             isShowingTranslationPlaceholder: false,
                             isInterim: true,
+                            shimmersText: transcriber.isRecording && !transcriber.isPaused,
                             onEdit: nil
                         )
                     }
@@ -1741,6 +1771,7 @@ private struct MacLiveTranscriptList: View {
                             translatedText: translatedTextByLineID[line.id],
                             isShowingTranslationPlaceholder: isShowingTranslationPlaceholder(for: line),
                             isInterim: false,
+                            shimmersText: false,
                             onEdit: {
                                 onEditFinalLine(line)
                             }
@@ -1783,6 +1814,7 @@ private struct MacLiveTranscriptRow: View {
     let translatedText: String?
     let isShowingTranslationPlaceholder: Bool
     let isInterim: Bool
+    let shimmersText: Bool
     let onEdit: (() -> Void)?
 
     var body: some View {
@@ -1805,6 +1837,7 @@ private struct MacLiveTranscriptRow: View {
                     .lineSpacing(3)
                     .fixedSize(horizontal: false, vertical: true)
                     .frame(maxWidth: .infinity, alignment: .leading)
+                    .liveTranscriptShimmer(isActive: shimmersText)
 
                 if let translatedText, !translatedText.isEmpty {
                     Text(verbatim: line.text)

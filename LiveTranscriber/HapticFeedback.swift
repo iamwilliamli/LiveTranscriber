@@ -21,6 +21,8 @@ enum HapticFeedback {
         case importComplete
         case retranscribeStart
         case retranscribeComplete
+        case analysisMenuCharge
+        case analysisMenuPresented
         case analysisStart
         case analysisComplete
         case deleteRequested
@@ -78,6 +80,10 @@ enum HapticFeedback {
             }
         case .playbackToggle, .copy:
             impactGenerator(for: .light).prepare()
+        case .analysisMenuCharge:
+            impactGenerator(for: .soft).prepare()
+        case .analysisMenuPresented:
+            impactGenerator(for: .rigid).prepare()
         case .analysisStart:
             impactGenerator(for: .soft).prepare()
             impactGenerator(for: .light).prepare()
@@ -130,6 +136,10 @@ enum HapticFeedback {
             mediumImpact(intensity: 0.52)
         case .retranscribeComplete:
             success()
+        case .analysisMenuCharge:
+            softImpact(intensity: 0.32)
+        case .analysisMenuPresented:
+            rigidImpact(intensity: 0.68)
         case .analysisStart:
             softImpact(intensity: 0.64)
             delayedImpact(.light, intensity: 0.32, afterMilliseconds: 80)

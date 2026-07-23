@@ -28,7 +28,9 @@ struct MacRecordingDetailView: View {
     @State private var isShowingAudioEvents = false
     @State private var isAnalyzingAudioEvents = false
     @State private var lineEdit: MacTranscriptLineEdit?
-    @State private var speakerPropagationRequest: MacTranscriptSpeakerPropagationRequest?
+    @State private var isShowingSpeakerListEdit = false
+    @State private var editedSpeakerNames: [String: String] = [:]
+    @State private var isSavingSpeakerNames = false
     @State private var reminderDraftRequest: MacReminderDraftRequest?
     @State private var isAddingReminders = false
     @State private var reminderConfirmationText: String?
@@ -234,45 +236,31 @@ struct MacRecordingDetailView: View {
             MacTranscriptLineEditHost(
                 edit: edit,
                 speakerPresentations: speakerPresentations,
-                onSave: { text, speakerID in
-                    saveTranscriptLine(edit: edit, text: text, speakerID: speakerID)
+                followingSpeakerSegmentCount: followingTranscriptLines(
+                    matching: edit.speakerID,
+                    after: edit.lineID
+                ).count,
+                onSave: { text, speakerID, scope in
+                    saveTranscriptLine(
+                        edit: edit,
+                        text: text,
+                        speakerID: speakerID,
+                        scope: scope
+                    )
                 }
             )
         }
-        .confirmationDialog(
-            String(localized: L10n.Recordings.transcriptSpeakerPropagationTitle),
-            isPresented: Binding(
-                get: { speakerPropagationRequest != nil },
-                set: { if !$0 { speakerPropagationRequest = nil } }
+        .sheet(isPresented: $isShowingSpeakerListEdit) {
+            TranscriptSpeakerListEditSheet(
+                speakers: speakerPresentations,
+                namesBySpeakerID: $editedSpeakerNames,
+                isSaving: isSavingSpeakerNames,
+                onSave: saveTranscriptSpeakerNames,
+                onCancel: {
+                    isShowingSpeakerListEdit = false
+                }
             )
-        ) {
-            if let request = speakerPropagationRequest {
-                Button(
-                    String(
-                        format: String(localized: L10n.Recordings.transcriptSpeakerPropagationFollowingActionFormat),
-                        request.followingLines.count
-                    )
-                ) {
-                    performTranscriptLineEdit(request, propagatingSpeakerTo: request.followingLines)
-                }
-
-                Button(String(localized: L10n.Recordings.transcriptSpeakerPropagationCurrentOnlyAction)) {
-                    performTranscriptLineEdit(request, propagatingSpeakerTo: [])
-                }
-            }
-
-            Button(String(localized: L10n.Common.cancel), role: .cancel) {
-                speakerPropagationRequest = nil
-            }
-        } message: {
-            if let request = speakerPropagationRequest {
-                Text(
-                    verbatim: String(
-                        format: String(localized: L10n.Recordings.transcriptSpeakerPropagationMessageFormat),
-                        request.followingLines.count
-                    )
-                )
-            }
+            .interactiveDismissDisabled(isSavingSpeakerNames)
         }
         .confirmationDialog(
             String(localized: L10n.Recordings.deleteRecording),
@@ -379,11 +367,19 @@ struct MacRecordingDetailView: View {
             : Double(currentItem.durationSeconds)
 
         return VStack(alignment: .leading, spacing: 14) {
-            HStack(alignment: .center, spacing: 10) {
-                Text(verbatim: currentItem.displayName)
-                    .font(.redditSans(.title3, weight: .bold))
-                    .lineLimit(2)
-                    .textSelection(.enabled)
+            HStack(alignment: .top, spacing: 10) {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(verbatim: currentItem.displayName)
+                        .font(.redditSans(.headline, weight: .bold))
+                        .lineLimit(1)
+                        .truncationMode(.middle)
+                        .textSelection(.enabled)
+
+                    if let summary = currentItem.singleLineSummary {
+                        RecordingSummaryMarquee(text: summary)
+                    }
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
 
                 if currentItem.isTranscriptLocked {
                     Image(systemName: "lock.fill")
@@ -392,8 +388,6 @@ struct MacRecordingDetailView: View {
                         .padding(7)
                         .background(AppTheme.warning.opacity(0.12), in: Circle())
                 }
-
-                Spacer(minLength: 0)
             }
 
             RetroRecordingDisplay(
@@ -702,7 +696,10 @@ struct MacRecordingDetailView: View {
             }
 
             if showsSpeakerDistinction {
-                MacTranscriptSpeakerLegend(speakers: speakerPresentations)
+                MacTranscriptSpeakerLegend(
+                    speakers: speakerPresentations,
+                    onEditSpeakers: currentItem.isTranscriptLocked ? nil : beginTranscriptSpeakerListEdit
+                )
             }
 
             transcriptTranslationStatus
@@ -926,7 +923,10 @@ struct MacRecordingDetailView: View {
                 }
             }
 
-            if let intelligence = currentItem.intelligence {
+            if isAnalyzingSummary {
+                SummarySkeletonView(isAnimated: true)
+            } else if let intelligence = currentItem.intelligence,
+                      !intelligence.summary.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
                 HStack {
                     Spacer()
                     Button {
@@ -948,12 +948,8 @@ struct MacRecordingDetailView: View {
                 Text(intelligence.generatedAt, format: .dateTime.year().month().day().hour().minute())
                     .font(.caption)
                     .foregroundStyle(.secondary)
-            } else if isAnalyzingSummary {
-                ProgressView(String(localized: L10n.Recordings.analyzing))
             } else {
-                Text(L10n.Recordings.chatUnavailable)
-                    .font(.callout)
-                    .foregroundStyle(.secondary)
+                SummarySkeletonView(isAnimated: false)
             }
         }
         .padding(16)
@@ -976,7 +972,9 @@ struct MacRecordingDetailView: View {
                 }
             }
 
-            if let analysis = currentItem.meetingAnalysis {
+            if isAnalyzingMeeting {
+                MeetingAnalysisSkeletonView(isAnimated: true)
+            } else if let analysis = currentItem.meetingAnalysis {
                 if let summary = analysis.summary, !summary.isEmpty {
                     Text(verbatim: summary)
                         .font(.redditSans(.subheadline))
@@ -1053,8 +1051,8 @@ struct MacRecordingDetailView: View {
                 Text(analysis.generatedAt, format: .dateTime.year().month().day().hour().minute())
                     .font(.caption)
                     .foregroundStyle(.secondary)
-            } else if isAnalyzingMeeting {
-                ProgressView(String(localized: L10n.Recordings.analyzingMeeting))
+            } else {
+                MeetingAnalysisSkeletonView(isAnimated: false)
             }
         }
         .padding(16)
@@ -1810,44 +1808,82 @@ struct MacRecordingDetailView: View {
         "\(transcriptTranslationCachePrefix)|\(language.id)"
     }
 
-    private func saveTranscriptLine(edit: MacTranscriptLineEdit, text: String, speakerID: String?) {
-        let followingLines = consecutiveFollowingLinesForSpeakerChange(
-            edit: edit,
-            proposedSpeakerID: speakerID
-        )
-        let request = MacTranscriptSpeakerPropagationRequest(
+    private func saveTranscriptLine(
+        edit: MacTranscriptLineEdit,
+        text: String,
+        speakerID: String?,
+        scope: TranscriptSpeakerApplyScope
+    ) {
+        let speakerChanged = !transcriptSpeakerIDsMatch(edit.speakerID, speakerID)
+        let followingLines = speakerChanged && scope == .matchingFollowing
+            ? followingTranscriptLines(matching: edit.speakerID, after: edit.lineID)
+            : []
+        let request = MacTranscriptLineUpdateRequest(
             edit: edit,
             text: text,
-            speakerID: speakerID,
-            followingLines: followingLines
+            speakerID: speakerID
         )
 
-        guard !followingLines.isEmpty else {
-            performTranscriptLineEdit(request, propagatingSpeakerTo: [])
+        performTranscriptLineEdit(request, applyingSpeakerTo: followingLines)
+    }
+
+    private func beginTranscriptSpeakerListEdit() {
+        guard !speakerPresentations.isEmpty else {
+            return
+        }
+        editedSpeakerNames = Dictionary(
+            uniqueKeysWithValues: speakerPresentations.map {
+                ($0.id, $0.displayName)
+            }
+        )
+        isShowingSpeakerListEdit = true
+    }
+
+    private func saveTranscriptSpeakerNames() {
+        guard !isSavingSpeakerNames else {
             return
         }
 
-        speakerPropagationRequest = request
+        let renamedSpeakers = Dictionary(
+            uniqueKeysWithValues: speakerPresentations.compactMap { speaker in
+                let name = (editedSpeakerNames[speaker.id] ?? speaker.displayName)
+                    .trimmingCharacters(in: .whitespacesAndNewlines)
+                return name == speaker.displayName ? nil : (speaker.id, name)
+            }
+        )
+        guard !renamedSpeakers.isEmpty else {
+            isShowingSpeakerListEdit = false
+            return
+        }
+
+        isSavingSpeakerNames = true
+        do {
+            _ = try store.renameTranscriptSpeakers(
+                for: currentItem,
+                namesBySpeakerID: renamedSpeakers
+            )
+            isShowingSpeakerListEdit = false
+            Task {
+                await loadTranscript()
+            }
+        } catch {
+            actionErrorMessage = error.localizedDescription
+        }
+        isSavingSpeakerNames = false
     }
 
-    private func consecutiveFollowingLinesForSpeakerChange(
-        edit: MacTranscriptLineEdit,
-        proposedSpeakerID: String?
+    private func followingTranscriptLines(
+        matching originalSpeakerID: String?,
+        after lineID: String
     ) -> [StoredTranscriptLine] {
-        guard let originalSpeakerID = TranscriptSpeakerNaming.normalizedID(edit.speakerID),
-              !transcriptSpeakerIDsMatch(originalSpeakerID, proposedSpeakerID),
-              let editedLineIndex = transcriptLines.firstIndex(where: { $0.id == edit.lineID }) else {
+        guard let originalSpeakerID = TranscriptSpeakerNaming.normalizedID(originalSpeakerID),
+              let editedLineIndex = transcriptLines.firstIndex(where: { $0.id == lineID }) else {
             return []
         }
 
-        var followingLines: [StoredTranscriptLine] = []
-        for line in transcriptLines.dropFirst(editedLineIndex + 1) {
-            guard transcriptSpeakerIDsMatch(line.speaker, originalSpeakerID) else {
-                break
-            }
-            followingLines.append(line)
+        return transcriptLines.dropFirst(editedLineIndex + 1).filter {
+            transcriptSpeakerIDsMatch($0.speaker, originalSpeakerID)
         }
-        return followingLines
     }
 
     private func transcriptSpeakerIDsMatch(_ lhs: String?, _ rhs: String?) -> Bool {
@@ -1864,8 +1900,8 @@ struct MacRecordingDetailView: View {
     }
 
     private func performTranscriptLineEdit(
-        _ request: MacTranscriptSpeakerPropagationRequest,
-        propagatingSpeakerTo followingLines: [StoredTranscriptLine]
+        _ request: MacTranscriptLineUpdateRequest,
+        applyingSpeakerTo followingLines: [StoredTranscriptLine]
     ) {
         do {
             _ = try store.updateTranscriptLine(
@@ -1873,11 +1909,10 @@ struct MacRecordingDetailView: View {
                 lineID: request.edit.lineID,
                 text: request.text,
                 speaker: request.speakerID,
-                consecutiveFollowingLines: followingLines.map {
+                followingLines: followingLines.map {
                     (lineID: $0.id, text: $0.spokenText)
                 }
             )
-            speakerPropagationRequest = nil
             lineEdit = nil
             Task {
                 await loadTranscript()
@@ -2087,58 +2122,101 @@ private struct MacReminderDraftReviewSheet: View {
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 14) {
-            Text(L10n.Recordings.reviewReminders)
-                .font(.title2.bold())
+        VStack(alignment: .leading, spacing: 0) {
+            HStack(spacing: 12) {
+                Image(systemName: "bell.badge.fill")
+                    .font(.system(size: 18, weight: .semibold))
+                    .foregroundStyle(AppTheme.info)
+                    .frame(width: 38, height: 38)
+                    .background(
+                        AppTheme.info.opacity(0.12),
+                        in: RoundedRectangle(cornerRadius: 12, style: .continuous)
+                    )
 
-            Text(L10n.Recordings.reminderReviewFooter)
-                .font(.callout)
-                .foregroundStyle(.secondary)
+                VStack(alignment: .leading, spacing: 3) {
+                    Text(L10n.Recordings.reviewReminders)
+                        .font(.title2.bold())
 
-            List {
-                ForEach($drafts) { $draft in
-                    VStack(alignment: .leading, spacing: 10) {
-                        HStack {
-                            TextField(text: $draft.title) {
-                                Text(L10n.Recordings.reminderTitle)
-                            }
-                            .font(.headline)
-
-                            Button(role: .destructive) {
-                                drafts.removeAll { $0.id == draft.id }
-                            } label: {
-                                Image(systemName: "trash")
-                            }
-                            .buttonStyle(.borderless)
-                        }
-
-                        Toggle(isOn: $draft.hasDueDate) {
-                            Label {
-                                Text(L10n.Recordings.reminderDueDate)
-                            } icon: {
-                                Image(systemName: "calendar")
-                            }
-                        }
-
-                        if draft.hasDueDate {
-                            DatePicker(
-                                selection: Binding(
-                                    get: { draft.dueDate ?? Date() },
-                                    set: { draft.dueDate = $0 }
-                                ),
-                                displayedComponents: [.date, .hourAndMinute]
-                            ) {
-                                Text(L10n.Recordings.reminderDueDate)
-                            }
-                        }
-
-                        TextEditor(text: $draft.notes)
-                            .font(.callout)
-                            .frame(minHeight: 64)
-                    }
-                    .padding(.vertical, 8)
+                    Text(L10n.Recordings.reminderReviewFooter)
+                        .font(.callout)
+                        .foregroundStyle(.secondary)
                 }
             }
+            .padding(22)
+
+            Divider()
+
+            ScrollView {
+                LazyVStack(alignment: .leading, spacing: 16) {
+                    ForEach($drafts) { $draft in
+                        EditorSheetSection(
+                            title: draft.title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+                                ? String(localized: L10n.Recordings.reminderTitle)
+                                : draft.title,
+                            systemImage: "bell.fill",
+                            tint: AppTheme.info
+                        ) {
+                            HStack(alignment: .center, spacing: 8) {
+                                TextField(text: $draft.title) {
+                                    Text(L10n.Recordings.reminderTitle)
+                                }
+                                .font(.headline)
+                                .textFieldStyle(.plain)
+                                .padding(.horizontal, 13)
+                                .frame(minHeight: 44)
+                                .editorSheetInputSurface(tint: AppTheme.info)
+
+                                Button(role: .destructive) {
+                                    drafts.removeAll { $0.id == draft.id }
+                                } label: {
+                                    Image(systemName: "trash")
+                                }
+                                .buttonStyle(.bordered)
+                                .help(String(localized: L10n.Common.delete))
+                            }
+
+                            Toggle(isOn: $draft.hasDueDate) {
+                                Label {
+                                    Text(L10n.Recordings.reminderDueDate)
+                                } icon: {
+                                    Image(systemName: "calendar")
+                                }
+                            }
+
+                            if draft.hasDueDate {
+                                DatePicker(
+                                    selection: Binding(
+                                        get: { draft.dueDate ?? Date() },
+                                        set: { draft.dueDate = $0 }
+                                    ),
+                                    displayedComponents: [.date, .hourAndMinute]
+                                ) {
+                                    Text(L10n.Recordings.reminderDueDate)
+                                }
+                            }
+
+                            VStack(alignment: .leading, spacing: 7) {
+                                Text(L10n.Recordings.meetingNotes)
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+
+                                TextEditor(text: $draft.notes)
+                                    .font(.body)
+                                    .lineSpacing(3)
+                                    .frame(minHeight: 92)
+                                    .padding(10)
+                                    .scrollContentBackground(.hidden)
+                                    .editorSheetInputSurface()
+                            }
+                        }
+                    }
+                }
+                .padding(20)
+            }
+            .disabled(isSaving)
+            .background(AppTheme.groupedBackground)
+
+            Divider()
 
             HStack {
                 Button(action: onCancel) {
@@ -2163,9 +2241,9 @@ private struct MacReminderDraftReviewSheet: View {
                 .keyboardShortcut(.defaultAction)
                 .disabled(isSaving || validDrafts.isEmpty)
             }
+            .padding(20)
         }
-        .padding(22)
-        .frame(minWidth: 620, minHeight: 520)
+        .frame(minWidth: 640, minHeight: 560)
     }
 }
 
@@ -2234,7 +2312,7 @@ private struct MacTranscriptLineRow: View {
             }
         }
         .padding(.vertical, speaker == nil ? 5 : 8)
-        .padding(.leading, speaker == nil ? 7 : 11)
+        .padding(.leading, 7)
         .padding(.trailing, 8)
         .background(
             isCurrent
@@ -2242,15 +2320,6 @@ private struct MacTranscriptLineRow: View {
                 : speaker?.tint.opacity(0.055) ?? Color.clear,
             in: RoundedRectangle(cornerRadius: AppTheme.compactCornerRadius, style: .continuous)
         )
-        .overlay(alignment: .leading) {
-            if let speaker {
-                Capsule()
-                    .fill(speaker.tint)
-                    .frame(width: 3)
-                    .padding(.vertical, 7)
-                    .padding(.leading, 3)
-            }
-        }
         .contentShape(Rectangle())
         .onTapGesture(perform: onSeek)
         .contextMenu {
@@ -2745,10 +2814,19 @@ private struct MacRecordingDetailFactCell: View {
 }
 
 private struct MacRecordingDetailContextStrip: View {
+    private struct EdgeFade: Equatable {
+        var leading: CGFloat = 0
+        var trailing: CGFloat = 0
+    }
+
+    @State private var edgeFade = EdgeFade()
+
     let tags: [String]
     let projectName: String?
     let categoryName: String?
     let location: RecordingLocation?
+
+    private static let edgeFadeWidth: CGFloat = 14
 
     var body: some View {
         ScrollView(.horizontal, showsIndicators: false) {
@@ -2785,6 +2863,47 @@ private struct MacRecordingDetailContextStrip: View {
             }
             .padding(.vertical, 1)
         }
+        .onScrollGeometryChange(for: EdgeFade.self) { geometry in
+            let leadingOffset = max(geometry.visibleRect.minX, 0)
+            let trailingOffset = max(
+                geometry.contentSize.width - geometry.visibleRect.maxX,
+                0
+            )
+
+            return EdgeFade(
+                leading: min(leadingOffset / Self.edgeFadeWidth, 1),
+                trailing: min(trailingOffset / Self.edgeFadeWidth, 1)
+            )
+        } action: { _, newValue in
+            edgeFade = newValue
+        }
+        .mask {
+            HStack(spacing: 0) {
+                LinearGradient(
+                    colors: [
+                        Color.black.opacity(1 - Double(edgeFade.leading)),
+                        .black
+                    ],
+                    startPoint: .leading,
+                    endPoint: .trailing
+                )
+                .frame(width: Self.edgeFadeWidth)
+
+                Rectangle()
+                    .fill(.black)
+
+                LinearGradient(
+                    colors: [
+                        .black,
+                        Color.black.opacity(1 - Double(edgeFade.trailing))
+                    ],
+                    startPoint: .leading,
+                    endPoint: .trailing
+                )
+                .frame(width: Self.edgeFadeWidth)
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 }
 
@@ -2816,26 +2935,77 @@ private struct MacRecordingDetailContextChip: View {
 }
 
 private struct MacTranscriptSpeakerLegend: View {
+    private struct EdgeFade: Equatable {
+        var leading: CGFloat = 0
+        var trailing: CGFloat = 0
+    }
+
+    @Environment(\.accessibilityReduceMotion) private var accessibilityReduceMotion
+    @State private var edgeFade = EdgeFade()
+
     let speakers: [TranscriptSpeakerPresentation]
+    let onEditSpeakers: (() -> Void)?
+
+    private static let edgeFadeWidth: CGFloat = 14
+
+    private var editActionTransition: AnyTransition {
+        guard !accessibilityReduceMotion else {
+            return .opacity
+        }
+        return .asymmetric(
+            insertion: .opacity.combined(with: .scale(scale: 0.94, anchor: .leading)),
+            removal: .opacity.combined(with: .scale(scale: 0.98, anchor: .leading))
+        )
+    }
+
+    private var editActionAnimation: Animation {
+        accessibilityReduceMotion
+            ? .easeOut(duration: 0.14)
+            : .snappy(duration: 0.20, extraBounce: 0)
+    }
 
     var body: some View {
         ScrollView(.horizontal, showsIndicators: false) {
             HStack(spacing: 8) {
-                Label {
-                    Text(
-                        verbatim: String(
-                            format: String(localized: L10n.Recordings.transcriptSpeakersDetectedFormat),
-                            speakers.count
+                HStack(spacing: 8) {
+                    Label {
+                        Text(
+                            verbatim: String(
+                                format: String(localized: L10n.Recordings.transcriptSpeakersDetectedFormat),
+                                speakers.count
+                            )
                         )
-                    )
-                } icon: {
-                    Image(systemName: "person.2.fill")
+                    } icon: {
+                        Image(systemName: "person.2.fill")
+                    }
+                    .foregroundStyle(.secondary)
+
+                    if let onEditSpeakers {
+                        HStack(spacing: 8) {
+                            Divider()
+                                .frame(height: 14)
+
+                            Button {
+                                onEditSpeakers()
+                            } label: {
+                                Text(L10n.Common.edit)
+                                    .foregroundStyle(.secondary)
+                            }
+                            .buttonStyle(.plain)
+                            .contentShape(Rectangle())
+                        }
+                        .transition(editActionTransition)
+                    }
                 }
                 .font(.redditSans(.caption, weight: .semibold))
-                .foregroundStyle(.secondary)
                 .padding(.horizontal, 9)
                 .frame(height: 28)
                 .background(AppTheme.elevatedBackground, in: Capsule())
+                .overlay {
+                    Capsule()
+                        .stroke(AppTheme.subtleBorder, lineWidth: 1)
+                }
+                .animation(editActionAnimation, value: onEditSpeakers != nil)
 
                 ForEach(speakers) { speaker in
                     HStack(spacing: 6) {
@@ -2853,10 +3023,52 @@ private struct MacTranscriptSpeakerLegend: View {
                         Capsule()
                             .stroke(speaker.tint.opacity(0.20), lineWidth: 1)
                     }
+                    .accessibilityElement(children: .combine)
                 }
             }
             .padding(.horizontal, 1)
         }
+        .onScrollGeometryChange(for: EdgeFade.self) { geometry in
+            let leadingOffset = max(geometry.visibleRect.minX, 0)
+            let trailingOffset = max(
+                geometry.contentSize.width - geometry.visibleRect.maxX,
+                0
+            )
+
+            return EdgeFade(
+                leading: min(leadingOffset / Self.edgeFadeWidth, 1),
+                trailing: min(trailingOffset / Self.edgeFadeWidth, 1)
+            )
+        } action: { _, newValue in
+            edgeFade = newValue
+        }
+        .mask {
+            HStack(spacing: 0) {
+                LinearGradient(
+                    colors: [
+                        Color.black.opacity(1 - Double(edgeFade.leading)),
+                        .black
+                    ],
+                    startPoint: .leading,
+                    endPoint: .trailing
+                )
+                .frame(width: Self.edgeFadeWidth)
+
+                Rectangle()
+                    .fill(.black)
+
+                LinearGradient(
+                    colors: [
+                        .black,
+                        Color.black.opacity(1 - Double(edgeFade.trailing))
+                    ],
+                    startPoint: .leading,
+                    endPoint: .trailing
+                )
+                .frame(width: Self.edgeFadeWidth)
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
         .accessibilityElement(children: .contain)
     }
 }
@@ -3080,29 +3292,32 @@ struct MacTranscriptLineEdit: Identifiable {
     var id: String { lineID }
 }
 
-private struct MacTranscriptSpeakerPropagationRequest {
+private struct MacTranscriptLineUpdateRequest {
     let edit: MacTranscriptLineEdit
     let text: String
     let speakerID: String?
-    let followingLines: [StoredTranscriptLine]
 }
 
 private struct MacTranscriptLineEditHost: View {
     let edit: MacTranscriptLineEdit
     let speakerPresentations: [TranscriptSpeakerPresentation]
-    let onSave: (String, String?) -> Void
+    let followingSpeakerSegmentCount: Int
+    let onSave: (String, String?, TranscriptSpeakerApplyScope) -> Void
 
     @Environment(\.dismiss) private var dismiss
     @State private var text: String
     @State private var speakerID: String?
+    @State private var speakerApplyScope: TranscriptSpeakerApplyScope = .matchingFollowing
 
     init(
         edit: MacTranscriptLineEdit,
         speakerPresentations: [TranscriptSpeakerPresentation],
-        onSave: @escaping (String, String?) -> Void
+        followingSpeakerSegmentCount: Int,
+        onSave: @escaping (String, String?, TranscriptSpeakerApplyScope) -> Void
     ) {
         self.edit = edit
         self.speakerPresentations = speakerPresentations
+        self.followingSpeakerSegmentCount = followingSpeakerSegmentCount
         self.onSave = onSave
         _text = State(initialValue: edit.text)
         _speakerID = State(initialValue: edit.speakerID)
@@ -3131,13 +3346,16 @@ private struct MacTranscriptLineEditHost: View {
             speakerOptions: speakerOptions,
             newSpeakerOption: newSpeakerOption,
             showsSpeakerEditor: !speakerPresentations.isEmpty,
+            originalSpeakerID: edit.speakerID,
+            followingSpeakerSegmentCount: followingSpeakerSegmentCount,
+            speakerApplyScope: $speakerApplyScope,
             isSaving: false,
             onSave: {
                 let resolvedSpeaker = speakerID.flatMap { id in
                     speakerOptions.first(where: { $0.id == id })?.displayName
                         ?? (id == newSpeakerOption.id ? newSpeakerOption.displayName : nil)
                 }
-                onSave(text, resolvedSpeaker)
+                onSave(text, resolvedSpeaker, speakerApplyScope)
             },
             onCancel: {
                 dismiss()

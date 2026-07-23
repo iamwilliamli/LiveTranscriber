@@ -12,6 +12,7 @@ struct SettingsView: View {
         case iCloudSyncDetails
         case privacy
         case developer
+        case about
         case transcriptionLanguage
         case localWhisper
         case localWhisperModel
@@ -148,6 +149,8 @@ struct SettingsView: View {
             privacySettingsPage
         case .developer:
             developerSettingsPage
+        case .about:
+            aboutSettingsPage
         case .transcriptionLanguage:
             transcriptionLanguagePage
         case .localWhisper:
@@ -223,54 +226,17 @@ struct SettingsView: View {
                     .settingsNavigationHaptic()
                     .settingsSurface()
 
-                    NavigationLink(value: SettingsRoute.privacy) {
+                    NavigationLink(value: SettingsRoute.about) {
                         SettingsNavigationRow(
-                            icon: "lock.shield",
-                            titleResource: L10n.Settings.privacy,
-                            value: String(localized: L10n.Settings.localProcessing),
-                            subtitleResource: L10n.Settings.dataBoundariesAndPermissions,
-                            tint: AppTheme.success
-                        )
-                    }
-                    .buttonStyle(.plain)
-                    .settingsNavigationHaptic()
-                    .settingsSurface()
-
-                    NavigationLink(value: SettingsRoute.developer) {
-                        SettingsNavigationRow(
-                            icon: "wrench.and.screwdriver",
-                            titleResource: L10n.Settings.developerOptions,
-                            value: transcriber.speechPipelineDiagnostics.activePipelineName,
-                            subtitleResource: L10n.Settings.deviceAndPipelineDiagnostics,
-                            tint: AppTheme.purple
-                        )
-                    }
-                    .buttonStyle(.plain)
-                    .settingsNavigationHaptic()
-                    .settingsSurface()
-
-                    Button {
-                        openPublicBetaFeedback()
-                    } label: {
-                        SettingsCommandRow(
-                            icon: "paperplane.fill",
-                            titleResource: L10n.Settings.publicBetaFeedback,
-                            tint: AppTheme.info
-                        )
-                    }
-                    .buttonStyle(.plain)
-                    .settingsSurface()
-
-                    Button {
-                        sendFeedbackEmail()
-                    } label: {
-                        SettingsCommandRow(
-                            icon: "envelope",
-                            titleResource: L10n.Settings.feedback,
+                            icon: "info.circle",
+                            titleResource: L10n.Settings.about,
+                            value: DeveloperBuildInfo.current.version,
+                            subtitleResource: L10n.Settings.aboutSubtitle,
                             tint: AppTheme.brand
                         )
                     }
                     .buttonStyle(.plain)
+                    .settingsNavigationHaptic()
                     .settingsSurface()
                 }
                 .padding()
@@ -2436,6 +2402,91 @@ struct SettingsView: View {
         }
     }
 
+    private var aboutSettingsPage: some View {
+        let build = DeveloperBuildInfo.current
+        let libraryMessage = String(
+            format: String(localized: L10n.Settings.aboutLibraryCountFormat),
+            Int64(recordingStore.recordings.count)
+        )
+
+        return SettingsDetailPage(titleResource: L10n.Settings.about) {
+            SettingsAboutIdentityCard(
+                version: build.version,
+                libraryMessage: libraryMessage
+            )
+
+            SettingsSection(
+                titleResource: L10n.Settings.feedback,
+                systemImage: "bubble.left.and.bubble.right",
+                tint: AppTheme.info
+            ) {
+                Button {
+                    openPublicBetaFeedback()
+                } label: {
+                    SettingsCommandRow(
+                        icon: "paperplane.fill",
+                        titleResource: L10n.Settings.publicBetaFeedback,
+                        tint: AppTheme.info
+                    )
+                }
+                .buttonStyle(.plain)
+
+                Button {
+                    sendFeedbackEmail()
+                } label: {
+                    SettingsCommandRow(
+                        icon: "envelope",
+                        titleResource: L10n.Settings.emailFeedback,
+                        tint: AppTheme.brand
+                    )
+                }
+                .buttonStyle(.plain)
+            }
+
+            SettingsSection(
+                titleResource: L10n.Settings.about,
+                systemImage: "heart.text.square",
+                tint: AppTheme.brand
+            ) {
+                SettingsStatusRow(
+                    icon: "person.fill",
+                    textResource: L10n.Settings.aboutByline,
+                    tint: AppTheme.brand
+                )
+
+                SettingsStatusRow(
+                    icon: "lock.shield.fill",
+                    textResource: L10n.Settings.aboutPrivacy,
+                    tint: AppTheme.success
+                )
+
+                NavigationLink(value: SettingsRoute.privacy) {
+                    SettingsNavigationRow(
+                        icon: "lock.shield",
+                        titleResource: L10n.Settings.privacy,
+                        value: String(localized: L10n.Settings.localProcessing),
+                        subtitleResource: L10n.Settings.dataBoundariesAndPermissions,
+                        tint: AppTheme.success
+                    )
+                }
+                .buttonStyle(.plain)
+                .settingsNavigationHaptic()
+
+                NavigationLink(value: SettingsRoute.developer) {
+                    SettingsNavigationRow(
+                        icon: "wrench.and.screwdriver",
+                        titleResource: L10n.Settings.developerOptions,
+                        value: transcriber.speechPipelineDiagnostics.activePipelineName,
+                        subtitleResource: L10n.Settings.deviceAndPipelineDiagnostics,
+                        tint: AppTheme.purple
+                    )
+                }
+                .buttonStyle(.plain)
+                .settingsNavigationHaptic()
+            }
+        }
+    }
+
     private var speechPipelineModePage: some View {
         SettingsDetailPage(titleResource: L10n.Settings.speechPipelineMode) {
             SettingsSection(titleResource: L10n.Settings.speechPipelineMode, systemImage: "waveform.path.ecg", tint: AppTheme.brand) {
@@ -2902,6 +2953,108 @@ private struct SettingsDetailPage<Content: View>: View {
         .background(AppTheme.groupedBackground.ignoresSafeArea())
         .navigationTitle(title)
         .navigationBarTitleDisplayMode(.inline)
+    }
+}
+
+private struct SettingsAboutIdentityCard: View {
+    let version: String
+    let libraryMessage: String
+
+    var body: some View {
+        VStack(spacing: 14) {
+            SettingsAboutAppIcon()
+                .shadow(color: AppTheme.brand.opacity(0.22), radius: 12, y: 6)
+
+            VStack(spacing: 5) {
+                Text(verbatim: "LiveTranscriber")
+                    .font(.redditSans(.title2, weight: .bold))
+                    .foregroundStyle(.primary)
+
+                Text(L10n.Onboarding.heroSplashTitle)
+                    .font(.redditSans(.subheadline, weight: .semibold))
+                    .foregroundStyle(AppTheme.brand)
+                    .multilineTextAlignment(.center)
+
+                Text(verbatim: version)
+                    .font(.redditSans(.caption, weight: .semibold))
+                    .foregroundStyle(.secondary)
+                    .padding(.horizontal, 10)
+                    .frame(height: 26)
+                    .background(AppTheme.elevatedBackground, in: Capsule())
+            }
+
+            Text(verbatim: libraryMessage)
+                .font(.redditSans(.subheadline))
+                .foregroundStyle(.secondary)
+                .multilineTextAlignment(.center)
+                .fixedSize(horizontal: false, vertical: true)
+                .frame(maxWidth: 320)
+        }
+        .padding(.horizontal, 20)
+        .padding(.vertical, 26)
+        .frame(maxWidth: .infinity)
+        .background(
+            LinearGradient(
+                colors: [
+                    AppTheme.brand.opacity(0.10),
+                    AppTheme.cardBackground,
+                    AppTheme.info.opacity(0.06)
+                ],
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            )
+        )
+        .overlay {
+            RoundedRectangle(cornerRadius: AppTheme.cornerRadius, style: .continuous)
+                .stroke(AppTheme.cardBorder, lineWidth: 1)
+        }
+        .clipShape(RoundedRectangle(cornerRadius: AppTheme.cornerRadius, style: .continuous))
+        .shadow(
+            color: AppTheme.cardShadow,
+            radius: AppTheme.cardShadowRadius,
+            y: AppTheme.cardShadowYOffset
+        )
+        .accessibilityElement(children: .combine)
+    }
+}
+
+private struct SettingsAboutAppIcon: View {
+    private static let image: UIImage? = {
+        guard
+            let icons = Bundle.main.object(forInfoDictionaryKey: "CFBundleIcons") as? [String: Any],
+            let primaryIcon = icons["CFBundlePrimaryIcon"] as? [String: Any],
+            let iconFiles = primaryIcon["CFBundleIconFiles"] as? [String],
+            let iconName = iconFiles.last
+        else {
+            return nil
+        }
+
+        return UIImage(named: iconName)
+    }()
+
+    var body: some View {
+        Group {
+            if let image = Self.image {
+                Image(uiImage: image)
+                    .resizable()
+                    .scaledToFit()
+            } else {
+                Image(systemName: "waveform.badge.mic")
+                    .font(.system(size: 30, weight: .semibold))
+                    .foregroundStyle(.white)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .background(
+                        LinearGradient(
+                            colors: [AppTheme.brandSoft, AppTheme.brand],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
+                    )
+            }
+        }
+        .frame(width: 64, height: 64)
+        .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+        .accessibilityHidden(true)
     }
 }
 

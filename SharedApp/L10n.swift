@@ -65,6 +65,11 @@ enum L10n {
             defaultValue: "Save",
             comment: "Generic save button title."
         )
+        static let edit = L10n.resource(
+            "common.edit",
+            defaultValue: "Edit",
+            comment: "Generic edit action title."
+        )
         static let back = L10n.resource(
             "common.back",
             defaultValue: "Back",
@@ -123,6 +128,11 @@ enum L10n {
 
     enum Settings {
         static let title = L10n.resource("settings.title", defaultValue: "Settings", comment: "Settings screen title.")
+        static let about = L10n.resource("settings.about", defaultValue: "About", comment: "Settings page title for app information and feedback.")
+        static let aboutSubtitle = L10n.resource("settings.about.subtitle", defaultValue: "App info, privacy, and developer options", comment: "Subtitle for the About row in Settings.")
+        static let aboutByline = L10n.resource("settings.about.byline", defaultValue: "Made with care by William Li.", comment: "Personal developer byline shown on the About page.")
+        static let aboutLibraryCountFormat = L10n.resource("settings.about.library_count.format", defaultValue: "Your library holds %lld recordings. Thanks for making this space yours.", comment: "Personalized About-page message. Parameter: recording count.")
+        static let aboutPrivacy = L10n.resource("settings.about.privacy", defaultValue: "Your recordings are yours. LiveTranscriber is local-first, with no ads or tracking.", comment: "Short privacy promise on the About page.")
         static let transcription = L10n.resource("settings.transcription", defaultValue: "Transcription", comment: "Settings section title for transcription.")
         static let offlineTranscription = L10n.resource("settings.offline_transcription", defaultValue: "Offline Transcription", comment: "Settings section title for offline transcription engines and their models.")
         static let onlineTranscription = L10n.resource("settings.online_transcription", defaultValue: "Online Transcription", comment: "Settings section title for online transcription providers.")
@@ -139,6 +149,7 @@ enum L10n {
         static let dataBoundariesAndPermissions = L10n.resource("settings.subtitle.data_boundaries_permissions", defaultValue: "Data boundaries and permission usage", comment: "Settings row subtitle.")
         static let deviceAndPipelineDiagnostics = L10n.resource("settings.subtitle.device_pipeline_diagnostics", defaultValue: "Device and pipeline diagnostics", comment: "Settings row subtitle.")
         static let publicBetaFeedback = L10n.resource("settings.public_beta_feedback", defaultValue: "Public Beta Feedback", comment: "Settings row title for opening the public beta Telegram feedback group.")
+        static let emailFeedback = L10n.resource("settings.email_feedback", defaultValue: "Email Feedback", comment: "Settings row title for sending feedback by email.")
         static let feedback = L10n.resource("settings.feedback", defaultValue: "Feedback", comment: "Settings row title for sending feedback email.")
         static let feedbackUnavailable = L10n.resource("settings.feedback.unavailable", defaultValue: "Feedback Unavailable", comment: "Alert title when feedback email cannot be opened.")
         static let feedbackOpenFailedFormat = L10n.resource("settings.feedback.open_failed.format", defaultValue: "No mail app is configured. Send feedback to %@.", comment: "Alert message when feedback email cannot be opened. Parameter: feedback email address.")
@@ -223,6 +234,10 @@ enum L10n {
         static let pause = L10n.resource("transcription.pause", defaultValue: "Pause", comment: "Pause recording button title.")
         static let stop = L10n.resource("transcription.stop", defaultValue: "Stop", comment: "Stop recording button title.")
         static let saveRecording = L10n.resource("transcription.save_recording", defaultValue: "Save Recording", comment: "Save recording button or sheet title.")
+        static let finishingRecording = L10n.resource("transcription.finishing_recording", defaultValue: "Finishing Recording", comment: "Accessibility label while recorded audio and transcript are being finalized before the save sheet appears.")
+        static let savingRecording = L10n.resource("transcription.saving_recording", defaultValue: "Saving…", comment: "Save button status while a recording is being saved.")
+        static let saveRecordingFailed = L10n.resource("transcription.save_recording_failed", defaultValue: "Couldn't Save Recording", comment: "Alert title when an unsaved recording could not be saved.")
+        static let saveRecordingFailedMessage = L10n.resource("transcription.save_recording_failed.message", defaultValue: "The unsaved recording is still available. Check available storage and try again.", comment: "Fallback alert message when an unsaved recording could not be saved.")
         static let startRecording = L10n.resource("transcription.start_recording", defaultValue: "Start Recording", comment: "Start recording button title.")
         static let waitingForFinalSegments = L10n.resource("transcription.translation.waiting_final_segments", defaultValue: "Waiting for completed segments", comment: "Live translation status.")
         static let translatingFinalSegments = L10n.resource("transcription.translation.translating_final_segments", defaultValue: "Translating completed segments", comment: "Live translation status.")
@@ -634,12 +649,15 @@ enum L10n {
         static let editTranscriptLine = L10n.resource("recordings.transcript.edit_line", defaultValue: "Edit Transcript Line", comment: "Action and sheet title for editing one transcript line.")
         static let transcriptLineText = L10n.resource("recordings.transcript.line_text", defaultValue: "Transcript Text", comment: "Field title for one editable transcript line.")
         static let transcriptSpeaker = L10n.resource("recordings.transcript.speaker", defaultValue: "Change Speaker", comment: "Field title for changing the speaker assigned to one transcript segment.")
+        static let transcriptSpeakerName = L10n.resource("recordings.transcript.speaker.name", defaultValue: "Speaker Name", comment: "Field title for a transcript speaker's editable name.")
+        static let transcriptEditSpeakers = L10n.resource("recordings.transcript.speakers.edit", defaultValue: "Edit Speakers", comment: "Title for the list editor that renames every speaker in one transcript.")
+        static let transcriptEditSpeakersDetail = L10n.resource("recordings.transcript.speakers.edit_detail", defaultValue: "Changes apply to every transcript segment assigned to each speaker.", comment: "Explanation in the transcript speaker list editor.")
         static let transcriptNoSpeaker = L10n.resource("recordings.transcript.speaker.none", defaultValue: "No Speaker", comment: "Option that removes the speaker assignment from one transcript segment.")
         static let transcriptNewSpeaker = L10n.resource("recordings.transcript.speaker.new", defaultValue: "New Speaker", comment: "Option that assigns one transcript segment to a newly numbered speaker.")
-        static let transcriptSpeakerCurrentSegmentDetail = L10n.resource("recordings.transcript.speaker.current_segment_detail", defaultValue: "The speaker change starts with this segment. If the same speaker continues immediately after it, you can apply the change to that continuous block when saving.", comment: "Explanation below the speaker picker in the transcript segment editor.")
-        static let transcriptSpeakerPropagationTitle = L10n.resource("recordings.transcript.speaker.propagation.title", defaultValue: "Update consecutive speaker segments?", comment: "Confirmation title shown after changing the speaker of a transcript segment when immediately following segments have the same original speaker.")
-        static let transcriptSpeakerPropagationMessageFormat = L10n.resource("recordings.transcript.speaker.propagation.message.format", defaultValue: "The next %d immediately following segments use the same speaker. Apply the new speaker to this continuous block?", comment: "Confirmation message for applying a speaker change to consecutive following transcript segments. Parameter: number of immediately following matching segments.")
-        static let transcriptSpeakerPropagationFollowingActionFormat = L10n.resource("recordings.transcript.speaker.propagation.following_action.format", defaultValue: "Change This + Next %d", comment: "Action that applies a speaker change to the current transcript segment and consecutive following matching segments. Parameter: number of following segments.")
+        static let transcriptSpeakerCurrentSegmentDetail = L10n.resource("recordings.transcript.speaker.current_segment_detail", defaultValue: "Choose whether the change applies only here or to every later segment assigned to the original speaker, even when they aren't adjacent.", comment: "Explanation below the speaker picker in the transcript segment editor.")
+        static let transcriptSpeakerPropagationTitle = L10n.resource("recordings.transcript.speaker.propagation.title", defaultValue: "Apply Speaker Change", comment: "Field title for choosing the range affected by a speaker change.")
+        static let transcriptSpeakerPropagationMessageFormat = L10n.resource("recordings.transcript.speaker.propagation.message.format", defaultValue: "%d later segments use the original speaker, including non-adjacent segments.", comment: "Description of later transcript segments affected by a speaker change. Parameter: number of later matching segments.")
+        static let transcriptSpeakerPropagationFollowingActionFormat = L10n.resource("recordings.transcript.speaker.propagation.following_action.format", defaultValue: "This + Later with Same Label (%d)", comment: "Option that applies a speaker change to the current transcript segment and every later segment with the same original speaker label. Parameter: number of later matching segments.")
         static let transcriptSpeakerPropagationCurrentOnlyAction = L10n.resource("recordings.transcript.speaker.propagation.current_only_action", defaultValue: "Change This Only", comment: "Action that applies a speaker change only to the currently edited transcript segment.")
         static let lockTranscript = L10n.resource("recordings.transcript.lock", defaultValue: "Lock Transcript", comment: "Menu action to lock transcript text against automatic updates.")
         static let unlockTranscript = L10n.resource("recordings.transcript.unlock", defaultValue: "Unlock Transcript", comment: "Menu action to unlock transcript text.")

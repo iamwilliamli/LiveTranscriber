@@ -26,7 +26,6 @@
 "mac.transcription.translation_unavailable" = "追加の翻訳言語は利用できません";
 "mac.files.show_audio_in_finder" = "Finderにオーディオを表示";
 "mac.files.open_recordings_folder" = "録音フォルダを開く";
-"mac.settings.help_and_feedback" = "ヘルプ";
 "mac.permissions.status" = "現在のアクセス権";
 "mac.permissions.allowed" = "許可済み";
 "mac.permissions.not_requested" = "未要求";

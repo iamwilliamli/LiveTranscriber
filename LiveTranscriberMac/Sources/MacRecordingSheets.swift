@@ -49,83 +49,198 @@ struct MacRecordingEditSheet: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
-            Text(L10n.Recordings.editDetails)
-                .font(.title2.bold())
-                .padding(.bottom, 14)
+            HStack(spacing: 12) {
+                Image(systemName: "waveform.badge.pencil")
+                    .font(.system(size: 18, weight: .semibold))
+                    .foregroundStyle(AppTheme.brand)
+                    .frame(width: 40, height: 40)
+                    .background(
+                        AppTheme.brand.opacity(0.12),
+                        in: RoundedRectangle(cornerRadius: 12, style: .continuous)
+                    )
 
-            Form {
-                HStack {
-                    TextField(text: $name) {
-                        Text(L10n.Recordings.recordingName)
-                    }
+                VStack(alignment: .leading, spacing: 3) {
+                    Text(L10n.Recordings.editDetails)
+                        .font(.title2.bold())
 
-                    if store.intelligenceAvailability.isAvailable {
-                        Button {
-                            generateTitle()
-                        } label: {
-                            if isGeneratingTitle {
-                                ProgressView()
-                                    .controlSize(.small)
-                            } else {
-                                Image(systemName: "sparkles")
-                            }
-                        }
-                        .disabled(isGeneratingTitle)
-                        .help(String(localized: L10n.Recordings.generateTagsAndSummary))
-                    }
-                }
-
-                Picker(selection: $languageID) {
-                    ForEach(languageOptions) { language in
-                        Text(verbatim: language.displayName)
-                            .tag(language.id)
-                    }
-                    if !languageOptions.contains(where: { $0.id == languageID }) {
-                        Text(verbatim: TranscriptionLanguage(id: languageID).displayName)
-                            .tag(languageID)
-                    }
-                } label: {
-                    Text(L10n.Settings.transcriptionLanguage)
-                }
-
-                Picker(selection: $categoryName) {
-                    Text(L10n.Recordings.uncategorized)
-                        .tag(String?.none)
-                    ForEach(categories, id: \.self) { category in
-                        Text(verbatim: category)
-                            .tag(String?.some(category))
-                    }
-                } label: {
-                    Text(L10n.Recordings.categoryName)
-                }
-
-                TextField(text: $newCategoryName) {
-                    Text(L10n.Recordings.categoryNamePlaceholder)
-                }
-
-                TextField(text: $tagsText) {
-                    Text(L10n.Recordings.tags)
-                }
-
-                TextField(text: $keyPoints, axis: .vertical) {
-                    Text(L10n.Recordings.keyPoints)
-                }
-                .lineLimit(2...4)
-
-                TextField(text: $summary, axis: .vertical) {
-                    Text(L10n.Recordings.intelligenceSummary)
-                }
-                .lineLimit(3...6)
-
-                Toggle(isOn: $includesLocation) {
-                    Text(L10n.Recordings.addLocation)
-                }
-
-                if includesLocation {
-                    MacRecordingLocationPreview(provider: locationProvider)
+                    Text(verbatim: item.displayName)
+                        .font(.callout)
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
                 }
             }
-            .formStyle(.grouped)
+            .padding(22)
+
+            Divider()
+
+            ScrollView {
+                VStack(alignment: .leading, spacing: 16) {
+                    EditorSheetSection(
+                        title: String(localized: L10n.Recordings.recordingName),
+                        systemImage: "captions.bubble.fill",
+                        tint: AppTheme.brand
+                    ) {
+                        HStack(spacing: 8) {
+                            TextField(text: $name) {
+                                Text(L10n.Recordings.recordingName)
+                            }
+                            .font(.headline)
+                            .textFieldStyle(.plain)
+                            .padding(.horizontal, 13)
+                            .frame(minHeight: 46)
+                            .editorSheetInputSurface(tint: AppTheme.brand)
+
+                            if store.intelligenceAvailability.isAvailable {
+                                Button {
+                                    generateTitle()
+                                } label: {
+                                    if isGeneratingTitle {
+                                        ProgressView()
+                                            .controlSize(.small)
+                                    } else {
+                                        Image(systemName: "sparkles")
+                                    }
+                                }
+                                .buttonStyle(.bordered)
+                                .disabled(isGeneratingTitle)
+                                .help(String(localized: L10n.Recordings.generateTagsAndSummary))
+                            }
+                        }
+                    }
+
+                    EditorSheetSection(
+                        title: String(localized: L10n.Recordings.categoryName),
+                        systemImage: "folder.fill",
+                        tint: AppTheme.info
+                    ) {
+                        HStack(alignment: .top, spacing: 12) {
+                            VStack(alignment: .leading, spacing: 7) {
+                                Text(L10n.Settings.transcriptionLanguage)
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+
+                                Picker(selection: $languageID) {
+                                    ForEach(languageOptions) { language in
+                                        Text(verbatim: language.displayName)
+                                            .tag(language.id)
+                                    }
+                                    if !languageOptions.contains(where: { $0.id == languageID }) {
+                                        Text(verbatim: TranscriptionLanguage(id: languageID).displayName)
+                                            .tag(languageID)
+                                    }
+                                } label: {
+                                    EmptyView()
+                                }
+                                .labelsHidden()
+                                .pickerStyle(.menu)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                            }
+                            .frame(maxWidth: .infinity, alignment: .leading)
+
+                            VStack(alignment: .leading, spacing: 7) {
+                                Text(L10n.Recordings.categoryName)
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+
+                                Picker(selection: $categoryName) {
+                                    Text(L10n.Recordings.uncategorized)
+                                        .tag(String?.none)
+                                    ForEach(categories, id: \.self) { category in
+                                        Text(verbatim: category)
+                                            .tag(String?.some(category))
+                                    }
+                                } label: {
+                                    EmptyView()
+                                }
+                                .labelsHidden()
+                                .pickerStyle(.menu)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                            }
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                        }
+
+                        VStack(alignment: .leading, spacing: 7) {
+                            Text(L10n.Recordings.newCategory)
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+
+                            TextField(text: $newCategoryName) {
+                                Text(L10n.Recordings.categoryNamePlaceholder)
+                            }
+                            .textFieldStyle(.plain)
+                            .padding(.horizontal, 13)
+                            .frame(minHeight: 44)
+                            .editorSheetInputSurface()
+                        }
+                    }
+
+                    EditorSheetSection(
+                        title: String(localized: L10n.Recordings.keyPoints),
+                        systemImage: "list.bullet.clipboard.fill",
+                        tint: AppTheme.purple
+                    ) {
+                        VStack(alignment: .leading, spacing: 7) {
+                            Text(L10n.Recordings.tags)
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+
+                            TextField(text: $tagsText) {
+                                Text(L10n.Recordings.tags)
+                            }
+                            .textFieldStyle(.plain)
+                            .padding(.horizontal, 13)
+                            .frame(minHeight: 44)
+                            .editorSheetInputSurface()
+                        }
+
+                        VStack(alignment: .leading, spacing: 7) {
+                            Text(L10n.Recordings.keyPoints)
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+
+                            TextEditor(text: $keyPoints)
+                                .font(.body)
+                                .lineSpacing(3)
+                                .frame(minHeight: 92)
+                                .padding(10)
+                                .scrollContentBackground(.hidden)
+                                .editorSheetInputSurface()
+                        }
+
+                        VStack(alignment: .leading, spacing: 7) {
+                            Text(L10n.Recordings.intelligenceSummary)
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+
+                            TextEditor(text: $summary)
+                                .font(.body)
+                                .lineSpacing(3)
+                                .frame(minHeight: 130)
+                                .padding(10)
+                                .scrollContentBackground(.hidden)
+                                .editorSheetInputSurface()
+                        }
+                    }
+
+                    EditorSheetSection(
+                        title: String(localized: L10n.Recordings.addLocation),
+                        systemImage: "location.fill",
+                        tint: AppTheme.success
+                    ) {
+                        Toggle(isOn: $includesLocation) {
+                            Text(L10n.Recordings.addLocation)
+                        }
+
+                        if includesLocation {
+                            MacRecordingLocationPreview(provider: locationProvider)
+                        }
+                    }
+                }
+                .padding(20)
+            }
+            .background(AppTheme.groupedBackground)
+
+            Divider()
 
             HStack {
                 Button {
@@ -143,11 +258,12 @@ struct MacRecordingEditSheet: View {
                     Text(L10n.Common.save)
                 }
                 .keyboardShortcut(.defaultAction)
+                .buttonStyle(.borderedProminent)
+                .disabled(name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
             }
-            .padding(.top, 14)
+            .padding(20)
         }
-        .padding(22)
-        .frame(minWidth: 500, minHeight: 480)
+        .frame(minWidth: 620, minHeight: 620)
         .onChange(of: includesLocation) { _, isEnabled in
             if isEnabled {
                 locationProvider.requestLocation()

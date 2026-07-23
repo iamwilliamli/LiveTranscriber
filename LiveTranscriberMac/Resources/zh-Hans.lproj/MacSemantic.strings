@@ -26,7 +26,6 @@
 "mac.transcription.translation_unavailable" = "没有其他可用的翻译语言";
 "mac.files.show_audio_in_finder" = "在访达中显示音频";
 "mac.files.open_recordings_folder" = "打开录音文件夹";
-"mac.settings.help_and_feedback" = "帮助";
 "mac.permissions.status" = "当前权限状态";
 "mac.permissions.allowed" = "已允许";
 "mac.permissions.not_requested" = "尚未请求";

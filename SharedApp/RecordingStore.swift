@@ -233,6 +233,16 @@ struct RecordingItem: Identifiable, Codable, Hashable {
         return fileExtension.isEmpty ? displayName : "\(displayName).\(fileExtension)"
     }
 
+    var singleLineSummary: String? {
+        guard let summary = intelligence?.summary else {
+            return nil
+        }
+        let normalized = summary
+            .split(whereSeparator: \.isWhitespace)
+            .joined(separator: " ")
+        return normalized.isEmpty ? nil : normalized
+    }
+
     var recordingSession: RecordingSession {
         let primaryAssetID = assets.first(where: { $0.relativePath == audioFileName })?.id
         return RecordingSession(
@@ -1534,6 +1544,7 @@ final class RecordingStore: ObservableObject {
     @Published private var iCloudSyncStatusCache: [RecordingItem.ID: RecordingICloudSyncStatus] = [:]
     @Published private(set) var isICloudStorageEnabled: Bool = false
     @Published private(set) var isStorageLocationChanging = false
+    @Published private(set) var lastRecordingSaveErrorMessage: String?
     @Published private var cachedICloudContainerURL: URL?
 
     private static let logger = Logger(subsystem: "com.reddownloader.LiveTranscriber", category: "RecordingStore")
@@ -1834,6 +1845,7 @@ final class RecordingStore: ObservableObject {
         keyPoints: String? = nil,
         location: RecordingLocation? = nil
     ) async -> RecordingItem? {
+        lastRecordingSaveErrorMessage = nil
         do {
             try await prepareActiveRecordingsDirectory()
 
@@ -1880,6 +1892,8 @@ final class RecordingStore: ObservableObject {
             try persist()
             return item
         } catch {
+            lastRecordingSaveErrorMessage = error.localizedDescription
+            Self.logger.error("Recording save failed: \(error.localizedDescription, privacy: .public)")
             return nil
         }
     }
@@ -2165,8 +2179,6 @@ final class RecordingStore: ObservableObject {
                 self.recordings[index].languageName = language.displayName
                 self.recordings[index].transcriptPreview = lines.plainTranscriptText
                 self.recordings[index].lineCount = lines.count
-                self.recordings[index].intelligence = nil
-                self.recordings[index].meetingAnalysis = nil
                 self.recordings[index].speakerDiarization = nil
                 self.recordings[index].importStatus = nil
                 try self.persist()
@@ -2227,8 +2239,6 @@ final class RecordingStore: ObservableObject {
                 self.recordings[index].languageName = language.displayName
                 self.recordings[index].transcriptPreview = lines.plainTranscriptText
                 self.recordings[index].lineCount = lines.count
-                self.recordings[index].intelligence = nil
-                self.recordings[index].meetingAnalysis = nil
                 self.recordings[index].speakerDiarization = nil
                 self.recordings[index].importStatus = nil
                 try self.persist()
@@ -2287,8 +2297,6 @@ final class RecordingStore: ObservableObject {
                 self.recordings[index].languageName = language.displayName
                 self.recordings[index].transcriptPreview = lines.plainTranscriptText
                 self.recordings[index].lineCount = lines.count
-                self.recordings[index].intelligence = nil
-                self.recordings[index].meetingAnalysis = nil
                 self.recordings[index].speakerDiarization = nil
                 self.recordings[index].importStatus = nil
                 try self.persist()
@@ -2349,8 +2357,6 @@ final class RecordingStore: ObservableObject {
                 )
                 self.recordings[index].transcriptPreview = result.lines.plainTranscriptText
                 self.recordings[index].lineCount = result.lines.count
-                self.recordings[index].intelligence = nil
-                self.recordings[index].meetingAnalysis = nil
                 self.recordings[index].speakerDiarization = result.speakerDiarization
                 self.recordings[index].importStatus = nil
                 self.searchIndexCache[item.id] = nil
@@ -2426,8 +2432,6 @@ final class RecordingStore: ObservableObject {
                 self.recordings[index].durationSeconds = max(currentItem.durationSeconds, measuredDuration)
                 self.recordings[index].transcriptPreview = transcription.lines.plainTranscriptText
                 self.recordings[index].lineCount = transcription.lines.count
-                self.recordings[index].intelligence = nil
-                self.recordings[index].meetingAnalysis = nil
                 self.recordings[index].speakerDiarization = transcription.diarization
                 self.recordings[index].importStatus = RecordingImportStatus(
                     progress: 0.78,
@@ -2515,8 +2519,6 @@ final class RecordingStore: ObservableObject {
         recordings[index].durationSeconds = max(currentItem.durationSeconds, measuredDuration)
         recordings[index].transcriptPreview = transcription.lines.plainTranscriptText
         recordings[index].lineCount = transcription.lines.count
-        recordings[index].intelligence = nil
-        recordings[index].meetingAnalysis = nil
         recordings[index].speakerDiarization = transcription.diarization
         recordings[index].importStatus = nil
         searchIndexCache[currentItem.id] = nil
@@ -2549,8 +2551,6 @@ final class RecordingStore: ObservableObject {
 
         recordings[index].transcriptPreview = restoredTranscript.plainTranscriptTextForIntelligence
         recordings[index].lineCount = restoredTranscript.transcriptLineCount
-        recordings[index].intelligence = nil
-        recordings[index].meetingAnalysis = nil
         recordings[index].speakerDiarization = nil
         recordings[index].importStatus = nil
         searchIndexCache[item.id] = nil
@@ -2951,7 +2951,7 @@ final class RecordingStore: ObservableObject {
         lineID: String,
         text: String,
         speaker: String?,
-        consecutiveFollowingLines: [(lineID: String, text: String)] = []
+        followingLines: [(lineID: String, text: String)] = []
     ) throws -> RecordingItem {
         try ensureRecordingsDirectory()
         guard let index = recordings.firstIndex(where: { $0.id == item.id }) else {
@@ -2962,13 +2962,13 @@ final class RecordingStore: ObservableObject {
         let transcriptURL = transcriptURL(for: currentItem)
         let transcript = (try? String(contentsOf: transcriptURL, encoding: .utf8)) ?? ""
         let speaker = Self.cleanedTranscriptSpeaker(speaker)
-        try Self.validateConsecutiveTranscriptLineIDs(
-            consecutiveFollowingLines.map { $0.lineID },
+        try Self.validateFollowingTranscriptLineIDs(
+            followingLines.map { $0.lineID },
             after: lineID,
             in: transcript,
             recordingDuration: Double(currentItem.durationSeconds)
         )
-        let edits = [(lineID: lineID, text: text)] + consecutiveFollowingLines
+        let edits = [(lineID: lineID, text: text)] + followingLines
         var updatedTranscript = transcript
         var updatedSpeakerDiarization = currentItem.speakerDiarization
 
@@ -2990,6 +2990,98 @@ final class RecordingStore: ObservableObject {
             )
         }
         try updatedTranscript.write(to: transcriptURL, atomically: true, encoding: .utf8)
+
+        recordings[index].transcriptPreview = updatedTranscript.plainTranscriptTextForIntelligence
+        recordings[index].lineCount = updatedTranscript.plainTranscriptTextForIntelligence.transcriptLineCount
+        recordings[index].intelligence = nil
+        recordings[index].meetingAnalysis = nil
+        recordings[index].speakerDiarization = updatedSpeakerDiarization
+        searchIndexCache[item.id] = nil
+        try persist()
+        return recordings[index]
+    }
+
+    @discardableResult
+    func renameTranscriptSpeaker(
+        for item: RecordingItem,
+        from speakerID: String,
+        to name: String
+    ) throws -> RecordingItem {
+        try renameTranscriptSpeakers(
+            for: item,
+            namesBySpeakerID: [speakerID: name]
+        )
+    }
+
+    @discardableResult
+    func renameTranscriptSpeakers(
+        for item: RecordingItem,
+        namesBySpeakerID: [String: String]
+    ) throws -> RecordingItem {
+        try ensureRecordingsDirectory()
+        guard let index = recordings.firstIndex(where: { $0.id == item.id }) else {
+            throw RecordingRenameError.itemMissing
+        }
+
+        let currentItem = recordings[index]
+        let renames = try namesBySpeakerID.compactMap { source, target -> (source: String, target: String)? in
+            guard let source = Self.cleanedTranscriptSpeaker(source),
+                  let target = Self.cleanedTranscriptSpeaker(target) else {
+                throw RecordingTranscriptEditError.lineMissing
+            }
+            return source == target ? nil : (source: source, target: target)
+        }
+        guard !renames.isEmpty else {
+            return currentItem
+        }
+
+        let transcriptURL = transcriptURL(for: currentItem)
+        let transcript = (try? String(contentsOf: transcriptURL, encoding: .utf8)) ?? ""
+        let lines = StoredTranscriptLine.parse(
+            transcript,
+            speakerDiarization: currentItem.speakerDiarization
+        )
+        let matchingLines = lines.compactMap { line -> (line: StoredTranscriptLine, target: String)? in
+            guard let rename = renames.first(where: {
+                Self.transcriptSpeaker(line.speaker, matches: $0.source)
+            }) else {
+                return nil
+            }
+            return (line: line, target: rename.target)
+        }
+        let matchedSources = Set(matchingLines.compactMap { match in
+            renames.first(where: {
+                Self.transcriptSpeaker(match.line.speaker, matches: $0.source)
+            })?.source.folding(
+                options: [.caseInsensitive, .diacriticInsensitive, .widthInsensitive],
+                locale: Locale(identifier: "en_US_POSIX")
+            )
+        })
+        guard matchedSources.count == renames.count else {
+            throw RecordingTranscriptEditError.lineMissing
+        }
+
+        var updatedTranscript = transcript
+        for match in matchingLines {
+            updatedTranscript = try Self.replacingTranscriptLine(
+                in: updatedTranscript,
+                lineID: match.line.id,
+                replacementText: "\(match.target): \(match.line.spokenText)"
+            )
+        }
+        try updatedTranscript.write(to: transcriptURL, atomically: true, encoding: .utf8)
+
+        var updatedSpeakerDiarization = currentItem.speakerDiarization
+        for match in matchingLines {
+            updatedSpeakerDiarization = try Self.updatingSpeakerDiarization(
+                updatedSpeakerDiarization,
+                in: transcript,
+                lineID: match.line.id,
+                speaker: match.target,
+                spokenText: match.line.spokenText,
+                recordingDuration: Double(currentItem.durationSeconds)
+            )
+        }
 
         recordings[index].transcriptPreview = updatedTranscript.plainTranscriptTextForIntelligence
         recordings[index].lineCount = updatedTranscript.plainTranscriptTextForIntelligence.transcriptLineCount
@@ -3084,7 +3176,20 @@ final class RecordingStore: ObservableObject {
         return cleaned.isEmpty ? nil : cleaned
     }
 
-    private static func validateConsecutiveTranscriptLineIDs(
+    private static func transcriptSpeaker(_ speaker: String?, matches candidate: String) -> Bool {
+        guard let speaker = cleanedTranscriptSpeaker(speaker) else {
+            return false
+        }
+        return speaker.folding(
+            options: [.caseInsensitive, .diacriticInsensitive, .widthInsensitive],
+            locale: Locale(identifier: "en_US_POSIX")
+        ) == candidate.folding(
+            options: [.caseInsensitive, .diacriticInsensitive, .widthInsensitive],
+            locale: Locale(identifier: "en_US_POSIX")
+        )
+    }
+
+    private static func validateFollowingTranscriptLineIDs(
         _ followingLineIDs: [String],
         after lineID: String,
         in transcript: String,
@@ -3101,14 +3206,16 @@ final class RecordingStore: ObservableObject {
         guard let targetIndex = locations.firstIndex(where: { $0.id == lineID }) else {
             throw RecordingTranscriptEditError.lineMissing
         }
-        let expectedLineIDs = Array(
-            locations
-                .dropFirst(targetIndex + 1)
-                .prefix(followingLineIDs.count)
-                .map(\.id)
-        )
-        guard expectedLineIDs == followingLineIDs else {
-            throw RecordingTranscriptEditError.lineMissing
+
+        var nextSearchIndex = targetIndex + 1
+        for followingLineID in followingLineIDs {
+            guard nextSearchIndex < locations.endIndex,
+                  let matchedIndex = locations[nextSearchIndex...].firstIndex(where: {
+                      $0.id == followingLineID
+                  }) else {
+                throw RecordingTranscriptEditError.lineMissing
+            }
+            nextSearchIndex = matchedIndex + 1
         }
     }
 
