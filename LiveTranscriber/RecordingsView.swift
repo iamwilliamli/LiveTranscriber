@@ -4154,6 +4154,8 @@ struct RecordingDetailView: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.scenePhase) private var scenePhase
     @Environment(\.accessibilityReduceMotion) private var accessibilityReduceMotion
+    @AppStorage(AudioEventDisplayConfiguration.confidenceThresholdDefaultsKey)
+    private var audioEventConfidenceThreshold = AudioEventDisplayConfiguration.defaultConfidenceThreshold
     @State private var copied = false
     @State private var deleteRequest: RecordingDeleteRequest?
     @State private var isAnalyzing = false
@@ -4173,6 +4175,7 @@ struct RecordingDetailView: View {
     @State private var audioPreparationStatus: RecordingAudioPreparationStatus = .checking
     @State private var isShowingAudioFileInfo = false
     @State private var isShowingAudioEventsSheet = false
+    @State private var audioEventsInitialScrollTargetID: RecordingAudioEvent.ID?
     @StateObject private var editLocationProvider = RecordingEditLocationProvider()
     @State private var isShowingRecordingEditSheet = false
     @State private var editRecordingName = ""
@@ -4199,6 +4202,8 @@ struct RecordingDetailView: View {
     @State private var cachedTranscriptLines: [StoredTranscriptLine] = []
     @State private var cachedTranscriptSpeakers: [TranscriptSpeakerPresentation] = []
     @State private var scrubbedPlaybackTime: TimeInterval?
+    @State private var isTranscriptFollowEnabled = false
+    @State private var followedTranscriptLineID: StoredTranscriptLine.ID?
     @State private var translationConfiguration: TranslationSession.Configuration?
     @State private var selectedTranslationLanguage: TranscriptionLanguage?
     @State private var translatedTranscriptByLineID: [StoredTranscriptLine.ID: String] = [:]
@@ -4459,31 +4464,70 @@ struct RecordingDetailView: View {
         }
         .sheet(isPresented: $isShowingAudioEventsSheet) {
             NavigationStack {
-                ScrollView {
-                    audioEventsSheetContent
-                        .padding()
+                ScrollViewReader { proxy in
+                    ScrollView {
+                        audioEventsSheetContent
+                            .padding(.horizontal, 16)
+                            .padding(.top, 12)
+                            .padding(.bottom, 24)
+                    }
+                    .scrollIndicators(.hidden)
+                    .background(AppTheme.groupedBackground.ignoresSafeArea())
+                    .task(id: audioEventsInitialScrollTargetID) {
+                        guard let targetID = audioEventsInitialScrollTargetID else {
+                            return
+                        }
+
+                        await Task.yield()
+                        var transaction = Transaction()
+                        transaction.disablesAnimations = true
+                        withTransaction(transaction) {
+                            proxy.scrollTo(targetID, anchor: .center)
+                        }
+                    }
                 }
-                .background(AppTheme.groupedBackground.ignoresSafeArea())
-                .navigationTitle(localized(L10n.Recordings.audioEvents))
                 .navigationBarTitleDisplayMode(.inline)
                 .toolbar {
                     if currentItem.audioEventAnalysis != nil {
                         ToolbarItem(placement: .topBarLeading) {
-                            Button(localized(L10n.Recordings.analyzeAudioEventsAgain)) {
+                            Button {
+                                HapticFeedback.play(.menuSelection)
                                 analyzeCurrentAudioEvents()
+                            } label: {
+                                Image(systemName: "arrow.clockwise")
                             }
+                            .tint(AppTheme.info)
                             .disabled(isAnalyzingAudioEvents)
+                            .accessibilityLabel(Text(L10n.Recordings.analyzeAudioEventsAgain))
+                        }
+                    }
+
+                    ToolbarItem(placement: .principal) {
+                        VStack(spacing: 1) {
+                            Text(L10n.Recordings.audioEvents)
+                                .font(.redditSans(.headline, weight: .bold))
+
+                            Text(audioEventsToolbarSubtitle)
+                                .font(.redditSans(.caption2, weight: .medium))
+                                .foregroundStyle(.secondary)
+                                .monospacedDigit()
                         }
                     }
 
                     ToolbarItem(placement: .topBarTrailing) {
-                        Button(localized(L10n.Common.done)) {
+                        Button {
+                            HapticFeedback.play(.navigation)
                             isShowingAudioEventsSheet = false
+                        } label: {
+                            Image(systemName: "xmark")
                         }
+                        .tint(.primary)
+                        .accessibilityLabel(Text(L10n.Common.done))
                     }
                 }
             }
-            .presentationDetents([.medium, .large])
+            .presentationDetents([.height(audioEventsCompactHeight), .large])
+            .presentationContentInteraction(.scrolls)
             .presentationDragIndicator(.visible)
         }
         .sheet(isPresented: $isShowingRecordingEditSheet) {
@@ -5060,6 +5104,20 @@ struct RecordingDetailView: View {
                         .padding(.bottom, 6)
                         .offset(y: 12)
                 }
+                .onReceive(player.$currentTime) { time in
+                    followTranscriptIfNeeded(
+                        at: time,
+                        using: scrollProxy
+                    )
+                }
+                .onScrollPhaseChange { _, newPhase in
+                    guard newPhase == .interacting,
+                          isTranscriptFollowEnabled else {
+                        return
+                    }
+                    isTranscriptFollowEnabled = false
+                    followedTranscriptLineID = nil
+                }
                 .task(id: initialTranscriptScrollTarget) {
                     guard let lineID = initialTranscriptScrollTarget else {
                         return
@@ -5397,39 +5455,97 @@ struct RecordingDetailView: View {
     }
 
     private func audioEventRow(_ event: RecordingAudioEvent) -> some View {
-        Button {
+        let isFocused = event.id == audioEventsInitialScrollTargetID
+        let shape = RoundedRectangle(cornerRadius: 16, style: .continuous)
+
+        return Button {
             HapticFeedback.play(.timelineSeek)
             player.seek(to: event.startTime)
             scrubbedPlaybackTime = nil
             isShowingAudioEventsSheet = false
         } label: {
-            HStack(alignment: .center, spacing: 10) {
-                VStack(alignment: .leading, spacing: 4) {
+            HStack(alignment: .center, spacing: 12) {
+                ZStack {
+                    Circle()
+                        .fill(AppTheme.info.opacity(isFocused ? 0.18 : 0.10))
+
+                    Image(systemName: audioEventSymbolName(event))
+                        .font(.system(size: 15, weight: .semibold))
+                        .foregroundStyle(AppTheme.info)
+                }
+                .frame(width: 40, height: 40)
+
+                VStack(alignment: .leading, spacing: 5) {
                     Text(event.localizedLabel)
                         .font(.redditSans(.subheadline, weight: .semibold))
                         .foregroundStyle(.primary)
                         .frame(maxWidth: .infinity, alignment: .leading)
 
-                    Text(localizedFormat(L10n.Recordings.audioEventConfidenceFormat, event.confidence * 100))
-                        .font(.redditSans(.caption))
-                        .foregroundStyle(.secondary)
+                    HStack(spacing: 10) {
+                        Label {
+                            Text(
+                                localizedFormat(
+                                    L10n.Recordings.audioEventConfidenceFormat,
+                                    event.confidence * 100
+                                )
+                            )
+                        } icon: {
+                            Image(systemName: "checkmark.seal.fill")
+                        }
+
+                        Label {
+                            Text(TranscriptionLine.formatTimestamp(event.duration))
+                                .monospacedDigit()
+                        } icon: {
+                            Image(systemName: "timer")
+                        }
+                    }
+                    .font(.redditSans(.caption2, weight: .medium))
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
                 }
 
-                Text(audioEventTimeRangeText(event))
-                    .font(.redditSans(.caption, weight: .bold))
-                    .foregroundStyle(AppTheme.info)
-                    .lineLimit(1)
-                    .monospacedDigit()
-                    .padding(.horizontal, 8)
-                    .frame(height: 24)
-                    .background(AppTheme.info.opacity(0.12), in: Capsule())
+                Label {
+                    Text(audioEventTimeRangeText(event))
+                        .monospacedDigit()
+                } icon: {
+                    Image(systemName: "play.fill")
+                        .font(.system(size: 8, weight: .bold))
+                }
+                .font(.redditSans(.caption2, weight: .bold))
+                .foregroundStyle(AppTheme.info)
+                .lineLimit(1)
+                .padding(.horizontal, 9)
+                .frame(height: 28)
+                .background(AppTheme.info.opacity(isFocused ? 0.16 : 0.10), in: Capsule())
             }
-            .padding(.vertical, 8)
-            .padding(.horizontal, 10)
+            .padding(12)
             .frame(maxWidth: .infinity, alignment: .leading)
-            .background(Color.secondary.opacity(0.08), in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+            .background {
+                shape
+                    .fill(
+                        isFocused
+                            ? AppTheme.info.opacity(0.075)
+                            : AppTheme.cardBackground
+                    )
+            }
+            .overlay {
+                shape
+                    .strokeBorder(
+                        isFocused
+                            ? AppTheme.info.opacity(0.30)
+                            : AppTheme.cardBorder.opacity(0.72),
+                        lineWidth: isFocused ? 1 : 0.75
+                    )
+            }
+            .shadow(
+                color: Color.black.opacity(isFocused ? 0.07 : 0.045),
+                radius: isFocused ? 9 : 6,
+                y: isFocused ? 4 : 2
+            )
         }
-        .buttonStyle(.plain)
+        .buttonStyle(PlaybackAudioEventRowButtonStyle())
+        .accessibilityHint(Text(audioEventTimeRangeText(event)))
     }
 
     private func audioEventTimeRangeText(_ event: RecordingAudioEvent) -> String {
@@ -5439,40 +5555,64 @@ struct RecordingDetailView: View {
     }
 
     private var audioEventsSheetContent: some View {
-        VStack(alignment: .leading, spacing: 12) {
+        let events = visibleAudioEvents
+
+        return VStack(alignment: .leading, spacing: 14) {
             if isAnalyzingAudioEvents {
-                HStack(spacing: 10) {
-                    ProgressView()
-                        .controlSize(.small)
+                VStack(spacing: 14) {
+                    ZStack {
+                        Circle()
+                            .fill(AppTheme.info.opacity(0.10))
+
+                        ProgressView()
+                            .controlSize(.regular)
+                            .tint(AppTheme.info)
+                    }
+                    .frame(width: 52, height: 52)
+
                     Text(L10n.Recordings.analyzingAudioEvents)
-                        .font(.redditSans(.subheadline, weight: .semibold))
+                        .font(.redditSans(.headline, weight: .semibold))
                 }
                 .foregroundStyle(AppTheme.info)
-                .padding(14)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .background(AppTheme.cardBackground, in: RoundedRectangle(cornerRadius: AppTheme.cornerRadius, style: .continuous))
-            } else if let analysis = currentItem.audioEventAnalysis, !analysis.events.isEmpty {
-                LazyVStack(alignment: .leading, spacing: 8) {
-                    ForEach(analysis.events) { event in
+                .padding(.vertical, 30)
+                .frame(maxWidth: .infinity)
+                .background(
+                    AppTheme.cardBackground,
+                    in: RoundedRectangle(cornerRadius: 20, style: .continuous)
+                )
+            } else if let analysis = currentItem.audioEventAnalysis, !events.isEmpty {
+                LazyVStack(alignment: .leading, spacing: 10) {
+                    ForEach(events) { event in
                         audioEventRow(event)
+                            .id(event.id)
                     }
                 }
-                .padding(14)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .background(AppTheme.cardBackground, in: RoundedRectangle(cornerRadius: AppTheme.cornerRadius, style: .continuous))
 
-                Text(analysis.generatedAt, format: .dateTime.year().month().day().hour().minute())
-                    .font(.redditSans(.caption2))
-                    .foregroundStyle(.secondary)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(.horizontal, 4)
+                Label {
+                    Text(
+                        analysis.generatedAt,
+                        format: .dateTime.year().month().day().hour().minute()
+                    )
+                } icon: {
+                    Image(systemName: "clock")
+                }
+                .font(.redditSans(.caption2, weight: .medium))
+                .foregroundStyle(.secondary)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.horizontal, 6)
             } else {
-                VStack(spacing: 12) {
-                    EmptyStateView(icon: "waveform.badge.magnifyingglass", titleResource: L10n.Recordings.noAudioEvents)
-                        .frame(maxWidth: .infinity)
-                        .frame(height: 112)
+                VStack(spacing: 18) {
+                    ContentUnavailableView {
+                        Label(
+                            localized(L10n.Recordings.noAudioEvents),
+                            systemImage: "waveform.badge.magnifyingglass"
+                        )
+                    } description: {
+                        Text(L10n.Recordings.noAudioEventsDetected)
+                    }
 
                     Button {
+                        HapticFeedback.play(.menuSelection)
                         analyzeCurrentAudioEvents()
                     } label: {
                         Label(localized(L10n.Recordings.analyzeAudioEvents), systemImage: "waveform.badge.magnifyingglass")
@@ -5481,11 +5621,85 @@ struct RecordingDetailView: View {
                     .buttonStyle(.borderedProminent)
                     .disabled(isAnalyzingAudioEvents)
                 }
-                .padding(14)
+                .padding(.horizontal, 14)
+                .padding(.vertical, 24)
                 .frame(maxWidth: .infinity)
-                .background(AppTheme.cardBackground, in: RoundedRectangle(cornerRadius: AppTheme.cornerRadius, style: .continuous))
+                .background(
+                    AppTheme.cardBackground,
+                    in: RoundedRectangle(cornerRadius: 20, style: .continuous)
+                )
             }
         }
+    }
+
+    private var audioEventsToolbarSubtitle: String {
+        if isAnalyzingAudioEvents {
+            return localized(L10n.Recordings.analyzingAudioEvents)
+        }
+
+        let eventCount = visibleAudioEvents.count.formatted()
+        let threshold = audioEventConfidenceThreshold.formatted(
+            .percent.precision(.fractionLength(0))
+        )
+        return "\(eventCount) · >\(threshold)"
+    }
+
+    private var audioEventsCompactHeight: CGFloat {
+        let visibleRowCount = min(max(visibleAudioEvents.count, 1), 3)
+        return min(300 + CGFloat(visibleRowCount) * 84, 552)
+    }
+
+    private func audioEventSymbolName(_ event: RecordingAudioEvent) -> String {
+        let identifier = event.sourceIdentifier.lowercased()
+
+        if identifier.contains("alarm")
+            || identifier.contains("bell")
+            || identifier.contains("siren")
+            || identifier.contains("phone") {
+            return "bell.badge.fill"
+        }
+        if identifier.contains("applause")
+            || identifier.contains("clap")
+            || identifier.contains("cheer") {
+            return "hands.clap.fill"
+        }
+        if identifier.contains("music") || identifier.contains("sing") {
+            return "music.note"
+        }
+        if identifier.contains("cat") {
+            return "cat.fill"
+        }
+        if identifier.contains("dog") {
+            return "dog.fill"
+        }
+        if identifier.contains("cough") || identifier.contains("sneeze") {
+            return "waveform.path.ecg"
+        }
+        if identifier.contains("engine") || identifier.contains("vehicle") {
+            return "car.fill"
+        }
+        if identifier.contains("footstep") {
+            return "figure.walk"
+        }
+        if identifier.contains("knock") {
+            return "hand.tap.fill"
+        }
+        if identifier.contains("laugh") {
+            return "face.smiling.fill"
+        }
+        if identifier.contains("rain") || identifier.contains("water") {
+            return "drop.fill"
+        }
+        if identifier.contains("thunder") {
+            return "cloud.bolt.rain.fill"
+        }
+        if identifier.contains("typing") {
+            return "keyboard.fill"
+        }
+        if identifier.contains("wind") {
+            return "wind"
+        }
+        return "waveform"
     }
 
     private var audioParametersCard: some View {
@@ -5566,10 +5780,10 @@ struct RecordingDetailView: View {
             ) { _ in
                 let displayedTime = scrubbedPlaybackTime ?? player.presentationTime()
 
-                HStack(alignment: .center, spacing: 8) {
+                HStack(alignment: .playbackTimelineTrack, spacing: 8) {
                     Text(TranscriptionLine.formatTimestamp(displayedTime))
                         .font(.redditSans(.caption2, weight: .semibold).monospacedDigit())
-                        .foregroundStyle(.primary)
+                        .foregroundStyle(.secondary)
                         .lineLimit(1)
                         .minimumScaleFactor(0.78)
                         .frame(width: timeLabelWidth, alignment: .leading)
@@ -5578,7 +5792,7 @@ struct RecordingDetailView: View {
                         currentTime: displayedTime,
                         duration: player.duration,
                         scrubbedTime: $scrubbedPlaybackTime,
-                        audioEvents: currentItem.audioEventAnalysis?.events ?? [],
+                        audioEvents: visibleAudioEvents,
                         isEnabled: player.isLoaded,
                         onSeek: { time in
                             HapticFeedback.play(.timelineSeek)
@@ -5591,6 +5805,9 @@ struct RecordingDetailView: View {
                         }
                     )
                     .frame(maxWidth: .infinity)
+                    .alignmentGuide(.playbackTimelineTrack) { _ in
+                        RecordingTimelineLayout.trackCenterY
+                    }
 
                     Text(TranscriptionLine.formatTimestamp(player.duration))
                         .font(.redditSans(.caption2, weight: .semibold).monospacedDigit())
@@ -5610,6 +5827,17 @@ struct RecordingDetailView: View {
         .padding(.top, 8)
         .padding(.bottom, 9)
         .frame(maxWidth: .infinity, alignment: .leading)
+        .background {
+            // Glass renders the player surface, but it does not make every
+            // visually covered point an interaction target. Keep taps in the
+            // gaps between controls from reaching transcript rows underneath.
+            shape
+                .fill(Color.black.opacity(0.001))
+                .contentShape(.interaction, shape)
+                .onTapGesture {}
+                .accessibilityHidden(true)
+        }
+        .contentShape(.interaction, shape)
         .glassEffect(.regular.tint(AppTheme.playbackGlassTint), in: shape)
         .overlay {
             shape
@@ -5626,7 +5854,7 @@ struct RecordingDetailView: View {
                 HStack(spacing: 0) {
                     playbackAccessoryControls(transcriptScrollProxy: transcriptScrollProxy)
                     Spacer(minLength: 0)
-                    playbackSpeedMenu
+                    playbackPreferenceControls
                 }
 
                 playbackTransportControls
@@ -5638,7 +5866,7 @@ struct RecordingDetailView: View {
                 Spacer(minLength: 0)
                 playbackTransportControls
                 Spacer(minLength: 0)
-                playbackSpeedMenu
+                playbackPreferenceControls
             }
         }
     }
@@ -5648,7 +5876,14 @@ struct RecordingDetailView: View {
     ) -> some View {
         HStack(spacing: 6) {
             audioEventsTimelineControl
-            transcriptSyncControl(scrollProxy: transcriptScrollProxy)
+            transcriptFollowControl(scrollProxy: transcriptScrollProxy)
+        }
+    }
+
+    private var playbackPreferenceControls: some View {
+        HStack(spacing: 6) {
+            silenceSkippingControl
+            playbackSpeedMenu
         }
     }
 
@@ -5697,39 +5932,68 @@ struct RecordingDetailView: View {
         return audioPreparationStatus
     }
 
-    private func transcriptSyncControl(scrollProxy: ScrollViewProxy) -> some View {
+    private func transcriptFollowControl(scrollProxy: ScrollViewProxy) -> some View {
         Button {
-            syncTranscriptToPlayback(using: scrollProxy)
+            let isEnabling = !isTranscriptFollowEnabled
+            HapticFeedback.play(isEnabling ? .toggleOn : .toggleOff)
+            withAnimation(.snappy(duration: 0.18, extraBounce: 0)) {
+                isTranscriptFollowEnabled = isEnabling
+            }
+            followedTranscriptLineID = nil
+            if isEnabling {
+                followTranscriptIfNeeded(
+                    at: scrubbedPlaybackTime ?? player.presentationTime(),
+                    using: scrollProxy,
+                    force: true
+                )
+            }
         } label: {
-            PlaybackUtilityControlLabel(tint: .primary, width: 42) {
-                Image(systemName: "scope")
+            PlaybackUtilityControlLabel(
+                tint: isTranscriptFollowEnabled ? AppTheme.info : .primary,
+                width: 42,
+                isSelected: isTranscriptFollowEnabled
+            ) {
+                Image(systemName: "text.line.first.and.arrowtriangle.forward")
                     .font(.system(size: 13, weight: .semibold))
+                    .contentTransition(.symbolEffect(.replace))
             }
         }
         .buttonStyle(PlaybackUtilityButtonStyle())
         .disabled(!player.isLoaded || cachedTranscriptLines.isEmpty)
-        .accessibilityLabel(Text(L10n.Recordings.syncCurrentTranscript))
+        .accessibilityLabel(Text(L10n.Recordings.followTranscript))
+        .accessibilityValue(
+            Text(
+                isTranscriptFollowEnabled
+                    ? L10n.ICloud.enabled
+                    : L10n.ICloud.disabled
+            )
+        )
     }
 
-    private func syncTranscriptToPlayback(using scrollProxy: ScrollViewProxy) {
-        let playbackTime = scrubbedPlaybackTime ?? player.presentationTime()
+    private func followTranscriptIfNeeded(
+        at playbackTime: TimeInterval,
+        using scrollProxy: ScrollViewProxy,
+        force: Bool = false
+    ) {
+        guard isTranscriptFollowEnabled else {
+            return
+        }
         let lineID = StoredTranscriptLine.currentLineID(
             in: cachedTranscriptLines,
             time: playbackTime
         ) ?? cachedTranscriptLines.first?.id
 
-        guard let lineID else {
-            HapticFeedback.play(.blocked)
+        guard let lineID,
+              force || followedTranscriptLineID != lineID else {
             return
         }
-
-        HapticFeedback.play(.navigation)
+        followedTranscriptLineID = lineID
         guard !accessibilityReduceMotion else {
             scrollProxy.scrollTo(lineID, anchor: .center)
             return
         }
 
-        withAnimation(.snappy(duration: 0.34, extraBounce: 0)) {
+        withAnimation(.snappy(duration: 0.30, extraBounce: 0)) {
             scrollProxy.scrollTo(lineID, anchor: .center)
         }
     }
@@ -5739,6 +6003,11 @@ struct RecordingDetailView: View {
             if currentItem.audioEventAnalysis == nil {
                 analyzeCurrentAudioEvents()
             } else {
+                let playbackTime = scrubbedPlaybackTime ?? player.presentationTime()
+                audioEventsInitialScrollTargetID = nearestAudioEvent(
+                    to: playbackTime,
+                    in: visibleAudioEvents
+                )?.id
                 isShowingAudioEventsSheet = true
             }
         } label: {
@@ -5751,8 +6020,8 @@ struct RecordingDetailView: View {
                         Image(systemName: "waveform.badge.magnifyingglass")
                             .font(.system(size: 13, weight: .semibold))
 
-                        if let eventCount = currentItem.audioEventAnalysis?.events.count {
-                            Text(eventCount.formatted(.number.notation(.compactName)))
+                        if currentItem.audioEventAnalysis != nil {
+                            Text(visibleAudioEvents.count.formatted(.number.notation(.compactName)))
                                 .font(.redditSans(.caption2, weight: .bold))
                                 .lineLimit(1)
                                 .minimumScaleFactor(0.8)
@@ -5761,9 +6030,58 @@ struct RecordingDetailView: View {
                 }
             }
         }
-        .buttonStyle(PlaybackUtilityButtonStyle())
+        .buttonStyle(PlaybackUtilityButtonStyle(showsDepthShadow: true))
         .disabled(!player.isLoaded || isAnalyzingAudioEvents)
         .accessibilityLabel(Text(L10n.Recordings.audioEvents))
+    }
+
+    private var visibleAudioEvents: [RecordingAudioEvent] {
+        guard let events = currentItem.audioEventAnalysis?.events else {
+            return []
+        }
+
+        return events
+            .filter { $0.confidence > audioEventConfidenceThreshold }
+            .sorted { lhs, rhs in
+                if lhs.startTime != rhs.startTime {
+                    return lhs.startTime < rhs.startTime
+                }
+                if lhs.endTime != rhs.endTime {
+                    return lhs.endTime < rhs.endTime
+                }
+                return lhs.id.uuidString < rhs.id.uuidString
+            }
+    }
+
+    private func nearestAudioEvent(
+        to playbackTime: TimeInterval,
+        in events: [RecordingAudioEvent]
+    ) -> RecordingAudioEvent? {
+        events.min { lhs, rhs in
+            let lhsDistance = audioEventDistance(from: playbackTime, to: lhs)
+            let rhsDistance = audioEventDistance(from: playbackTime, to: rhs)
+
+            if lhsDistance != rhsDistance {
+                return lhsDistance < rhsDistance
+            }
+            if lhs.startTime != rhs.startTime {
+                return lhs.startTime < rhs.startTime
+            }
+            return lhs.endTime < rhs.endTime
+        }
+    }
+
+    private func audioEventDistance(
+        from playbackTime: TimeInterval,
+        to event: RecordingAudioEvent
+    ) -> TimeInterval {
+        if playbackTime >= event.startTime, playbackTime <= event.endTime {
+            return 0
+        }
+        return min(
+            abs(playbackTime - event.startTime),
+            abs(playbackTime - event.endTime)
+        )
     }
 
     private var playbackSpeedMenu: some View {
@@ -5780,14 +6098,49 @@ struct RecordingDetailView: View {
                 }
             }
         } label: {
-            PlaybackUtilityControlLabel(tint: .primary, width: 50) {
+            PlaybackUtilityControlLabel(tint: .primary, width: 42) {
                 Text(RecordingPlaybackController.playbackRateLabel(player.playbackRate))
                     .font(.redditSans(.caption2, weight: .bold).monospacedDigit())
                     .lineLimit(1)
             }
         }
+        .buttonStyle(PlaybackUtilityButtonStyle(showsDepthShadow: true))
+        .disabled(!player.isLoaded)
+    }
+
+    private var silenceSkippingControl: some View {
+        Button {
+            let isEnabling = !player.isSilenceSkippingEnabled
+            HapticFeedback.play(isEnabling ? .toggleOn : .toggleOff)
+            withAnimation(.snappy(duration: 0.18, extraBounce: 0)) {
+                player.toggleSilenceSkipping()
+            }
+        } label: {
+            PlaybackUtilityControlLabel(
+                tint: player.isSilenceSkippingEnabled ? AppTheme.info : .primary,
+                width: 42,
+                isSelected: player.isSilenceSkippingEnabled
+            ) {
+                if player.isPreparingSilenceAnalysis {
+                    ProgressView()
+                        .controlSize(.small)
+                } else {
+                    Image(systemName: "waveform.slash")
+                        .font(.system(size: 13, weight: .semibold))
+                        .contentTransition(.symbolEffect(.replace))
+                }
+            }
+        }
         .buttonStyle(PlaybackUtilityButtonStyle())
         .disabled(!player.isLoaded)
+        .accessibilityLabel(Text(L10n.Recordings.skipSilence))
+        .accessibilityValue(
+            Text(
+                player.isSilenceSkippingEnabled
+                    ? L10n.ICloud.enabled
+                    : L10n.ICloud.disabled
+            )
+        )
     }
 
     private var transcript: some View {
@@ -5808,7 +6161,7 @@ struct RecordingDetailView: View {
                         .foregroundStyle(AppTheme.warning)
                         .lineLimit(1)
                         .padding(.horizontal, 8)
-                        .frame(height: 24)
+                        .frame(height: 30)
                         .background(AppTheme.warning.opacity(0.12), in: Capsule())
                         .accessibilityHint(localized(L10n.Recordings.transcriptLockedDetail))
                 }
@@ -7074,38 +7427,64 @@ private struct RecordingEditSheet: View {
     var onGenerateTitle: (() async throws -> RecordingTitleSuggestion)? = nil
     let onSave: () -> Void
     let onCancel: () -> Void
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var isGeneratingTitle = false
     @State private var titleGenerationErrorMessage: String?
     @State private var isShowingLanguagePicker = false
+    @FocusState private var focusedField: FocusedField?
+
+    private enum FocusedField: Hashable {
+        case name
+        case summary
+        case keyPoints
+    }
+
+    private var hasChanges: Bool {
+        let originalLanguageID = TranscriptionLanguage(id: item.languageID).baseLanguage.id
+        return recordingName != item.displayName
+            || languageID != originalLanguageID
+            || categoryName != (item.categoryName ?? "")
+            || keyPoints != (item.keyPoints ?? "")
+            || tags != item.combinedTags
+            || summary != (item.intelligence?.summary ?? "")
+            || includesLocation != (item.location != nil)
+            || locationProvider.recordingLocation != nil
+    }
+
+    private var canSave: Bool {
+        !isSaving
+            && hasChanges
+            && !recordingName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    }
 
     var body: some View {
         NavigationStack {
             ScrollView {
-                VStack(alignment: .leading, spacing: 14) {
-                    nameSection
-                    languageSection
-                    categorySection
-                    keyPointsSection
-                    summarySection
-                    tagsEntry
-                    durationRow
-                    locationSection
+                VStack(alignment: .leading, spacing: 12) {
+                    primaryInformationCard
+                    contentCard
+                    metadataCard
                 }
-                .padding(16)
+                .padding(.horizontal, 16)
+                .padding(.top, 10)
+                .padding(.bottom, 28)
             }
+            .scrollDismissesKeyboard(.interactively)
             .background(AppTheme.groupedBackground.ignoresSafeArea())
             .navigationTitle(localized(L10n.Recordings.editRecordingTitle))
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
-                ToolbarItem(placement: .topBarLeading) {
+                ToolbarItem(placement: .cancellationAction) {
                     Button(localized(L10n.Common.cancel)) {
                         onCancel()
                     }
                     .disabled(isSaving)
+                    .tint(.primary)
                 }
 
-                ToolbarItem(placement: .topBarTrailing) {
+                ToolbarItem(placement: .confirmationAction) {
                     Button {
+                        focusedField = nil
                         onSave()
                     } label: {
                         if isSaving {
@@ -7116,10 +7495,24 @@ private struct RecordingEditSheet: View {
                                 .font(.redditSans(.subheadline, weight: .semibold))
                         }
                     }
-                    .disabled(isSaving || recordingName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                    .disabled(!canSave)
+                    .tint(AppTheme.brand)
                 }
+
+                #if os(iOS)
+                ToolbarItemGroup(placement: .keyboard) {
+                    Spacer()
+                    Button(localized(L10n.Common.done)) {
+                        focusedField = nil
+                    }
+                }
+                #endif
             }
         }
+        .animation(
+            reduceMotion ? nil : .easeOut(duration: 0.18),
+            value: focusedField
+        )
         .sheet(isPresented: $isShowingLanguagePicker) {
             RecordingRetranscriptionLanguagePicker(
                 title: localized(L10n.Settings.transcriptionLanguage),
@@ -7154,17 +7547,29 @@ private struct RecordingEditSheet: View {
         }
     }
 
-    private var nameSection: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Label(localized(L10n.Recordings.recordingName), systemImage: "pencil")
-                .font(.redditSans(.caption, weight: .semibold))
-                .foregroundStyle(.secondary)
+    private var primaryInformationCard: some View {
+        let selectedLanguage = languageOptions.first(where: { $0.id == languageID })
+            ?? TranscriptionLanguage(id: languageID).baseLanguage
+        let appearance = categoryName.isEmpty
+            ? nil
+            : RecordingCategoryAppearanceCatalog.appearance(for: categoryName)
+
+        return VStack(alignment: .leading, spacing: 0) {
+            recordingEditFieldHeader(
+                L10n.Recordings.recordingName,
+                systemImage: "pencil",
+                tint: AppTheme.brand
+            )
 
             HStack(spacing: 8) {
                 TextField(localized(L10n.Recordings.recordingName), text: $recordingName)
                     .font(.redditSans(.headline, weight: .semibold))
-                    .textInputAutocapitalization(.never)
-                    .autocorrectionDisabled()
+                    .textInputAutocapitalization(.sentences)
+                    .submitLabel(.done)
+                    .focused($focusedField, equals: .name)
+                    .onSubmit {
+                        focusedField = nil
+                    }
 
                 if showsTitleGeneration, onGenerateTitle != nil {
                     Button {
@@ -7175,142 +7580,219 @@ private struct RecordingEditSheet: View {
                                 ProgressView()
                                     .controlSize(.small)
                             } else {
-                                Image(systemName: "sparkles")
-                                    .font(.system(size: 15, weight: .semibold))
+                                HStack(spacing: 5) {
+                                    Image(systemName: "sparkles")
+                                        .font(.system(size: 13, weight: .semibold))
+                                    Text("AI")
+                                        .font(.redditSans(.caption, weight: .bold))
+                                }
                             }
                         }
-                        .frame(width: 34, height: 34)
                         .foregroundStyle(AppTheme.brand)
-                        .background(AppTheme.brand.opacity(0.11), in: Circle())
+                        .frame(minWidth: 48)
+                        .frame(height: 36)
+                        .background(
+                            AppTheme.brand.opacity(0.11),
+                            in: RoundedRectangle(cornerRadius: 12, style: .continuous)
+                        )
                     }
                     .buttonStyle(.plain)
                     .disabled(isSaving || isGeneratingTitle)
-                    .accessibilityLabel(localized(L10n.Transcription.generateTitleAndTagsAccessibility))
+                    .accessibilityLabel(
+                        localized(L10n.Transcription.generateTitleAndTagsAccessibility)
+                    )
                 }
             }
-            .padding(.leading, 12)
-            .padding(.trailing, showsTitleGeneration && onGenerateTitle != nil ? 7 : 12)
-            .frame(height: 48)
-            .editorSheetInputSurface()
-        }
-        .recordingEditSectionSurface()
-    }
+            .padding(.leading, 13)
+            .padding(.trailing, showsTitleGeneration && onGenerateTitle != nil ? 8 : 13)
+            .frame(minHeight: 52)
+            .recordingEditInputSurface(
+                isFocused: focusedField == .name,
+                tint: AppTheme.brand
+            )
+            .padding(.top, 10)
+            .padding(.bottom, 14)
 
-    private var categorySection: some View {
-        let appearance = categoryName.isEmpty
-            ? nil
-            : RecordingCategoryAppearanceCatalog.appearance(for: categoryName)
-
-        return VStack(alignment: .leading, spacing: 8) {
-            Label(localized(L10n.Recordings.categoryName), systemImage: "folder")
-                .font(.redditSans(.caption, weight: .semibold))
-                .foregroundStyle(.secondary)
-
-            RecordingCategoryMenu(
-                selection: categoryName.isEmpty ? nil : categoryName,
-                categories: RecordingCategoryCatalog.normalized(availableCategories + [categoryName]),
-                onSelect: { selectedName in
-                    categoryName = selectedName ?? ""
-                }
-            ) {
-                HStack(spacing: 8) {
-                    Image(systemName: appearance?.iconName ?? "tray")
-                        .font(.system(size: 14, weight: .semibold))
-                        .foregroundStyle(
-                            appearance.map { AnyShapeStyle($0.color) } ?? AnyShapeStyle(.secondary)
-                        )
-
-                    Text(categoryName.isEmpty ? localized(L10n.Recordings.uncategorized) : categoryName)
-                        .font(.redditSans(.subheadline, weight: .semibold))
-                        .foregroundStyle(.primary)
-                        .lineLimit(1)
-
-                    Spacer(minLength: 8)
-
-                    Image(systemName: "chevron.up.chevron.down")
-                        .font(.system(size: 12, weight: .semibold))
-                        .foregroundStyle(.tertiary)
-                }
-                .padding(.horizontal, 12)
-                .frame(height: 44)
-                .frame(maxWidth: .infinity)
-                .editorSheetInputSurface()
-                .contentShape(RoundedRectangle(cornerRadius: 13, style: .continuous))
-            }
-            .buttonStyle(.plain)
-        }
-        .recordingEditSectionSurface()
-    }
-
-    private var languageSection: some View {
-        let selectedLanguage = languageOptions.first(where: { $0.id == languageID })
-            ?? TranscriptionLanguage(id: languageID).baseLanguage
-
-        return VStack(alignment: .leading, spacing: 8) {
-            Label(localized(L10n.Settings.transcriptionLanguage), systemImage: "globe")
-                .font(.redditSans(.caption, weight: .semibold))
-                .foregroundStyle(.secondary)
+            recordingEditDivider
 
             Button {
+                focusedField = nil
                 isShowingLanguagePicker = true
                 HapticFeedback.play(.menuSelection)
             } label: {
-                HStack(spacing: 8) {
-                    Image(systemName: "globe")
-                        .font(.system(size: 14, weight: .semibold))
-                        .foregroundStyle(AppTheme.info)
-
-                    Text(selectedLanguage.displayName)
-                        .font(.redditSans(.subheadline, weight: .semibold))
-                        .foregroundStyle(.primary)
-                        .lineLimit(1)
-
-                    Spacer(minLength: 8)
-
-                    Image(systemName: "chevron.up.chevron.down")
-                        .font(.system(size: 12, weight: .semibold))
-                        .foregroundStyle(.tertiary)
-                }
-                .padding(.horizontal, 12)
-                .frame(height: 44)
-                .frame(maxWidth: .infinity)
-                .editorSheetInputSurface()
-                .contentShape(RoundedRectangle(cornerRadius: 13, style: .continuous))
+                recordingEditSelectionRow(
+                    title: L10n.Settings.transcriptionLanguage,
+                    value: selectedLanguage.displayName,
+                    systemImage: "globe",
+                    tint: AppTheme.info,
+                    trailingSystemImage: "chevron.right"
+                )
             }
             .buttonStyle(.plain)
             .disabled(isSaving || languageOptions.isEmpty)
+
+            recordingEditDivider
+
+            RecordingCategoryMenu(
+                selection: categoryName.isEmpty ? nil : categoryName,
+                categories: RecordingCategoryCatalog.normalized(
+                    availableCategories + [categoryName]
+                ),
+                onSelect: { selectedName in
+                    categoryName = selectedName ?? ""
+                    HapticFeedback.play(.menuSelection)
+                }
+            ) {
+                recordingEditSelectionRow(
+                    title: L10n.Recordings.categoryName,
+                    value: categoryName.isEmpty
+                        ? localized(L10n.Recordings.uncategorized)
+                        : categoryName,
+                    systemImage: appearance?.iconName ?? "tray",
+                    tint: appearance?.color ?? Color.secondary,
+                    trailingSystemImage: "chevron.down"
+                )
+            }
+            .buttonStyle(.plain)
         }
-        .recordingEditSectionSurface()
+        .recordingEditGroupedSurface()
     }
 
-    private var keyPointsSection: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Label(localized(L10n.Recordings.keyPoints), systemImage: "list.bullet.clipboard")
-                .font(.redditSans(.caption, weight: .semibold))
-                .foregroundStyle(.secondary)
+    private var contentCard: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            recordingEditTextArea(
+                title: L10n.Recordings.summary,
+                placeholder: L10n.Recordings.summaryPlaceholder,
+                text: $summary,
+                field: .summary,
+                systemImage: "text.alignleft",
+                tint: AppTheme.purple,
+                minimumHeight: 92
+            )
+
+            Divider()
+                .overlay(AppTheme.subtleBorder)
+
+            recordingEditTextArea(
+                title: L10n.Recordings.keyPoints,
+                placeholder: L10n.Recordings.keyPointsPlaceholder,
+                text: $keyPoints,
+                field: .keyPoints,
+                systemImage: "list.bullet.clipboard",
+                tint: AppTheme.warning,
+                minimumHeight: 80
+            )
+        }
+        .recordingEditGroupedSurface()
+    }
+
+    private var recordingEditDivider: some View {
+        Divider()
+            .overlay(AppTheme.subtleBorder)
+            .padding(.leading, 42)
+    }
+
+    private func recordingEditFieldHeader(
+        _ title: LocalizedStringResource,
+        systemImage: String,
+        tint: Color
+    ) -> some View {
+        HStack(spacing: 9) {
+            Image(systemName: systemImage)
+                .font(.system(size: 13, weight: .semibold))
+                .foregroundStyle(tint)
+                .frame(width: 27, height: 27)
+                .background(
+                    tint.opacity(0.11),
+                    in: RoundedRectangle(cornerRadius: 8, style: .continuous)
+                )
+
+            Text(title)
+                .font(.redditSans(.subheadline, weight: .semibold))
+                .foregroundStyle(.primary)
+        }
+    }
+
+    private func recordingEditSelectionRow(
+        title: LocalizedStringResource,
+        value: String,
+        systemImage: String,
+        tint: Color,
+        trailingSystemImage: String
+    ) -> some View {
+        HStack(spacing: 12) {
+            Image(systemName: systemImage)
+                .font(.system(size: 14, weight: .semibold))
+                .foregroundStyle(tint)
+                .frame(width: 30, height: 30)
+                .background(
+                    tint.opacity(0.11),
+                    in: RoundedRectangle(cornerRadius: 9, style: .continuous)
+                )
+
+            VStack(alignment: .leading, spacing: 2) {
+                Text(title)
+                    .font(.redditSans(.caption))
+                    .foregroundStyle(.secondary)
+
+                Text(value)
+                    .font(.redditSans(.subheadline, weight: .semibold))
+                    .foregroundStyle(.primary)
+                    .lineLimit(1)
+            }
+
+            Spacer(minLength: 8)
+
+            Image(systemName: trailingSystemImage)
+                .font(.system(size: 12, weight: .semibold))
+                .foregroundStyle(.tertiary)
+        }
+        .frame(minHeight: 58)
+        .contentShape(Rectangle())
+    }
+
+    private func recordingEditTextArea(
+        title: LocalizedStringResource,
+        placeholder: LocalizedStringResource,
+        text: Binding<String>,
+        field: FocusedField,
+        systemImage: String,
+        tint: Color,
+        minimumHeight: CGFloat
+    ) -> some View {
+        VStack(alignment: .leading, spacing: 10) {
+            recordingEditFieldHeader(
+                title,
+                systemImage: systemImage,
+                tint: tint
+            )
 
             ZStack(alignment: .topLeading) {
-                if keyPoints.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-                    Text(L10n.Recordings.keyPointsPlaceholder)
+                if text.wrappedValue.trimmingCharacters(
+                    in: .whitespacesAndNewlines
+                ).isEmpty {
+                    Text(placeholder)
                         .font(.redditSans(.body))
                         .foregroundStyle(.tertiary)
-                        .padding(.horizontal, 5)
-                        .padding(.vertical, 8)
+                        .padding(.horizontal, 13)
+                        .padding(.vertical, 14)
                         .allowsHitTesting(false)
                 }
 
-                TextEditor(text: $keyPoints)
+                TextEditor(text: text)
                     .font(.redditSans(.body))
+                    .lineSpacing(3)
                     .scrollContentBackground(.hidden)
-                    .frame(minHeight: 96)
-                    .padding(.horizontal, -4)
+                    .focused($focusedField, equals: field)
+                    .padding(8)
+                    .frame(minHeight: minimumHeight)
                     .background(Color.clear)
             }
-            .padding(.horizontal, 12)
-            .padding(.vertical, 8)
-            .editorSheetInputSurface()
+            .recordingEditInputSurface(
+                isFocused: focusedField == field,
+                tint: tint
+            )
         }
-        .recordingEditSectionSurface()
     }
 
     private func generateTitle() {
@@ -7348,88 +7830,130 @@ private struct RecordingEditSheet: View {
         }
     }
 
-    private var summarySection: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Label(localized(L10n.Recordings.summary), systemImage: "text.alignleft")
-                .font(.redditSans(.caption, weight: .semibold))
-                .foregroundStyle(.secondary)
+    private var metadataCard: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            NavigationLink {
+                RecordingMetadataTagsEditor(tags: $tags)
+            } label: {
+                HStack(spacing: 12) {
+                    Image(systemName: "tag")
+                        .font(.system(size: 14, weight: .semibold))
+                        .foregroundStyle(AppTheme.info)
+                        .frame(width: 30, height: 30)
+                        .background(
+                            AppTheme.info.opacity(0.11),
+                            in: RoundedRectangle(cornerRadius: 9, style: .continuous)
+                        )
 
-            ZStack(alignment: .topLeading) {
-                if summary.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-                    Text(L10n.Recordings.summaryPlaceholder)
-                        .font(.redditSans(.body))
+                    VStack(alignment: .leading, spacing: 5) {
+                        Text(L10n.Recordings.tags)
+                            .font(.redditSans(.caption))
+                            .foregroundStyle(.secondary)
+
+                        recordingEditTagPreview
+                    }
+
+                    Spacer(minLength: 8)
+
+                    Image(systemName: "chevron.right")
+                        .font(.system(size: 12, weight: .semibold))
                         .foregroundStyle(.tertiary)
-                        .padding(.horizontal, 5)
-                        .padding(.vertical, 8)
-                        .allowsHitTesting(false)
                 }
-
-                TextEditor(text: $summary)
-                    .font(.redditSans(.body))
-                    .scrollContentBackground(.hidden)
-                    .frame(minHeight: 112)
-                    .padding(.horizontal, -4)
-                    .background(Color.clear)
+                .frame(minHeight: 62)
+                .contentShape(Rectangle())
             }
-            .padding(.horizontal, 12)
-            .padding(.vertical, 8)
-            .editorSheetInputSurface()
-        }
-        .recordingEditSectionSurface()
-    }
+            .buttonStyle(.plain)
 
-    private var tagsEntry: some View {
-        NavigationLink {
-            RecordingMetadataTagsEditor(tags: $tags)
-        } label: {
+            recordingEditDivider
+
             HStack(spacing: 12) {
-                Label(localized(L10n.Recordings.tags), systemImage: "tag")
+                Image(systemName: "clock")
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundStyle(.secondary)
+                    .frame(width: 30, height: 30)
+                    .background(
+                        Color.secondary.opacity(0.09),
+                        in: RoundedRectangle(cornerRadius: 9, style: .continuous)
+                    )
+
+                Text(L10n.Recordings.audioDuration)
                     .font(.redditSans(.subheadline, weight: .semibold))
                     .foregroundStyle(.primary)
 
-                Spacer()
+                Spacer(minLength: 8)
 
-                Text(tags.isEmpty ? localized(L10n.Recordings.notAdded) : "\(tags.count)")
-                    .font(.redditSans(.caption, weight: .semibold))
+                Text(TranscriptionLine.formatTimestamp(Double(item.durationSeconds)))
+                    .font(
+                        .redditSans(.subheadline, weight: .semibold)
+                            .monospacedDigit()
+                    )
                     .foregroundStyle(.secondary)
-
-                Image(systemName: "chevron.right")
-                    .font(.system(size: 13, weight: .semibold))
-                    .foregroundStyle(.tertiary)
             }
-        }
-        .buttonStyle(.plain)
-        .recordingEditSectionSurface()
-    }
+            .frame(minHeight: 58)
+            .accessibilityElement(children: .combine)
 
-    private var durationRow: some View {
-        HStack(spacing: 12) {
-            Label(localized(L10n.Recordings.audioDuration), systemImage: "clock")
-                .font(.redditSans(.subheadline, weight: .semibold))
-            Spacer()
-            Text(TranscriptionLine.formatTimestamp(Double(item.durationSeconds)))
-                .font(.redditSans(.subheadline, weight: .semibold).monospacedDigit())
-                .foregroundStyle(.secondary)
-        }
-        .recordingEditSectionSurface()
-    }
+            recordingEditDivider
 
-    private var locationSection: some View {
-        VStack(alignment: .leading, spacing: 12) {
             Toggle(isOn: $includesLocation) {
-                Label(localized(L10n.Recordings.addLocation), systemImage: "location")
-                    .font(.redditSans(.subheadline, weight: .semibold))
+                HStack(spacing: 12) {
+                    Image(systemName: "location")
+                        .font(.system(size: 14, weight: .semibold))
+                        .foregroundStyle(AppTheme.success)
+                        .frame(width: 30, height: 30)
+                        .background(
+                            AppTheme.success.opacity(0.11),
+                            in: RoundedRectangle(cornerRadius: 9, style: .continuous)
+                        )
+
+                    Text(L10n.Recordings.addLocation)
+                        .font(.redditSans(.subheadline, weight: .semibold))
+                        .foregroundStyle(.primary)
+                }
             }
             .tint(AppTheme.brand)
+            .frame(minHeight: 58)
 
             if includesLocation {
+                Divider()
+                    .overlay(AppTheme.subtleBorder)
+                    .padding(.bottom, 14)
+
                 RecordingEditLocationPreview(
                     existingLocation: item.location,
                     locationProvider: locationProvider
                 )
             }
         }
-        .recordingEditSectionSurface()
+        .recordingEditGroupedSurface()
+    }
+
+    @ViewBuilder
+    private var recordingEditTagPreview: some View {
+        if tags.isEmpty {
+            Text(L10n.Recordings.notAdded)
+                .font(.redditSans(.subheadline, weight: .semibold))
+                .foregroundStyle(.secondary)
+        } else {
+            HStack(spacing: 5) {
+                ForEach(Array(tags.prefix(2)), id: \.self) { tag in
+                    Text(tag)
+                        .font(.redditSans(.caption2, weight: .semibold))
+                        .foregroundStyle(AppTheme.info)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.8)
+                        .padding(.horizontal, 7)
+                        .frame(height: 22)
+                        .background(AppTheme.info.opacity(0.11), in: Capsule())
+                }
+
+                if tags.count > 2 {
+                    Text("+\(tags.count - 2)")
+                        .font(.redditSans(.caption2, weight: .bold))
+                        .foregroundStyle(.secondary)
+                        .monospacedDigit()
+                }
+            }
+        }
     }
 }
 
@@ -7769,7 +8293,57 @@ private final class RecordingEditLocationProvider: NSObject, ObservableObject, C
     }
 }
 
+private struct RecordingEditInputSurfaceModifier: ViewModifier {
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    let isFocused: Bool
+    let tint: Color
+
+    func body(content: Content) -> some View {
+        let shape = RoundedRectangle(cornerRadius: 14, style: .continuous)
+
+        content
+            .background(AppTheme.elevatedBackground, in: shape)
+            .overlay {
+                shape.strokeBorder(
+                    isFocused ? tint.opacity(0.52) : AppTheme.subtleBorder,
+                    lineWidth: isFocused ? 1.5 : 1
+                )
+            }
+            .animation(
+                reduceMotion ? nil : .easeOut(duration: 0.16),
+                value: isFocused
+            )
+    }
+}
+
 private extension View {
+    func recordingEditGroupedSurface() -> some View {
+        self
+            .padding(14)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(
+                AppTheme.cardBackground,
+                in: RoundedRectangle(cornerRadius: 22, style: .continuous)
+            )
+            .overlay {
+                RoundedRectangle(cornerRadius: 22, style: .continuous)
+                    .strokeBorder(AppTheme.subtleBorder, lineWidth: 1)
+            }
+    }
+
+    func recordingEditInputSurface(
+        isFocused: Bool,
+        tint: Color
+    ) -> some View {
+        modifier(
+            RecordingEditInputSurfaceModifier(
+                isFocused: isFocused,
+                tint: tint
+            )
+        )
+    }
+
     func recordingEditSectionSurface() -> some View {
         self
             .padding(16)
@@ -7893,7 +8467,24 @@ private struct RecordingStatusDismissButton: View {
     }
 }
 
+private enum RecordingTimelineLayout {
+    static let height: CGFloat = 48
+    static let trackCenterY: CGFloat = 27
+}
+
+private struct PlaybackTimelineTrackAlignment: AlignmentID {
+    static func defaultValue(in context: ViewDimensions) -> CGFloat {
+        context[VerticalAlignment.center]
+    }
+}
+
+private extension VerticalAlignment {
+    static let playbackTimelineTrack = VerticalAlignment(PlaybackTimelineTrackAlignment.self)
+}
+
 private struct RecordingTimelineScrubber: View {
+    @Environment(\.accessibilityReduceMotion) private var accessibilityReduceMotion
+
     let currentTime: TimeInterval
     let duration: TimeInterval
     @Binding var scrubbedTime: TimeInterval?
@@ -7903,6 +8494,8 @@ private struct RecordingTimelineScrubber: View {
     let onEventTap: (RecordingAudioEvent) -> Void
 
     @State private var isScrubbing = false
+    @State private var hapticAudioEventID: RecordingAudioEvent.ID?
+    @State private var previousHapticScrubTime: TimeInterval?
 
     private var displayedTime: TimeInterval {
         min(max(scrubbedTime ?? currentTime, 0), effectiveDuration)
@@ -7919,19 +8512,47 @@ private struct RecordingTimelineScrubber: View {
                 let progress = CGFloat(displayedTime / effectiveDuration)
                 let thumbX = min(max(progress * width, 0), width)
                 let thumbSize: CGFloat = isScrubbing ? 18 : 14
-                let trackCenterY: CGFloat = 27
+                let trackCenterY = RecordingTimelineLayout.trackCenterY
                 let trackHeight: CGFloat = 6
-                let markerHeight: CGFloat = 16
+                let eventMarkerHeight: CGFloat = 2
+                let focusedEvent = isScrubbing
+                    ? activeAudioEvent(at: displayedTime)
+                    : audioEvent(containing: displayedTime)
 
                 ZStack(alignment: .topLeading) {
-                    if isScrubbing, let event = activeAudioEvent(at: displayedTime) {
-                        audioEventCallout(event, thumbX: thumbX, trackWidth: width)
-                            .transition(.opacity.combined(with: .scale(scale: 0.96, anchor: .bottom)))
+                    ZStack(alignment: .top) {
+                        if let focusedEvent {
+                            Text(focusedEvent.localizedLabel)
+                                .font(.redditSans(.caption2, weight: .semibold))
+                                .foregroundStyle(Color.primary.opacity(0.76))
+                                .lineLimit(1)
+                                .minimumScaleFactor(0.78)
+                                .transition(
+                                    accessibilityReduceMotion
+                                        ? .opacity
+                                        : .asymmetric(
+                                            insertion: .opacity.combined(with: .offset(x: 0, y: 2)),
+                                            removal: .opacity
+                                        )
+                                )
+                                .id(focusedEvent.id)
+                        }
                     }
+                    .frame(width: width, height: 18, alignment: .top)
+                    .allowsHitTesting(false)
+                    .animation(
+                        accessibilityReduceMotion ? nil : .easeOut(duration: 0.16),
+                        value: focusedEvent?.id
+                    )
 
                     Capsule()
                         .fill(Color.secondary.opacity(0.18))
                         .frame(height: trackHeight)
+                        .offset(y: trackCenterY - trackHeight / 2)
+
+                    Capsule()
+                        .fill(AppTheme.brand.opacity(isEnabled ? 0.88 : 0.34))
+                        .frame(width: max(thumbX, 0), height: trackHeight)
                         .offset(y: trackCenterY - trackHeight / 2)
 
                     Canvas(opaque: false, rendersAsynchronously: true) { context, _ in
@@ -7939,34 +8560,76 @@ private struct RecordingTimelineScrubber: View {
                             let rect = markerRect(
                                 for: event,
                                 trackWidth: width,
-                                markerHeight: markerHeight
+                                markerHeight: eventMarkerHeight
                             )
-                            context.fill(
-                                Path(roundedRect: rect, cornerRadius: 3),
-                                with: .color(AppTheme.info.opacity(markerOpacity(for: event)))
-                            )
-                            context.fill(
-                                Path(
-                                    roundedRect: CGRect(
-                                        x: rect.minX,
-                                        y: rect.minY,
-                                        width: rect.width,
-                                        height: 1
-                                    ),
-                                    cornerRadius: 0.5
-                                ),
-                                with: .color(Color.white.opacity(0.26))
-                            )
+                            let playedWidth = min(max(thumbX - rect.minX, 0), rect.width)
+
+                            if playedWidth > 0 {
+                                let playedRect = CGRect(
+                                    x: rect.minX,
+                                    y: rect.minY,
+                                    width: playedWidth,
+                                    height: rect.height
+                                )
+                                context.fill(
+                                    Path(roundedRect: playedRect, cornerRadius: eventMarkerHeight / 2),
+                                    with: .color(Color.white.opacity(isEnabled ? 0.30 : 0.14))
+                                )
+                            }
+
+                            if playedWidth < rect.width {
+                                let unplayedRect = CGRect(
+                                    x: rect.minX + playedWidth,
+                                    y: rect.minY,
+                                    width: rect.width - playedWidth,
+                                    height: rect.height
+                                )
+                                context.fill(
+                                    Path(roundedRect: unplayedRect, cornerRadius: eventMarkerHeight / 2),
+                                    with: .color(AppTheme.info.opacity(isEnabled ? 0.46 : 0.20))
+                                )
+                            }
                         }
                     }
-                    .frame(width: width, height: markerHeight)
-                    .offset(y: trackCenterY - markerHeight / 2)
+                    .frame(width: width, height: eventMarkerHeight)
+                    .offset(y: trackCenterY - eventMarkerHeight / 2)
                     .allowsHitTesting(false)
 
-                    Capsule()
-                        .fill(AppTheme.brand.opacity(isEnabled ? 0.88 : 0.34))
-                        .frame(width: max(thumbX, 0), height: trackHeight)
-                        .offset(y: trackCenterY - trackHeight / 2)
+                    if let focusedEvent {
+                        let rect = focusedMarkerRect(
+                            for: focusedEvent,
+                            trackWidth: width,
+                            markerHeight: trackHeight
+                        )
+                        let playedWidth = min(max(thumbX - rect.minX, 0), rect.width)
+
+                        ZStack(alignment: .leading) {
+                            Capsule()
+                                .fill(AppTheme.info.opacity(isEnabled ? 0.92 : 0.38))
+
+                            if playedWidth > 0 {
+                                Rectangle()
+                                    .fill(Color.white.opacity(isEnabled ? 0.74 : 0.30))
+                                    .frame(width: playedWidth)
+                            }
+
+                            Capsule()
+                                .stroke(Color.white.opacity(0.20), lineWidth: 0.6)
+                        }
+                        .clipShape(Capsule())
+                        .frame(width: rect.width, height: trackHeight)
+                        .shadow(
+                            color: AppTheme.info.opacity(isEnabled ? 0.24 : 0),
+                            radius: 4
+                        )
+                        .position(x: rect.midX, y: trackCenterY)
+                        .transaction { transaction in
+                            // This marker is tied to an absolute timeline
+                            // coordinate. Animating its offset makes SwiftUI
+                            // interpolate from the ZStack's top-left origin.
+                            transaction.animation = nil
+                        }
+                    }
 
                     Circle()
                         .fill(isEnabled ? AppTheme.brand : Color.secondary.opacity(0.55))
@@ -7975,12 +8638,12 @@ private struct RecordingTimelineScrubber: View {
                         .offset(x: thumbX - thumbSize / 2, y: trackCenterY - thumbSize / 2)
                         .animation(.snappy(duration: 0.16, extraBounce: 0), value: isScrubbing)
                 }
-                .frame(width: width, height: 48, alignment: .topLeading)
+                .frame(width: width, height: RecordingTimelineLayout.height, alignment: .topLeading)
                 .contentShape(Rectangle())
                 .gesture(timelineGesture(trackWidth: width))
             }
         }
-        .frame(height: 48)
+        .frame(height: RecordingTimelineLayout.height)
         .opacity(isEnabled ? 1 : 0.55)
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(Text(L10n.Recordings.audioEvents))
@@ -8001,31 +8664,6 @@ private struct RecordingTimelineScrubber: View {
         }
     }
 
-    private func audioEventCallout(_ event: RecordingAudioEvent, thumbX: CGFloat, trackWidth: CGFloat) -> some View {
-        let width = min(trackWidth, 178)
-        let x = min(max(thumbX - width / 2, 0), max(trackWidth - width, 0))
-
-        return HStack(spacing: 6) {
-            Text(event.localizedLabel)
-                .font(.redditSans(.caption2, weight: .bold))
-                .foregroundStyle(.primary)
-                .lineLimit(1)
-
-            Text(audioEventTimeRangeText(event))
-                .font(.redditSans(.caption2, weight: .semibold).monospacedDigit())
-                .foregroundStyle(.secondary)
-                .lineLimit(1)
-        }
-        .padding(.horizontal, 9)
-        .frame(width: width, height: 24)
-        .background(.ultraThinMaterial, in: Capsule())
-        .overlay {
-            Capsule()
-                .stroke(Color.white.opacity(0.18), lineWidth: 1)
-        }
-        .offset(x: x, y: 0)
-    }
-
     private func timelineGesture(trackWidth: CGFloat) -> some Gesture {
         DragGesture(minimumDistance: 0)
             .onChanged { value in
@@ -8033,11 +8671,19 @@ private struct RecordingTimelineScrubber: View {
                     return
                 }
                 if !isScrubbing {
+                    HapticFeedback.prepare(.timelineAudioEvent)
+                    hapticAudioEventID = nil
+                    previousHapticScrubTime = nil
                     withAnimation(.snappy(duration: 0.16, extraBounce: 0)) {
                         isScrubbing = true
                     }
                 }
-                scrubbedTime = time(for: value.location.x, trackWidth: trackWidth)
+                let scrubTime = time(for: value.location.x, trackWidth: trackWidth)
+                scrubbedTime = scrubTime
+                let dragDistance = hypot(value.translation.width, value.translation.height)
+                if dragDistance >= 2 {
+                    updateAudioEventHaptic(at: scrubTime)
+                }
             }
             .onEnded { value in
                 guard isEnabled else {
@@ -8046,6 +8692,8 @@ private struct RecordingTimelineScrubber: View {
                 let time = time(for: value.location.x, trackWidth: trackWidth)
                 let tapDistance = hypot(value.translation.width, value.translation.height)
                 scrubbedTime = nil
+                hapticAudioEventID = nil
+                previousHapticScrubTime = nil
                 withAnimation(.snappy(duration: 0.18, extraBounce: 0)) {
                     isScrubbing = false
                 }
@@ -8055,6 +8703,52 @@ private struct RecordingTimelineScrubber: View {
                 }
                 onSeek(time)
             }
+    }
+
+    private func updateAudioEventHaptic(at time: TimeInterval) {
+        let focusedEvent = activeAudioEvent(at: time)
+        let focusedEventID = focusedEvent?.id
+
+        if focusedEventID != hapticAudioEventID {
+            hapticAudioEventID = focusedEventID
+            if focusedEventID != nil {
+                HapticFeedback.play(.timelineAudioEvent)
+                previousHapticScrubTime = time
+                return
+            }
+        }
+
+        if focusedEvent == nil,
+           let previousTime = previousHapticScrubTime,
+           let crossedEvent = audioEventCrossedEntering(
+               from: previousTime,
+               to: time
+           ),
+           crossedEvent.id != hapticAudioEventID {
+            hapticAudioEventID = crossedEvent.id
+            HapticFeedback.play(.timelineAudioEvent)
+        }
+
+        previousHapticScrubTime = time
+    }
+
+    private func audioEventCrossedEntering(
+        from previousTime: TimeInterval,
+        to currentTime: TimeInterval
+    ) -> RecordingAudioEvent? {
+        if currentTime > previousTime {
+            return audioEvents.first {
+                $0.startTime > previousTime
+                    && $0.startTime <= currentTime
+            }
+        }
+        if currentTime < previousTime {
+            return audioEvents.reversed().first {
+                $0.endTime < previousTime
+                    && $0.endTime >= currentTime
+            }
+        }
+        return nil
     }
 
     private func activeAudioEvent(at time: TimeInterval) -> RecordingAudioEvent? {
@@ -8071,6 +8765,12 @@ private struct RecordingTimelineScrubber: View {
         }
 
         return closestEvent
+    }
+
+    private func audioEvent(containing time: TimeInterval) -> RecordingAudioEvent? {
+        audioEvents
+            .filter { time >= $0.startTime && time <= $0.endTime }
+            .max { $0.confidence < $1.confidence }
     }
 
     private func distance(from time: TimeInterval, to event: RecordingAudioEvent) -> TimeInterval {
@@ -8092,20 +8792,26 @@ private struct RecordingTimelineScrubber: View {
     ) -> CGRect {
         let markerX = min(max(CGFloat(event.startTime / effectiveDuration) * trackWidth, 0), trackWidth)
         let rawWidth = CGFloat(max(event.duration, 0.1) / effectiveDuration) * trackWidth
-        let remainingWidth = max(trackWidth - markerX, 3)
-        let markerWidth = min(max(rawWidth, 4), remainingWidth)
+        let remainingWidth = max(trackWidth - markerX, 2)
+        let markerWidth = min(max(rawWidth, 2), remainingWidth)
         return CGRect(x: markerX, y: 0, width: markerWidth, height: markerHeight)
     }
 
-    private func markerOpacity(for event: RecordingAudioEvent) -> Double {
-        min(max(0.28 + event.confidence * 0.58, 0.34), 0.88)
+    private func focusedMarkerRect(
+        for event: RecordingAudioEvent,
+        trackWidth: CGFloat,
+        markerHeight: CGFloat
+    ) -> CGRect {
+        let marker = markerRect(
+            for: event,
+            trackWidth: trackWidth,
+            markerHeight: markerHeight
+        )
+        let width = min(max(marker.width, markerHeight), trackWidth)
+        let x = min(max(marker.midX - width / 2, 0), max(trackWidth - width, 0))
+        return CGRect(x: x, y: 0, width: width, height: markerHeight)
     }
 
-    private func audioEventTimeRangeText(_ event: RecordingAudioEvent) -> String {
-        let start = TranscriptionLine.formatTimestamp(event.startTime)
-        let end = TranscriptionLine.formatTimestamp(event.endTime)
-        return "\(start)-\(end)"
-    }
 }
 
 private struct PlaybackUtilityControlLabel<Content: View>: View {
@@ -8113,11 +8819,18 @@ private struct PlaybackUtilityControlLabel<Content: View>: View {
 
     let tint: Color
     let width: CGFloat
+    let isSelected: Bool
     let content: Content
 
-    init(tint: Color, width: CGFloat, @ViewBuilder content: () -> Content) {
+    init(
+        tint: Color,
+        width: CGFloat,
+        isSelected: Bool = false,
+        @ViewBuilder content: () -> Content
+    ) {
         self.tint = tint
         self.width = width
+        self.isSelected = isSelected
         self.content = content()
     }
 
@@ -8127,23 +8840,59 @@ private struct PlaybackUtilityControlLabel<Content: View>: View {
             .frame(width: width, height: 42)
             .background {
                 Capsule()
-                    .fill(AppTheme.raisedControlBackground)
-                    .opacity(colorScheme == .dark ? 0.48 : 0.78)
+                    .fill(
+                        isSelected
+                            ? tint.opacity(colorScheme == .dark ? 0.18 : 0.13)
+                            : AppTheme.raisedControlBackground.opacity(
+                                colorScheme == .dark ? 0.48 : 0.78
+                            )
+                    )
             }
             .overlay {
                 Capsule()
                     .stroke(
-                        Color.white.opacity(colorScheme == .dark ? 0.11 : 0.24),
+                        isSelected
+                            ? tint.opacity(colorScheme == .dark ? 0.46 : 0.34)
+                            : Color.white.opacity(
+                                colorScheme == .dark ? 0.11 : 0.24
+                            ),
                         lineWidth: 0.8
                     )
             }
             .contentShape(Capsule())
+            .animation(
+                .snappy(duration: 0.18, extraBounce: 0),
+                value: isSelected
+            )
+    }
+}
+
+private struct PlaybackAudioEventRowButtonStyle: ButtonStyle {
+    @Environment(\.accessibilityReduceMotion) private var accessibilityReduceMotion
+
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .scaleEffect(
+                accessibilityReduceMotion
+                    ? 1
+                    : configuration.isPressed ? 0.985 : 1
+            )
+            .opacity(configuration.isPressed ? 0.86 : 1)
+            .animation(
+                accessibilityReduceMotion
+                    ? nil
+                    : .snappy(duration: 0.12, extraBounce: 0),
+                value: configuration.isPressed
+            )
     }
 }
 
 private struct PlaybackUtilityButtonStyle: ButtonStyle {
     @Environment(\.isEnabled) private var isEnabled
     @Environment(\.accessibilityReduceMotion) private var accessibilityReduceMotion
+    @Environment(\.colorScheme) private var colorScheme
+
+    var showsDepthShadow = false
 
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
@@ -8170,12 +8919,27 @@ private struct PlaybackUtilityButtonStyle: ButtonStyle {
                     )
                     .allowsHitTesting(false)
             }
+            .compositingGroup()
             .opacity(isEnabled ? 1 : 0.42)
             .scaleEffect(accessibilityReduceMotion ? 1 : (configuration.isPressed ? 0.97 : 1))
+            .shadow(
+                color: showsDepthShadow
+                    ? utilityShadowColor(isPressed: configuration.isPressed)
+                    : .clear,
+                radius: configuration.isPressed ? 3 : 7,
+                y: configuration.isPressed ? 1 : 4
+            )
             .animation(
                 accessibilityReduceMotion ? nil : .snappy(duration: 0.11, extraBounce: 0),
                 value: configuration.isPressed
             )
+    }
+
+    private func utilityShadowColor(isPressed: Bool) -> Color {
+        if colorScheme == .dark {
+            return Color.black.opacity(isPressed ? 0.04 : 0.08)
+        }
+        return Color.black.opacity(isPressed ? 0.06 : 0.12)
     }
 }
 
@@ -8741,7 +9505,7 @@ private struct RecordingDetailFactsGrid: View {
         case .failed:
             return AppTheme.danger
         case .localOnly:
-            return Color(uiColor: .secondaryLabel)
+            return AppTheme.privacy
         }
     }
 
@@ -8818,14 +9582,14 @@ private struct RecordingDetailStorageFactCell: View {
 
             Text(displayText)
                 .font(.redditSans(.caption, weight: .semibold))
-                .foregroundStyle(.secondary)
-            .lineLimit(1)
-            .minimumScaleFactor(0.72)
-            .allowsTightening(true)
+                .foregroundStyle(Color.primary.opacity(0.72))
+                .lineLimit(1)
+                .minimumScaleFactor(0.72)
+                .allowsTightening(true)
         }
         .padding(.horizontal, 10)
         .frame(maxWidth: .infinity, minHeight: 32, alignment: .leading)
-        .background(AppTheme.cardBackground, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+        .recordingDetailFactSurface()
     }
 }
 
@@ -8843,14 +9607,50 @@ private struct RecordingDetailFactCell: View {
 
             Text(text)
                 .font(.redditSans(.caption, weight: .semibold))
-                .foregroundStyle(.secondary)
+                .foregroundStyle(Color.primary.opacity(0.72))
                 .lineLimit(1)
                 .minimumScaleFactor(0.72)
                 .allowsTightening(true)
         }
         .padding(.horizontal, 10)
         .frame(maxWidth: .infinity, minHeight: 32, alignment: .leading)
-        .background(AppTheme.cardBackground, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+        .recordingDetailFactSurface()
+    }
+}
+
+private struct RecordingDetailFactSurfaceModifier: ViewModifier {
+    @Environment(\.colorScheme) private var colorScheme
+
+    func body(content: Content) -> some View {
+        let shape = RoundedRectangle(cornerRadius: 10, style: .continuous)
+
+        content
+            .background {
+                shape
+                    .fill(
+                        AppTheme.cardBackground.opacity(
+                            colorScheme == .dark ? 0.86 : 0.82
+                        )
+                    )
+            }
+            .overlay {
+                shape
+                    .strokeBorder(
+                        Color.white.opacity(colorScheme == .dark ? 0.08 : 0.68),
+                        lineWidth: 0.75
+                    )
+            }
+            .shadow(
+                color: Color.black.opacity(colorScheme == .dark ? 0.12 : 0.045),
+                radius: 4,
+                y: 1.5
+            )
+    }
+}
+
+private extension View {
+    func recordingDetailFactSurface() -> some View {
+        modifier(RecordingDetailFactSurfaceModifier())
     }
 }
 

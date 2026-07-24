@@ -1,3 +1,4 @@
+import Accelerate
 import AVFoundation
 import Foundation
 
@@ -113,5 +114,197 @@ enum RecordingDisplayWaveformSampler {
             let normalized = min(level / referenceLevel, 1)
             return CGFloat(pow(normalized, 0.55))
         }
+    }
+}
+
+struct RecordingSilenceInterval: Equatable, Sendable {
+    let startTime: TimeInterval
+    let endTime: TimeInterval
+}
+
+enum RecordingSilenceDetector {
+    private struct LoudnessWindow {
+        let startTime: TimeInterval
+        let endTime: TimeInterval
+        let decibels: Double
+    }
+
+    private static let analysisWindowDuration: TimeInterval = 0.1
+    private static let audibleEdgePaddingWindowCount = 2
+    private static let minimumSkippableDuration: TimeInterval = 0.9
+    private static let minimumDynamicRangeDecibels = 8.0
+    private static let minimumSilenceThresholdDecibels = -55.0
+    private static let maximumSilenceThresholdDecibels = -32.0
+
+    static func intervals(from url: URL) async -> [RecordingSilenceInterval] {
+        let analysisTask = Task.detached(priority: .utility) {
+            do {
+                return try detectIntervals(from: url)
+            } catch {
+                return []
+            }
+        }
+        return await withTaskCancellationHandler {
+            await analysisTask.value
+        } onCancel: {
+            analysisTask.cancel()
+        }
+    }
+
+    private static func detectIntervals(from url: URL) throws -> [RecordingSilenceInterval] {
+        let audioFile = try AVAudioFile(
+            forReading: url,
+            commonFormat: .pcmFormatFloat32,
+            interleaved: false
+        )
+        let format = audioFile.processingFormat
+        let sampleRate = format.sampleRate
+        guard audioFile.length > 0,
+              sampleRate.isFinite,
+              sampleRate > 0,
+              format.channelCount > 0 else {
+            return []
+        }
+
+        let windowFrameCount = AVAudioFrameCount(
+            min(
+                max((sampleRate * analysisWindowDuration).rounded(), 1),
+                Double(AVAudioFrameCount.max)
+            )
+        )
+        guard let buffer = AVAudioPCMBuffer(
+            pcmFormat: format,
+            frameCapacity: windowFrameCount
+        ) else {
+            return []
+        }
+
+        var windows: [LoudnessWindow] = []
+        windows.reserveCapacity(
+            Int(ceil(Double(audioFile.length) / Double(windowFrameCount)))
+        )
+        var processedFrames: AVAudioFramePosition = 0
+
+        while processedFrames < audioFile.length {
+            try Task.checkCancellation()
+            let remainingFrames = audioFile.length - processedFrames
+            let framesToRead = AVAudioFrameCount(
+                min(remainingFrames, AVAudioFramePosition(windowFrameCount))
+            )
+            buffer.frameLength = 0
+            try audioFile.read(into: buffer, frameCount: framesToRead)
+
+            let frameLength = Int(buffer.frameLength)
+            guard frameLength > 0,
+                  let channelData = buffer.floatChannelData else {
+                break
+            }
+
+            var channelMeanSquareSum = 0.0
+            for channel in 0..<Int(format.channelCount) {
+                var rootMeanSquare: Float = 0
+                vDSP_rmsqv(
+                    channelData[channel],
+                    1,
+                    &rootMeanSquare,
+                    vDSP_Length(frameLength)
+                )
+                let finiteRMS = rootMeanSquare.isFinite ? Double(rootMeanSquare) : 0
+                channelMeanSquareSum += finiteRMS * finiteRMS
+            }
+
+            let combinedRMS = sqrt(
+                channelMeanSquareSum / Double(format.channelCount)
+            )
+            let decibels = 20 * log10(max(combinedRMS, 0.000_001))
+            let startTime = Double(processedFrames) / sampleRate
+            processedFrames += AVAudioFramePosition(frameLength)
+            let endTime = Double(processedFrames) / sampleRate
+            windows.append(
+                LoudnessWindow(
+                    startTime: startTime,
+                    endTime: endTime,
+                    decibels: decibels
+                )
+            )
+        }
+
+        guard windows.count >= 2 else {
+            return []
+        }
+
+        let sortedLevels = windows.map(\.decibels).sorted()
+        let noiseFloor = percentile(0.2, in: sortedLevels)
+        let audibleLevel = percentile(0.85, in: sortedLevels)
+        guard audibleLevel - noiseFloor >= minimumDynamicRangeDecibels else {
+            return []
+        }
+
+        let adaptiveThreshold = max(
+            noiseFloor + 8,
+            audibleLevel - 24
+        )
+        let silenceThreshold = min(
+            max(adaptiveThreshold, minimumSilenceThresholdDecibels),
+            maximumSilenceThresholdDecibels
+        )
+
+        var audibleWindows = windows.map { $0.decibels >= silenceThreshold }
+        let unpaddedAudibleWindows = audibleWindows
+        for index in unpaddedAudibleWindows.indices where unpaddedAudibleWindows[index] {
+            let lowerBound = max(index - audibleEdgePaddingWindowCount, 0)
+            let upperBound = min(
+                index + audibleEdgePaddingWindowCount,
+                audibleWindows.count - 1
+            )
+            for paddedIndex in lowerBound...upperBound {
+                audibleWindows[paddedIndex] = true
+            }
+        }
+
+        var intervals: [RecordingSilenceInterval] = []
+        var index = audibleWindows.startIndex
+        while index < audibleWindows.endIndex {
+            guard !audibleWindows[index] else {
+                index += 1
+                continue
+            }
+
+            let silentStartIndex = index
+            while index < audibleWindows.endIndex, !audibleWindows[index] {
+                index += 1
+            }
+            let silentEndIndex = index - 1
+            let startTime = windows[silentStartIndex].startTime
+            let endTime = windows[silentEndIndex].endTime
+            guard endTime - startTime >= minimumSkippableDuration else {
+                continue
+            }
+            intervals.append(
+                RecordingSilenceInterval(
+                    startTime: startTime,
+                    endTime: endTime
+                )
+            )
+        }
+
+        return intervals
+    }
+
+    private static func percentile(
+        _ percentile: Double,
+        in sortedValues: [Double]
+    ) -> Double {
+        let index = min(
+            max(
+                Int(
+                    (Double(sortedValues.count - 1) * percentile)
+                        .rounded(.down)
+                ),
+                0
+            ),
+            sortedValues.count - 1
+        )
+        return sortedValues[index]
     }
 }

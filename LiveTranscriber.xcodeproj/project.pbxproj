@@ -1081,6 +1081,7 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				APPLICATION_EXTENSION_API_ONLY = YES;
+				CODE_SIGN_ENTITLEMENTS = LiveTranscriberWidget/LiveTranscriberWidget.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 13;
 				GENERATE_INFOPLIST_FILE = NO;
@@ -1105,6 +1106,7 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				APPLICATION_EXTENSION_API_ONLY = YES;
+				CODE_SIGN_ENTITLEMENTS = LiveTranscriberWidget/LiveTranscriberWidget.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 13;
 				GENERATE_INFOPLIST_FILE = NO;

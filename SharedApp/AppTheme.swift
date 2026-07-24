@@ -75,6 +75,7 @@ enum AppTheme {
     static let brandSoft = Color(red: 1.0, green: 0.49, blue: 0.25)
     static let info = Color(red: 0.12, green: 0.44, blue: 0.95)
     static let success = Color(red: 0.08, green: 0.62, blue: 0.36)
+    static let privacy = Color(red: 0.16, green: 0.66, blue: 0.47)
     static let warning = Color(red: 0.93, green: 0.58, blue: 0.12)
     static let danger = Color(red: 0.86, green: 0.18, blue: 0.18)
     static let purple = Color(red: 0.47, green: 0.34, blue: 0.86)

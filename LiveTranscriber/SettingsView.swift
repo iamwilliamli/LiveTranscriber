@@ -1,3 +1,4 @@
+import CoreMotion
 import SwiftUI
 import TranscriberDomain
 import UIKit
@@ -73,6 +74,8 @@ struct SettingsView: View {
     @AppStorage(Qwen3ASRDeveloperConfiguration.streamingLongAudioDefaultsKey) private var isQwen3ASRStreamingLongAudioEnabled = false
     @AppStorage(ManualGeminiDeveloperConfiguration.enabledDefaultsKey) private var isManualGeminiEnabled = false
     @AppStorage(MOSSDecoderSegmentDuration.defaultsKey) private var mossDecoderSegmentDurationSeconds = MOSSDecoderSegmentDuration.defaultValue.rawValue
+    @AppStorage(AudioEventDisplayConfiguration.confidenceThresholdDefaultsKey)
+    private var audioEventConfidenceThreshold = AudioEventDisplayConfiguration.defaultConfidenceThreshold
     private static let publicBetaFeedbackURL = URL(string: "https://t.me/livetranscriber")!
     private static let privacyPolicyURL = URL(string: "https://iamwilliamli.github.io/LiveTranscriber/privacy/")!
     private static let whisperModelURL = URL(string: "https://github.com/openai/whisper")!
@@ -2658,6 +2661,43 @@ struct SettingsView: View {
             }
             .toggleStyle(.switch)
 
+            VStack(alignment: .leading, spacing: 10) {
+                HStack(alignment: .top, spacing: 10) {
+                    SettingsIcon(systemImage: "waveform.badge.magnifyingglass", tint: AppTheme.info)
+
+                    VStack(alignment: .leading, spacing: 3) {
+                        Text(L10n.Settings.audioEventConfidenceThreshold)
+                            .font(.redditSans(.subheadline, weight: .semibold))
+                            .foregroundStyle(.primary)
+
+                        Text(L10n.Settings.audioEventConfidenceThresholdDescription)
+                            .font(.redditSans(.caption))
+                            .foregroundStyle(.secondary)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+
+                    Spacer(minLength: 8)
+
+                    Text(audioEventConfidenceThreshold, format: .percent.precision(.fractionLength(0)))
+                        .font(.redditSans(.caption, weight: .bold).monospacedDigit())
+                        .foregroundStyle(AppTheme.info)
+                        .padding(.horizontal, 8)
+                        .frame(minWidth: 48, minHeight: 24)
+                        .background(AppTheme.info.opacity(0.12), in: Capsule())
+                }
+
+                Slider(
+                    value: $audioEventConfidenceThreshold,
+                    in: AudioEventDisplayConfiguration.confidenceThresholdRange,
+                    step: AudioEventDisplayConfiguration.confidenceThresholdStep
+                )
+                .tint(AppTheme.info)
+                .accessibilityLabel(Text(L10n.Settings.audioEventConfidenceThreshold))
+                .accessibilityValue(
+                    Text(audioEventConfidenceThreshold, format: .percent.precision(.fractionLength(0)))
+                )
+            }
+
             SettingsMetricRow(
                 icon: "waveform.path.ecg",
                 titleResource: L10n.Settings.currentSpeechPipeline,
@@ -2957,6 +2997,10 @@ private struct SettingsDetailPage<Content: View>: View {
 }
 
 private struct SettingsAboutIdentityCard: View {
+    @Environment(\.accessibilityReduceMotion) private var accessibilityReduceMotion
+    @Environment(\.scenePhase) private var scenePhase
+    @StateObject private var panelMotion = SettingsAboutPanelMotion()
+
     let version: String
     let libraryMessage: String
 
@@ -2993,17 +3037,11 @@ private struct SettingsAboutIdentityCard: View {
         .padding(.horizontal, 20)
         .padding(.vertical, 26)
         .frame(maxWidth: .infinity)
-        .background(
-            LinearGradient(
-                colors: [
-                    AppTheme.brand.opacity(0.10),
-                    AppTheme.cardBackground,
-                    AppTheme.info.opacity(0.06)
-                ],
-                startPoint: .topLeading,
-                endPoint: .bottomTrailing
+        .background {
+            SettingsAboutReflectivePanelBackground(
+                tilt: accessibilityReduceMotion ? .zero : panelMotion.tilt
             )
-        )
+        }
         .overlay {
             RoundedRectangle(cornerRadius: AppTheme.cornerRadius, style: .continuous)
                 .stroke(AppTheme.cardBorder, lineWidth: 1)
@@ -3014,7 +3052,174 @@ private struct SettingsAboutIdentityCard: View {
             radius: AppTheme.cardShadowRadius,
             y: AppTheme.cardShadowYOffset
         )
+        .onAppear {
+            updatePanelMotion()
+        }
+        .onDisappear {
+            panelMotion.stop()
+        }
+        .onChange(of: scenePhase) { _, _ in
+            updatePanelMotion()
+        }
+        .onChange(of: accessibilityReduceMotion) { _, _ in
+            updatePanelMotion()
+        }
         .accessibilityElement(children: .combine)
+    }
+
+    private func updatePanelMotion() {
+        if scenePhase == .active && !accessibilityReduceMotion {
+            panelMotion.start()
+        } else {
+            panelMotion.stop()
+        }
+    }
+}
+
+private final class SettingsAboutPanelMotion: ObservableObject {
+    @Published private(set) var tilt = CGSize.zero
+
+    private let motionManager = CMMotionManager()
+    private var filteredTilt = CGSize.zero
+
+    func start() {
+        guard motionManager.isDeviceMotionAvailable,
+              !motionManager.isDeviceMotionActive
+        else {
+            return
+        }
+
+        motionManager.deviceMotionUpdateInterval = 1.0 / 30.0
+        motionManager.startDeviceMotionUpdates(to: .main) { [weak self] motion, _ in
+            guard let self, let gravity = motion?.gravity else {
+                return
+            }
+
+            self.consume(gravity: gravity)
+        }
+    }
+
+    func stop() {
+        motionManager.stopDeviceMotionUpdates()
+        filteredTilt = .zero
+        tilt = .zero
+    }
+
+    deinit {
+        motionManager.stopDeviceMotionUpdates()
+    }
+
+    private func consume(gravity: CMAcceleration) {
+        let target = Self.interfaceTilt(for: gravity)
+        let smoothing: CGFloat = 0.14
+
+        filteredTilt.width += (target.width - filteredTilt.width) * smoothing
+        filteredTilt.height += (target.height - filteredTilt.height) * smoothing
+
+        guard abs(filteredTilt.width - tilt.width) > 0.002
+                || abs(filteredTilt.height - tilt.height) > 0.002
+        else {
+            return
+        }
+
+        tilt = filteredTilt
+    }
+
+    private static func interfaceTilt(for gravity: CMAcceleration) -> CGSize {
+        let orientation = UIApplication.shared.connectedScenes
+            .compactMap { $0 as? UIWindowScene }
+            .first(where: { $0.activationState == .foregroundActive })?
+            .effectiveGeometry.interfaceOrientation ?? .portrait
+
+        let horizontal: Double
+        let vertical: Double
+
+        switch orientation {
+        case .portrait:
+            horizontal = gravity.x
+            vertical = -gravity.y
+        case .portraitUpsideDown:
+            horizontal = -gravity.x
+            vertical = gravity.y
+        case .landscapeLeft:
+            horizontal = -gravity.y
+            vertical = -gravity.x
+        case .landscapeRight:
+            horizontal = gravity.y
+            vertical = gravity.x
+        default:
+            horizontal = gravity.x
+            vertical = -gravity.y
+        }
+
+        return CGSize(
+            width: CGFloat(min(max(horizontal, -1), 1)),
+            height: CGFloat(min(max(vertical, -1), 1))
+        )
+    }
+}
+
+private struct SettingsAboutReflectivePanelBackground: View {
+    @Environment(\.colorScheme) private var colorScheme
+
+    let tilt: CGSize
+
+    var body: some View {
+        GeometryReader { proxy in
+            let longestSide = max(proxy.size.width, proxy.size.height)
+            let highlightCenter = UnitPoint(
+                x: 0.5 + tilt.width * 0.38,
+                y: 0.5 + tilt.height * 0.34
+            )
+
+            ZStack {
+                LinearGradient(
+                    colors: [
+                        AppTheme.brand.opacity(0.12),
+                        AppTheme.cardBackground,
+                        AppTheme.info.opacity(0.08)
+                    ],
+                    startPoint: .topLeading,
+                    endPoint: .bottomTrailing
+                )
+
+                RadialGradient(
+                    colors: [
+                        Color.white.opacity(colorScheme == .dark ? 0.20 : 0.34),
+                        Color.white.opacity(colorScheme == .dark ? 0.08 : 0.14),
+                        Color.clear
+                    ],
+                    center: highlightCenter,
+                    startRadius: 0,
+                    endRadius: longestSide * 0.72
+                )
+                .blendMode(.screen)
+
+                LinearGradient(
+                    colors: [
+                        Color.clear,
+                        Color.white.opacity(colorScheme == .dark ? 0.05 : 0.10),
+                        Color.white.opacity(colorScheme == .dark ? 0.13 : 0.22),
+                        Color.white.opacity(colorScheme == .dark ? 0.04 : 0.08),
+                        Color.clear
+                    ],
+                    startPoint: .leading,
+                    endPoint: .trailing
+                )
+                .frame(
+                    width: proxy.size.width * 0.40,
+                    height: proxy.size.height * 1.65
+                )
+                .rotationEffect(.degrees(-20 + Double(tilt.width) * 8))
+                .offset(
+                    x: tilt.width * proxy.size.width * 0.44,
+                    y: tilt.height * proxy.size.height * 0.24
+                )
+                .blur(radius: 12)
+                .blendMode(.screen)
+            }
+        }
+        .allowsHitTesting(false)
     }
 }
 

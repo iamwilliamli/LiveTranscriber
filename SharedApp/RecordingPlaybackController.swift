@@ -18,12 +18,14 @@ final class RecordingPlaybackController: ObservableObject {
     @Published private(set) var duration: TimeInterval = 0
     @Published private(set) var errorText: String?
     @Published private(set) var playbackRate: Float = 1
+    @Published private(set) var isSilenceSkippingEnabled = false
+    @Published private(set) var isPreparingSilenceAnalysis = false
 
     private static let playbackGainDecibels: Float = 3
     private static let playbackUITickMilliseconds = 250
     private static let playbackPreparationDuration: TimeInterval = 0.2
     private static let logger = Logger(subsystem: "com.reddownloader.LiveTranscriber", category: "RecordingPlayback")
-    static let availablePlaybackRates: [Float] = [0.75, 1, 1.25, 1.5, 2]
+    static let availablePlaybackRates: [Float] = [0.5, 0.75, 1, 1.25, 1.5, 2]
 
     /// Local recordings are decoded by AVAudioFile/AVAudioPlayerNode, which is
     /// Apple's file-playback path and supports the Float32 WAV files already
@@ -41,8 +43,13 @@ final class RecordingPlaybackController: ObservableObject {
         qos: .userInitiated
     )
     private var audioFile: AVAudioFile?
+    private var loadedAudioURL: URL?
     private var connectedFileFormat: AVAudioFormat?
     private var playbackTimerTask: Task<Void, Never>?
+    private var silenceAnalysisTask: Task<Void, Never>?
+    private var silenceIntervals: [RecordingSilenceInterval] = []
+    private var silenceAnalysisGeneration = 0
+    private var hasAnalyzedSilence = false
     private var sampleRate: Double = 44_100
     private var scheduledStartTime: TimeInterval = 0
     private var playbackScheduleID = 0
@@ -215,10 +222,14 @@ final class RecordingPlaybackController: ObservableObject {
 
             let file = preparedFile.file
             audioFile = file
+            loadedAudioURL = url
             sampleRate = file.fileFormat.sampleRate
             duration = sampleRate > 0 ? Double(file.length) / sampleRate : 0
             currentTime = 0
             isLoaded = true
+            if isSilenceSkippingEnabled {
+                startSilenceAnalysis(at: url)
+            }
             updateNowPlayingInfo()
             updateRemoteCommandAvailability(isEnabled: true)
             Self.logger.info(
@@ -401,6 +412,27 @@ final class RecordingPlaybackController: ObservableObject {
         updateNowPlayingInfo()
     }
 
+    func toggleSilenceSkipping() {
+        guard isLoaded else {
+            return
+        }
+        isSilenceSkippingEnabled.toggle()
+        if isSilenceSkippingEnabled {
+            if !hasAnalyzedSilence,
+               !isPreparingSilenceAnalysis,
+               let loadedAudioURL {
+                startSilenceAnalysis(at: loadedAudioURL)
+            }
+        } else if isPreparingSilenceAnalysis {
+            silenceAnalysisGeneration += 1
+            silenceAnalysisTask?.cancel()
+            silenceAnalysisTask = nil
+            silenceIntervals = []
+            isPreparingSilenceAnalysis = false
+            hasAnalyzedSilence = false
+        }
+    }
+
     func presentationTime() -> TimeInterval {
         min(max(currentPlaybackTime(), 0), duration)
     }
@@ -427,7 +459,14 @@ final class RecordingPlaybackController: ObservableObject {
         let node = playerNode
 
         audioFile = nil
+        loadedAudioURL = nil
         currentItem = nil
+        silenceAnalysisGeneration += 1
+        silenceAnalysisTask?.cancel()
+        silenceAnalysisTask = nil
+        silenceIntervals = []
+        isPreparingSilenceAnalysis = false
+        hasAnalyzedSilence = false
         hasScheduledPlayback = false
         needsPlaybackReschedule = true
         isTransportReconfiguring = false
@@ -542,6 +581,12 @@ final class RecordingPlaybackController: ObservableObject {
                 }
 
                 let playbackTime = min(self.currentPlaybackTime(), self.duration)
+                if let skipDestination = self.silenceSkipDestination(
+                    at: playbackTime
+                ) {
+                    self.seek(to: skipDestination)
+                    continue
+                }
                 self.currentTime = playbackTime
                 self.refreshNowPlayingTitleIfNeeded(at: playbackTime)
 
@@ -557,6 +602,59 @@ final class RecordingPlaybackController: ObservableObject {
     private func stopTimer() {
         playbackTimerTask?.cancel()
         playbackTimerTask = nil
+    }
+
+    private func startSilenceAnalysis(at url: URL) {
+        silenceAnalysisGeneration += 1
+        let generation = silenceAnalysisGeneration
+        silenceAnalysisTask?.cancel()
+        silenceIntervals = []
+        isPreparingSilenceAnalysis = true
+        hasAnalyzedSilence = false
+
+        let task = Task { [weak self] in
+            let intervals = await RecordingSilenceDetector.intervals(from: url)
+            guard !Task.isCancelled,
+                  let self,
+                  generation == self.silenceAnalysisGeneration,
+                  self.isLoaded else {
+                return
+            }
+            self.silenceIntervals = intervals
+            self.isPreparingSilenceAnalysis = false
+            self.hasAnalyzedSilence = true
+            self.silenceAnalysisTask = nil
+        }
+        silenceAnalysisTask = task
+    }
+
+    private func silenceSkipDestination(
+        at playbackTime: TimeInterval
+    ) -> TimeInterval? {
+        guard isSilenceSkippingEnabled,
+              isPlaying,
+              !isTransportReconfiguring,
+              !silenceIntervals.isEmpty else {
+            return nil
+        }
+
+        var lowerBound = silenceIntervals.startIndex
+        var upperBound = silenceIntervals.endIndex
+        while lowerBound < upperBound {
+            let midIndex = lowerBound + (upperBound - lowerBound) / 2
+            let interval = silenceIntervals[midIndex]
+            if playbackTime < interval.startTime {
+                upperBound = midIndex
+            } else if playbackTime >= interval.endTime {
+                lowerBound = midIndex + 1
+            } else {
+                let destination = min(interval.endTime, duration)
+                return destination > playbackTime + 0.05
+                    ? destination
+                    : nil
+            }
+        }
+        return nil
     }
 
     private func configurePersistentPlaybackGraph() {
@@ -1240,13 +1338,16 @@ struct RetroRecordingDisplay: View {
     }
 
     var body: some View {
+        let displayShape = RoundedRectangle(cornerRadius: 24, style: .continuous)
+
         ZStack {
             Color(red: 0.018, green: 0.020, blue: 0.022)
 
             RetroDotMatrixGrid()
+                .padding(RetroDisplayMetrics.edgePixelInset)
                 .accessibilityHidden(true)
 
-            VStack(spacing: 8) {
+            VStack(spacing: 6) {
                 HStack(spacing: 7) {
                     RetroPlaybackStatusMark(color: displayRed, isActive: player.isPlaying)
                         .accessibilityHidden(true)
@@ -1280,7 +1381,7 @@ struct RetroRecordingDisplay: View {
                         effectiveDuration
                     )
 
-                    VStack(spacing: 8) {
+                    VStack(spacing: 4) {
                         RetroPixelWaveform(
                             samples: waveformSamples,
                             progress: playbackProgress(for: currentTime),
@@ -1288,6 +1389,13 @@ struct RetroRecordingDisplay: View {
                             isActive: player.isPlaying
                         )
                         .frame(height: 106)
+                        .padding(
+                            .horizontal,
+                            -(
+                                RetroDisplayMetrics.contentHorizontalInset
+                                    - RetroDisplayMetrics.edgePixelInset
+                            )
+                        )
                         .accessibilityHidden(true)
 
                         RetroDotMatrixTime(
@@ -1295,23 +1403,20 @@ struct RetroRecordingDisplay: View {
                             accessibilityText: "\(TranscriptionLine.formatTimestamp(currentTime)) / \(TranscriptionLine.formatTimestamp(effectiveDuration))"
                         )
                         .frame(maxWidth: .infinity)
-                        .frame(height: 40)
+                        .frame(height: 35)
                     }
                 }
             }
-            .padding(.horizontal, 16)
-            .padding(.vertical, 14)
+            .padding(.horizontal, RetroDisplayMetrics.contentHorizontalInset)
+            .padding(.vertical, 10)
         }
-        .frame(height: 212)
-        .clipShape(RoundedRectangle(cornerRadius: 23, style: .continuous))
+        .coordinateSpace(name: RetroDisplayMetrics.coordinateSpaceName)
+        .frame(height: 184)
+        .clipShape(displayShape)
         .overlay {
-            RoundedRectangle(cornerRadius: 23, style: .continuous)
-                .strokeBorder(Color.black.opacity(0.88), lineWidth: 2)
-        }
-        .overlay {
-            RoundedRectangle(cornerRadius: 21, style: .continuous)
-                .strokeBorder(Color.white.opacity(0.08), lineWidth: 1)
-                .padding(3)
+            displayShape
+                .strokeBorder(Color.white.opacity(0.18), lineWidth: 1)
+                .allowsHitTesting(false)
         }
         .task(id: audioURL) {
             waveformSamples = []
@@ -1336,29 +1441,44 @@ struct RetroRecordingDisplay: View {
 }
 
 enum RetroDisplayMetrics {
+    static let coordinateSpaceName = "retroRecordingDisplayGrid"
+    static let contentHorizontalInset: CGFloat = 16
     static let gridPitch: CGFloat = 4.6
+    static let edgePixelInset: CGFloat = gridPitch
     static let backgroundDotSize: CGFloat = 2.15
     static let activeDotSize: CGFloat = 2.7
+    static let gridOrigin: CGFloat = 1.4
+
+    static func pixelAligned(_ value: CGFloat, displayScale: CGFloat) -> CGFloat {
+        let safeScale = max(displayScale, 1)
+        return (value * safeScale).rounded() / safeScale
+    }
 }
 
 private struct RetroDotMatrixGrid: View {
+    @Environment(\.displayScale) private var displayScale
+
     var body: some View {
         Canvas(opaque: false, rendersAsynchronously: true) { context, size in
             let pitch = RetroDisplayMetrics.gridPitch
-            let dotSize = RetroDisplayMetrics.backgroundDotSize
-            var y: CGFloat = 1.4
+            let dotSize = RetroDisplayMetrics.pixelAligned(
+                RetroDisplayMetrics.backgroundDotSize,
+                displayScale: displayScale
+            )
+            let cornerRadius = 1 / max(displayScale, 1)
+            var y = RetroDisplayMetrics.gridOrigin
 
             while y < size.height {
-                var x: CGFloat = 1.4
+                var x = RetroDisplayMetrics.gridOrigin
                 while x < size.width {
                     let rect = CGRect(
-                        x: x,
-                        y: y,
+                        x: RetroDisplayMetrics.pixelAligned(x, displayScale: displayScale),
+                        y: RetroDisplayMetrics.pixelAligned(y, displayScale: displayScale),
                         width: dotSize,
                         height: dotSize
                     )
                     context.fill(
-                        Path(roundedRect: rect, cornerRadius: 0.45),
+                        Path(roundedRect: rect, cornerRadius: cornerRadius),
                         with: .color(Color.white.opacity(0.065))
                     )
                     x += pitch
@@ -1398,154 +1518,347 @@ private struct RetroPlaybackStatusMark: View {
 }
 
 private struct RetroDotMatrixTime: View {
+    @Environment(\.displayScale) private var displayScale
+
     let text: String
     let accessibilityText: String
 
     private static let glyphRows: [Character: [String]] = [
-        "0": ["0111110", "1100011", "1000001", "1000001", "1000001", "1000001", "1000001", "1000001", "1000001", "1100011", "0111110"],
-        "1": ["0011000", "0111000", "1011000", "0011000", "0011000", "0011000", "0011000", "0011000", "0011000", "0011000", "1111111"],
-        "2": ["0111110", "1100011", "0000001", "0000001", "0000010", "0001100", "0110000", "1000000", "1000000", "1000000", "1111111"],
-        "3": ["1111110", "0000011", "0000001", "0000001", "0000010", "0011110", "0000010", "0000001", "0000001", "1100011", "0111110"],
-        "4": ["0000110", "0001110", "0010110", "0100110", "1000110", "1000110", "1111111", "0000110", "0000110", "0000110", "0000110"],
-        "5": ["1111111", "1000000", "1000000", "1000000", "1111110", "0000011", "0000001", "0000001", "0000001", "1100011", "0111110"],
-        "6": ["0011110", "0110000", "1100000", "1000000", "1111110", "1100011", "1000001", "1000001", "1000001", "1100011", "0111110"],
-        "7": ["1111111", "0000011", "0000010", "0000100", "0001000", "0010000", "0010000", "0100000", "0100000", "1000000", "1000000"],
-        "8": ["0111110", "1100011", "1000001", "1000001", "1100011", "0111110", "1100011", "1000001", "1000001", "1100011", "0111110"],
-        "9": ["0111110", "1100011", "1000001", "1000001", "1100011", "0111111", "0000001", "0000001", "0000011", "0000110", "0111100"],
-        ":": ["00", "00", "11", "11", "00", "00", "00", "11", "11", "00", "00"]
+        "0": ["01110", "10001", "10001", "10001", "10001", "10001", "01110"],
+        "1": ["00100", "01100", "00100", "00100", "00100", "00100", "01110"],
+        "2": ["01110", "10001", "00001", "00010", "00100", "01000", "11111"],
+        "3": ["11110", "00001", "00001", "01110", "00001", "00001", "11110"],
+        "4": ["00010", "00110", "01010", "10010", "11111", "00010", "00010"],
+        "5": ["11111", "10000", "10000", "11110", "00001", "00001", "11110"],
+        "6": ["01110", "10000", "10000", "11110", "10001", "10001", "01110"],
+        "7": ["11111", "00001", "00010", "00100", "01000", "01000", "01000"],
+        "8": ["01110", "10001", "10001", "01110", "10001", "10001", "01110"],
+        "9": ["01110", "10001", "10001", "01111", "00001", "00001", "01110"],
+        ":": ["0", "1", "1", "0", "1", "1", "0"]
     ]
 
     var body: some View {
-        Canvas(opaque: false, rendersAsynchronously: false) { context, size in
-            let glyphs = text.compactMap { Self.glyphRows[$0] }
-            guard !glyphs.isEmpty else {
-                return
-            }
+        GeometryReader { proxy in
+            let displayFrame = proxy.frame(
+                in: .named(RetroDisplayMetrics.coordinateSpaceName)
+            )
 
-            let glyphWidths = glyphs.map { $0.first?.count ?? 0 }
-            let totalColumns = glyphWidths.reduce(0, +) + max(glyphs.count - 1, 0)
-            let rowCount = glyphs.map(\.count).max() ?? 0
-            guard totalColumns > 0, rowCount > 0 else {
-                return
-            }
-
-            let horizontalPitch = max((size.width - 4) / CGFloat(totalColumns), 1)
-            let verticalPitch = max((size.height - 2) / CGFloat(rowCount), 1)
-            let pitch = min(horizontalPitch, verticalPitch)
-            let dotSize = max(pitch * 0.66, 1.35)
-            let contentWidth = CGFloat(totalColumns - 1) * pitch + dotSize
-            let contentHeight = CGFloat(rowCount - 1) * pitch + dotSize
-            let originX = (size.width - contentWidth) / 2
-            let originY = (size.height - contentHeight) / 2
-            var glyphColumn = 0
-
-            for (glyphIndex, rows) in glyphs.enumerated() {
-                let width = glyphWidths[glyphIndex]
-
-                for (row, pattern) in rows.enumerated() {
-                    for (column, value) in pattern.enumerated() where value == "1" {
-                        let rect = CGRect(
-                            x: originX + CGFloat(glyphColumn + column) * pitch,
-                            y: originY + CGFloat(row) * pitch,
-                            width: dotSize,
-                            height: dotSize
-                        )
-                        context.fill(
-                            Path(roundedRect: rect, cornerRadius: dotSize * 0.12),
-                            with: .color(Color.white.opacity(0.96))
-                        )
-                    }
+            Canvas(opaque: false, rendersAsynchronously: false) { context, size in
+                let glyphs = text.compactMap { Self.glyphRows[$0] }
+                guard !glyphs.isEmpty else {
+                    return
                 }
 
-                glyphColumn += width + 1
+                let glyphWidths = glyphs.map { $0.first?.count ?? 0 }
+                let totalColumns = glyphWidths.reduce(0, +) + max(glyphs.count - 1, 0)
+                let rowCount = glyphs.map(\.count).max() ?? 0
+                guard totalColumns > 0, rowCount > 0 else {
+                    return
+                }
+
+                let pitch = RetroDisplayMetrics.gridPitch
+                let dotSize = RetroDisplayMetrics.pixelAligned(
+                    RetroDisplayMetrics.backgroundDotSize,
+                    displayScale: displayScale
+                )
+                let contentWidth = CGFloat(totalColumns - 1) * pitch + dotSize
+                let contentHeight = CGFloat(rowCount - 1) * pitch + dotSize
+                let horizontalPhase = gridPhase(for: displayFrame.minX)
+                let verticalPhase = gridPhase(for: displayFrame.minY)
+                let originX = alignedOrigin(
+                    centeredIn: size.width,
+                    contentLength: contentWidth,
+                    phase: horizontalPhase
+                )
+                let originY = alignedOrigin(
+                    centeredIn: size.height,
+                    contentLength: contentHeight,
+                    phase: verticalPhase
+                )
+                var glyphColumn = 0
+
+                for (glyphIndex, rows) in glyphs.enumerated() {
+                    let width = glyphWidths[glyphIndex]
+
+                    for (row, pattern) in rows.enumerated() {
+                        for (column, value) in pattern.enumerated() where value == "1" {
+                            let localX = originX + CGFloat(glyphColumn + column) * pitch
+                            let localY = originY + CGFloat(row) * pitch
+                            let rect = CGRect(
+                                x: pixelAligned(
+                                    localX,
+                                    displayOffset: displayFrame.minX
+                                ),
+                                y: pixelAligned(
+                                    localY,
+                                    displayOffset: displayFrame.minY
+                                ),
+                                width: dotSize,
+                                height: dotSize
+                            )
+                            context.fill(
+                                Path(
+                                    roundedRect: rect,
+                                    cornerRadius: 1 / max(displayScale, 1)
+                                ),
+                                with: .color(Color.white.opacity(0.96))
+                            )
+                        }
+                    }
+
+                    glyphColumn += width + 1
+                }
             }
         }
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(Text(accessibilityText))
     }
+
+    private func gridPhase(for displayOffset: CGFloat) -> CGFloat {
+        let pitch = RetroDisplayMetrics.gridPitch
+        let alignedGridOrigin = RetroDisplayMetrics.pixelAligned(
+            RetroDisplayMetrics.gridOrigin,
+            displayScale: displayScale
+        )
+        let unwrappedPhase = alignedGridOrigin - displayOffset
+        return ((unwrappedPhase.truncatingRemainder(dividingBy: pitch)) + pitch)
+            .truncatingRemainder(dividingBy: pitch)
+    }
+
+    private func pixelAligned(
+        _ localValue: CGFloat,
+        displayOffset: CGFloat
+    ) -> CGFloat {
+        RetroDisplayMetrics.pixelAligned(
+            localValue + displayOffset,
+            displayScale: displayScale
+        ) - displayOffset
+    }
+
+    private func alignedOrigin(
+        centeredIn availableLength: CGFloat,
+        contentLength: CGFloat,
+        phase: CGFloat
+    ) -> CGFloat {
+        let pitch = RetroDisplayMetrics.gridPitch
+        let maximumOrigin = max(availableLength - contentLength, 0)
+        let desiredOrigin = (availableLength - contentLength) / 2
+        let firstVisibleStep = Int(ceil((0 - phase) / pitch))
+        let lastVisibleStep = Int(floor((maximumOrigin - phase) / pitch))
+
+        guard firstVisibleStep <= lastVisibleStep else {
+            return min(max(desiredOrigin, 0), maximumOrigin)
+        }
+
+        let centeredStep = Int(round((desiredOrigin - phase) / pitch))
+        let visibleStep = min(max(centeredStep, firstVisibleStep), lastVisibleStep)
+        return phase + CGFloat(visibleStep) * pitch
+    }
 }
 
 
 struct RetroPixelWaveform: View {
+    @Environment(\.displayScale) private var displayScale
+
     let samples: [CGFloat]
     let progress: CGFloat
     let playheadColor: Color
     let isActive: Bool
 
     var body: some View {
-        Canvas(opaque: false, rendersAsynchronously: false) { context, size in
-            let centerY = size.height / 2
-            let pitch = RetroDisplayMetrics.gridPitch
-            let pixelSize = RetroDisplayMetrics.activeDotSize
-            let maximumHalfRows = max(Int((size.height / 2 - pitch) / pitch), 1)
-            let drawableWidth = max(size.width - pixelSize, 0)
-            let columnCount = max(Int((drawableWidth / pitch).rounded(.down)) + 1, 2)
-            let columnPitch = drawableWidth / CGFloat(columnCount - 1)
-            let rawPlayheadX = min(max(progress, 0), 1) * size.width
-            let lineX = min(
-                max(rawPlayheadX, pixelSize / 2),
-                max(size.width - pixelSize / 2, pixelSize / 2)
+        GeometryReader { proxy in
+            let displayFrame = proxy.frame(
+                in: .named(RetroDisplayMetrics.coordinateSpaceName)
             )
 
-            for index in 0..<columnCount {
-                let x = pixelSize / 2 + CGFloat(index) * columnPitch
-                let sample = interpolatedSample(at: index, columnCount: columnCount)
-                let halfRows = max(
-                    Int((min(max(sample, 0), 1) * CGFloat(maximumHalfRows)).rounded()),
+            Canvas(opaque: false, rendersAsynchronously: false) { context, size in
+                let pitch = RetroDisplayMetrics.gridPitch
+                let cellSize = RetroDisplayMetrics.pixelAligned(
+                    RetroDisplayMetrics.backgroundDotSize,
+                    displayScale: displayScale
+                )
+                let cornerRadius = 1 / max(displayScale, 1)
+                let columns = gridOrigins(
+                    phase: gridPhase(for: displayFrame.minX),
+                    length: size.width,
+                    pitch: pitch,
+                    cellSize: cellSize,
+                    displayOffset: displayFrame.minX
+                )
+                let rows = gridOrigins(
+                    phase: gridPhase(for: displayFrame.minY),
+                    length: size.height,
+                    pitch: pitch,
+                    cellSize: cellSize,
+                    displayOffset: displayFrame.minY
+                )
+                guard columns.count > 2, rows.count > 2 else {
+                    return
+                }
+
+                let firstWaveformColumn = columns.index(after: columns.startIndex)
+                let lastWaveformColumn = columns.index(columns.endIndex, offsetBy: -2)
+                let waveformColumnIndices = firstWaveformColumn...lastWaveformColumn
+                let firstWaveformCenter = columns[firstWaveformColumn] + cellSize / 2
+                let lastWaveformCenter = columns[lastWaveformColumn] + cellSize / 2
+                let rawPlayheadX = firstWaveformCenter
+                    + min(max(progress, 0), 1)
+                    * (lastWaveformCenter - firstWaveformCenter)
+                let playheadColumn = nearestIndex(
+                    to: rawPlayheadX,
+                    in: columns,
+                    cellSize: cellSize
+                )
+                let centerRow = nearestIndex(
+                    to: size.height / 2,
+                    in: rows,
+                    cellSize: cellSize
+                )
+                let maximumHalfRows = max(
+                    min(centerRow, rows.count - centerRow - 1),
                     0
                 )
-                let waveformOpacity = x <= rawPlayheadX ? 0.94 : 0.34
 
-                for row in -halfRows...halfRows {
-                    let y = centerY + CGFloat(row) * pitch
+                for index in waveformColumnIndices {
+                    let sample = interpolatedSample(
+                        at: index - firstWaveformColumn,
+                        columnCount: waveformColumnIndices.count
+                    )
+                    let halfRows = max(
+                        Int(
+                            (
+                                min(max(sample, 0), 1)
+                                    * CGFloat(maximumHalfRows)
+                            ).rounded()
+                        ),
+                        0
+                    )
+                    let waveformOpacity = index <= playheadColumn ? 0.94 : 0.34
+                    let lowerRow = max(centerRow - halfRows, rows.startIndex)
+                    let upperRow = min(centerRow + halfRows, rows.index(before: rows.endIndex))
+
+                    for rowIndex in lowerRow...upperRow {
+                        let rect = CGRect(
+                            x: pixelAligned(
+                                columns[index],
+                                displayOffset: displayFrame.minX
+                            ),
+                            y: pixelAligned(
+                                rows[rowIndex],
+                                displayOffset: displayFrame.minY
+                            ),
+                            width: cellSize,
+                            height: cellSize
+                        )
+                        context.fill(
+                            Path(roundedRect: rect, cornerRadius: cornerRadius),
+                            with: .color(Color.white.opacity(waveformOpacity))
+                        )
+                    }
+                }
+
+                let playheadOpacity = isActive ? 1.0 : 0.74
+                let playheadX = pixelAligned(
+                    columns[playheadColumn],
+                    displayOffset: displayFrame.minX
+                )
+
+                for rowIndex in rows.indices.dropFirst(2) {
                     let rect = CGRect(
-                        x: x - pixelSize / 2,
-                        y: y - pixelSize / 2,
-                        width: pixelSize,
-                        height: pixelSize
+                        x: playheadX,
+                        y: pixelAligned(
+                            rows[rowIndex],
+                            displayOffset: displayFrame.minY
+                        ),
+                        width: cellSize,
+                        height: cellSize
                     )
                     context.fill(
-                        Path(roundedRect: rect, cornerRadius: pixelSize * 0.14),
-                        with: .color(Color.white.opacity(waveformOpacity))
+                        Path(roundedRect: rect, cornerRadius: cornerRadius),
+                        with: .color(playheadColor.opacity(playheadOpacity))
                     )
                 }
-            }
 
-            var playheadY = pixelSize / 2 + pitch * 2
-            while playheadY <= size.height - pixelSize / 2 {
-                let rect = CGRect(
-                    x: lineX - pixelSize / 2,
-                    y: playheadY - pixelSize / 2,
-                    width: pixelSize,
-                    height: pixelSize
-                )
-                context.fill(
-                    Path(roundedRect: rect, cornerRadius: pixelSize * 0.14),
-                    with: .color(playheadColor.opacity(isActive ? 1 : 0.74))
-                )
-                playheadY += pitch
-            }
-
-            for row in 0..<2 {
-                for column in 0..<2 {
-                    let horizontalOffset = (CGFloat(column) - 0.5) * pitch
-                    let center = CGPoint(
-                        x: rawPlayheadX + horizontalOffset,
-                        y: pixelSize / 2 + CGFloat(row) * pitch
-                    )
-                    let rect = CGRect(
-                        x: center.x - pixelSize / 2,
-                        y: center.y - pixelSize / 2,
-                        width: pixelSize,
-                        height: pixelSize
-                    )
-                    context.fill(
-                        Path(roundedRect: rect, cornerRadius: pixelSize * 0.14),
-                        with: .color(playheadColor.opacity(isActive ? 1 : 0.74))
-                    )
+                let capStartColumn = columns.index(before: playheadColumn)
+                let capEndColumn = columns.index(after: playheadColumn)
+                for columnIndex in capStartColumn...capEndColumn {
+                    for rowIndex in rows.indices.prefix(2) {
+                        let rect = CGRect(
+                            x: pixelAligned(
+                                columns[columnIndex],
+                                displayOffset: displayFrame.minX
+                            ),
+                            y: pixelAligned(
+                                rows[rowIndex],
+                                displayOffset: displayFrame.minY
+                            ),
+                            width: cellSize,
+                            height: cellSize
+                        )
+                        context.fill(
+                            Path(roundedRect: rect, cornerRadius: cornerRadius),
+                            with: .color(playheadColor.opacity(playheadOpacity))
+                        )
+                    }
                 }
             }
         }
+    }
+
+    private func gridPhase(for displayOffset: CGFloat) -> CGFloat {
+        let pitch = RetroDisplayMetrics.gridPitch
+        let alignedGridOrigin = RetroDisplayMetrics.pixelAligned(
+            RetroDisplayMetrics.gridOrigin,
+            displayScale: displayScale
+        )
+        let unwrappedPhase = alignedGridOrigin - displayOffset
+        return ((unwrappedPhase.truncatingRemainder(dividingBy: pitch)) + pitch)
+            .truncatingRemainder(dividingBy: pitch)
+    }
+
+    private func gridOrigins(
+        phase: CGFloat,
+        length: CGFloat,
+        pitch: CGFloat,
+        cellSize: CGFloat,
+        displayOffset: CGFloat
+    ) -> [CGFloat] {
+        var origins: [CGFloat] = []
+        var origin = phase
+
+        while origin < length {
+            let alignedOrigin = pixelAligned(
+                origin,
+                displayOffset: displayOffset
+            )
+            if alignedOrigin >= 0, alignedOrigin + cellSize <= length {
+                origins.append(alignedOrigin)
+            }
+            origin += pitch
+        }
+
+        return origins
+    }
+
+    private func nearestIndex(
+        to position: CGFloat,
+        in origins: [CGFloat],
+        cellSize: CGFloat
+    ) -> Int {
+        origins.indices.min { lhs, rhs in
+            abs(origins[lhs] + cellSize / 2 - position)
+                < abs(origins[rhs] + cellSize / 2 - position)
+        } ?? origins.startIndex
+    }
+
+    private func pixelAligned(
+        _ localValue: CGFloat,
+        displayOffset: CGFloat
+    ) -> CGFloat {
+        RetroDisplayMetrics.pixelAligned(
+            localValue + displayOffset,
+            displayScale: displayScale
+        ) - displayOffset
     }
 
     private func interpolatedSample(at column: Int, columnCount: Int) -> CGFloat {

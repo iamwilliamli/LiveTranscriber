@@ -1,6 +1,7 @@
 import AppIntents
 import Foundation
 import UIKit
+import WidgetKit
 
 enum QuickRecordingControlL10n {
     static let title = LocalizedStringResource(
@@ -62,6 +63,61 @@ enum HomeWidgetL10n {
     static let activityTranscript = resource("widget.live_activity.transcript", defaultValue: "Transcript", comment: "Transcript heading in the recording Live Activity.")
     static let activityStop = resource("widget.live_activity.stop", defaultValue: "Stop", comment: "Stop recording action in the recording Live Activity.")
     static let activityLanguage = resource("widget.live_activity.language", defaultValue: "Lang", comment: "Compact language label in the Dynamic Island.")
+}
+
+struct HomeWidgetRecentRecording: Codable, Hashable, Identifiable {
+    let id: UUID
+    let title: String
+    let createdAt: Date
+    let durationSeconds: Int
+    let languageName: String
+}
+
+struct HomeWidgetSnapshot: Codable, Hashable {
+    let updatedAt: Date
+    let recordingCount: Int
+    let recentRecordings: [HomeWidgetRecentRecording]
+
+    static let empty = HomeWidgetSnapshot(
+        updatedAt: .distantPast,
+        recordingCount: 0,
+        recentRecordings: []
+    )
+}
+
+enum HomeWidgetSnapshotStore {
+    static let widgetKind = "LiveTranscriberHomeWidget"
+
+    private static let appGroupIdentifier = "group.com.iamwilliamli.LiveTranscriber"
+    private static let snapshotKey = "HomeWidget.snapshot.v1"
+
+    static func load() -> HomeWidgetSnapshot {
+        guard let defaults = UserDefaults(suiteName: appGroupIdentifier),
+              let data = defaults.data(forKey: snapshotKey),
+              let snapshot = try? JSONDecoder().decode(HomeWidgetSnapshot.self, from: data) else {
+            return .empty
+        }
+        return snapshot
+    }
+
+    static func save(_ snapshot: HomeWidgetSnapshot) {
+        guard let defaults = UserDefaults(suiteName: appGroupIdentifier) else {
+            return
+        }
+
+        if let existingData = defaults.data(forKey: snapshotKey),
+           let existingSnapshot = try? JSONDecoder().decode(HomeWidgetSnapshot.self, from: existingData),
+           existingSnapshot.recordingCount == snapshot.recordingCount,
+           existingSnapshot.recentRecordings == snapshot.recentRecordings {
+            return
+        }
+
+        guard let data = try? JSONEncoder().encode(snapshot) else {
+            return
+        }
+        defaults.set(data, forKey: snapshotKey)
+        WidgetCenter.shared.reloadTimelines(ofKind: widgetKind)
+    }
 }
 
 enum LiveTranscriberLaunchTarget: String, AppEnum {

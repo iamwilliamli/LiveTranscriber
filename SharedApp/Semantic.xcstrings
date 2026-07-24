@@ -22425,6 +22425,48 @@
         }
       }
     },
+    "recordings.playback.skip_silence" : {
+      "comment" : "Accessibility label for the playback control that skips extended silence.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Stille überspringen"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Skip Silence"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "無音部分をスキップ"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Stilte overslaan"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "跳过静音"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "跳過靜音"
+          }
+        }
+      }
+    },
     "recordings.playback.start_failed.format" : {
       "comment" : "Playback start failure. Parameter: error description.",
       "extractionState" : "stale",
@@ -24148,43 +24190,43 @@
       }
     },
     "recordings.transcript.sync_current" : {
-      "comment" : "Accessibility label for the player action that scrolls to the transcript line matching the current playback time.",
+      "comment" : "Accessibility label for the playback toggle that keeps the current transcript line visible.",
       "extractionState" : "manual",
       "localizations" : {
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Zur aktuellen Transkriptstelle"
+            "value" : "Transkript folgen"
           }
         },
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Sync to Current Transcript"
+            "value" : "Follow Transcript"
           }
         },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "現在の文字起こし位置に移動"
+            "value" : "文字起こしを追従"
           }
         },
         "nl" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Naar huidige transcriptpositie"
+            "value" : "Transcript volgen"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "同步到当前转录位置"
+            "value" : "跟随转录文本"
           }
         },
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "同步到目前轉錄位置"
+            "value" : "跟隨轉錄文字"
           }
         }
       }
@@ -26451,6 +26493,90 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "高階模型"
+          }
+        }
+      }
+    },
+    "settings.audio_event_confidence_threshold" : {
+      "comment" : "Developer option title for the minimum displayed audio event confidence.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Konfidenzschwelle für Audioereignisse"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Audio Event Confidence Threshold"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "オーディオイベントの信頼度しきい値"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Betrouwbaarheidsdrempel audio-events"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "音频事件置信度阈值"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "音訊事件信心度門檻"
+          }
+        }
+      }
+    },
+    "settings.audio_event_confidence_threshold.description" : {
+      "comment" : "Developer option description for the minimum displayed audio event confidence.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nur erkannte Audioereignisse oberhalb dieser Konfidenz in Listen und bei der Wiedergabe anzeigen."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Only show detected audio events above this confidence in lists and playback."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "この信頼度を超えるオーディオイベントのみ、リストと再生画面に表示します。"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Toon in lijsten en tijdens het afspelen alleen gedetecteerde audio-events boven deze betrouwbaarheid."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "仅在列表和播放界面中显示置信度高于此值的已检测音频事件。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "只在列表和播放畫面中顯示信心度高於此值的已偵測音訊事件。"
           }
         }
       }

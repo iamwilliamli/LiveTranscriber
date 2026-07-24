@@ -14,7 +14,10 @@ enum HapticFeedback {
         case recordingStop
         case recordingSaved
         case playbackToggle
+        case toggleOn
+        case toggleOff
         case timelineSeek
+        case timelineAudioEvent
         case copy
         case importQueued
         case importStart
@@ -64,7 +67,7 @@ enum HapticFeedback {
         case .tabSelection:
             selectionGenerator.prepare()
             impactGenerator(for: .light).prepare()
-        case .menuSelection, .timelineSeek:
+        case .menuSelection, .timelineSeek, .timelineAudioEvent:
             selectionGenerator.prepare()
         case .recordingStart:
             impactGenerator(for: .rigid).prepare()
@@ -80,6 +83,10 @@ enum HapticFeedback {
             }
         case .playbackToggle, .copy:
             impactGenerator(for: .light).prepare()
+        case .toggleOn:
+            impactGenerator(for: .rigid).prepare()
+        case .toggleOff:
+            impactGenerator(for: .soft).prepare()
         case .analysisMenuCharge:
             impactGenerator(for: .soft).prepare()
         case .analysisMenuPresented:
@@ -122,7 +129,13 @@ enum HapticFeedback {
             success()
         case .playbackToggle:
             lightImpact(intensity: 0.48)
+        case .toggleOn:
+            rigidImpact(intensity: 0.42)
+        case .toggleOff:
+            softImpact(intensity: 0.38)
         case .timelineSeek:
+            selection()
+        case .timelineAudioEvent:
             selection()
         case .copy:
             lightImpact(intensity: 0.42)
@@ -257,9 +270,9 @@ enum HapticFeedback {
 
     private static func minimumInterval(for event: Event) -> TimeInterval {
         switch event {
-        case .timelineSeek, .menuSelection:
+        case .timelineSeek, .timelineAudioEvent, .menuSelection:
             return 0.04
-        case .navigation, .tabSelection, .playbackToggle, .copy:
+        case .navigation, .tabSelection, .playbackToggle, .toggleOn, .toggleOff, .copy:
             return 0.08
         case .blocked, .warning, .failure:
             return 0.35

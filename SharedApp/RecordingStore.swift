@@ -407,6 +407,13 @@ struct RecordingAudioEvent: Codable, Hashable, Identifiable {
     }
 }
 
+enum AudioEventDisplayConfiguration {
+    static let confidenceThresholdDefaultsKey = "audioEvents.display.confidenceThreshold"
+    static let defaultConfidenceThreshold = 0.8
+    static let confidenceThresholdRange = 0.0 ... 1.0
+    static let confidenceThresholdStep = 0.05
+}
+
 extension RecordingAudioEventAnalysis {
     var searchableText: String {
         Set(events.flatMap { [$0.label, $0.localizedLabel, $0.sourceIdentifier] })
@@ -1775,6 +1782,8 @@ final class RecordingStore: ObservableObject {
             searchIndexWarmupTask = nil
         }
 
+        publishHomeWidgetSnapshot()
+
         if synchronizeMetadata && isICloudStorageEnabled {
             RecordingMetadataCloudSync.shared.synchronizeNow()
         }
@@ -2782,6 +2791,7 @@ final class RecordingStore: ObservableObject {
         recordings.removeAll { $0.id == item.id }
         inferredRecordingIDs.remove(item.id)
         searchIndexCache[item.id] = nil
+        publishHomeWidgetSnapshot()
         do {
             try deletePersistedRecording(id: item.id)
         } catch {
@@ -4347,6 +4357,30 @@ final class RecordingStore: ObservableObject {
         try persist(recordings)
         refreshICloudSyncStatusCache()
         scheduleSpotlightIndexUpdate()
+        publishHomeWidgetSnapshot()
+    }
+
+    private func publishHomeWidgetSnapshot() {
+        let recentRecordings = recordings
+            .sorted { $0.createdAt > $1.createdAt }
+            .prefix(3)
+            .map { item in
+                HomeWidgetRecentRecording(
+                    id: item.id,
+                    title: item.displayName,
+                    createdAt: item.createdAt,
+                    durationSeconds: item.durationSeconds,
+                    languageName: item.languageName
+                )
+            }
+
+        HomeWidgetSnapshotStore.save(
+            HomeWidgetSnapshot(
+                updatedAt: Date(),
+                recordingCount: recordings.count,
+                recentRecordings: Array(recentRecordings)
+            )
+        )
     }
 
     private func pruneSearchIndexCache() {
