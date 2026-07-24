@@ -584,8 +584,8 @@ struct MacRecordingDetailView: View {
         .buttonStyle(MacPlaybackUtilityButtonStyle())
         .frame(maxWidth: .infinity)
         .disabled(!isPlayerLoaded || transcriptLines.isEmpty)
-        .help(String(localized: L10n.Recordings.syncCurrentTranscript))
-        .accessibilityLabel(Text(L10n.Recordings.syncCurrentTranscript))
+        .help(String(localized: L10n.Recordings.followTranscript))
+        .accessibilityLabel(Text(L10n.Recordings.followTranscript))
     }
 
     private func syncTranscriptToPlayback(using scrollProxy: ScrollViewProxy) {
