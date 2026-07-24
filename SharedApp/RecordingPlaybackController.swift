@@ -9,6 +9,105 @@ import TranscriberDomain
 import UIKit
 #endif
 
+struct RecordingPlaybackHistoryEntry: Codable, Hashable, Sendable {
+    let position: TimeInterval
+    let duration: TimeInterval
+    let lastPlayedAt: Date
+
+    func resumePosition(for actualDuration: TimeInterval) -> TimeInterval? {
+        let resolvedDuration = max(actualDuration, duration)
+        guard resolvedDuration.isFinite, resolvedDuration > 0 else {
+            return nil
+        }
+
+        let clampedPosition = min(max(position, 0), resolvedDuration)
+        let progress = clampedPosition / resolvedDuration
+        guard clampedPosition >= 5,
+              resolvedDuration - clampedPosition >= 5,
+              progress < 0.95 else {
+            return nil
+        }
+        return clampedPosition
+    }
+}
+
+enum RecordingPlaybackHistoryStore {
+    static let defaultsKey = "RecordingPlayback.historyV1JSON"
+    private static let maximumEntryCount = 200
+
+    static func entries(from json: String) -> [RecordingItem.ID: RecordingPlaybackHistoryEntry] {
+        guard let data = json.data(using: .utf8),
+              let stored = try? JSONDecoder().decode(
+                  [String: RecordingPlaybackHistoryEntry].self,
+                  from: data
+              ) else {
+            return [:]
+        }
+
+        return Dictionary(uniqueKeysWithValues: stored.compactMap { key, entry in
+            UUID(uuidString: key).map { ($0, entry) }
+        })
+    }
+
+    static func entry(for recordingID: RecordingItem.ID) -> RecordingPlaybackHistoryEntry? {
+        entries(from: UserDefaults.standard.string(forKey: defaultsKey) ?? "{}")[recordingID]
+    }
+
+    static func save(
+        recordingID: RecordingItem.ID,
+        position: TimeInterval,
+        duration: TimeInterval,
+        lastPlayedAt: Date = Date()
+    ) {
+        guard position.isFinite,
+              duration.isFinite,
+              duration > 0 else {
+            return
+        }
+
+        var entries = entries(from: UserDefaults.standard.string(forKey: defaultsKey) ?? "{}")
+        entries[recordingID] = RecordingPlaybackHistoryEntry(
+            position: min(max(position, 0), duration),
+            duration: duration,
+            lastPlayedAt: lastPlayedAt
+        )
+
+        if entries.count > maximumEntryCount {
+            let retainedIDs = Set(
+                entries
+                    .sorted { $0.value.lastPlayedAt > $1.value.lastPlayedAt }
+                    .prefix(maximumEntryCount)
+                    .map(\.key)
+            )
+            entries = entries.filter { retainedIDs.contains($0.key) }
+        }
+
+        let stored = Dictionary(uniqueKeysWithValues: entries.map { id, entry in
+            (id.uuidString, entry)
+        })
+        guard let data = try? JSONEncoder().encode(stored),
+              let json = String(data: data, encoding: .utf8) else {
+            return
+        }
+        UserDefaults.standard.set(json, forKey: defaultsKey)
+    }
+
+    static func remove(recordingID: RecordingItem.ID) {
+        var entries = entries(from: UserDefaults.standard.string(forKey: defaultsKey) ?? "{}")
+        guard entries.removeValue(forKey: recordingID) != nil else {
+            return
+        }
+        let stored = Dictionary(uniqueKeysWithValues: entries.map { id, entry in
+            (id.uuidString, entry)
+        })
+        guard let data = try? JSONEncoder().encode(stored),
+              let json = String(data: data, encoding: .utf8) else {
+            return
+        }
+        UserDefaults.standard.set(json, forKey: defaultsKey)
+    }
+}
+
 @MainActor
 final class RecordingPlaybackController: ObservableObject {
     @Published private(set) var currentItem: RecordingItem?
@@ -68,6 +167,8 @@ final class RecordingPlaybackController: ObservableObject {
     private var transportCleanupGeneration = 0
     private var transportLoadCommandID: Int?
     private var isTransportReconfiguring = false
+    private var playbackHistoryTrackingID: RecordingItem.ID?
+    private var lastPlaybackHistoryWriteAt = Date.distantPast
 
     init() {
         configurePersistentPlaybackGraph()
@@ -225,7 +326,15 @@ final class RecordingPlaybackController: ObservableObject {
             loadedAudioURL = url
             sampleRate = file.fileFormat.sampleRate
             duration = sampleRate > 0 ? Double(file.length) / sampleRate : 0
-            currentTime = 0
+            currentTime = currentItem
+                .flatMap { item in
+                    RecordingPlaybackHistoryStore
+                        .entry(for: item.id)?
+                        .resumePosition(for: duration)
+                }
+                ?? 0
+            playbackHistoryTrackingID = nil
+            lastPlaybackHistoryWriteAt = .distantPast
             isLoaded = true
             if isSilenceSkippingEnabled {
                 startSilenceAnalysis(at: url)
@@ -321,6 +430,8 @@ final class RecordingPlaybackController: ObservableObject {
                     return
                 }
                 isPlaying = true
+                playbackHistoryTrackingID = currentItem?.id
+                persistPlaybackHistory(force: true)
                 startTimer()
                 updateNowPlayingInfo()
                 Self.logger.info(
@@ -343,6 +454,7 @@ final class RecordingPlaybackController: ObservableObject {
         isPlaying = false
         playerNode.pause()
         currentTime = pausedTime
+        persistPlaybackHistory(position: pausedTime, force: true)
         stopTimer()
         updateNowPlayingInfo()
         Self.logger.debug("[RecordingPlayback] Paused at \(pausedTime, privacy: .public)")
@@ -355,6 +467,7 @@ final class RecordingPlaybackController: ObservableObject {
 
         let clampedTime = min(max(time, 0), duration)
         currentTime = clampedTime
+        persistPlaybackHistory(position: clampedTime, force: true)
         needsPlaybackReschedule = true
         if isPlaying {
             playbackCommandID += 1
@@ -446,6 +559,9 @@ final class RecordingPlaybackController: ObservableObject {
 
     @discardableResult
     private func resetPlaybackState(deactivateSession: Bool) -> Task<Void, Never>? {
+        persistPlaybackHistory(force: true)
+        playbackHistoryTrackingID = nil
+        lastPlaybackHistoryWriteAt = .distantPast
         playbackCommandID += 1
         playbackScheduleID += 1
         transportCleanupGeneration += 1
@@ -588,6 +704,7 @@ final class RecordingPlaybackController: ObservableObject {
                     continue
                 }
                 self.currentTime = playbackTime
+                self.persistPlaybackHistory(force: false)
                 self.refreshNowPlayingTitleIfNeeded(at: playbackTime)
 
                 do {
@@ -602,6 +719,31 @@ final class RecordingPlaybackController: ObservableObject {
     private func stopTimer() {
         playbackTimerTask?.cancel()
         playbackTimerTask = nil
+    }
+
+    private func persistPlaybackHistory(
+        position: TimeInterval? = nil,
+        force: Bool
+    ) {
+        guard let currentItem,
+              playbackHistoryTrackingID == currentItem.id,
+              duration.isFinite,
+              duration > 0 else {
+            return
+        }
+
+        let now = Date()
+        guard force || now.timeIntervalSince(lastPlaybackHistoryWriteAt) >= 5 else {
+            return
+        }
+
+        RecordingPlaybackHistoryStore.save(
+            recordingID: currentItem.id,
+            position: position ?? presentationTime(),
+            duration: duration,
+            lastPlayedAt: now
+        )
+        lastPlaybackHistoryWriteAt = now
     }
 
     private func startSilenceAnalysis(at url: URL) {
@@ -821,6 +963,7 @@ final class RecordingPlaybackController: ObservableObject {
         isTransportReconfiguring = false
         currentTime = duration
         isPlaying = false
+        persistPlaybackHistory(position: duration, force: true)
         stopTimer()
         updateNowPlayingInfo()
     }

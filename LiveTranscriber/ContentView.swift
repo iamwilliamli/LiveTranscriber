@@ -137,7 +137,14 @@ struct ContentView: View {
                         systemAudioCoordinator: systemAudioCoordinator,
                         captionStore: captionStore,
                         captionPiPController: captionPiPController,
-                        externalPendingRecordingDraft: $pendingRecordingDraftFromLiveActivity
+                        externalPendingRecordingDraft: $pendingRecordingDraftFromLiveActivity,
+                        onOpenRecording: { recordingID in
+                            pendingOpenRecordingID = recordingID
+                            selectedTab = .recordings
+                        },
+                        onShowRecordings: {
+                            selectedTab = .recordings
+                        }
                     )
                 }
 

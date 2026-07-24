@@ -48,6 +48,23 @@ Iconography uses SF Symbols throughout. Primary controls use familiar symbols su
 
 The recording screen uses a grouped background with two card surfaces and a bottom floating recording dock.
 
+When no recording is active and the transcript is empty, the same tab becomes a personal recording dashboard. The dashboard keeps the recording action primary, then presents:
+
+- A compact personalized prompt that combines the assistant avatar, time-aware greeting, and recording question in one header cluster. Chinese and other compact locales use a single line; longer localizations fall back to two tightly spaced lines without restoring a large display heading.
+- Three tappable weekly metrics for recording count, duration, and unique topics.
+- A tappable Voice Footprints collection made from saved recording locations.
+- A weekly activity chart and recap.
+- A shortcut back into the most recent recording.
+
+Dashboard metric details use progressive disclosure rather than placing every graph on the home screen:
+
+- Recordings shows the seven-day recording rhythm, all-time count, active days, located-recording count, and recent recordings.
+- Duration shows the seven-day duration rhythm, all-time duration, average duration, and longest recording.
+- Topics ranks the all-time topic collection by the total recording duration associated with each topic. Each row also states its recording count, so color and bar length are not the only encodings.
+- Voice Footprints opens a map, collection totals, and a ranked stamp list. A place with one recording opens it directly; a place with multiple recordings first opens that location’s complete recording collection so the user can choose the intended item. Map markers and stamp rows share the same behavior.
+
+Voice Footprints treats coordinates as the canonical identity. Stored locations within a 20 km city-scale radius are merged before display, with normalized city-and-country names as a secondary match. This prevents localized names such as `Munich`, `München`, and `慕尼黑` from creating duplicate stamps while keeping the most recent human-readable place label.
+
 The top card shows:
 
 - Real-time transcription title and current status.
@@ -64,9 +81,17 @@ The floating dock has two states:
 - Idle/preparing: a full-width red capsule button for starting recording, with a spinner while preparing.
 - Recording: a material capsule with pause/resume and stop buttons.
 
+Recorder-launch motion invariants:
+
+- Do not attach recording-state animation to the page root; it causes unrelated gradients, shadows, and scroll content to interpolate together.
+- The idle dashboard and recording workspace crossfade without scaling the complete surfaces.
+- The assistant robot and time-aware greeting keep separate matched-geometry identities across the idle dashboard and active recording header. The robot moves and grows from 42pt to 52pt while the greeting follows the same spatial path; the dashboard-only prompt fades instead of stretching. Reduced Motion falls back to the existing short crossfade.
+- The recorder dock uses matched position only. Its container keeps a fixed frame, while a lightweight animatable shape draws the actual 64pt circle and expands its path into the active capsule. Do not horizontally scale a pre-rendered capsule: doing so compresses its corner radius and makes the idle button look noncircular.
+- Standard launch motion stays at or below 240ms. Reduced Motion uses a short opacity transition.
+
 Language switching is disabled while recording or preparing.
 
-After tapping stop, the app presents a save sheet instead of immediately playing a drop animation. The sheet contains an editable recording name, a tags entry, duration, and an optional location toggle with a map preview. Saving writes the audio file, transcript, and metadata together; discarding removes the temporary audio draft and clears the transcript.
+After tapping stop, the app presents a save sheet instead of immediately playing a drop animation. The sheet contains an editable recording name, transcription-language picker, a tags entry, duration, and an optional location toggle with a map preview. The chosen language updates the saved recording metadata without re-transcribing the already captured text. Saving writes the audio file, transcript, and metadata together; discarding removes the temporary audio draft and clears the transcript.
 
 ## Recording Library
 
@@ -90,6 +115,12 @@ Rows show:
 - Summary/tag preview when available.
 - Transcript preview otherwise.
 - Unified tags and a location marker when available.
+
+Recording-row presentation invariants:
+
+- Row cards keep the shared light `AppTheme` shadow as well as the separator-opacity border; list redesigns must not flatten them into border-only rows.
+- Category, location, and tag chips share one horizontally scrollable context strip.
+- The context strip uses independent 14pt leading and trailing fades. A fade appears only on the edge that has additional off-screen content, so the initial leading edge remains crisp while an overflowing trailing edge is visibly hinted.
 
 Actions are intentionally discoverable but not always visible:
 

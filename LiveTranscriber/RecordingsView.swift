@@ -670,7 +670,7 @@ private struct AppleSpeechRetranscriptionRequest: Identifiable {
     }
 }
 
-private struct RecordingRetranscriptionLanguagePicker: View {
+struct RecordingRetranscriptionLanguagePicker: View {
     let title: String
     let recordingLanguageID: String
     let languages: [TranscriptionLanguage]
@@ -1133,6 +1133,7 @@ struct RecordingsView: View {
     @State private var addRecordingsCategoryTarget: RecordingCategoryFolder?
     @State private var isShowingCategoryOrganizer = false
     @State private var isShowingRecordingsMap = false
+    @State private var selectedRootCategoryID: String?
     @AppStorage("Recordings.customCategoriesJSON") private var customCategoriesJSON = "[]"
     @AppStorage(RecordingCategoryAppearanceCatalog.defaultsKey) private var categoryAppearancesJSON = "{}"
     @AppStorage(RecordingSummaryProvider.selectedDefaultsKey) private var selectedSummaryProviderRawValue = RecordingSummaryProvider.automatic.rawValue
@@ -1217,6 +1218,24 @@ struct RecordingsView: View {
 
     private var isSearchingCategoryRoot: Bool {
         !normalizedSearchText(searchText).isEmpty
+    }
+
+    private var rootFilteredRecordings: [RecordingItem] {
+        guard let selectedRootCategoryID,
+              let folder = categoryFolder(for: selectedRootCategoryID) else {
+            return store.recordings
+        }
+
+        return store.recordings.filter { item in
+            if folder.isUncategorized {
+                return item.categoryName == nil
+            }
+            return item.categoryName?.normalizedForRecordingSearch == folder.matchKey
+        }
+    }
+
+    private var rootRecordingDateSections: [RecordingDateSection] {
+        RecordingDateSection.grouped(rootFilteredRecordings)
     }
 
     private var isSpeechLocaleReleaseAlertPresented: Binding<Bool> {
@@ -1418,7 +1437,7 @@ struct RecordingsView: View {
                 }
             )
         }
-        .sheet(item: $editCategoryTarget) { _ in
+        .sheet(item: $editCategoryTarget) { target in
             RecordingCategoryEditSheet(
                 categoryName: $editCategoryName,
                 iconName: $editCategoryIconName,
@@ -1429,6 +1448,7 @@ struct RecordingsView: View {
                     editCategoryTarget = nil
                 }
             )
+            .id(target.id)
             .presentationDetents([.large])
             .presentationDragIndicator(.visible)
         }
@@ -1642,14 +1662,36 @@ struct RecordingsView: View {
                         )
                     }
                 }
-            } else if folders.isEmpty && videoImportProgressState == nil {
+            } else if store.recordings.isEmpty && videoImportProgressState == nil {
                 EmptyStateView(icon: "folder", titleResource: L10n.Recordings.noRecordings)
                     .frame(maxWidth: .infinity, minHeight: 320)
                     .listRowSeparator(.hidden)
                     .listRowBackground(Color.clear)
             } else {
-                ForEach(folders) { folder in
-                    categoryFolderRow(folder)
+                categoryFilterStrip(folders)
+                    .listRowSeparator(.hidden)
+                    .listRowBackground(Color.clear)
+                    .listRowInsets(EdgeInsets(top: 4, leading: 0, bottom: 8, trailing: 0))
+
+                if rootFilteredRecordings.isEmpty {
+                    EmptyStateView(icon: "waveform", titleResource: L10n.Recordings.noRecordings)
+                        .frame(maxWidth: .infinity, minHeight: 280)
+                        .listRowSeparator(.hidden)
+                        .listRowBackground(Color.clear)
+                } else {
+                    ForEach(rootRecordingDateSections) { section in
+                        Section {
+                            ForEach(section.recordings) { item in
+                                searchResultRecordingRow(item, searchMatch: nil)
+                            }
+                        } header: {
+                            Text(section.title)
+                                .font(.redditSans(.subheadline, weight: .bold))
+                                .foregroundStyle(.primary)
+                                .textCase(nil)
+                                .padding(.top, 4)
+                        }
+                    }
                 }
             }
         }
@@ -1661,6 +1703,97 @@ struct RecordingsView: View {
         .safeAreaInset(edge: .bottom) {
             Color.clear.frame(height: 8)
         }
+        .onChange(of: folders.map(\.id)) { _, availableCategoryIDs in
+            guard let selectedRootCategoryID,
+                  !availableCategoryIDs.contains(selectedRootCategoryID) else {
+                return
+            }
+            self.selectedRootCategoryID = nil
+        }
+    }
+
+    private func categoryFilterStrip(_ folders: [RecordingCategoryFolder]) -> some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: 8) {
+                categoryFilterChip(
+                    title: localized(L10n.Recordings.allCategories),
+                    systemImage: "square.grid.2x2",
+                    tint: AppTheme.brand,
+                    isSelected: selectedRootCategoryID == nil
+                ) {
+                    selectedRootCategoryID = nil
+                }
+
+                ForEach(folders) { folder in
+                    categoryFilterChip(
+                        title: folder.name,
+                        systemImage: folder.isUncategorized ? "tray" : folder.appearance.iconName,
+                        tint: folder.isUncategorized ? Color.secondary : folder.appearance.color,
+                        isSelected: selectedRootCategoryID == folder.id,
+                        onLongPress: folder.isUncategorized ? nil : {
+                            guard let currentFolder = categoryFolder(for: folder.id) else {
+                                return
+                            }
+                            beginEditCategory(currentFolder)
+                        }
+                    ) {
+                        selectedRootCategoryID = folder.id
+                    }
+                }
+            }
+            .padding(.horizontal, 16)
+        }
+        .scrollClipDisabled()
+        .accessibilityLabel(Text(L10n.Recordings.categoryFilter))
+    }
+
+    private func categoryFilterChip(
+        title: String,
+        systemImage: String,
+        tint: Color,
+        isSelected: Bool,
+        onLongPress: (() -> Void)? = nil,
+        action: @escaping () -> Void
+    ) -> some View {
+        Button {
+            HapticFeedback.play(.menuSelection)
+            withAnimation(
+                accessibilityReduceMotion
+                    ? nil
+                    : .snappy(duration: 0.22, extraBounce: 0)
+            ) {
+                action()
+            }
+        } label: {
+            HStack(spacing: 6) {
+                Image(systemName: systemImage)
+                    .font(.system(size: 12, weight: .semibold))
+
+                Text(title)
+                    .font(.redditSans(.caption, weight: .semibold))
+                    .lineLimit(1)
+            }
+            .foregroundStyle(isSelected ? tint : Color.secondary)
+            .padding(.horizontal, 11)
+            .frame(height: 34)
+            .background(
+                isSelected ? tint.opacity(0.12) : AppTheme.cardBackground,
+                in: Capsule()
+            )
+            .overlay {
+                Capsule()
+                    .stroke(
+                        isSelected ? tint.opacity(0.32) : AppTheme.cardBorder,
+                        lineWidth: 1
+                    )
+            }
+            .contentShape(Capsule())
+        }
+        .buttonStyle(RecordingLibraryFilterButtonStyle())
+        .onLongPressGesture(minimumDuration: 0.42, maximumDistance: 14) {
+            onLongPress?()
+        }
+        .accessibilityAddTraits(isSelected ? .isSelected : [])
     }
 
     @ToolbarContentBuilder
@@ -1716,6 +1849,39 @@ struct RecordingsView: View {
                 beginNewCategory()
             } label: {
                 Label(localized(L10n.Recordings.newCategory), systemImage: "folder.badge.plus")
+            }
+
+            let editableFolders = categoryFolders.filter { !$0.isUncategorized }
+            if !editableFolders.isEmpty {
+                Menu {
+                    ForEach(editableFolders) { folder in
+                        Button {
+                            beginEditCategory(folder)
+                        } label: {
+                            Label(folder.name, systemImage: folder.appearance.iconName)
+                        }
+                    }
+                } label: {
+                    Label(
+                        localized(L10n.Recordings.modifyCategory),
+                        systemImage: "paintpalette"
+                    )
+                }
+
+                Menu {
+                    ForEach(editableFolders) { folder in
+                        Button(role: .destructive) {
+                            requestDeleteCategory(folder)
+                        } label: {
+                            Label(folder.name, systemImage: "trash")
+                        }
+                    }
+                } label: {
+                    Label(
+                        localized(L10n.Recordings.deleteCategory),
+                        systemImage: "trash"
+                    )
+                }
             }
 
             Button {
@@ -2543,6 +2709,85 @@ private struct RecordingCategoryFolder: Identifiable, Hashable {
 private enum RecordingNavigationDestination: Hashable {
     case category(String)
     case recording(RecordingItem.ID, transcriptLineID: StoredTranscriptLine.ID?)
+}
+
+private struct RecordingDateSection: Identifiable {
+    enum Kind: Int, Hashable {
+        case today
+        case yesterday
+        case thisWeek
+        case earlier
+    }
+
+    let kind: Kind
+    let title: String
+    let recordings: [RecordingItem]
+
+    var id: Kind {
+        kind
+    }
+
+    static func grouped(
+        _ recordings: [RecordingItem],
+        now: Date = Date(),
+        calendar: Calendar = .current
+    ) -> [RecordingDateSection] {
+        var today: [RecordingItem] = []
+        var yesterday: [RecordingItem] = []
+        var thisWeek: [RecordingItem] = []
+        var earlier: [RecordingItem] = []
+        let weekInterval = calendar.dateInterval(of: .weekOfYear, for: now)
+
+        for recording in recordings.sorted(by: { $0.createdAt > $1.createdAt }) {
+            if calendar.isDateInToday(recording.createdAt) {
+                today.append(recording)
+            } else if calendar.isDateInYesterday(recording.createdAt) {
+                yesterday.append(recording)
+            } else if weekInterval?.contains(recording.createdAt) == true {
+                thisWeek.append(recording)
+            } else {
+                earlier.append(recording)
+            }
+        }
+
+        return [
+            RecordingDateSection(
+                kind: .today,
+                title: localized(L10n.Recordings.today),
+                recordings: today
+            ),
+            RecordingDateSection(
+                kind: .yesterday,
+                title: localized(L10n.Recordings.yesterday),
+                recordings: yesterday
+            ),
+            RecordingDateSection(
+                kind: .thisWeek,
+                title: localized(L10n.Recordings.thisWeek),
+                recordings: thisWeek
+            ),
+            RecordingDateSection(
+                kind: .earlier,
+                title: localized(L10n.Recordings.earlier),
+                recordings: earlier
+            )
+        ]
+        .filter { !$0.recordings.isEmpty }
+    }
+}
+
+private struct RecordingLibraryFilterButtonStyle: ButtonStyle {
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .scaleEffect(configuration.isPressed && !reduceMotion ? 0.97 : 1)
+            .opacity(configuration.isPressed ? 0.82 : 1)
+            .animation(
+                reduceMotion ? nil : .snappy(duration: 0.12, extraBounce: 0),
+                value: configuration.isPressed
+            )
+    }
 }
 
 private extension Array where Element == RecordingNavigationDestination {
@@ -3516,6 +3761,13 @@ private struct RecordingTranscriptSearchMatchView: View {
 }
 
 private struct RecordingRow: View {
+    private struct TopicEdgeFade: Equatable {
+        var leading: CGFloat = 0
+        var trailing: CGFloat = 0
+    }
+
+    @State private var topicEdgeFade = TopicEdgeFade()
+
     let item: RecordingItem
     let isAnalyzing: Bool
     let canGenerateIntelligence: Bool
@@ -3525,21 +3777,31 @@ private struct RecordingRow: View {
     let onTerminateTranscription: () -> Void
     let onOpen: () -> Void
 
+    private static let topicEdgeFadeWidth: CGFloat = 14
+
     private var isTranscriptionRunning: Bool {
         item.importStatus?.isFailed == false
     }
 
+    private var previewText: String? {
+        if let summary = item.singleLineSummary, !summary.isEmpty {
+            return summary
+        }
+        let transcript = item.transcriptPreview.trimmingCharacters(in: .whitespacesAndNewlines)
+        return transcript.isEmpty ? nil : transcript
+    }
+
     var body: some View {
-        VStack(alignment: .leading, spacing: 11) {
+        VStack(alignment: .leading, spacing: 10) {
             HStack(alignment: .top, spacing: 10) {
                 ZStack {
-                    RoundedRectangle(cornerRadius: AppTheme.compactCornerRadius, style: .continuous)
-                        .fill(AppTheme.brand.opacity(0.12))
+                    RoundedRectangle(cornerRadius: 12, style: .continuous)
+                        .fill(AppTheme.brand.opacity(0.10))
                     Image(systemName: "waveform")
                         .font(.system(size: 17, weight: .semibold))
                         .foregroundStyle(AppTheme.brand)
                 }
-                .frame(width: 36, height: 36)
+                .frame(width: 40, height: 40)
                 .padding(.top, 1)
 
                 VStack(alignment: .leading, spacing: 4) {
@@ -3559,12 +3821,6 @@ private struct RecordingRow: View {
                 Spacer(minLength: 8)
 
                 trailingStatus
-            }
-
-            RecordingMetadataStrip(item: item)
-
-            if !item.combinedTags.isEmpty {
-                FlowTags(tags: Array(item.combinedTags.prefix(4)))
             }
 
             if let importStatus = item.importStatus {
@@ -3594,15 +3850,15 @@ private struct RecordingRow: View {
                 Label(localized(L10n.Recordings.analyzing), systemImage: "sparkles")
                     .font(.redditSans(.caption, weight: .semibold))
                     .foregroundStyle(AppTheme.info)
-            } else if let intelligence = item.intelligence {
-                RecordingIntelligencePreview(intelligence: intelligence)
-            } else if !item.transcriptPreview.isEmpty {
-                Text(item.transcriptPreview)
+            } else if let previewText {
+                Text(previewText)
                     .font(.redditSans(.subheadline))
                     .foregroundStyle(.primary)
                     .lineLimit(2)
                     .fixedSize(horizontal: false, vertical: true)
             }
+
+            compactTopicStrip
         }
         .padding(14)
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -3614,7 +3870,7 @@ private struct RecordingRow: View {
         .background(AppTheme.cardBackground)
         .overlay {
             RoundedRectangle(cornerRadius: AppTheme.cornerRadius, style: .continuous)
-                .stroke(AppTheme.cardBorder, lineWidth: 1)
+                .stroke(AppTheme.subtleBorder, lineWidth: 1)
         }
         .clipShape(RoundedRectangle(cornerRadius: AppTheme.cornerRadius, style: .continuous))
         .shadow(
@@ -3622,6 +3878,90 @@ private struct RecordingRow: View {
             radius: AppTheme.cardShadowRadius,
             y: AppTheme.cardShadowYOffset
         )
+    }
+
+    @ViewBuilder
+    private var compactTopicStrip: some View {
+        let visibleTags = Array(item.combinedTags.prefix(2))
+        let remainingTagCount = max(item.combinedTags.count - visibleTags.count, 0)
+
+        if item.categoryName != nil || !visibleTags.isEmpty || item.location != nil {
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 6) {
+                    if let categoryName = item.categoryName {
+                        let appearance = RecordingCategoryAppearanceCatalog.appearance(for: categoryName)
+                        RecordingCompactTopicChip(
+                            systemImage: appearance.iconName,
+                            text: categoryName,
+                            tint: appearance.color
+                        )
+                    }
+
+                    if let location = item.location {
+                        RecordingCompactLocationChip(location: location)
+                    }
+
+                    ForEach(visibleTags, id: \.self) { tag in
+                        RecordingCompactTopicChip(
+                            systemImage: nil,
+                            text: tag,
+                            tint: AppTheme.info
+                        )
+                    }
+
+                    if remainingTagCount > 0 {
+                        Text("+\(remainingTagCount)")
+                            .font(.redditSans(.caption2, weight: .semibold).monospacedDigit())
+                            .foregroundStyle(.secondary)
+                            .padding(.horizontal, 8)
+                            .frame(height: 22)
+                            .background(Color.secondary.opacity(0.09), in: Capsule())
+                    }
+                }
+            }
+            .onScrollGeometryChange(for: TopicEdgeFade.self) { geometry in
+                let leadingOffset = max(geometry.visibleRect.minX, 0)
+                let trailingOffset = max(
+                    geometry.contentSize.width - geometry.visibleRect.maxX,
+                    0
+                )
+
+                return TopicEdgeFade(
+                    leading: min(leadingOffset / Self.topicEdgeFadeWidth, 1),
+                    trailing: min(trailingOffset / Self.topicEdgeFadeWidth, 1)
+                )
+            } action: { _, newValue in
+                topicEdgeFade = newValue
+            }
+            .mask {
+                HStack(spacing: 0) {
+                    LinearGradient(
+                        colors: [
+                            Color.black.opacity(1 - Double(topicEdgeFade.leading)),
+                            .black
+                        ],
+                        startPoint: .leading,
+                        endPoint: .trailing
+                    )
+                    .frame(width: Self.topicEdgeFadeWidth)
+
+                    Rectangle()
+                        .fill(.black)
+
+                    LinearGradient(
+                        colors: [
+                            .black,
+                            Color.black.opacity(1 - Double(topicEdgeFade.trailing))
+                        ],
+                        startPoint: .leading,
+                        endPoint: .trailing
+                    )
+                    .frame(width: Self.topicEdgeFadeWidth)
+                }
+            }
+            .scrollClipDisabled()
+            .frame(maxWidth: .infinity, alignment: .leading)
+        }
     }
 
     @ViewBuilder
@@ -3643,6 +3983,49 @@ private struct RecordingRow: View {
                 .frame(height: 28)
                 .background(Color.secondary.opacity(0.12), in: Capsule())
         }
+    }
+}
+
+private struct RecordingCompactLocationChip: View {
+    let location: RecordingLocation
+
+    var body: some View {
+        HStack(spacing: 4) {
+            Image(systemName: "mappin.and.ellipse")
+                .font(.system(size: 10, weight: .semibold))
+
+            RecordingLocationNameText(location: location)
+                .font(.redditSans(.caption2, weight: .semibold))
+                .lineLimit(1)
+        }
+        .foregroundStyle(AppTheme.success)
+        .padding(.horizontal, 8)
+        .frame(height: 22)
+        .background(AppTheme.success.opacity(0.10), in: Capsule())
+        .accessibilityElement(children: .combine)
+    }
+}
+
+private struct RecordingCompactTopicChip: View {
+    let systemImage: String?
+    let text: String
+    let tint: Color
+
+    var body: some View {
+        HStack(spacing: 4) {
+            if let systemImage {
+                Image(systemName: systemImage)
+                    .font(.system(size: 10, weight: .semibold))
+            }
+
+            Text(text)
+                .font(.redditSans(.caption2, weight: .semibold))
+                .lineLimit(1)
+        }
+        .foregroundStyle(tint)
+        .padding(.horizontal, 8)
+        .frame(height: 22)
+        .background(tint.opacity(0.10), in: Capsule())
     }
 }
 

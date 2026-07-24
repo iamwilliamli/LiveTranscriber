@@ -2791,6 +2791,7 @@ final class RecordingStore: ObservableObject {
         recordings.removeAll { $0.id == item.id }
         inferredRecordingIDs.remove(item.id)
         searchIndexCache[item.id] = nil
+        RecordingPlaybackHistoryStore.remove(recordingID: item.id)
         publishHomeWidgetSnapshot()
         do {
             try deletePersistedRecording(id: item.id)
