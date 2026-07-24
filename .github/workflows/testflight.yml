@@ -1,0 +1,159 @@
+name: Upload iOS to TestFlight
+
+on:
+  workflow_dispatch:
+    inputs:
+      build_number:
+        description: Optional App Store build number (leave empty to use 1000 + workflow run number)
+        required: false
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: testflight-production
+  cancel-in-progress: false
+
+jobs:
+  upload:
+    name: Archive and upload
+    runs-on: macos-26
+    timeout-minutes: 90
+    environment: app-store-production
+
+    env:
+      DEVELOPER_DIR: /Applications/Xcode.app/Contents/Developer
+      ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+      ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+      ASC_PRIVATE_KEY_BASE64: ${{ secrets.ASC_PRIVATE_KEY_BASE64 }}
+      REQUESTED_BUILD_NUMBER: ${{ inputs.build_number }}
+      ARCHIVE_PATH: ${{ runner.temp }}/LiveTranscriber.xcarchive
+      EXPORT_PATH: ${{ runner.temp }}/LiveTranscriberExport
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+          lfs: true
+
+      - name: Report toolchain
+        run: xcodebuild -version
+
+      - name: Validate App Store Connect credentials
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          missing=()
+          for variable in ASC_KEY_ID ASC_ISSUER_ID ASC_PRIVATE_KEY_BASE64; do
+            if [[ -z "${!variable:-}" ]]; then
+              missing+=("${variable}")
+            fi
+          done
+
+          if (( ${#missing[@]} > 0 )); then
+            echo "::error::Missing app-store-production environment secrets: ${missing[*]}"
+            exit 1
+          fi
+
+      - name: Install App Store Connect API key
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          key_directory="${RUNNER_TEMP}/app-store-connect"
+          key_path="${key_directory}/AuthKey_${ASC_KEY_ID}.p8"
+          mkdir -p "${key_directory}"
+          printf '%s' "${ASC_PRIVATE_KEY_BASE64}" | /usr/bin/base64 -D > "${key_path}"
+          chmod 600 "${key_path}"
+
+          if ! /usr/bin/grep -q -- "BEGIN PRIVATE KEY" "${key_path}"; then
+            echo "::error::ASC_PRIVATE_KEY_BASE64 did not decode to an App Store Connect .p8 key."
+            exit 1
+          fi
+
+          echo "ASC_KEY_PATH=${key_path}" >> "${GITHUB_ENV}"
+
+      - name: Select build number
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          if [[ -n "${REQUESTED_BUILD_NUMBER}" ]]; then
+            if [[ ! "${REQUESTED_BUILD_NUMBER}" =~ ^[1-9][0-9]*$ ]]; then
+              echo "::error::build_number must be a positive integer."
+              exit 1
+            fi
+            build_number="${REQUESTED_BUILD_NUMBER}"
+          else
+            build_number="$((1000 + GITHUB_RUN_NUMBER))"
+          fi
+
+          echo "APP_BUILD_NUMBER=${build_number}" >> "${GITHUB_ENV}"
+          echo "Using App Store build number ${build_number}"
+
+      - name: Archive iOS app
+        run: |
+          set -euo pipefail
+
+          xcodebuild archive \
+            -project LiveTranscriber.xcodeproj \
+            -scheme LiveTranscriber \
+            -configuration Release \
+            -destination 'generic/platform=iOS' \
+            -archivePath "${ARCHIVE_PATH}" \
+            -skipPackagePluginValidation \
+            -allowProvisioningUpdates \
+            -authenticationKeyPath "${ASC_KEY_PATH}" \
+            -authenticationKeyID "${ASC_KEY_ID}" \
+            -authenticationKeyIssuerID "${ASC_ISSUER_ID}" \
+            DEVELOPMENT_TEAM=F8M4T754W4 \
+            CURRENT_PROJECT_VERSION="${APP_BUILD_NUMBER}"
+
+      - name: Validate archive
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          app_path="${ARCHIVE_PATH}/Products/Applications/LiveTranscriber.app"
+          if [[ ! -d "${app_path}" ]]; then
+            echo "::error::Archive does not contain LiveTranscriber.app."
+            exit 1
+          fi
+
+          archived_build_number="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleVersion' "${app_path}/Info.plist")"
+          if [[ "${archived_build_number}" != "${APP_BUILD_NUMBER}" ]]; then
+            echo "::error::Archived build number ${archived_build_number} does not match ${APP_BUILD_NUMBER}."
+            exit 1
+          fi
+
+          /usr/bin/codesign --verify --deep --strict --verbose=2 "${app_path}"
+
+      - name: Upload archive to TestFlight
+        run: |
+          set -euo pipefail
+
+          xcodebuild -exportArchive \
+            -archivePath "${ARCHIVE_PATH}" \
+            -exportPath "${EXPORT_PATH}" \
+            -exportOptionsPlist .github/ExportOptions-TestFlight.plist \
+            -allowProvisioningUpdates \
+            -authenticationKeyPath "${ASC_KEY_PATH}" \
+            -authenticationKeyID "${ASC_KEY_ID}" \
+            -authenticationKeyIssuerID "${ASC_ISSUER_ID}"
+
+      - name: Write job summary
+        if: success()
+        shell: bash
+        run: |
+          {
+            echo "## TestFlight upload completed"
+            echo
+            echo "- App: LiveTranscriber"
+            echo "- Build: ${APP_BUILD_NUMBER}"
+            echo "- Commit: \`${GITHUB_SHA}\`"
+            echo
+            echo "Apple may need several minutes to finish processing the build in App Store Connect."
+          } >> "${GITHUB_STEP_SUMMARY}"
