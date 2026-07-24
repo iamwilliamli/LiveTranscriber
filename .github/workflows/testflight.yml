@@ -28,8 +28,6 @@ jobs:
       ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
       ASC_PRIVATE_KEY_BASE64: ${{ secrets.ASC_PRIVATE_KEY_BASE64 }}
       REQUESTED_BUILD_NUMBER: ${{ inputs.build_number }}
-      ARCHIVE_PATH: ${{ runner.temp }}/LiveTranscriber.xcarchive
-      EXPORT_PATH: ${{ runner.temp }}/LiveTranscriberExport
 
     steps:
       - name: Check out repository
@@ -75,6 +73,8 @@ jobs:
           fi
 
           echo "ASC_KEY_PATH=${key_path}" >> "${GITHUB_ENV}"
+          echo "ARCHIVE_PATH=${RUNNER_TEMP}/LiveTranscriber.xcarchive" >> "${GITHUB_ENV}"
+          echo "EXPORT_PATH=${RUNNER_TEMP}/LiveTranscriberExport" >> "${GITHUB_ENV}"
 
       - name: Select build number
         shell: bash
