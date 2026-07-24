@@ -1219,6 +1219,83 @@ struct RecordingsView: View {
         !normalizedSearchText(searchText).isEmpty
     }
 
+    private var isSpeechLocaleReleaseAlertPresented: Binding<Bool> {
+        Binding<Bool>(
+            get: { pendingSpeechLocaleReleaseAction != nil },
+            set: { isPresented in
+                if !isPresented {
+                    pendingSpeechLocaleReleaseAction = nil
+                }
+            }
+        )
+    }
+
+    private var isAnalysisErrorAlertPresented: Binding<Bool> {
+        Binding<Bool>(
+            get: { analysisErrorMessage != nil },
+            set: { isPresented in
+                if !isPresented {
+                    analysisErrorMessage = nil
+                }
+            }
+        )
+    }
+
+    private var isImportErrorAlertPresented: Binding<Bool> {
+        Binding<Bool>(
+            get: { importErrorMessage != nil },
+            set: { isPresented in
+                if !isPresented {
+                    importErrorMessage = nil
+                }
+            }
+        )
+    }
+
+    private var isTranscriptionErrorAlertPresented: Binding<Bool> {
+        Binding<Bool>(
+            get: { transcriptionErrorMessage != nil },
+            set: { isPresented in
+                if !isPresented {
+                    transcriptionErrorMessage = nil
+                }
+            }
+        )
+    }
+
+    private var isDeleteRecordingAlertPresented: Binding<Bool> {
+        Binding<Bool>(
+            get: { deleteRequest != nil },
+            set: { isPresented in
+                if !isPresented {
+                    deleteRequest = nil
+                }
+            }
+        )
+    }
+
+    private var isDeleteCategoryAlertPresented: Binding<Bool> {
+        Binding<Bool>(
+            get: { deleteCategoryTarget != nil },
+            set: { isPresented in
+                if !isPresented {
+                    deleteCategoryTarget = nil
+                }
+            }
+        )
+    }
+
+    private var isDeleteErrorAlertPresented: Binding<Bool> {
+        Binding<Bool>(
+            get: { deleteErrorMessage != nil },
+            set: { isPresented in
+                if !isPresented {
+                    deleteErrorMessage = nil
+                }
+            }
+        )
+    }
+
     var body: some View {
         NavigationStack(path: $navigationPath) {
             recordingsList
@@ -1397,14 +1474,7 @@ struct RecordingsView: View {
         }
         .alert(
             localized(L10n.SpeechText.releaseOldLanguagesTitle),
-            isPresented: Binding(
-                get: { pendingSpeechLocaleReleaseAction != nil },
-                set: { isPresented in
-                    if !isPresented {
-                        pendingSpeechLocaleReleaseAction = nil
-                    }
-                }
-            )
+            isPresented: isSpeechLocaleReleaseAlertPresented
         ) {
             Button(localized(L10n.SpeechText.releaseOldLanguagesAction), role: .destructive) {
                 if let pendingSpeechLocaleReleaseAction {
@@ -1418,14 +1488,7 @@ struct RecordingsView: View {
         }
         .alert(
             localized(L10n.Recordings.analysisFailed),
-            isPresented: Binding(
-                get: { analysisErrorMessage != nil },
-                set: { isPresented in
-                    if !isPresented {
-                        analysisErrorMessage = nil
-                    }
-                }
-            )
+            isPresented: isAnalysisErrorAlertPresented
         ) {
             Button(localized(L10n.Common.ok), role: .cancel) {}
         } message: {
@@ -1433,14 +1496,7 @@ struct RecordingsView: View {
         }
         .alert(
             localized(L10n.Recordings.importFailed),
-            isPresented: Binding(
-                get: { importErrorMessage != nil },
-                set: { isPresented in
-                    if !isPresented {
-                        importErrorMessage = nil
-                    }
-                }
-            )
+            isPresented: isImportErrorAlertPresented
         ) {
             Button(localized(L10n.Common.ok), role: .cancel) {}
         } message: {
@@ -1448,14 +1504,7 @@ struct RecordingsView: View {
         }
         .alert(
             localized(L10n.Recordings.transcriptionFailed),
-            isPresented: Binding(
-                get: { transcriptionErrorMessage != nil },
-                set: { isPresented in
-                    if !isPresented {
-                        transcriptionErrorMessage = nil
-                    }
-                }
-            )
+            isPresented: isTranscriptionErrorAlertPresented
         ) {
             Button(localized(L10n.Common.ok), role: .cancel) {}
         } message: {
@@ -1463,14 +1512,7 @@ struct RecordingsView: View {
         }
         .alert(
             localized(L10n.Recordings.deleteRecording),
-            isPresented: Binding(
-                get: { deleteRequest != nil },
-                set: { isPresented in
-                    if !isPresented {
-                        deleteRequest = nil
-                    }
-                }
-            )
+            isPresented: isDeleteRecordingAlertPresented
         ) {
             Button(localized(L10n.Common.delete), role: .destructive) {
                 if let request = deleteRequest {
@@ -1483,14 +1525,7 @@ struct RecordingsView: View {
         }
         .alert(
             localized(L10n.Recordings.deleteCategory),
-            isPresented: Binding(
-                get: { deleteCategoryTarget != nil },
-                set: { isPresented in
-                    if !isPresented {
-                        deleteCategoryTarget = nil
-                    }
-                }
-            )
+            isPresented: isDeleteCategoryAlertPresented
         ) {
             Button(localized(L10n.Common.delete), role: .destructive) {
                 if let target = deleteCategoryTarget {
@@ -1510,14 +1545,7 @@ struct RecordingsView: View {
         }
         .alert(
             localized(L10n.Recordings.deleteFailed),
-            isPresented: Binding(
-                get: { deleteErrorMessage != nil },
-                set: { isPresented in
-                    if !isPresented {
-                        deleteErrorMessage = nil
-                    }
-                }
-            )
+            isPresented: isDeleteErrorAlertPresented
         ) {
             Button(localized(L10n.Common.ok), role: .cancel) {}
         } message: {
@@ -4316,6 +4344,83 @@ struct RecordingDetailView: View {
         pendingSpeechLocaleReleaseAction?.request.messageText ?? ""
     }
 
+    private var isSpeechLocaleReleaseAlertPresented: Binding<Bool> {
+        Binding<Bool>(
+            get: { pendingSpeechLocaleReleaseAction != nil },
+            set: { isPresented in
+                if !isPresented {
+                    pendingSpeechLocaleReleaseAction = nil
+                }
+            }
+        )
+    }
+
+    private var isAnalysisErrorAlertPresented: Binding<Bool> {
+        Binding<Bool>(
+            get: { analysisErrorMessage != nil },
+            set: { isPresented in
+                if !isPresented {
+                    analysisErrorMessage = nil
+                }
+            }
+        )
+    }
+
+    private var isTranscriptionErrorAlertPresented: Binding<Bool> {
+        Binding<Bool>(
+            get: { transcriptionErrorMessage != nil },
+            set: { isPresented in
+                if !isPresented {
+                    transcriptionErrorMessage = nil
+                }
+            }
+        )
+    }
+
+    private var isExportErrorAlertPresented: Binding<Bool> {
+        Binding<Bool>(
+            get: { exportErrorMessage != nil },
+            set: { isPresented in
+                if !isPresented {
+                    exportErrorMessage = nil
+                }
+            }
+        )
+    }
+
+    private var isDeleteRecordingAlertPresented: Binding<Bool> {
+        Binding<Bool>(
+            get: { deleteRequest != nil },
+            set: { isPresented in
+                if !isPresented {
+                    deleteRequest = nil
+                }
+            }
+        )
+    }
+
+    private var isDeleteErrorAlertPresented: Binding<Bool> {
+        Binding<Bool>(
+            get: { deleteErrorMessage != nil },
+            set: { isPresented in
+                if !isPresented {
+                    deleteErrorMessage = nil
+                }
+            }
+        )
+    }
+
+    private var isEditErrorAlertPresented: Binding<Bool> {
+        Binding<Bool>(
+            get: { editErrorMessage != nil },
+            set: { isPresented in
+                if !isPresented {
+                    editErrorMessage = nil
+                }
+            }
+        )
+    }
+
     @ViewBuilder
     private var reminderAddedBanner: some View {
         if let reminderBannerMessage {
@@ -4721,14 +4826,7 @@ struct RecordingDetailView: View {
         }
         .alert(
             localized(L10n.SpeechText.releaseOldLanguagesTitle),
-            isPresented: Binding(
-                get: { pendingSpeechLocaleReleaseAction != nil },
-                set: { isPresented in
-                    if !isPresented {
-                        pendingSpeechLocaleReleaseAction = nil
-                    }
-                }
-            )
+            isPresented: isSpeechLocaleReleaseAlertPresented
         ) {
             Button(localized(L10n.SpeechText.releaseOldLanguagesAction), role: .destructive) {
                 if let pendingSpeechLocaleReleaseAction {
@@ -4742,14 +4840,7 @@ struct RecordingDetailView: View {
         }
         .alert(
             localized(L10n.Recordings.analysisFailed),
-            isPresented: Binding(
-                get: { analysisErrorMessage != nil },
-                set: { isPresented in
-                    if !isPresented {
-                        analysisErrorMessage = nil
-                    }
-                }
-            )
+            isPresented: isAnalysisErrorAlertPresented
         ) {
             Button(localized(L10n.Common.ok), role: .cancel) {}
         } message: {
@@ -4779,14 +4870,7 @@ struct RecordingDetailView: View {
         }
         .alert(
             localized(L10n.Recordings.transcriptionFailed),
-            isPresented: Binding(
-                get: { transcriptionErrorMessage != nil },
-                set: { isPresented in
-                    if !isPresented {
-                        transcriptionErrorMessage = nil
-                    }
-                }
-            )
+            isPresented: isTranscriptionErrorAlertPresented
         ) {
             Button(localized(L10n.Common.ok), role: .cancel) {}
         } message: {
@@ -4794,14 +4878,7 @@ struct RecordingDetailView: View {
         }
         .alert(
             localized(L10n.Recordings.exportFailed),
-            isPresented: Binding(
-                get: { exportErrorMessage != nil },
-                set: { isPresented in
-                    if !isPresented {
-                        exportErrorMessage = nil
-                    }
-                }
-            )
+            isPresented: isExportErrorAlertPresented
         ) {
             Button(localized(L10n.Common.ok), role: .cancel) {}
         } message: {
@@ -4809,14 +4886,7 @@ struct RecordingDetailView: View {
         }
         .alert(
             localized(L10n.Recordings.deleteRecording),
-            isPresented: Binding(
-                get: { deleteRequest != nil },
-                set: { isPresented in
-                    if !isPresented {
-                        deleteRequest = nil
-                    }
-                }
-            )
+            isPresented: isDeleteRecordingAlertPresented
         ) {
             Button(localized(L10n.Common.delete), role: .destructive) {
                 if let request = deleteRequest {
@@ -4830,14 +4900,7 @@ struct RecordingDetailView: View {
         }
         .alert(
             localized(L10n.Recordings.deleteFailed),
-            isPresented: Binding(
-                get: { deleteErrorMessage != nil },
-                set: { isPresented in
-                    if !isPresented {
-                        deleteErrorMessage = nil
-                    }
-                }
-            )
+            isPresented: isDeleteErrorAlertPresented
         ) {
             Button(localized(L10n.Common.ok), role: .cancel) {}
         } message: {
@@ -4845,14 +4908,7 @@ struct RecordingDetailView: View {
         }
         .alert(
             localized(L10n.Recordings.editFailed),
-            isPresented: Binding(
-                get: { editErrorMessage != nil },
-                set: { isPresented in
-                    if !isPresented {
-                        editErrorMessage = nil
-                    }
-                }
-            )
+            isPresented: isEditErrorAlertPresented
         ) {
             Button(localized(L10n.Common.ok), role: .cancel) {}
         } message: {

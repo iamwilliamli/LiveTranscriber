@@ -4361,6 +4361,7 @@ final class RecordingStore: ObservableObject {
     }
 
     private func publishHomeWidgetSnapshot() {
+#if os(iOS)
         let recentRecordings = recordings
             .sorted { $0.createdAt > $1.createdAt }
             .prefix(3)
@@ -4381,6 +4382,7 @@ final class RecordingStore: ObservableObject {
                 recentRecordings: Array(recentRecordings)
             )
         )
+#endif
     }
 
     private func pruneSearchIndexCache() {
