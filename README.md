@@ -6,6 +6,7 @@
 
 <p align="center">
   <a href="README.zh-CN.md">简体中文</a> · <strong>English</strong> ·
+  <a href="https://apps.apple.com/app/id6785515364">App Store</a> ·
   <a href="https://testflight.apple.com/join/gsu9xa9k">TestFlight Beta</a>
 </p>
 
@@ -16,7 +17,10 @@
   <img alt="License" src="https://img.shields.io/badge/license-source--available-orange">
 </p>
 
-LiveTranscriber is a local-first iOS recording app built around one workflow: record on your iPhone, read the transcript as it appears, translate the text while recording, then turn saved audio into searchable notes with local transcription, summaries, and tags.
+> [!NOTE]
+> This is the public showcase and stable foundation for the App Store version of LiveTranscriber. Active product development and release automation continue privately. Issues and support remain available here.
+
+LiveTranscriber is a local-first iOS recording app built around one workflow: record on your iPhone, read the transcript as it appears, translate the text while recording, then turn saved audio into searchable notes with local transcription, summaries, and tags. This repository preserves the stable, runnable public foundation of the product.
 
 It uses Apple Speech for the default live transcription path, supports optional Local Whisper for offline high-accuracy re-transcription, and can generate summaries and topic tags with Apple Intelligence or a downloaded Qwen3 1.7B Q4 GGUF model through embedded llama.cpp. This makes it useful on devices where Apple Intelligence is unavailable, including China-region iPhones and other unsupported configurations.
 
@@ -222,6 +226,7 @@ For device testing, open `LiveTranscriber.xcodeproj` in Xcode and use a signing 
 
 ## Community
 
+- [Download on the App Store](https://apps.apple.com/app/id6785515364)
 - [TestFlight Beta](https://testflight.apple.com/join/gsu9xa9k)
 - [Contributing Guide](CONTRIBUTING.md)
 - [Code of Conduct](CODE_OF_CONDUCT.md)
@@ -231,7 +236,7 @@ For device testing, open `LiveTranscriber.xcodeproj` in Xcode and use a signing 
 
 ## Source Availability and Commercial Attribution
 
-LiveTranscriber is source-available under the [LiveTranscriber Source Available License 1.0](LICENSE). The code is public so people can learn from it, fork it, and continue development.
+The public LiveTranscriber foundation is source-available under the [LiveTranscriber Source Available License 1.0](LICENSE). The code is available so people can study it, fork it, and build on the published baseline.
 
 This is not an OSI-approved open-source license because commercial forks have an attribution requirement. Commercial apps, services, forks, or derivative products based on this project must include visible in-app attribution:
 

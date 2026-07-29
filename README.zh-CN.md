@@ -6,6 +6,7 @@
 
 <p align="center">
   <strong>简体中文</strong> · <a href="README.md">English</a> ·
+  <a href="https://apps.apple.com/app/id6785515364">App Store</a> ·
   <a href="https://testflight.apple.com/join/gsu9xa9k">TestFlight 测试版</a>
 </p>
 
@@ -16,7 +17,10 @@
   <img alt="License" src="https://img.shields.io/badge/license-source--available-orange">
 </p>
 
-LiveTranscriber 是一个 iPhone 录音转写工具。它的核心目标很直接：一边录音一边转录，转录文字可以在录音过程中实时翻译；录完以后，可以用本地 Whisper 做更高精度的离线重转录，也可以用本地 Qwen3 在手机上总结、打标签，最后通过搜索快速找回内容。
+> [!NOTE]
+> 这是 LiveTranscriber App Store 版本的公开展示仓库和稳定基础版本。后续产品开发与发布自动化将在私有仓库中进行；Issue 和用户支持仍保留在这里。
+
+LiveTranscriber 是一个 iPhone 录音转写工具。它的核心目标很直接：一边录音一边转录，转录文字可以在录音过程中实时翻译；录完以后，可以用本地 Whisper 做更高精度的离线重转录，也可以用本地 Qwen3 在手机上总结、打标签，最后通过搜索快速找回内容。这个仓库保留产品稳定、可运行的公开基础。
 
 录音、转写、摘要、标签、回放和搜索都优先在本机完成；如果设备支持 Apple Intelligence，可以用系统模型总结；如果设备没有 Apple Intelligence，也可以下载 Qwen3 1.7B Q4 GGUF 模型，在手机上生成摘要和标签。这个设计对国行 iPhone 和其他无法使用 Apple Intelligence 的设备更友好。
 
@@ -200,6 +204,7 @@ LiveTranscriber 默认按本地优先设计。
 
 ## 试用和反馈
 
+- [在 App Store 下载](https://apps.apple.com/app/id6785515364)
 - [TestFlight Beta](https://testflight.apple.com/join/gsu9xa9k)
 - [Contributing Guide](CONTRIBUTING.md)
 - [Code of Conduct](CODE_OF_CONDUCT.md)
@@ -209,7 +214,7 @@ LiveTranscriber 默认按本地优先设计。
 
 ## 授权和商业署名
 
-LiveTranscriber 使用 [LiveTranscriber Source Available License 1.0](LICENSE)。代码公开，方便学习、fork 和继续开发。
+LiveTranscriber 的公开基础版本使用 [LiveTranscriber Source Available License 1.0](LICENSE)。代码可供学习、fork，并可在已发布的基础版本上继续构建。
 
 这不是 OSI 认证的开源许可证，因为商业 fork 有署名要求。任何基于本项目的商业 app、服务、fork 或衍生产品，都必须在 app 内合理可见的位置展示：
 
