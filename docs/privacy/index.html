@@ -25,7 +25,7 @@
 <main>
   <header>
     <h1>Live Transcriber<br>Privacy Policy</h1>
-    <p class="meta">Effective October 2, 2026 · 中文版本见下方</p>
+    <p class="meta">Effective October 12, 2026 · 中文版本见下方</p>
   </header>
 
   <p class="notice">Live Transcriber is local-first. Recordings and transcripts stay in the app's private storage on your device by default. We do not operate a backend that receives your recordings.</p>
@@ -67,8 +67,8 @@
   <p>Eligible TestFlight builds automatically send performance and failure reports to our servers to improve reliability and transcription. Reports may include app, system, device, and diagnostic information, plus reviewed model families, usage counts, operation outcomes, bounded processing times, audio duration for real-time factor, and thermal state. They do not include user content (such as recordings, transcripts, prompts, or model output), account or purchase identifiers, API keys, raw model paths, or stable device identifiers. This reporting has no in-app off switch and stops when you leave TestFlight or use the App Store version. Raw reports are kept for up to 30 days, and aggregated trends for up to 13 months.</p>
 
   <h2>Analytics, advertising, and tracking</h2>
-  <p>This usage analytics integration begins with TestFlight 1.2.5 (2020). Earlier App Store versions do not include it; the same default and opt-out apply when an App Store version includes this integration.</p>
-  <p>In the iPhone/iPad app, usage analytics is on by default in both App Store and TestFlight versions. You can turn off Share Usage Analytics in Settings → Privacy. We send PostHog US Cloud a limited set of app launches, foreground/background transitions, selected tabs, onboarding completion, and recording attempt/start/end outcomes, with event timestamps, app version/build, distribution channel, and a random app-specific analytics identifier. This identifier is separate from purchase and account identifiers; we do not identify you to PostHog or link it to website visits. No audio, transcript, summary, prompt, recording title, filename, or recording identifier is sent. There is no screen recording, automatic interaction capture, advertising, or cross-app tracking. IP-based geolocation is disabled; like any network service, PostHog receives the connection's IP address. PostHog processes data under its <a href="https://posthog.com/privacy">privacy policy</a> and the project's retention settings.</p>
+  <p>This usage analytics integration begins with TestFlight 1.2.5 (2020). Earlier App Store versions do not include it. Early TestFlight 1.2.5 builds turned it on by default; current versions keep it off until you turn it on. Updating from one of those builds turns it off and removes the local analytics identifier, unless you had already turned it back on yourself in Settings.</p>
+  <p>In the iPhone/iPad app, usage analytics is off by default in both App Store and TestFlight versions. You can turn on Share Usage Analytics in Settings → Privacy to help us improve the app's AI models and optimize them for different iPhone and iPad models. Only while it is on, we send PostHog US Cloud a limited set of app launches, foreground/background transitions, selected tabs, onboarding completion, and recording attempt/start/end outcomes, with event timestamps, app version/build, distribution channel, device model (a hardware model name such as “iPhone17,1”, not a device identifier), and a random app-specific analytics identifier. This identifier is separate from purchase and account identifiers; we do not identify you to PostHog or link it to website visits. No audio, transcript, summary, prompt, recording title, filename, or recording identifier is sent. There is no screen recording, automatic interaction capture, advertising, or cross-app tracking. IP-based geolocation is disabled; like any network service, PostHog receives the connection's IP address. PostHog processes data under its <a href="https://posthog.com/privacy">privacy policy</a> and the project's retention settings.</p>
   <p>Turning off analytics cancels active requests, discards pending events, and removes the local analytics identifier. It remains off after relaunch. Turning it on creates a new identifier and does not send events from the disabled period. Events already received cannot be recalled by the switch. Pending events are held only in a bounded memory queue and are lost when the app exits. This switch does not change the separate TestFlight optimization diagnostics or RevenueCat purchase services described above. The native macOS app does not use this PostHog integration.</p>
 
   <h2>Retention and deletion</h2>
@@ -86,7 +86,7 @@
   <section class="language" lang="zh-Hans">
     <header>
       <h1>Live Transcriber<br>隐私政策</h1>
-      <p class="meta">生效日期：2026 年 10 月 2 日</p>
+      <p class="meta">生效日期：2026 年 10 月 12 日</p>
     </header>
 
     <p class="notice">Live Transcriber 以本地处理为优先。录音和转录内容默认保存在设备上的 App 私有空间中。我们不运营接收用户录音的开发者后端。</p>
@@ -128,8 +128,8 @@
     <p>符合条件的 TestFlight 版本会自动向我们的服务器发送性能与故障报告，用于改进稳定性和转录体验。报告可能包含 App、系统、设备和诊断信息，以及经审查的模型类别、使用次数、操作结果、受限的处理和音频时长（用于计算实时系数）及温度状态。不包含录音、转录、提示词、模型输出等用户内容，也不包含账户或购买标识符、API Key、原始模型路径或稳定的设备标识符。App 内无法关闭这项报告；退出 TestFlight 或改用 App Store 版本后即停止。原始报告最多保留 30 天，汇总趋势最多保留 13 个月。</p>
 
     <h2>分析、广告与追踪</h2>
-    <p>这项使用统计接入始于 TestFlight 1.2.5（2020）。更早的 App Store 版本不包含它；后续包含这项接入的正式版也采用相同的默认设置和关闭方式。</p>
-    <p>iPhone/iPad App 的正式版和 TestFlight 版本默认开启使用统计，你可以在“设置 → 隐私”中关闭“共享使用统计”。我们向 PostHog 美国云服务发送范围受限的 App 启动、前后台切换、标签页选择、引导完成，以及录音尝试、开始和结束结果，附带事件时间、App 版本与构建号、发行渠道及随机生成的 App 专用统计标识。该标识与购买和账户标识独立；我们不会向 PostHog 识别你的身份或将其与网站访问关联。不发送音频、转录、摘要、提示词、录音标题、文件名或录音标识，也不录制屏幕、自动采集界面内容、投放广告或跨 App 追踪。已关闭基于 IP 的地理位置推断；与其他网络服务一样，PostHog 会收到连接的 IP 地址。PostHog 根据其<a href="https://posthog.com/privacy">隐私政策</a>及项目的数据保留设置处理数据。</p>
+    <p>这项使用统计接入始于 TestFlight 1.2.5（2020）。更早的 App Store 版本不包含它。早期的 TestFlight 1.2.5 构建默认开启；当前版本默认关闭，需由你主动开启。从这些早期构建更新后，统计会被关闭并删除本机统计标识，除非你此前已在设置中自行重新开启。</p>
+    <p>iPhone/iPad App 的正式版和 TestFlight 版本默认关闭使用统计。你可以在“设置 → 隐私”中开启“共享使用统计”，帮助我们改进 App 中的 AI 模型，并针对不同的 iPhone 和 iPad 机型进行优化。仅在开启期间，我们会向 PostHog 美国云服务发送范围受限的 App 启动、前后台切换、标签页选择、引导完成，以及录音尝试、开始和结束结果，附带事件时间、App 版本与构建号、发行渠道、设备型号（如“iPhone17,1”这类硬件型号名称，并非设备标识）及随机生成的 App 专用统计标识。该标识与购买和账户标识独立；我们不会向 PostHog 识别你的身份或将其与网站访问关联。不发送音频、转录、摘要、提示词、录音标题、文件名或录音标识，也不录制屏幕、自动采集界面内容、投放广告或跨 App 追踪。已关闭基于 IP 的地理位置推断；与其他网络服务一样，PostHog 会收到连接的 IP 地址。PostHog 根据其<a href="https://posthog.com/privacy">隐私政策</a>及项目的数据保留设置处理数据。</p>
     <p>关闭统计会取消正在发送的请求、清除待发事件和本机统计标识，重启后仍保持关闭。重新开启会生成新标识，不会补报关闭期间的操作。开关无法撤回服务端已经收到的事件。待发事件仅存于有上限的内存队列，退出 App 后即丢弃。此开关不影响上文所述、独立运行的 TestFlight 优化诊断及 RevenueCat 购买服务。原生 macOS App 不使用这项 PostHog 接入。</p>
 
     <h2>保留与删除</h2>
