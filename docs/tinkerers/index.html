@@ -180,7 +180,7 @@ ul.list li b { color: var(--label); font-weight: 650; }
 .tr-row p { margin: .25rem 0 0; font-size: 1.12rem; line-height: 1.35; color: var(--label); }
 
 /* ---------- 2 lanes ---------- */
-.lanes { display: grid; grid-template-columns: minmax(0, 1fr); gap: 1.1rem; align-content: start; }
+.lanes { display: grid; grid-template-columns: minmax(0, 1fr); gap: .9rem; align-content: start; }
 .lane-head { display: flex; align-items: center; gap: .7rem; margin-bottom: .85rem; }
 .lane-head .budget { margin-left: auto; font-size: .78rem; color: var(--label2); }
 .flow { position: relative; display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; gap: 1.5rem; }
@@ -192,7 +192,7 @@ ul.list li b { color: var(--label); font-weight: 650; }
 .flow .node.opt { background: transparent; box-shadow: inset 0 0 0 1.5px var(--sep); }
 .flow .node:not(:last-child)::after { content: ""; position: absolute; right: -1.08rem; top: 50%; width: .62rem; height: .62rem; border-top: 2px solid var(--label3); border-right: 2px solid var(--label3); transform: translateY(-50%) rotate(45deg); }
 .router-note { display: flex; align-items: center; gap: 1rem; margin-top: .2rem; }
-.router-note .formula { flex: none; }
+.router-note .formula { flex: none; font-size: .84rem; padding: .4em .8em; }
 
 /* ---------- 3 spectrogram ---------- */
 .spec-wrap { display: grid; grid-template-columns: 1.35fr 1fr; grid-template-rows: minmax(0, 1fr); gap: 1.6rem; height: 100%; }
@@ -235,8 +235,8 @@ ul.list li b { color: var(--label); font-weight: 650; }
 .lat-log { font-size: .8rem; color: var(--label); min-height: 1.4em; display: flex; gap: 1rem; }
 .lat-log .txt { flex: 1; }
 .lat-log .cnt { color: var(--label2); white-space: nowrap; }
-.lat-side { display: grid; gap: .9rem; align-content: start; }
-.lat-side .card { padding: .9rem 1.1rem; }
+.lat-side { display: grid; gap: .75rem; align-content: start; }
+.lat-side .card { padding: .8rem 1.05rem; }
 .lat-side .card p { font-size: .8rem; margin-top: .45rem; }
 .lat-side .formula { margin-top: .5rem; font-size: .85rem; }
 .chunks { display: flex; gap: 4px; height: 2rem; overflow: hidden; border-radius: 12px; padding: 4px; background: var(--elev); }
@@ -257,6 +257,7 @@ ul.list li b { color: var(--label); font-weight: 650; }
 .tokens { display: flex; flex-wrap: wrap; gap: .45rem; align-content: flex-start; min-height: 8.2rem; }
 .tok { font-family: var(--mono); font-variant-ligatures: none; font-size: 1rem; padding: .28em .65em; border-radius: 999px; background: var(--elev); transition: opacity .25s, transform .25s, box-shadow .2s; }
 .tok.prompt { background: transparent; box-shadow: inset 0 0 0 1.5px var(--sep); color: var(--label2); }
+.tok.lang { color: var(--info); background: color-mix(in srgb, var(--info) 12%, transparent); }
 .tok.ctl { color: var(--info); background: color-mix(in srgb, var(--info) 12%, transparent); box-shadow: none; }
 .tok.time { color: var(--warning); background: color-mix(in srgb, var(--warning) 14%, transparent); }
 .tok.spk { color: #fff; background: var(--purple); }
@@ -273,12 +274,45 @@ ul.list li b { color: var(--label); font-weight: 650; }
 .prob .v { text-align: right; color: var(--label2); font-size: .85rem; }
 .ar-note { font-size: .86rem; color: var(--label2); margin: .8rem 0 0; }
 
+/* ---------- near-live ---------- */
+.nl-wrap { display: grid; grid-template-columns: 1.35fr 1fr; grid-template-rows: minmax(0, 1fr); gap: 1.6rem; height: 100%; }
+.nl-card { display: flex; flex-direction: column; gap: .75rem; }
+.nl-head { display: flex; align-items: center; gap: .8rem; font-size: .85rem; font-weight: 600; }
+.nl-head .nl-speed { margin-left: auto; font-size: .74rem; font-weight: 500; }
+.nl-win.full { color: var(--warning); }
+.nl-track { position: relative; height: 3.4rem; border-radius: 16px; background: var(--elev); overflow: hidden; }
+.nl-commit { position: absolute; left: 0; top: 0; bottom: 0; width: 0; background: color-mix(in srgb, var(--success) 24%, transparent); }
+.nl-window { position: absolute; top: 7px; bottom: 7px; left: 0; width: 0; border-radius: 11px; box-shadow: inset 0 0 0 2px var(--brand); background: color-mix(in srgb, var(--brand) 7%, transparent); }
+.nl-window.full { box-shadow: inset 0 0 0 2px var(--warning); }
+.nl-window.flash { animation: nlflash .38s ease-out; }
+@keyframes nlflash { from { background: color-mix(in srgb, var(--brand) 32%, transparent); } }
+.nl-now { position: absolute; top: 0; bottom: 0; width: 2px; margin-left: -1px; background: var(--brand); }
+.nl-ticks i { position: absolute; bottom: 9px; width: 2px; height: 12px; margin-left: -1px; border-radius: 1px; background: var(--label3); }
+.nl-ticks i.done { background: var(--success); }
+.nl-axis { display: flex; justify-content: space-between; font-size: .7rem; color: var(--label2); margin-top: -.45rem; }
+.nl-legend { display: flex; gap: .4rem; flex-wrap: wrap; }
+.nl-text { flex: 1; min-height: 0; overflow: hidden; font-size: 1.12rem; line-height: 1.5; }
+.nl-committed { color: var(--label); }
+.nl-draft { color: var(--label3); }
+.nl-facts { display: flex; gap: .4rem; flex-wrap: wrap; }
+.nl-side { display: grid; gap: .9rem; align-content: start; }
+.nl-side .card { padding: .9rem 1.1rem; }
+.nl-side .card p { font-size: .82rem; }
+.nl-side .formula { margin-top: .5rem; font-size: .85rem; }
+.doc .nl-wrap { grid-template-columns: 1fr; grid-template-rows: auto; }
+.doc .nl-wrap > * { min-width: 0; }
+.doc .nl-text { min-height: 8rem; }
+
 /* ---------- 7 diarization ---------- */
+.dia-top { display: flex; align-items: center; gap: .8rem; flex-wrap: wrap; }
+.dia-facts { display: flex; gap: .4rem; flex-wrap: wrap; }
+.dia-desc { min-height: 4.1em; }
+.dia-live .formula { margin-top: .7rem; font-size: .88rem; }
 .dia-wrap { display: grid; grid-template-columns: 1.1fr 1fr; gap: 1.4rem; margin-top: 1.2rem; }
 .heat { display: grid; grid-template-columns: 2.4rem 1fr; gap: .5rem; margin-top: .9rem; }
-.heat .labels { display: grid; grid-template-rows: repeat(4, 1fr); font-size: .78rem; font-weight: 700; align-items: center; }
+.heat .labels { display: grid; grid-template-rows: repeat(var(--rows, 4), 1fr); font-size: .72rem; line-height: 1; font-weight: 700; align-items: center; }
 .heat .labels span { color: var(--c); }
-.heat canvas { width: 100%; height: 9.4rem; border-radius: 14px; image-rendering: pixelated; background: var(--elev); }
+.heat canvas { width: 100%; height: 10rem; border-radius: 14px; image-rendering: pixelated; background: var(--elev); }
 .turns { display: flex; gap: .4rem; flex-wrap: wrap; min-height: 2rem; margin-top: .7rem; }
 .vchain { display: grid; gap: .45rem; margin-top: .8rem; }
 .vchain .v { display: grid; grid-template-columns: 1fr auto; gap: .6rem; align-items: center; padding: .55rem .85rem; border-radius: var(--r-md); background: var(--elev); transition: box-shadow .3s, background .3s; }
@@ -290,7 +324,9 @@ ul.list li b { color: var(--label); font-weight: 650; }
 /* ---------- 8 text ai ---------- */
 .ai-wrap { display: grid; grid-template-columns: 1fr auto 1fr auto 1.1fr; gap: 1rem; align-items: center; margin-top: 1.4rem; }
 .ai-wrap .arr { width: 1.6rem; height: 1.6rem; color: var(--label3); }
-.engines { display: grid; gap: .6rem; }
+.engines { display: grid; gap: .6rem; margin: 0; padding: 0; list-style: none; counter-reset: eng; }
+.engines .engine { position: relative; padding-left: 2.2rem; counter-increment: eng; }
+.engines .engine::before { content: counter(eng); position: absolute; left: .85rem; top: .7rem; font-family: var(--serif); font-weight: 700; color: var(--brand); }
 .engine { padding: .7rem .9rem; border-radius: var(--r-md); background: var(--card); box-shadow: var(--shadow); transition: box-shadow .3s; }
 .engine b { display: block; font-size: .92rem; }
 .engine small { color: var(--label2); font-size: .75rem; }
@@ -304,15 +340,50 @@ ul.list li b { color: var(--label); font-weight: 650; }
 .out .tags .pill { opacity: 0; transition: opacity .3s; }
 .out .tags .pill.show { opacity: 1; }
 
+/* ---------- cloud ---------- */
+.cl-wrap { display: grid; grid-template-columns: 1.15fr 1.15fr .85fr; gap: 1.2rem; align-items: start; }
+.cl-wrap .card { padding: 1rem 1.15rem; }
+.cl-wrap .card p { font-size: .8rem; }
+.cl-api { display: grid; gap: .55rem; margin: .8rem 0 .7rem; }
+.cl-api div { display: grid; grid-template-columns: 7.6rem 1fr; gap: .6rem; align-items: baseline; }
+.cl-api .capsule { justify-self: start; font-family: var(--sans); font-weight: 700; font-size: .72rem; }
+.cl-api small { font-size: .78rem; color: var(--label2); }
+.cl-wrap .formula { font-size: .82rem; }
+.cl-steps { display: grid; gap: .5rem; margin-top: .8rem; counter-reset: st; }
+.cl-steps div { position: relative; padding: .5rem .75rem .5rem 2.1rem; border-radius: var(--r-md); background: var(--elev); counter-increment: st; }
+.cl-steps div::before { content: counter(st); position: absolute; left: .8rem; top: .45rem; font-family: var(--serif); font-weight: 700; color: var(--brand); }
+.cl-steps b { font-size: .86rem; }
+.cl-steps small { display: block; font-size: .76rem; color: var(--label2); }
+.cl-names { font-size: .74rem !important; }
+.cl-side { display: grid; gap: 1rem; }
+
+/* ---------- documents ---------- */
+.dc-wrap { display: grid; grid-template-columns: 1fr .9fr 1.05fr; gap: 1.2rem; margin-top: 1.2rem; align-items: start; }
+.dc-wrap .card { padding: 1rem 1.15rem; }
+.dc-wrap .card p { font-size: .8rem; }
+.dc-skills { display: flex; flex-wrap: wrap; gap: .35rem; margin-top: .7rem; }
+.dc-md { margin: .7rem 0 0; padding: .7rem .85rem; border-radius: 14px; background: var(--elev); font-family: var(--mono); font-size: .74rem; line-height: 1.5; white-space: pre-wrap; color: var(--label); }
+.dc-md .h { color: var(--brand); font-weight: 700; }
+.dc-md .k { color: var(--purple); font-weight: 600; }
+.dc-blocks { display: grid; gap: .4rem; margin-top: .7rem; }
+.dc-blocks div { display: grid; grid-template-columns: 7rem 1fr; gap: .5rem; align-items: center; padding: .4rem .55rem; border-radius: 12px; transition: background .3s, box-shadow .3s; }
+.dc-blocks div.on { background: color-mix(in srgb, var(--info) 9%, var(--card)); box-shadow: inset 0 0 0 1.5px var(--info); }
+.dc-blocks .capsule { justify-self: start; font-family: var(--sans); font-weight: 700; font-size: .7rem; }
+.dc-blocks small { font-size: .78rem; color: var(--label2); }
+.dc-out ul.list { margin-top: .7rem; }
+.dc-out ul.list li { font-size: .8rem; }
+.doc .cl-wrap, .doc .dc-wrap { grid-template-columns: 1fr; }
+.doc .cl-wrap > *, .doc .dc-wrap > * { min-width: 0; }
+
 /* ---------- 9 ship ---------- */
 .ship-wrap { display: grid; grid-template-columns: 1.55fr 1fr; gap: 1.6rem; margin-top: 1.2rem; align-items: start; }
 .ship-wrap .card.tbl { padding: .5rem 0 .3rem; }
-table.models { width: 100%; border-collapse: collapse; font-size: .82rem; }
-table.models th { text-align: left; font-weight: 700; font-size: .64rem; letter-spacing: .06em; text-transform: uppercase; color: var(--label2); padding: .5rem 1.1rem .4rem; }
-table.models td { padding: .42rem 1.1rem; border-top: 1px solid var(--sep); vertical-align: top; }
+table.models { width: 100%; border-collapse: collapse; font-size: .76rem; }
+table.models th { text-align: left; font-weight: 700; font-size: .62rem; letter-spacing: .06em; text-transform: uppercase; color: var(--label2); padding: .45rem .9rem .35rem; }
+table.models td { padding: .3rem .9rem; border-top: 1px solid var(--sep); vertical-align: top; }
 table.models td:first-child { font-weight: 650; white-space: nowrap; }
-table.models td.mono { font-size: .74rem; color: var(--label2); white-space: nowrap; }
-table.models .grp td { padding-top: .65rem; font-size: .66rem; letter-spacing: .06em; color: var(--brand); text-transform: uppercase; font-weight: 700; }
+table.models td.mono { font-size: .7rem; color: var(--label2); white-space: nowrap; }
+table.models .grp td { padding-top: .5rem; font-size: .66rem; letter-spacing: .06em; color: var(--brand); text-transform: uppercase; font-weight: 700; }
 .bignum { display: grid; grid-template-columns: 1fr 1fr; gap: .9rem; }
 .bignum .card b { display: block; font-family: var(--serif); font-size: 2.4rem; line-height: 1; }
 .bignum .card span { display: block; margin-top: .35rem; color: var(--label2); font-size: .8rem; }
@@ -322,10 +393,10 @@ table.models .grp td { padding-top: .65rem; font-size: .66rem; letter-spacing: .
 .phones { display: flex; gap: .9rem; }
 .phones img { width: calc((100% - 3.6rem) / 5); aspect-ratio: 480 / 1040; object-fit: cover; border-radius: 18px; background: #fff; box-shadow: var(--shadow); }
 .phones img:nth-child(odd) { transform: translateY(1.1rem); }
-.feat { display: grid; gap: .7rem; }
-.feat div { display: grid; grid-template-columns: 1.5rem 1fr; gap: .55rem; align-items: start; font-size: .92rem; font-weight: 650; }
+.feat { display: grid; gap: .5rem; padding: .95rem 1.15rem; }
+.feat div { display: grid; grid-template-columns: 1.5rem 1fr; gap: .55rem; align-items: start; font-size: .86rem; font-weight: 650; line-height: 1.3; }
 .feat div .ic { margin-top: .1em; }
-.feat div small { display: block; color: var(--label2); font-size: .78rem; font-weight: 400; }
+.feat div small { display: block; color: var(--label2); font-size: .74rem; font-weight: 400; }
 
 /* ---------- 11 demo ---------- */
 .demo-wrap { flex: 1; display: grid; grid-template-columns: 1fr 1fr; gap: 3rem; align-items: center; }
@@ -521,15 +592,15 @@ ol.watch li small { display: block; color: var(--label2); font-size: .82rem; fon
 <section class="slide">
   <div class="eyebrow"><b>01</b> The system</div>
   <h2>Follow live. <mark>Finish offline.</mark></h2>
-  <p class="lede">Two latency budgets mean two different model families, and both run on the phone. Live captions must commit in about a third of a second. The final record can afford full context, timestamps and speaker labels.</p>
+  <p class="lede">Two latency budgets mean two different model families, and both run on the phone. Live captions must keep up chunk by chunk; the final record can afford full context, word timestamps and speaker labels.</p>
   <div class="body lanes">
     <div class="card">
-      <div class="lane-head"><span class="pill" style="--c:var(--danger)"><i></i>Live</span><h3>While you record</h3><span class="budget">≈ 320 ms per step · streaming state</span></div>
+      <div class="lane-head"><span class="pill" style="--c:var(--danger)"><i></i>Live</span><h3>While you record</h3><span class="budget">320 ms or 1,120 ms chunks · streaming state</span></div>
       <div class="flow">
         <div class="node" style="--c:var(--brand)"><div class="role"><svg class="ic"><use href="#i-mic"/></svg>Input</div><b>Mic / system audio</b><small>AVCaptureSession stereo → 16 kHz PCM</small></div>
         <div class="node" style="--c:var(--info)"><div class="role"><svg class="ic"><use href="#i-route"/></svg>Router</div><b>“Automatic”</b><small>picks an engine per language</small></div>
-        <div class="node" style="--c:var(--success)"><div class="role"><svg class="ic"><use href="#i-bolt"/></svg>ASR</div><b>Apple SpeechAnalyzer</b><small>or Nemotron 3.5 streaming RNN‑T</small></div>
-        <div class="node opt" style="--c:var(--purple)"><div class="role"><svg class="ic"><use href="#i-people"/></svg>Optional</div><b>Sortformer</b><small>4‑speaker streaming diarization</small></div>
+        <div class="node" style="--c:var(--success)"><div class="role"><svg class="ic"><use href="#i-bolt"/></svg>ASR</div><b>Nemotron 3.5 · Apple</b><small>or Parakeet near‑live, re‑read every 0.5 s</small></div>
+        <div class="node opt" style="--c:var(--purple)"><div class="role"><svg class="ic"><use href="#i-people"/></svg>Optional</div><b>Sortformer · Nemotron 3</b><small>4 or 8 speakers, about 1 s behind</small></div>
         <div class="node" style="--c:var(--brand)"><div class="role"><svg class="ic"><use href="#i-captions"/></svg>Output</div><b>Live captions</b><small>translation · Dynamic Island</small></div>
       </div>
     </div>
@@ -538,13 +609,13 @@ ol.watch li small { display: block; color: var(--label2); font-size: .82rem; fon
       <div class="flow">
         <div class="node" style="--c:var(--brand)"><div class="role"><svg class="ic"><use href="#i-wave"/></svg>Input</div><b>Saved recording</b><small>WAV / M4A / imported file</small></div>
         <div class="node" style="--c:var(--success)"><div class="role"><svg class="ic"><use href="#i-doc"/></svg>ASR</div><b>Parakeet V3 · Qwen3‑ASR</b><small>Whisper · MOSS</small></div>
-        <div class="node opt" style="--c:var(--purple)"><div class="role"><svg class="ic"><use href="#i-people"/></svg>Optional</div><b>Community‑1</b><small>voiceprints + clustering</small></div>
-        <div class="node" style="--c:var(--warning)"><div class="role"><svg class="ic"><use href="#i-doc"/></svg>Final record</div><b>Timed, labeled text</b><small>word timestamps · Speaker 1 / 2</small></div>
-        <div class="node" style="--c:var(--purple)"><div class="role"><svg class="ic"><use href="#i-sparkles"/></svg>Text AI</div><b>Local LLM</b><small>title · summary · tags</small></div>
+        <div class="node opt" style="--c:var(--purple)"><div class="role"><svg class="ic"><use href="#i-people"/></svg>Optional</div><b>Nemotron 3 · Community‑1</b><small>8 slots, or voiceprints + clustering</small></div>
+        <div class="node" style="--c:var(--purple)"><div class="role"><svg class="ic"><use href="#i-sparkles"/></svg>Text AI</div><b>On‑device LLM</b><small>cloud only if you add a key</small></div>
+        <div class="node" style="--c:var(--warning)"><div class="role"><svg class="ic"><use href="#i-doc"/></svg>Documents</div><b>Word · PDF · Markdown</b><small>timed, speaker‑labeled</small></div>
       </div>
     </div>
     <div class="router-note">
-      <span class="formula tex" data-tex="\mathrm{route}(\text{locale},\ \text{device}) \;\to\; \begin{cases}\text{Apple Speech} & \text{if the locale is supported}\\ \text{Nemotron} & \text{otherwise}\end{cases}">route(locale, device) → Apple Speech if supported, else Nemotron</span>
+      <span class="formula tex" data-tex="\mathrm{route}(\ell)=\begin{cases}\text{Nemotron} & \ell=\text{Auto, multilingual model installed}\\ \text{Apple On-Device} & \text{Apple supports }\ell\\ \text{Nemotron} & \text{installed for }\ell\text{, else Apple}\end{cases}">route(ℓ): Nemotron if Automatic + multilingual installed; else Apple if it supports ℓ; else Nemotron for ℓ</span>
       <span class="l2" style="font-size:.88rem">“Automatic” is a router, not a model. It never produces a token itself.</span>
     </div>
   </div>
@@ -576,7 +647,7 @@ ol.watch li small { display: block; color: var(--label2); font-size: .82rem; fon
     <div class="steps">
       <div class="step"><span class="k">1</span><div><b>16 kHz mono PCM</b><p>The mic delivers 48 kHz stereo. Every model wants 16,000 Float32 samples per second.</p></div></div>
       <div class="step"><span class="k">2</span><div><b>Short‑time Fourier transform</b><p>25 ms windows, hopping every 10 ms: 100 spectra per second.</p></div></div>
-      <div class="step"><span class="k">3</span><div><b>Mel filterbank + log</b><p>80 bins (Whisper) or 128 (Nemotron, Qwen3‑ASR, Whisper large‑v3), spaced like the cochlea: dense at low frequencies, sparse at high ones.</p></div></div>
+      <div class="step"><span class="k">3</span><div><b>Mel filterbank + log</b><p>128 bands for Parakeet, Nemotron and Qwen3‑ASR (80 for most Whisper sizes), spaced like the cochlea: dense at low frequencies, sparse at high ones.</p></div></div>
       <div class="step"><span class="k">4</span><div><b>Encoder</b><p>Conformer or Transformer blocks learn context: convolution sees local patterns, attention sees the whole utterance.</p></div></div>
       <div class="callout">Nobody cuts speech into phonemes by hand. Short overlapping windows turn the waveform into frames; the encoder learns what the sounds mean, and the decoder chooses the next text token.</div>
     </div>
@@ -680,18 +751,18 @@ ol.watch li small { display: block; color: var(--label2); font-size: .82rem; fon
       <div class="card">
         <h3>RNN‑T: blank advances time</h3>
         <span class="formula tex" data-tex="z_{t,u}=\mathrm{Joint}\big(h_t,\ \mathrm{Pred}(y_{u-1})\big)\in\mathbb{R}^{|V|+1}">z = Joint(hₜ, Pred(yᵤ₋₁)) ∈ ℝ^(|V|+1)</span>
-        <p><span class="tex" data-tex="\varnothing">∅</span> = go to the next frame, add nothing. A BPE token (<span class="mono">▁Meet</span>, <span class="mono">ing</span>) is appended and fed back, and the same frame is tried again. Calls = T + U.</p>
+        <p><span class="tex" data-tex="\varnothing">∅</span> = go to the next frame, add nothing. A word piece (<span class="mono">▁Meet</span>, <span class="mono">ing</span>) is appended and fed back, and the frame is tried again. Nemotron: 43 decisions for 32 frames, never taken back.</p>
       </div>
       <div class="card">
         <h3>TDT: predict the jump, too</h3>
         <span class="formula tex" data-tex="(\hat y_u,\ \widehat{\Delta t})=\big(\arg\max P_{\text{tok}},\ \arg\max P_{\text{dur}}\big)">(ŷ, Δt) = (argmax P_tok, argmax P_dur)</span>
-        <p>Each call also picks how many frames to skip: far fewer calls, and the jumps add up to word timestamps.</p>
+        <p>Parakeet also picks a skip of 0–4 frames: 16 steps for the same 32 frames, and the jumps become word times.</p>
       </div>
       <div class="card">
         <h3>Cache‑aware streaming <span class="pill" style="--c:var(--success)">Nemotron 3.5 · 0.6B</span></h3>
-        <p style="margin-bottom:.6rem">Only the newest 320 ms is computed. Each layer caches attention K/V and conv state, so cost per step stays flat, even two hours into a meeting.</p>
+        <p style="margin-bottom:.55rem">Only the newest chunk is computed (320 ms Speed First, 1,120 ms Quality First); 24 cached FastConformer layers keep the cost per step flat.</p>
         <div class="chunks"></div>
-        <div class="pipeline-mini" style="margin-top:.55rem"><b>320 ms</b> → 5,120 samples → <b>32</b> Mel frames → <b>4</b> encoder steps → <b>24</b> cached layers</div>
+        <div class="pipeline-mini" style="margin-top:.55rem"><b>320 ms</b> → 5,120 samples → <b>32</b> Mel frames → <b>4</b> encoder frames of 80 ms · <b>1,120 ms</b> → <b>14</b> frames</div>
       </div>
     </div>
   </div>
@@ -703,9 +774,49 @@ ol.watch li small { display: block; color: var(--label2); font-size: .82rem; fon
   </aside>
 </section>
 
+<!-- 5b ─────────────────────────────── NEAR-LIVE -->
+<section class="slide" data-widget="nearlive">
+  <div class="eyebrow"><b>05</b> Live path · near‑live</div>
+  <h2>Parakeet isn't streaming. <mark>It re‑reads a sliding window.</mark></h2>
+  <div class="body nl-wrap">
+    <div class="card nl-card">
+      <div class="nl-head">
+        <span class="pill" style="--c:var(--info)"><i></i>Decode pass <span class="nl-pass">0</span></span>
+        <span class="nl-win">active window 0.0 s</span>
+        <span class="l3 nl-speed">shown at 2× speed</span>
+      </div>
+      <div class="nl-track"><div class="nl-commit"></div><div class="nl-window"></div><div class="nl-ticks"></div><div class="nl-now"></div></div>
+      <div class="nl-axis"><span>0 s</span><span>10 s</span><span>20 s</span><span>30 s</span></div>
+      <div class="nl-legend"><span class="pill" style="--c:var(--success)">committed</span><span class="pill" style="--c:var(--brand)">active window</span><span class="pill" style="--c:var(--label2)">draft, may still change</span></div>
+      <div class="nl-text"><span class="nl-committed"></span> <span class="nl-draft"></span></div>
+      <div class="nl-facts"><span class="capsule">600M · Parakeet TDT V3</span><span class="capsule">update every 0.5 s</span><span class="capsule">Neural Engine</span></div>
+    </div>
+    <div class="nl-side">
+      <div class="card">
+        <h3><svg class="ic" style="color:var(--info)"><use href="#i-route"/></svg>A fresh decode every 0.5 s</h3>
+        <p>No streaming state: twice a second the whole active window is decoded again from scratch, with full context inside it. Each pass hears more, so the newest words can still change. Nemotron never takes a token back; Parakeet's draft keeps improving.</p>
+      </div>
+      <div class="card">
+        <h3><svg class="ic" style="color:var(--success)"><use href="#i-doc"/></svg>Commit, then slide</h3>
+        <span class="formula tex" data-tex="t-c\ge 15\,\mathrm{s}\;\Rightarrow\; c\leftarrow\max\{\,e_j : e_j\le t-2\,\mathrm{s}\,\}">if t − c ≥ 15 s: c ← last sentence end ≤ t − 2 s</span>
+        <p>Once the window reaches 15 s, text up to the last sentence that ended at least 2 s earlier is committed, and the window restarts there. Each pass costs at most 15 s of audio.</p>
+      </div>
+      <div class="card">
+        <h3><svg class="ic" style="color:var(--purple)"><use href="#i-bolt"/></svg>On Demand · Catch Up</h3>
+        <p>Or just record, and tap Catch Up later: the waiting audio is transcribed in 30‑second windows, much faster than real time.</p>
+      </div>
+    </div>
+  </div>
+  <aside class="notes">
+    <li>Parakeet is an offline model, but we can still use it live: re-decode the active window every half second.</li>
+    <li>Watch the gray draft change as more audio arrives; once the window hits 15 s, everything up to a sentence that ended 2 s ago is committed and the window slides.</li>
+    <li>Trade-off vs Nemotron: more compute, but better accuracy and the draft can fix itself.</li>
+  </aside>
+</section>
+
 <!-- 6 ─────────────────────────────── AUTOREGRESSIVE -->
 <section class="slide" data-widget="ar">
-  <div class="eyebrow"><b>05</b> Offline path · autoregressive</div>
+  <div class="eyebrow"><b>06</b> Offline path · autoregressive</div>
   <h2>One token at a time, <mark>conditioned on all of the audio</mark></h2>
   <div class="body">
     <div class="ar-top">
@@ -735,42 +846,44 @@ ol.watch li small { display: block; color: var(--label2); font-size: .82rem; fon
 
 <!-- 7 ─────────────────────────────── DIARIZATION -->
 <section class="slide" data-widget="diar">
-  <div class="eyebrow"><b>06</b> Who spoke when</div>
+  <div class="eyebrow"><b>07</b> Who spoke when</div>
   <h2>Speaker models output <mark>who and when</mark>, never words</h2>
   <div class="dia-wrap">
-    <div class="card">
-      <h3><svg class="ic" style="color:var(--purple)"><use href="#i-people"/></svg>Sortformer <span class="pill" style="--c:var(--danger)"><i></i>Live · 4 speakers</span></h3>
-      <p>A per‑frame sigmoid <span class="tex tex-inline" data-tex="P(S_k\mid t),\ k=1,\dots,4">P(Sₖ | t)</span> for four speaker slots. Slots are ordered by <b style="color:var(--label)">arrival time</b>, which removes the permutation ambiguity; an arrival‑order speaker cache keeps Speaker 1 stable across chunks.</p>
-      <div class="heat">
-        <div class="labels"><span style="--c:var(--brand)">S1</span><span style="--c:var(--purple)">S2</span><span style="--c:var(--info)">S3</span><span style="--c:var(--success)">S4</span></div>
-        <canvas width="200" height="40"></canvas>
+    <div class="card dia-live">
+      <div class="dia-top">
+        <div class="seg"><button class="on" data-d="sortformer" type="button">Sortformer</button><button data-d="nemotron3" type="button">Nemotron 3</button></div>
+        <span class="dia-facts"></span>
       </div>
+      <p class="dia-desc"></p>
+      <div class="heat"><div class="labels"></div><canvas width="240" height="64"></canvas></div>
       <div class="turns"></div>
-      <p style="font-size:.8rem">Labels attach to whichever live ASR is running; Sortformer never decides any words.</p>
+      <span class="formula tex dia-rule"></span>
     </div>
     <div class="card">
-      <h3><svg class="ic" style="color:var(--purple)"><use href="#i-people"/></svg>Pyannote Community‑1 <span class="pill" style="--c:var(--purple)"><i></i>Offline</span></h3>
+      <h3><svg class="ic" style="color:var(--purple)"><use href="#i-people"/></svg>Pyannote Community‑1 <span class="pill" style="--c:var(--purple)"><i></i>Saved · 21.6 MB</span></h3>
       <div class="vchain">
-        <div class="v"><div><b>10 s windows, 1 s hop</b><small>overlapping, 16 kHz</small></div><span class="tex" data-tex="x\in\mathbb{R}^{160{,}000}">PCM[160,000]</span></div>
-        <div class="v"><div><b>Segmentation</b><small>local speakers, overlap‑aware</small></div><span class="tex" data-tex="P\in[0,1]^{T\times K}">P[T × K]</span></div>
-        <div class="v"><div><b>Masked WeSpeaker</b><small>one voiceprint per local speaker</small></div><span class="tex" data-tex="e\in\mathbb{R}^{256}">e ∈ ℝ²⁵⁶</span></div>
-        <div class="v"><div><b>PLDA + AHC + VBx</b><small>local voices → global speakers, count estimated</small></div><span class="tex" data-tex="\{C_1,\dots,C_K\}">C_k</span></div>
-        <div class="v"><div><b>Join on time</b><small>each Parakeet word → speaker active at its timestamp</small></div><span class="tex" data-tex="w_j\mapsto S_k">word → Sₖ</span></div>
+        <div class="v"><div><b>10 s windows, every 2 s</b><small>overlapping, 16 kHz</small></div><span class="tex" data-tex="x\in\mathbb{R}^{160{,}000}">x ∈ ℝ^160,000</span></div>
+        <div class="v"><div><b>Segmentation</b><small>up to 3 local speakers, overlap included</small></div><span class="tex" data-tex="P\in[0,1]^{T\times 3}">P ∈ [0,1]^(T×3)</span></div>
+        <div class="v"><div><b>Voiceprints</b><small>clean speech of each local speaker</small></div><span class="tex" data-tex="e\in\mathbb{R}^{256}">e ∈ ℝ²⁵⁶</span></div>
+        <div class="v"><div><b>PLDA → AHC → VBx</b><small>two voices from one window never merge</small></div><span class="tex" data-tex="e'\in\mathbb{R}^{128}">e′ ∈ ℝ¹²⁸</span></div>
+        <div class="v"><div><b>One timeline</b><small>each line takes the speaker that fits best</small></div><span class="tex" data-tex="w_j\mapsto S_k">w ↦ Sₖ</span></div>
       </div>
+      <p style="font-size:.8rem">MOSS writes its own <span class="mono">[S01]</span> tags, but they restart in every window, so the app matches them across windows with voiceprints.</p>
     </div>
   </div>
   <aside class="notes">
-    <li>Diarization is a separate model family. It never transcribes.</li>
-    <li>Sortformer, live: four sigmoid outputs per frame. The trick is that speakers are sorted by who spoke first, so the training labels are unambiguous.</li>
-    <li>Community‑1, offline: windows → voiceprints → clustering, and then a join on time with Parakeet's word timestamps. That join is why TDT timing mattered.</li>
+    <li>Diarization is its own model family; it never transcribes.</li>
+    <li>Sortformer, live: four sigmoid slots per 80 ms frame, numbered by who spoke first, so the labels are unambiguous; on above 0.5, off below 0.3.</li>
+    <li>Toggle Nemotron 3: NVIDIA's successor, eight slots at 10 ms resolution, live or on saved recordings; each Parakeet word goes to whoever is most active in its first 0.6 s.</li>
+    <li>Community-1, offline: windows, voiceprints, clustering, then a join on time.</li>
   </aside>
 </section>
 
 <!-- 8 ─────────────────────────────── TEXT AI -->
 <section class="slide" data-widget="textai">
-  <div class="eyebrow"><b>07</b> After ASR</div>
+  <div class="eyebrow"><b>08</b> After ASR</div>
   <h2>The LLM reads the transcript, <mark>never the audio</mark></h2>
-  <p class="lede">Once the text is final, a small local model writes the title, summary and tags. Apple Intelligence is used when the device has it; everyone else, including China‑region iPhones, gets a GGUF model running through embedded llama.cpp.</p>
+  <p class="lede">Titles, summaries and Skills read only the transcript text. They run down an ordered engine list until one succeeds: Apple Intelligence first, then a local GGUF model through embedded llama.cpp, so China‑region iPhones get summaries too.</p>
   <div class="ai-wrap">
     <div class="card">
       <h3><svg class="ic" style="color:var(--brand)"><use href="#i-captions"/></svg>Final transcript</h3>
@@ -781,12 +894,12 @@ ol.watch li small { display: block; color: var(--label2); font-size: .82rem; fon
       </div>
     </div>
     <svg class="ic arr"><use href="#i-arrow"/></svg>
-    <div class="engines">
-      <div class="engine"><b>Apple Foundation Models</b><small>system on‑device LLM, when available</small></div>
-      <div class="engine sel"><b>Qwen3.5 2B · Q3_K_M</b><small>llama.cpp · 201 languages &amp; dialects</small></div>
-      <div class="engine"><b>LFM2.5 1.2B · Q4_K_M</b><small>llama.cpp · smaller and faster</small></div>
-      <div class="engine optin"><b>Gemini (opt‑in)</b><small>your own key, explicit confirmation; Automatic never picks it</small></div>
-    </div>
+    <ol class="engines">
+      <li class="engine"><b>Apple Intelligence</b><small>Foundation Models, on device</small></li>
+      <li class="engine sel"><b>Local GGUF · llama.cpp</b><small>Qwen3.5 2B Q3_K_M · LFM2.5 1.2B / 350M · 4k context</small></li>
+      <li class="engine optin"><b>Private Cloud Compute</b><small>iOS 27, opt‑in, quota‑aware</small></li>
+      <li class="engine optin"><b>Your cloud keys</b><small>16 providers, opt‑in, in your order</small></li>
+    </ol>
     <svg class="ic arr"><use href="#i-arrow"/></svg>
     <div class="card out">
       <h3><svg class="ic" style="color:var(--purple)"><use href="#i-sparkles"/></svg>Generated on device</h3>
@@ -801,9 +914,94 @@ ol.watch li small { display: block; color: var(--label2); font-size: .82rem; fon
   </aside>
 </section>
 
+<!-- 8b ─────────────────────────────── CLOUD -->
+<section class="slide">
+  <div class="eyebrow"><b>09</b> Cloud, only if you add it</div>
+  <h2>Bring your own key: <mark>16 providers, 3 API dialects</mark></h2>
+  <div class="body cl-wrap">
+    <div class="card">
+      <h3><svg class="ic" style="color:var(--info)"><use href="#i-globe"/></svg>Text: summaries, titles, Q&amp;A, Skills</h3>
+      <div class="cl-api">
+        <div><span class="capsule">OpenAI</span><small>Responses API · <span class="mono">store:false</span> · strict JSON Schema</small></div>
+        <div><span class="capsule">Gemini</span><small>Interactions API · <span class="mono">store:false</span> · thinking level</small></div>
+        <div><span class="capsule">Anthropic</span><small>Messages API · schema via output format</small></div>
+        <div><span class="capsule">Chat Completions</span><small>Meta · Groq · Cerebras · OpenRouter · Mistral · xAI · any HTTPS OpenAI‑compatible endpoint</small></div>
+      </div>
+      <span class="formula tex" data-tex="\text{strict }\texttt{json\_schema}\ \to\ \texttt{json\_object}\ \to\ \text{instructions only}">strict json_schema → json_object → instructions only</span>
+      <p>Three structured‑output tiers, then a lenient JSON extractor that also strips <span class="mono">&lt;think&gt;</span> blocks. Calls are non‑streaming and never auto‑retried, so nobody is billed twice.</p>
+    </div>
+    <div class="card">
+      <h3><svg class="ic" style="color:var(--brand)"><use href="#i-wave"/></svg>Audio: 11 speech‑to‑text adapters + Gemini</h3>
+      <div class="cl-steps">
+        <div><b>Confirm</b><small>names the recording, provider and model before any upload</small></div>
+        <div><b>Prepare</b><small>original, 16 kHz M4A or 16 kHz WAV per provider; split at the quietest point under its limit</small></div>
+        <div><b>Upload</b><small>multipart streamed from disk; async jobs polled, then the remote copy deleted</small></div>
+        <div><b>Assemble</b><small>timed words → lines: new line on speaker change, 1.2 s pause, 30 s or 320 characters</small></div>
+      </div>
+      <p class="cl-names">Deepgram · AssemblyAI · Speechmatics · Soniox · ElevenLabs · Groq Whisper · Mistral Voxtral · xAI · Meta · Cartesia · MOSS</p>
+    </div>
+    <div class="cl-side">
+      <div class="card"><h3><svg class="ic" style="color:var(--privacy)"><use href="#i-lock"/></svg>Keys</h3><p>One Keychain item per provider, this device only, never synced. Verified with a free authenticated <span class="mono">GET /v1/models</span>; requests use an ephemeral session with keys masked in errors.</p></div>
+      <div class="card"><h3><svg class="ic" style="color:var(--purple)"><use href="#i-chip"/></svg>Private Cloud Compute</h3><p>FoundationModels' <span class="mono">PrivateCloudComputeLanguageModel</span> with <span class="mono">@Generable</span> output on iOS 27, quota‑aware. Automatic never picks it, or any cloud.</p></div>
+    </div>
+  </div>
+  <aside class="notes">
+    <li>Everything so far is on device. Cloud is strictly opt-in, bring your own key, in an order you choose.</li>
+    <li>Three API dialects behind one interface, with structured output degrading gracefully from strict JSON Schema.</li>
+    <li>Audio uploads only after a confirmation that names the provider and model; the transcript comes back as the same timed, speaker-labeled lines as the local models.</li>
+  </aside>
+</section>
+
+<!-- 8c ─────────────────────────────── DOCUMENTS -->
+<section class="slide" data-widget="docs">
+  <div class="eyebrow"><b>10</b> Documents</div>
+  <h2>Transcript in, <mark>Word, PDF and Markdown</mark> out</h2>
+  <p class="lede">Skills turn transcripts into documents. The model writes Markdown; the app parses it into typed blocks and renders every format itself, with no third‑party libraries.</p>
+  <div class="dc-wrap">
+    <div class="card">
+      <h3><svg class="ic" style="color:var(--purple)"><use href="#i-sparkles"/></svg>1 · A Skill runs</h3>
+      <div class="dc-skills"><span class="pill" style="--c:var(--brand)">Daily meeting</span><span class="pill" style="--c:var(--info)">Research meeting</span><span class="pill" style="--c:var(--success)">General notes</span><span class="pill" style="--c:var(--warning)">Language learning</span><span class="pill" style="--c:var(--purple)">Transcript polish</span><span class="pill" style="--c:var(--label2)">Compare transcripts</span></div>
+      <p>Six built in, plus your own prompt (up to 1,000 characters). Up to 24 recordings: evidence notes first, then one synthesis pass. Can be locked to on‑device engines.</p>
+      <pre class="dc-md"><span class="h"># Beta Launch Plan</span>
+<span class="k">## Decisions</span>
+- Ship the beta next Friday
+<span class="k">## Action items</span>
+- [ ] TestFlight notes — @Speaker 2
+<span class="k">## Open questions</span>
+- Dutch captions ready?</pre>
+    </div>
+    <div class="card">
+      <h3><svg class="ic" style="color:var(--info)"><use href="#i-code"/></svg>2 · Typed blocks</h3>
+      <div class="dc-blocks">
+        <div data-b="0"><span class="capsule">heading</span><small>title, sections</small></div>
+        <div data-b="1"><span class="capsule">decision</span><small>Ship the beta next Friday</small></div>
+        <div data-b="2"><span class="capsule">action item</span><small>TestFlight notes · Speaker 2</small></div>
+        <div data-b="3"><span class="capsule">open question</span><small>Dutch captions ready?</small></div>
+        <div data-b="4"><span class="capsule">table</span><small>header row repeats across pages</small></div>
+        <div data-b="5"><span class="capsule">citation</span><small>links back to a transcript time</small></div>
+      </div>
+      <p>One Markdown codec feeds every renderer, so Word and PDF always agree.</p>
+    </div>
+    <div class="card dc-out">
+      <h3><svg class="ic" style="color:var(--warning)"><use href="#i-doc"/></svg>3 · Rendered on device</h3>
+      <ul class="list">
+        <li><svg class="ic" style="color:var(--info)"><use href="#i-doc"/></svg><span><b>Word .docx</b>: WordprocessingML written by hand, zipped by an in‑house ZIP writer (CRC‑32, DEFLATE)</span></li>
+        <li><svg class="ic" style="color:var(--brand)"><use href="#i-doc"/></svg><span><b>PDF</b>: CoreText layout, tagged PDF, running headers, page numbers, right‑to‑left text</span></li>
+        <li><svg class="ic" style="color:var(--success)"><use href="#i-code"/></svg><span><b>Markdown, text, SRT, VTT, JSON</b></span></li>
+        <li><svg class="ic" style="color:var(--purple)"><use href="#i-people"/></svg><span><b>Report</b>: summary, meeting analysis, speaker overview and a timed transcript in 6 speaker colors</span></li>
+        <li><svg class="ic" style="color:var(--warning)"><use href="#i-globe"/></svg><span><b>Locale‑aware</b>: Letter or A4 by region, CJK fonts, language detected per document</span></li>
+      </ul>
+    </div>
+  </div>
+  <aside class="notes">
+    <li>Skills: the LLM writes Markdown, never final layout. A codec parses it into typed blocks: decisions, action items, open questions, tables, citations.</li>
+    <li>Then the app renders Word and PDF itself: OOXML written by hand, our own ZIP writer, CoreText for PDF. Zero dependencies, fully on device.</li>
+  </aside>
+</section>
+
 <!-- 9 ─────────────────────────────── SHIPPING -->
 <section class="slide">
-  <div class="eyebrow"><b>08</b> Engineering</div>
+  <div class="eyebrow"><b>11</b> Engineering</div>
   <h2>Making it fit on a <mark>6 GB iPhone</mark></h2>
   <div class="ship-wrap">
     <div class="card tbl table-scroll">
@@ -812,16 +1010,17 @@ ol.watch li small { display: block; color: var(--label2); font-size: .82rem; fon
         <tbody>
           <tr class="grp"><td colspan="4">Live</td></tr>
           <tr><td>Apple SpeechAnalyzer</td><td>streaming ASR</td><td class="mono">system</td><td class="mono">Speech.framework</td></tr>
-          <tr><td>Nemotron 3.5 Streaming</td><td>cache‑aware RNN‑T</td><td class="mono">0.6B · INT8</td><td class="mono">Core ML</td></tr>
-          <tr><td>NVIDIA Sortformer</td><td>4‑speaker diarization</td><td class="mono">streaming</td><td class="mono">Core ML</td></tr>
-          <tr class="grp"><td colspan="4">Offline</td></tr>
-          <tr><td>Parakeet TDT V3</td><td>ASR + word timing</td><td class="mono">0.6B · INT8</td><td class="mono">Core ML</td></tr>
-          <tr><td>Pyannote Community‑1</td><td>offline diarization</td><td class="mono">pipeline</td><td class="mono">Core ML</td></tr>
-          <tr><td>Qwen3‑ASR + Silero VAD</td><td>audio‑LLM ASR</td><td class="mono">0.6B · 4‑bit</td><td class="mono">MLX</td></tr>
-          <tr><td>MOSS Transcribe‑Diarize</td><td>ASR + speakers</td><td class="mono">4‑bit · ~1 GB</td><td class="mono">MLX</td></tr>
-          <tr><td>Whisper tiny → large‑v3</td><td>encoder–decoder ASR</td><td class="mono">39M–1.55B · Q5_0</td><td class="mono">whisper.cpp</td></tr>
+          <tr><td>Nemotron 3.5 Streaming</td><td>cache‑aware RNN‑T</td><td class="mono">600M · INT8</td><td class="mono">Core ML · ANE</td></tr>
+          <tr><td>Parakeet V3 near‑live</td><td>re‑decode / 0.5 s</td><td class="mono">600M · INT8</td><td class="mono">Core ML · ANE</td></tr>
+          <tr><td>Sortformer · Nemotron 3</td><td>live speakers</td><td class="mono">4 / 8 slots · 100M</td><td class="mono">Core ML · ANE</td></tr>
+          <tr class="grp"><td colspan="4">Saved recordings</td></tr>
+          <tr><td>Parakeet TDT V3</td><td>ASR + word timing</td><td class="mono">600M · INT8</td><td class="mono">Core ML · ANE</td></tr>
+          <tr><td>Qwen3‑ASR + Silero</td><td>audio‑LLM ASR</td><td class="mono">600M / 1.7B</td><td class="mono">MLX · GPU</td></tr>
+          <tr><td>MOSS Transcribe‑Diarize</td><td>ASR + speakers</td><td class="mono">4‑bit · ~1 GB</td><td class="mono">MLX · GPU</td></tr>
+          <tr><td>Whisper tiny → large‑v3</td><td>enc–dec ASR</td><td class="mono">39M–1.55B</td><td class="mono">whisper.cpp · GPU</td></tr>
+          <tr><td>Community‑1 · Nemotron 3</td><td>saved speakers</td><td class="mono">21.6 MB · 100M</td><td class="mono">Core ML</td></tr>
           <tr class="grp"><td colspan="4">Text</td></tr>
-          <tr><td>Qwen3.5 2B / LFM2.5 1.2B</td><td>title · summary · tags</td><td class="mono">GGUF Q3_K_M / Q4_K_M</td><td class="mono">llama.cpp</td></tr>
+          <tr><td>LFM2.5 · Qwen3.5</td><td>summaries, Skills</td><td class="mono">350M–2B · GGUF</td><td class="mono">llama.cpp</td></tr>
         </tbody>
       </table>
     </div>
@@ -848,7 +1047,7 @@ ol.watch li small { display: block; color: var(--label2); font-size: .82rem; fon
 
 <!-- 10 ─────────────────────────────── PRODUCT -->
 <section class="slide">
-  <div class="eyebrow"><b>09</b> What it adds up to</div>
+  <div class="eyebrow"><b>12</b> What it adds up to</div>
   <h2>LiveTranscriber</h2>
   <p class="lede">A local‑first recorder for iPhone, with a native Mac companion. Every model on the previous slides is one tap away inside the app.</p>
   <div class="prod-wrap">
@@ -864,7 +1063,8 @@ ol.watch li small { display: block; color: var(--label2); font-size: .82rem; fon
       <div><svg class="ic" style="color:var(--purple)"><use href="#i-people"/></svg><span>Speaker labels, live and offline<small>Sortformer while recording; Community‑1 or MOSS afterwards</small></span></div>
       <div><svg class="ic" style="color:var(--info)"><use href="#i-island"/></svg><span>Dynamic Island &amp; Live Activity<small>follow the transcript without opening the app</small></span></div>
       <div><svg class="ic" style="color:var(--warning)"><use href="#i-globe"/></svg><span>Right model per language<small>Parakeet for Europe, Qwen3‑ASR for Chinese dialects, Whisper for the long tail</small></span></div>
-      <div><svg class="ic" style="color:var(--purple)"><use href="#i-sparkles"/></svg><span>Local summaries, titles, tags, search<small>works without Apple Intelligence</small></span></div>
+      <div><svg class="ic" style="color:var(--purple)"><use href="#i-sparkles"/></svg><span>Skills → Word, PDF, Markdown<small>summaries and meeting notes, on device by default</small></span></div>
+      <div><svg class="ic" style="color:var(--info)"><use href="#i-globe"/></svg><span>Cloud if you want it<small>16 providers with your own key; never automatic</small></span></div>
       <div><svg class="ic" style="color:var(--label2)"><use href="#i-laptop"/></svg><span>Mac companion<small>capture Zoom, Teams or Meet windows plus mic, synced via private iCloud</small></span></div>
       <div><svg class="ic" style="color:var(--privacy)"><use href="#i-lock"/></svg><span>Local‑first by default<small>no developer servers, no tracking</small></span></div>
     </div>
@@ -876,7 +1076,7 @@ ol.watch li small { display: block; color: var(--label2); font-size: .82rem; fon
 
 <!-- 11 ─────────────────────────────── DEMO -->
 <section class="slide">
-  <div class="eyebrow"><b>10</b> Running code</div>
+  <div class="eyebrow"><b>13</b> Running code</div>
   <div class="demo-wrap">
     <div>
       <div class="demo-big">Live<br>demo<span class="recdot"></span></div>
@@ -898,7 +1098,7 @@ ol.watch li small { display: block; color: var(--label2); font-size: .82rem; fon
 
 <!-- 12 ─────────────────────────────── END -->
 <section class="slide">
-  <div class="eyebrow"><b>11</b> Thanks</div>
+  <div class="eyebrow"><b>14</b> Thanks</div>
   <div class="end-wrap">
     <div class="qr" role="img" aria-label="QR code linking to these slides"><svg xmlns="http://www.w3.org/2000/svg" viewBox="-1 -1 35 35" shape-rendering="crispEdges"><path fill="#0b0c10" d="M0 0h7v1h-7zM9 0h3v1h-3zM14 0h2v1h-2zM18 0h2v1h-2zM22 0h2v1h-2zM26 0h7v1h-7zM0 1h1v1h-1zM6 1h1v1h-1zM15 1h1v1h-1zM21 1h1v1h-1zM23 1h2v1h-2zM26 1h1v1h-1zM32 1h1v1h-1zM0 2h1v1h-1zM2 2h3v1h-3zM6 2h1v1h-1zM12 2h1v1h-1zM14 2h1v1h-1zM16 2h5v1h-5zM23 2h2v1h-2zM26 2h1v1h-1zM28 2h3v1h-3zM32 2h1v1h-1zM0 3h1v1h-1zM2 3h3v1h-3zM6 3h1v1h-1zM9 3h1v1h-1zM12 3h2v1h-2zM18 3h1v1h-1zM20 3h1v1h-1zM22 3h1v1h-1zM26 3h1v1h-1zM28 3h3v1h-3zM32 3h1v1h-1zM0 4h1v1h-1zM2 4h3v1h-3zM6 4h1v1h-1zM10 4h3v1h-3zM16 4h1v1h-1zM18 4h1v1h-1zM21 4h3v1h-3zM26 4h1v1h-1zM28 4h3v1h-3zM32 4h1v1h-1zM0 5h1v1h-1zM6 5h1v1h-1zM8 5h1v1h-1zM12 5h1v1h-1zM17 5h3v1h-3zM21 5h2v1h-2zM26 5h1v1h-1zM32 5h1v1h-1zM0 6h7v1h-7zM8 6h1v1h-1zM10 6h1v1h-1zM12 6h1v1h-1zM14 6h1v1h-1zM16 6h1v1h-1zM18 6h1v1h-1zM20 6h1v1h-1zM22 6h1v1h-1zM24 6h1v1h-1zM26 6h7v1h-7zM11 7h2v1h-2zM14 7h1v1h-1zM17 7h2v1h-2zM20 7h3v1h-3zM0 8h1v1h-1zM3 8h1v1h-1zM5 8h2v1h-2zM8 8h2v1h-2zM11 8h1v1h-1zM13 8h1v1h-1zM15 8h2v1h-2zM21 8h1v1h-1zM23 8h3v1h-3zM27 8h1v1h-1zM0 9h1v1h-1zM4 9h2v1h-2zM7 9h4v1h-4zM12 9h1v1h-1zM16 9h2v1h-2zM21 9h1v1h-1zM24 9h4v1h-4zM32 9h1v1h-1zM1 10h2v1h-2zM6 10h2v1h-2zM11 10h2v1h-2zM19 10h1v1h-1zM21 10h1v1h-1zM27 10h2v1h-2zM30 10h1v1h-1zM32 10h1v1h-1zM2 11h4v1h-4zM7 11h2v1h-2zM14 11h1v1h-1zM16 11h1v1h-1zM18 11h4v1h-4zM23 11h3v1h-3zM28 11h2v1h-2zM32 11h1v1h-1zM1 12h1v1h-1zM3 12h2v1h-2zM6 12h1v1h-1zM8 12h5v1h-5zM15 12h1v1h-1zM17 12h1v1h-1zM19 12h4v1h-4zM24 12h3v1h-3zM29 12h1v1h-1zM0 13h2v1h-2zM4 13h1v1h-1zM9 13h5v1h-5zM15 13h2v1h-2zM18 13h3v1h-3zM22 13h1v1h-1zM24 13h3v1h-3zM28 13h1v1h-1zM31 13h2v1h-2zM3 14h1v1h-1zM5 14h3v1h-3zM9 14h2v1h-2zM12 14h2v1h-2zM17 14h2v1h-2zM20 14h1v1h-1zM23 14h1v1h-1zM25 14h5v1h-5zM31 14h1v1h-1zM1 15h1v1h-1zM4 15h1v1h-1zM8 15h1v1h-1zM14 15h2v1h-2zM17 15h2v1h-2zM21 15h1v1h-1zM23 15h1v1h-1zM26 15h2v1h-2zM31 15h1v1h-1zM0 16h3v1h-3zM5 16h2v1h-2zM8 16h1v1h-1zM11 16h1v1h-1zM13 16h1v1h-1zM17 16h1v1h-1zM20 16h4v1h-4zM26 16h1v1h-1zM28 16h1v1h-1zM31 16h1v1h-1zM1 17h1v1h-1zM9 17h3v1h-3zM14 17h1v1h-1zM18 17h1v1h-1zM23 17h3v1h-3zM27 17h1v1h-1zM29 17h1v1h-1zM31 17h1v1h-1zM0 18h3v1h-3zM4 18h4v1h-4zM12 18h1v1h-1zM14 18h1v1h-1zM16 18h3v1h-3zM20 18h2v1h-2zM26 18h1v1h-1zM30 18h3v1h-3zM1 19h1v1h-1zM4 19h1v1h-1zM8 19h1v1h-1zM12 19h1v1h-1zM16 19h2v1h-2zM20 19h2v1h-2zM23 19h5v1h-5zM0 20h1v1h-1zM5 20h2v1h-2zM8 20h5v1h-5zM14 20h1v1h-1zM16 20h1v1h-1zM19 20h1v1h-1zM21 20h1v1h-1zM24 20h2v1h-2zM31 20h2v1h-2zM3 21h1v1h-1zM5 21h1v1h-1zM9 21h1v1h-1zM15 21h4v1h-4zM20 21h1v1h-1zM22 21h1v1h-1zM24 21h3v1h-3zM31 21h2v1h-2zM0 22h2v1h-2zM6 22h3v1h-3zM10 22h3v1h-3zM15 22h1v1h-1zM19 22h2v1h-2zM24 22h2v1h-2zM28 22h3v1h-3zM32 22h1v1h-1zM1 23h2v1h-2zM4 23h1v1h-1zM9 23h1v1h-1zM11 23h2v1h-2zM16 23h1v1h-1zM21 23h3v1h-3zM26 23h2v1h-2zM29 23h1v1h-1zM32 23h1v1h-1zM0 24h1v1h-1zM3 24h1v1h-1zM6 24h1v1h-1zM9 24h9v1h-9zM19 24h3v1h-3zM24 24h7v1h-7zM8 25h1v1h-1zM10 25h1v1h-1zM14 25h1v1h-1zM17 25h1v1h-1zM19 25h6v1h-6zM28 25h2v1h-2zM0 26h7v1h-7zM9 26h1v1h-1zM12 26h1v1h-1zM14 26h1v1h-1zM18 26h1v1h-1zM20 26h1v1h-1zM24 26h1v1h-1zM26 26h1v1h-1zM28 26h4v1h-4zM0 27h1v1h-1zM6 27h1v1h-1zM8 27h1v1h-1zM11 27h1v1h-1zM15 27h7v1h-7zM24 27h1v1h-1zM28 27h1v1h-1zM32 27h1v1h-1zM0 28h1v1h-1zM2 28h3v1h-3zM6 28h1v1h-1zM10 28h2v1h-2zM13 28h2v1h-2zM17 28h2v1h-2zM20 28h3v1h-3zM24 28h6v1h-6zM0 29h1v1h-1zM2 29h3v1h-3zM6 29h1v1h-1zM8 29h1v1h-1zM11 29h1v1h-1zM13 29h3v1h-3zM17 29h1v1h-1zM21 29h1v1h-1zM23 29h1v1h-1zM26 29h1v1h-1zM28 29h2v1h-2zM0 30h1v1h-1zM2 30h3v1h-3zM6 30h1v1h-1zM9 30h2v1h-2zM13 30h2v1h-2zM18 30h1v1h-1zM22 30h1v1h-1zM24 30h1v1h-1zM28 30h1v1h-1zM30 30h1v1h-1zM32 30h1v1h-1zM0 31h1v1h-1zM6 31h1v1h-1zM10 31h2v1h-2zM13 31h1v1h-1zM17 31h1v1h-1zM21 31h1v1h-1zM24 31h1v1h-1zM0 32h7v1h-7zM8 32h1v1h-1zM10 32h2v1h-2zM15 32h1v1h-1zM19 32h1v1h-1zM21 32h1v1h-1zM24 32h3v1h-3zM28 32h1v1h-1zM31 32h1v1h-1z"/></svg></div>
     <div>
@@ -1427,26 +1627,28 @@ register('ar', s => {
         ['<|endoftext|>', 'eos', [['<|endoftext|>', .88], ['<|1.22|>', .07], [' and', .02]]],
       ],
       note: 'Language and task are prompt tokens. Timestamps are vocabulary tokens too, so Whisper writes its own subtitles. The 30 s window is fixed: shorter audio is padded, longer audio is chunked.',
-      rt: ['whisper.cpp · ggml · Metal', 'tiny 39M → large‑v3 1.55B', 'large‑v3: 128 Mel bins, Q5_0'],
+      rt: ['whisper.cpp · ggml · GPU', 'tiny 39M → large‑v3 1.55B', 'large‑v3: 128 Mel bins, Q5_0'],
     },
     qwen: {
-      tex: 'P\\big(y_i \\mid [\\,\\text{prompt};\\ W\\,\\mathrm{AudioEnc}(\\mathbf{X}_{128\\times T})\\,],\\ y_{<i}\\big)\\quad\\text{with a KV cache}',
-      chain: [['Gate', 'Silero VAD speech segments'], ['Features', 'log‑Mel 128 × T, ≤ 30 s'], ['Encoder', 'audio Transformer + projector'], ['Prefill', 'audio slots ← embeddings'], ['Decoder', 'Qwen3 LLM + KV cache']],
-      prompt: [['⟨system⟩', 'prompt'], ['⟨audio_start⟩', 'ctl'], ['⟨audio⟩ × T′', 'prompt'], ['⟨audio_end⟩', 'ctl'], ['⟨asr⟩', 'ctl']],
+      tex: 'P\\big(y_i \\mid [\\,\\text{prompt};\\ W\\,\\mathrm{AudioEnc}(\\mathbf{X}_{128\\times T})\\,],\\ y_{<i}\\big),\\quad |V|=151{,}936',
+      chain: [['Gate', 'Silero VAD: speech chunks ≤ 10 s'], ['Features', 'log‑Mel 128 × T'], ['Encoder', '3 stride‑2 convs → 13 tokens/s, 18 or 24 layers'], ['Prefill', 'audio tokens fill the chat prompt'], ['Decoder', '28‑layer Qwen3 + KV cache']],
+      prompt: [['⟨system⟩', 'prompt'], ['⟨audio_start⟩', 'ctl'], ['⟨audio⟩ × 13/s', 'prompt'], ['⟨audio_end⟩', 'ctl'], ['⟨assistant⟩', 'ctl']],
       out: [
+        ['language Chinese', 'lang', [['language Chinese', .97], ['language Cantonese', .02], ['language Japanese', .01]]],
+        ['⟨asr_text⟩', 'lang', [['⟨asr_text⟩', .99], ['⟨eos⟩', .005], ['，', .002]]],
         ['今', 'text', [['今', .93], ['金', .04], ['近', .01]]],
         ['天', 'text', [['天', .95], ['添', .02], ['田', .01]]],
         ['开', 'text', [['开', .96], ['凯', .02], ['该', .01]]],
         ['会', 'text', [['会', .90], ['汇', .05], ['绘', .02]]],
         ['⟨eos⟩', 'eos', [['⟨eos⟩', .91], ['，', .05], ['吧', .02]]],
       ],
-      note: '今 / 金 / 近 sound almost identical. When the acoustic evidence is ambiguous, the language model settles it from context, which is why this family is strong on Chinese dialects and code‑switching.',
-      rt: ['Qwen3‑ASR 0.6B', 'MLX · 4‑bit', 'Silero VAD v6'],
+      note: 'The answer names the language it heard, then the text. 今 / 金 / 近 sound almost identical, so the 28‑layer decoder settles them from context, which is why this family handles Chinese dialects well. An optional aligner adds word times on an 80 ms grid.',
+      rt: ['Qwen3‑ASR 0.6B / 1.7B', 'MLX · GPU', 'Silero VAD'],
     },
     moss: {
       tex: 'P\\big(y_i \\mid [\\,W\\,\\mathrm{WhisperEnc}(\\mathbf{X}_{30\\,\\mathrm{s}});\\ \\text{prompt}\\,],\\ y_{<i}\\big),\\quad y_i\\in\\{\\text{text},\\text{time},\\text{speaker}\\}',
-      chain: [['Input', 'fixed 30 s blocks'], ['Encoder', 'Whisper encoder, cached and reused'], ['Audio tokens', '≈ 12.5 per second'], ['Decoder', 'Qwen3‑style, autoregressive'], ['Parse', 'lines with time + speaker']],
-      prompt: [['⟨audio⟩ × 375', 'prompt'], ['“transcribe with speakers”', 'prompt']],
+      chain: [['Input', '30 s blocks'], ['Encoder', 'Whisper encoder → 12.5 tokens/s'], ['Time', 'a marker every 5 s'], ['Decoder', 'Qwen3 writes time, [S01], words'], ['Match', 'voiceprints link tags across windows']],
+      prompt: [['⟨audio⟩ × 12.5/s', 'prompt'], ['⟨t=0 s⟩ ⟨t=5 s⟩ …', 'prompt'], ['“transcribe with speakers”', 'prompt']],
       out: [
         ['[0.00]', 'time', [['[0.00]', .97], ['[0.08]', .02], ['[S01]', .01]]],
         ['[S01]', 'spk', [['[S01]', .98], ['[S02]', .01], ['Meeting', .01]]],
@@ -1458,8 +1660,8 @@ register('ar', s => {
         [' good', 'text', [[' good', .95], [' great', .03], [' good.', .01]]],
         ['⟨eos⟩', 'eos', [['⟨eos⟩', .9], ['[2.05]', .07], ['!', .02]]],
       ],
-      note: 'One token stream carries words, time markers and speaker tags, so transcription and diarization come from a single autoregressive model: the most accurate multi‑speaker path in the app, and the slowest.',
-      rt: ['MOSS Transcribe‑Diarize', 'MLX · 4‑bit', '≈ 1 GB on disk'],
+      note: 'One token stream carries start time, speaker tag, words and end time, so transcription and diarization come from one model. Tags restart in every decoder window, so the app compares voiceprints to keep each person on the same label.',
+      rt: ['MOSS Transcribe‑Diarize', 'MLX · 4‑bit · GPU', '≈ 1 GB on disk'],
     },
   };
   const segBtns = s.querySelectorAll('[data-m]');
@@ -1481,7 +1683,7 @@ register('ar', s => {
     i = 0; timer = 0;
   }
   function reveal() {
-    const d = M[cur]; const outs = tokEl.querySelectorAll('.tok:not(.prompt):not(.ctl)');
+    const d = M[cur]; const outs = tokEl.querySelectorAll('.tok:not(.prompt):not(.ctl)');  // output tokens only
     outs.forEach((el, k) => { el.classList.toggle('hidden', k > i); el.classList.toggle('cur', k === i); });
     d.out[i][2].forEach(([tok, p], k) => {
       const row = probsEl.children[k];
@@ -1509,31 +1711,49 @@ register('ar', s => {
 register('diar', s => {
   const cv = s.querySelector('.heat canvas');
   const ctx = cv.getContext('2d');
-  const W = cv.width, H = cv.height, ROW = H / 4;
-  const turnsEl = s.querySelector('.turns');
+  const W = cv.width, H = cv.height;
+  const labelsEl = s.querySelector('.heat .labels'), turnsEl = s.querySelector('.turns');
+  const descEl = s.querySelector('.dia-desc'), factsEl = s.querySelector('.dia-facts'), ruleEl = s.querySelector('.dia-rule');
   const vs = [...s.querySelectorAll('.vchain .v')];
-  const tokens = ['--brand', '--purple', '--info', '--success'];
-  let cols = [], bg = [0, 0, 0];
-  function readColors() { cols = tokens.map(v => rgb(C(v))); bg = rgb(C('--elev')); }
-  const script = [[0, 0.2, 3.2], [1, 3.0, 6.0], [2, 6.2, 8.8], [0, 9.0, 11.5], [1, 11.3, 13.0], [3, 13.3, 14.6], [0, 15.0, 17.0], [2, 17.2, 19.5]];
+  const PALETTE = ['--brand', '--purple', '--info', '--success', '--warning', '#C43C78', '#0D8A93', '--blank'];
+  const MODES = {
+    sortformer: {
+      slots: 4, edge: 14, noise: .07,
+      desc: 'Every 480 ms it reads the newest audio plus 560 ms of look‑ahead, so speakers trail the audio by about a second. Each 80 ms frame gets four probabilities, one per slot, and slots are numbered in the order people start talking; a speaker cache keeps each voice in its slot.',
+      facts: ['up to 4 speakers', '1.04 s delay', 'Neural Engine'],
+      tex: 'k\\ \\text{on if } p_k>0.5,\\quad \\text{off if } p_k<0.3,\\quad \\text{turns}<1\\,\\mathrm{s}\\ \\text{wait}',
+      script: [[0, 0.2, 3.2], [1, 3.0, 6.0], [2, 6.2, 8.8], [0, 9.0, 11.5], [1, 11.3, 13.0], [3, 13.3, 14.6], [0, 15.0, 17.0], [2, 17.2, 19.5]],
+    },
+    nemotron3: {
+      slots: 8, edge: 40, noise: .03,
+      desc: 'NVIDIA’s successor to Sortformer, about 100M parameters: up to eight slots with a result every 10 ms. Live it reads 0.72 s steps and answers about a second later; saved recordings go 10.24 s at a time. It has no voiceprints, so it can’t recognize remembered people.',
+      facts: ['up to 8 speakers', '10 ms resolution', 'live + saved'],
+      tex: '\\mathrm{spk}(w)=\\arg\\max_k \\sum_{t\\,\\in\\,[t_w,\\ t_w+0.6\\,\\mathrm{s}]} p_k(t)',
+      script: [[0, 0.2, 2.6], [1, 2.5, 4.4], [2, 4.6, 6.0], [3, 6.1, 7.6], [4, 7.8, 9.4], [0, 9.5, 11.0], [5, 11.1, 12.8], [1, 12.9, 14.2], [6, 14.3, 15.6], [2, 15.7, 17.0], [7, 17.1, 18.4], [0, 18.5, 19.8]],
+    },
+  };
   const LOOP = 20;
-  function prob(k, t) {
-    let p = 0.03 + 0.05 * Math.random();
-    for (const [sk, a, b] of script) if (sk === k) {
-      const edge = Math.min(t - a, b - t);
-      if (edge > -0.25) p = Math.max(p, 1 / (1 + Math.exp(-edge * 14)) * (0.86 + 0.12 * Math.random()));
+  let mode = 'sortformer', M = MODES[mode], cols = [], bg = [0, 0, 0];
+  let t = 0, acc = 0, lastSpk = -1, vIdx = 0, vAcc = 0;
+  const color = v => v.startsWith('--') ? C(v) : v;
+  function readColors() { cols = PALETTE.map(v => rgb(color(v))); bg = rgb(C('--elev')); }
+  function prob(k, time) {
+    let p = 0.02 + M.noise * Math.random();
+    for (const [sk, a, b] of M.script) if (sk === k) {
+      const edge = Math.min(time - a, b - time);
+      if (edge > -0.25) p = Math.max(p, 1 / (1 + Math.exp(-edge * M.edge)) * (0.88 + 0.1 * Math.random()));
     }
     return Math.min(1, p);
   }
-  let t = 0, acc = 0, lastSpk = -1, vIdx = 0, vAcc = 0;
   const img = ctx.createImageData(1, H);
   function column() {
     ctx.drawImage(cv, -1, 0);
-    const ps = [0, 1, 2, 3].map(k => prob(k, t % LOOP));
-    for (let k = 0; k < 4; k++) {
+    const n = M.slots, row = H / n;
+    const ps = Array.from({ length: n }, (_, k) => prob(k, t % LOOP));
+    for (let k = 0; k < n; k++) {
       const p = ps[k], c = cols[k];
-      for (let y = Math.round(k * ROW); y < Math.round((k + 1) * ROW); y++) {
-        const o = y * 4; const a = y === Math.round((k + 1) * ROW) - 1 ? 0 : p;
+      for (let y = Math.round(k * row); y < Math.round((k + 1) * row); y++) {
+        const o = y * 4; const a = y === Math.round((k + 1) * row) - 1 ? 0 : p;
         img.data[o] = bg[0] + (c[0] - bg[0]) * a; img.data[o + 1] = bg[1] + (c[1] - bg[1]) * a; img.data[o + 2] = bg[2] + (c[2] - bg[2]) * a; img.data[o + 3] = 255;
       }
     }
@@ -1542,14 +1762,26 @@ register('diar', s => {
     if (best >= 0 && best !== lastSpk) {
       lastSpk = best;
       const chip = document.createElement('span'); chip.className = 'pill';
-      chip.style.setProperty('--c', `var(${tokens[best]})`);
+      const tok = PALETTE[best]; chip.style.setProperty('--c', tok.startsWith('--') ? `var(${tok})` : tok);
       chip.textContent = `Speaker ${best + 1} · ${(t % LOOP).toFixed(1)} s`;
       turnsEl.appendChild(chip);
       while (turnsEl.children.length > 5) turnsEl.removeChild(turnsEl.firstChild);
     }
   }
-  function prefill() { for (let k = 0; k < W; k++) { t += 0.08; column(); } }
-  readColors(); prefill();
+  function prefill() { ctx.fillStyle = `rgb(${bg})`; ctx.fillRect(0, 0, W, H); for (let k = 0; k < W; k++) { t += 0.08; column(); } }
+  function setMode(m) {
+    mode = m; M = MODES[m]; lastSpk = -1; turnsEl.innerHTML = '';
+    s.querySelectorAll('[data-d]').forEach(b => b.classList.toggle('on', b.dataset.d === m));
+    labelsEl.style.setProperty('--rows', M.slots);
+    labelsEl.innerHTML = Array.from({ length: M.slots }, (_, k) => { const tok = PALETTE[k]; return `<span style="color:${tok.startsWith('--') ? `var(${tok})` : tok}">S${k + 1}</span>`; }).join('');
+    descEl.textContent = M.desc;
+    factsEl.innerHTML = M.facts.map(f => `<span class="capsule">${f}</span>`).join('');
+    ruleEl.dataset.tex = M.tex; delete ruleEl.dataset.rendered; ruleEl.textContent = '';
+    renderTex(s);
+    prefill();
+  }
+  s.querySelectorAll('[data-d]').forEach(b => b.onclick = () => setMode(b.dataset.d));
+  readColors(); setMode('sortformer');
   addEventListener('themechange', () => { readColors(); prefill(); });
   const l = loop((now, dt) => {
     acc += dt; vAcc += dt;
@@ -1557,6 +1789,64 @@ register('diar', s => {
     if (vAcc > 1100) { vAcc = 0; vIdx = (vIdx + 1) % vs.length; vs.forEach((v, k) => v.classList.toggle('on', k === vIdx)); }
   });
   vs[0].classList.add('on');
+  return { start: l.start, stop: l.stop };
+});
+
+/* ================================================ documents: cycle typed blocks */
+register('docs', s => {
+  const blocks = [...s.querySelectorAll('.dc-blocks div')];
+  let i = 0, timer = 0;
+  const show = () => blocks.forEach((b, k) => b.classList.toggle('on', k === i));
+  return {
+    start() { show(); timer = setInterval(() => { i = (i + 1) % blocks.length; show(); }, 1300); },
+    stop() { clearInterval(timer); },
+  };
+});
+
+/* ================================================ near-live (Parakeet) */
+register('nearlive', s => {
+  // ParakeetV3StreamingRuntime: emit every 0.5 s, window ≤ 15 s, commit sentences ending ≥ 2 s before now
+  const SPEED = 2, PASS = 0.5, MAXW = 15, BUF = 2, SPAN = 30, LOOP = 27.5;
+  const SENT = [[0.3, 3.4, 'So the beta goes out next Friday.'], [3.9, 6.8, 'We still need the TestFlight notes,'], [7.2, 10.6, 'and Maya will check the Dutch captions.'], [11.4, 14.2, 'If anything breaks, we roll back.'], [14.8, 17.4, 'Otherwise we ship on Monday.'], [18.2, 21.5, "Let's review feedback after a week."], [22.3, 24.6, 'Sounds good, thanks everyone.']];
+  const ALT = { 'Friday.': 'fried a', 'TestFlight': 'test flight', 'Maya': 'my a', 'Dutch': 'much', 'roll': 'role', 'Monday.': 'Mon', 'feedback': 'feed', 'everyone.': 'every' };
+  const words = [];
+  SENT.forEach(([a, b, txt], si) => { const ws = txt.split(' '); ws.forEach((w, i) => words.push({ si, w, t: a + (b - a) * (i + 1) / ws.length })); });
+  const passEl = s.querySelector('.nl-pass'), winEl = s.querySelector('.nl-win');
+  const commitEl = s.querySelector('.nl-commit'), windowEl = s.querySelector('.nl-window'), nowEl = s.querySelector('.nl-now'), ticksEl = s.querySelector('.nl-ticks');
+  const committedEl = s.querySelector('.nl-committed'), draftEl = s.querySelector('.nl-draft');
+  ticksEl.innerHTML = SENT.map(([, e]) => `<i style="left:${e / SPAN * 100}%"></i>`).join('');
+  const ticks = [...ticksEl.children];
+  let t = 0, c = 0, nextPass = PASS, passes = 0, hold = 0;
+  const pct = x => `${Math.min(100, x / SPAN * 100)}%`;
+  function decodePass() {
+    passes++;
+    // commit rule, then decode the remaining window from scratch
+    if (t - c >= MAXW) {
+      const cand = SENT.filter(([, e]) => e > c && e <= t - BUF).pop();
+      if (cand) c = cand[1];
+    }
+    committedEl.textContent = SENT.filter(([, e]) => e <= c).map(x => x[2]).join(' ');
+    draftEl.textContent = words.filter(x => x.t > c && x.t <= t).map(x => (t - x.t < 0.7 && ALT[x.w]) ? ALT[x.w] : x.w).join(' ');
+    windowEl.classList.remove('flash'); void windowEl.offsetWidth; windowEl.classList.add('flash');
+    ticks.forEach((el, i) => el.classList.toggle('done', SENT[i][1] <= c));
+  }
+  function render() {
+    commitEl.style.width = pct(c);
+    windowEl.style.left = pct(c); windowEl.style.width = `calc(${pct(t - c)} + 0px)`;
+    nowEl.style.left = pct(t);
+    const w = t - c;
+    winEl.textContent = `active window ${w.toFixed(1)} s`;
+    winEl.classList.toggle('full', w >= MAXW - 2); windowEl.classList.toggle('full', w >= MAXW - 2);
+    passEl.textContent = passes;
+  }
+  function reset() { t = 0; c = 0; nextPass = PASS; passes = 0; hold = 0; committedEl.textContent = ''; draftEl.textContent = ''; ticks.forEach(el => el.classList.remove('done')); render(); }
+  const l = loop((now, dt) => {
+    if (t >= LOOP) { hold += dt; if (hold > 2500) reset(); return; }
+    t = Math.min(LOOP, t + dt / 1000 * SPEED);
+    while (t >= nextPass) { decodePass(); nextPass += PASS; }
+    render();
+  });
+  reset();
   return { start: l.start, stop: l.stop };
 });
 
