@@ -85,11 +85,11 @@ mark { background: var(--marker); color: inherit; padding: 0 .08em; border-radiu
 .slide { position: relative; display: flex; flex-direction: column; }
 .deck .slide {
   position: absolute; inset: 0; padding: 3rem 4.2rem 4.2rem; overflow: hidden;
-  opacity: 0; visibility: hidden; transform: translateY(10px);
-  transition: opacity .4s ease, transform .4s cubic-bezier(.2,.8,.2,1), visibility 0s linear .4s;
+  opacity: 0; visibility: hidden;
+  transition: opacity .4s ease, visibility 0s linear .4s;
 }
 html:not(.ready) .slide { transition: none !important; }
-.deck .slide.active { opacity: 1; visibility: visible; transform: none; transition: opacity .4s ease, transform .4s cubic-bezier(.2,.8,.2,1); }
+.deck .slide.active { opacity: 1; visibility: visible; transition: opacity .4s ease; }
 .doc .slide { padding: 2.6rem max(16px, env(safe-area-inset-left)) 2.4rem; }
 .doc .slide + .slide { border-top: 1px solid var(--sep); }
 
@@ -349,11 +349,22 @@ ol.watch li small { display: block; color: var(--label2); font-size: .82rem; fon
 .grouped a .chev { color: var(--label3); width: .9rem; height: .9rem; }
 .url { font-size: .95rem; color: var(--brand); margin-top: .8rem; font-weight: 600; word-break: break-all; }
 
+/* ---------- download badge (every slide) ---------- */
+.dl-badge { position: absolute; right: 4.2rem; bottom: .35rem; z-index: 3; display: flex; align-items: center; gap: .7rem; padding: 4px 1rem 4px 4px; border-radius: 20px; background: var(--card); box-shadow: var(--shadow); color: var(--label); text-decoration: none; }
+.dl-qr { width: 3.7rem; height: 3.7rem; padding: 3px; border-radius: 16px; background: #fff; flex: none; }
+.dl-qr svg { display: block; width: 100%; height: 100%; }
+.dl-name { display: flex; align-items: center; gap: .45rem; }
+.dl-name .appicon { width: 1.5rem; height: 1.5rem; }
+.dl-name b { font-size: 1rem; font-weight: 700; letter-spacing: -.01em; }
+.dl-badge small { display: block; margin-top: .2rem; font-size: .7rem; font-weight: 600; color: var(--label2); }
+.doc .dl-badge { display: none; }
+
 /* ---------- chrome ---------- */
 .dock { position: fixed; bottom: 14px; z-index: 20; display: flex; align-items: center; gap: 2px; padding: 4px; border-radius: 999px; background: var(--glass); -webkit-backdrop-filter: blur(20px) saturate(180%); backdrop-filter: blur(20px) saturate(180%); box-shadow: inset 0 0 0 .5px var(--glass-edge), 0 8px 24px rgba(0,0,0,.12); font-size: 13px; transition: opacity .3s; opacity: .55; }
 .dock:hover, .dock:focus-within { opacity: 1; }
 .dock.left { left: 14px; }
 .dock.right { right: 14px; }
+.dock .dock-sep { width: 1px; height: 18px; margin: 0 4px; background: var(--sep); }
 .dock button { width: 34px; height: 34px; border: 0; border-radius: 50%; background: transparent; display: grid; place-items: center; cursor: pointer; color: var(--label); }
 .dock button:hover { background: var(--fill); }
 .dock button .ic { width: 17px; height: 17px; }
@@ -909,13 +920,22 @@ ol.watch li small { display: block; color: var(--label2); font-size: .82rem; fon
 
 </main>
 
+<template id="badgeTpl">
+  <a class="dl-badge" href="https://apps.apple.com/app/id6785515364" aria-label="Download LiveTranscriber on the App Store">
+    <span class="dl-qr"><svg xmlns="http://www.w3.org/2000/svg" viewBox="-1 -1 31 31" shape-rendering="crispEdges"><path fill="#0b0c10" d="M0 0h7v1h-7zM8 0h2v1h-2zM12 0h1v1h-1zM14 0h1v1h-1zM17 0h3v1h-3zM22 0h7v1h-7zM0 1h1v1h-1zM6 1h1v1h-1zM8 1h2v1h-2zM12 1h3v1h-3zM16 1h1v1h-1zM18 1h1v1h-1zM22 1h1v1h-1zM28 1h1v1h-1zM0 2h1v1h-1zM2 2h3v1h-3zM6 2h1v1h-1zM12 2h3v1h-3zM18 2h3v1h-3zM22 2h1v1h-1zM24 2h3v1h-3zM28 2h1v1h-1zM0 3h1v1h-1zM2 3h3v1h-3zM6 3h1v1h-1zM8 3h3v1h-3zM12 3h2v1h-2zM15 3h3v1h-3zM19 3h1v1h-1zM22 3h1v1h-1zM24 3h3v1h-3zM28 3h1v1h-1zM0 4h1v1h-1zM2 4h3v1h-3zM6 4h1v1h-1zM10 4h1v1h-1zM15 4h1v1h-1zM17 4h1v1h-1zM19 4h1v1h-1zM22 4h1v1h-1zM24 4h3v1h-3zM28 4h1v1h-1zM0 5h1v1h-1zM6 5h1v1h-1zM10 5h1v1h-1zM12 5h1v1h-1zM14 5h1v1h-1zM19 5h2v1h-2zM22 5h1v1h-1zM28 5h1v1h-1zM0 6h7v1h-7zM8 6h1v1h-1zM10 6h1v1h-1zM12 6h1v1h-1zM14 6h1v1h-1zM16 6h1v1h-1zM18 6h1v1h-1zM20 6h1v1h-1zM22 6h7v1h-7zM8 7h3v1h-3zM12 7h1v1h-1zM14 7h1v1h-1zM17 7h3v1h-3zM0 8h1v1h-1zM2 8h2v1h-2zM5 8h3v1h-3zM10 8h3v1h-3zM17 8h2v1h-2zM22 8h1v1h-1zM25 8h1v1h-1zM27 8h2v1h-2zM3 9h1v1h-1zM5 9h1v1h-1zM8 9h2v1h-2zM12 9h1v1h-1zM14 9h1v1h-1zM19 9h4v1h-4zM24 9h1v1h-1zM28 9h1v1h-1zM0 10h4v1h-4zM5 10h2v1h-2zM8 10h1v1h-1zM10 10h3v1h-3zM16 10h2v1h-2zM21 10h2v1h-2zM24 10h1v1h-1zM26 10h2v1h-2zM1 11h5v1h-5zM7 11h1v1h-1zM10 11h1v1h-1zM13 11h1v1h-1zM28 11h1v1h-1zM0 12h10v1h-10zM11 12h1v1h-1zM15 12h3v1h-3zM23 12h1v1h-1zM25 12h2v1h-2zM0 13h1v1h-1zM2 13h1v1h-1zM5 13h1v1h-1zM7 13h1v1h-1zM10 13h2v1h-2zM13 13h3v1h-3zM17 13h3v1h-3zM22 13h1v1h-1zM26 13h3v1h-3zM1 14h1v1h-1zM3 14h1v1h-1zM6 14h2v1h-2zM10 14h1v1h-1zM12 14h1v1h-1zM14 14h1v1h-1zM19 14h1v1h-1zM22 14h1v1h-1zM26 14h3v1h-3zM0 15h2v1h-2zM3 15h1v1h-1zM5 15h1v1h-1zM7 15h2v1h-2zM11 15h3v1h-3zM15 15h2v1h-2zM18 15h3v1h-3zM24 15h1v1h-1zM27 15h1v1h-1zM0 16h2v1h-2zM5 16h2v1h-2zM8 16h1v1h-1zM16 16h1v1h-1zM19 16h3v1h-3zM24 16h2v1h-2zM27 16h1v1h-1zM2 17h2v1h-2zM7 17h5v1h-5zM13 17h1v1h-1zM15 17h3v1h-3zM21 17h1v1h-1zM23 17h1v1h-1zM25 17h3v1h-3zM0 18h1v1h-1zM2 18h1v1h-1zM5 18h3v1h-3zM9 18h2v1h-2zM12 18h1v1h-1zM15 18h1v1h-1zM17 18h1v1h-1zM20 18h2v1h-2zM24 18h1v1h-1zM26 18h1v1h-1zM3 19h1v1h-1zM9 19h4v1h-4zM17 19h2v1h-2zM23 19h1v1h-1zM26 19h1v1h-1zM1 20h1v1h-1zM3 20h1v1h-1zM5 20h3v1h-3zM10 20h4v1h-4zM15 20h1v1h-1zM17 20h10v1h-10zM8 21h2v1h-2zM11 21h1v1h-1zM13 21h2v1h-2zM17 21h2v1h-2zM20 21h1v1h-1zM24 21h5v1h-5zM0 22h7v1h-7zM8 22h1v1h-1zM11 22h1v1h-1zM13 22h1v1h-1zM16 22h2v1h-2zM19 22h2v1h-2zM22 22h1v1h-1zM24 22h2v1h-2zM27 22h1v1h-1zM0 23h1v1h-1zM6 23h1v1h-1zM8 23h3v1h-3zM12 23h1v1h-1zM15 23h1v1h-1zM18 23h1v1h-1zM20 23h1v1h-1zM24 23h2v1h-2zM27 23h1v1h-1zM0 24h1v1h-1zM2 24h3v1h-3zM6 24h1v1h-1zM10 24h1v1h-1zM12 24h1v1h-1zM14 24h4v1h-4zM20 24h5v1h-5zM26 24h1v1h-1zM0 25h1v1h-1zM2 25h3v1h-3zM6 25h1v1h-1zM8 25h2v1h-2zM11 25h5v1h-5zM17 25h1v1h-1zM20 25h2v1h-2zM24 25h2v1h-2zM28 25h1v1h-1zM0 26h1v1h-1zM2 26h3v1h-3zM6 26h1v1h-1zM8 26h2v1h-2zM12 26h1v1h-1zM14 26h1v1h-1zM16 26h1v1h-1zM18 26h1v1h-1zM20 26h2v1h-2zM23 26h1v1h-1zM26 26h1v1h-1zM28 26h1v1h-1zM0 27h1v1h-1zM6 27h1v1h-1zM9 27h2v1h-2zM12 27h2v1h-2zM16 27h1v1h-1zM18 27h1v1h-1zM20 27h2v1h-2zM23 27h3v1h-3zM27 27h1v1h-1zM0 28h7v1h-7zM8 28h4v1h-4zM16 28h1v1h-1zM19 28h2v1h-2zM23 28h1v1h-1zM27 28h1v1h-1z"/></svg></span>
+    <span>
+      <span class="dl-name"><span class="appicon"><img class="light" src="img/icon-light.jpg" alt=""><img class="dark" src="img/icon-dark.jpg" alt=""></span><b>LiveTranscriber</b></span>
+      <small>Scan to download on the App Store</small>
+    </span>
+  </a>
+</template>
+
 <div class="notes-panel" id="notesPanel"><h4>Speaker notes · <span id="notesNum"></span></h4><ul id="notesBody"></ul></div>
 <nav class="dock left" aria-label="Slide navigation">
   <button id="prevBtn" type="button" aria-label="Previous slide"><svg class="ic"><use href="#i-left"/></svg></button>
   <span class="count" id="count">1 / 12</span>
   <button id="nextBtn" type="button" aria-label="Next slide"><svg class="ic"><use href="#i-right"/></svg></button>
-</nav>
-<nav class="dock right" aria-label="Presentation controls">
+  <span class="dock-sep"></span>
   <button class="theme-toggle" type="button" aria-label="Toggle light or dark appearance" title="Appearance (T)"><svg class="ic"><use href="#i-theme"/></svg></button>
   <button id="notesBtn" type="button" aria-label="Toggle speaker notes" title="Speaker notes (N)"><svg class="ic"><use href="#i-notes"/></svg></button>
   <button id="fsBtn" type="button" aria-label="Toggle fullscreen" title="Fullscreen (F)"><svg class="ic"><use href="#i-expand"/></svg></button>
@@ -930,6 +950,8 @@ const slides = [...document.querySelectorAll('.slide')];
 const live = getComputedStyle(root);
 const C = name => live.getPropertyValue(name).trim();
 let SCALE = 1;
+const badgeTpl = document.getElementById('badgeTpl');
+slides.forEach(sl => sl.appendChild(badgeTpl.content.cloneNode(true)));
 let index = 0;
 let mode = null;
 
