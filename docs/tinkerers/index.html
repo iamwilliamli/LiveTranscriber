@@ -5,437 +5,500 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>How Speech Becomes Text on an iPhone · LiveTranscriber</title>
 <meta name="description" content="AI Tinkerers Toronto demo: what eight on-device speech models compute, from PCM samples to tokens, timestamps and speaker labels. By William (Chengqi) Li.">
-<meta property="og:title" content="How speech becomes text — on an iPhone, offline">
+<meta property="og:title" content="How speech becomes text, on an iPhone">
 <meta property="og:description" content="Transducers, TDT, Whisper, audio-LLMs and speaker diarization, explained through LiveTranscriber. AI Tinkerers Toronto, Oct 2026.">
 <meta property="og:type" content="website">
 <meta property="og:url" content="https://iamwilliamli.github.io/LiveTranscriber/tinkerers/">
-<meta name="theme-color" content="#0b0c10">
-<link rel="icon" type="image/svg+xml" href="img/icon.svg">
+<meta property="og:image" content="https://iamwilliamli.github.io/LiveTranscriber/tinkerers/img/icon-light.jpg">
+<meta name="color-scheme" content="light dark">
+<meta name="theme-color" media="(prefers-color-scheme: light)" content="#F2F3F6">
+<meta name="theme-color" media="(prefers-color-scheme: dark)" content="#121212">
+<link rel="icon" type="image/png" href="img/favicon.png">
+<link rel="apple-touch-icon" href="img/apple-touch-icon.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=Reddit+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Reddit+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/katex.min.css" crossorigin="anonymous">
 <style>
+/* Tokens mirror SharedApp/DesignSystem/AppTheme.swift */
 :root {
-  --bg: #0b0c10;
-  --bg2: #101219;
-  --panel: #14161d;
-  --panel2: #1b1e27;
-  --line: rgba(255,255,255,.09);
-  --line2: rgba(255,255,255,.16);
-  --text: #f4f5f7;
-  --muted: #a2a9b6;
-  --dim: #6c7380;
-  --brand: #f5381a;
-  --brand-soft: #ff7d40;
-  --info: #4a8bff;
-  --success: #22c37a;
-  --warning: #f3a43b;
-  --purple: #9a7dff;
-  --blank: #6e7b97;
-  --sans: "Reddit Sans", -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", sans-serif;
-  --mono: "JetBrains Mono", ui-monospace, "SF Mono", Menlo, monospace;
+  --bg: #F2F3F6;          /* groupedBackground */
+  --card: #FFFFFF;        /* cardBackground */
+  --elev: #EDEEF2;        /* elevatedBackground */
+  --fill: rgba(118,118,128,.12);
+  --label: #111113;
+  --label2: #6C6C72;
+  --label3: #A3A3AA;
+  --sep: rgba(60,60,67,.12);
+  --shadow: 0 6px 24px rgba(17,24,39,.07), 0 1px 2px rgba(17,24,39,.05);
+  --glass: rgba(255,255,255,.72);
+  --glass-edge: rgba(255,255,255,.9);
+  --marker: rgba(255,171,115,.46);
+  --brand: #F5381A;
+  --brand-soft: #FF7D40;
+  --info: #1F70F2;
+  --success: #149E5C;
+  --privacy: #29A878;
+  --warning: #ED9420;
+  --danger: #DB2E2E;
+  --purple: #7857DB;
+  --blank: #8E8E93;
+  --r: 28px;              /* AppTheme.cornerRadius */
+  --r-md: 18px;
+  --r-xs: 7px;            /* compactCornerRadius */
+  --sans: "Reddit Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --serif: ui-serif, "New York", "Iowan Old Style", Charter, Georgia, serif;
+  --mono: ui-monospace, "SF Mono", SFMono-Regular, Menlo, Consolas, monospace;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #121212; --card: #1C1C1E; --elev: #2C2C2E; --fill: rgba(118,118,128,.24);
+    --label: #FFFFFF; --label2: #9C9CA3; --label3: #5F5F66; --sep: rgba(255,255,255,.09);
+    --shadow: 0 0 0 1px rgba(255,255,255,.05); --glass: rgba(44,44,46,.72); --glass-edge: rgba(255,255,255,.12);
+    --marker: rgba(255,171,115,.34); color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #121212; --card: #1C1C1E; --elev: #2C2C2E; --fill: rgba(118,118,128,.24);
+  --label: #FFFFFF; --label2: #9C9CA3; --label3: #5F5F66; --sep: rgba(255,255,255,.09);
+  --shadow: 0 0 0 1px rgba(255,255,255,.05); --glass: rgba(44,44,46,.72); --glass-edge: rgba(255,255,255,.12);
+  --marker: rgba(255,171,115,.34); color-scheme: dark;
 }
 * { box-sizing: border-box; }
-html, body { margin: 0; background: var(--bg); color: var(--text); font-family: var(--sans); -webkit-font-smoothing: antialiased; }
+html, body { margin: 0; background: var(--bg); color: var(--label); font-family: var(--sans); -webkit-font-smoothing: antialiased; }
 html.deck { font-size: 20px; }
 html.doc { font-size: 16px; }
 html.deck, html.deck body { height: 100%; overflow: hidden; }
-body { line-height: 1.4; }
+body { line-height: 1.4; font-variant-numeric: tabular-nums; }
 button { font: inherit; color: inherit; }
-.mono, .formula, .chip, .tok, .tag, .kicker, .prob, .lat-log, .pipeline-mini, .url, table.models td.mono { font-variant-ligatures: none; font-feature-settings: "liga" 0, "calt" 0; }
-a { color: var(--brand-soft); text-underline-offset: 3px; }
+a { color: var(--brand); text-underline-offset: 3px; }
+.ic { width: 1.15em; height: 1.15em; flex: none; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; vertical-align: -.2em; }
+.mono { font-family: var(--mono); font-variant-ligatures: none; }
+.l2 { color: var(--label2); }
+.l3 { color: var(--label3); }
+mark { background: var(--marker); color: inherit; padding: 0 .08em; border-radius: 4px; -webkit-box-decoration-break: clone; box-decoration-break: clone; }
 
 /* ---------- stage ---------- */
 .stage { position: relative; }
-.deck .stage {
-  position: absolute; left: 50%; top: 50%; width: 1600px; height: 900px;
-  transform: translate(-50%, -50%) scale(var(--s, 1)); transform-origin: 50% 50%;
-}
-.slide { position: relative; display: flex; flex-direction: column; overflow: hidden; }
+.deck .stage { position: absolute; left: 50%; top: 50%; width: 1600px; height: 900px; transform: translate(-50%, -50%) scale(var(--s, 1)); }
+.slide { position: relative; display: flex; flex-direction: column; }
 .deck .slide {
-  position: absolute; inset: 0; padding: 3.1rem 4.2rem 3.6rem;
-  opacity: 0; visibility: hidden; transform: translateX(18px);
-  transition: opacity .38s ease, transform .38s ease, visibility 0s linear .38s;
+  position: absolute; inset: 0; padding: 3rem 4.2rem 4.2rem; overflow: hidden;
+  opacity: 0; visibility: hidden; transform: translateY(10px);
+  transition: opacity .4s ease, transform .4s cubic-bezier(.2,.8,.2,1), visibility 0s linear .4s;
 }
-.deck .slide.active { opacity: 1; visibility: visible; transform: none; transition: opacity .38s ease, transform .38s ease; }
-.deck .slide.prev { transform: translateX(-18px); }
-.doc .slide { padding: 3.4rem max(16px, env(safe-area-inset-left)) 3rem; border-bottom: 1px solid var(--line); }
-.slide::before {
-  content: ""; position: absolute; inset: 0; pointer-events: none; z-index: 0;
-  background: radial-gradient(900px 500px at 92% -10%, rgba(245,56,26,.10), transparent 60%),
-              radial-gradient(800px 500px at -10% 110%, rgba(74,139,255,.08), transparent 60%);
-}
-.slide > * { position: relative; z-index: 1; }
+html:not(.ready) .slide { transition: none !important; }
+.deck .slide.active { opacity: 1; visibility: visible; transform: none; transition: opacity .4s ease, transform .4s cubic-bezier(.2,.8,.2,1); }
+.doc .slide { padding: 2.6rem max(16px, env(safe-area-inset-left)) 2.4rem; }
+.doc .slide + .slide { border-top: 1px solid var(--sep); }
 
-.kicker { font-family: var(--mono); font-size: .72rem; letter-spacing: .14em; text-transform: uppercase; color: var(--brand-soft); display: flex; gap: .8em; align-items: center; }
-.kicker .n { color: var(--dim); }
-h1, h2, h3 { margin: 0; letter-spacing: -.025em; }
-h1 { font-size: 4.1rem; line-height: 1.02; font-weight: 800; }
-h2 { font-size: 2.45rem; line-height: 1.08; font-weight: 800; margin-top: .45rem; }
-h3 { font-size: 1.05rem; font-weight: 700; letter-spacing: -.01em; }
-.lede { font-size: 1.12rem; color: var(--muted); max-width: 54rem; margin: .7rem 0 0; }
-.grad { background: linear-gradient(92deg, var(--brand) 0%, var(--brand-soft) 45%, var(--purple) 100%); -webkit-background-clip: text; background-clip: text; color: transparent; }
-.mono { font-family: var(--mono); }
-.muted { color: var(--muted); }
-.dim { color: var(--dim); }
-.small { font-size: .8rem; }
-.body { flex: 1; min-height: 0; margin-top: 1.5rem; }
-.cols { display: grid; gap: 1.6rem; }
-.card { background: var(--panel); border: 1px solid var(--line); border-radius: 18px; padding: 1.1rem 1.2rem; }
-.card p { margin: .45rem 0 0; color: var(--muted); font-size: .9rem; }
-.tag { display: inline-flex; align-items: center; gap: .35em; font-family: var(--mono); font-size: .66rem; letter-spacing: .08em; text-transform: uppercase; padding: .28em .6em; border-radius: 999px; border: 1px solid var(--line2); color: var(--muted); white-space: nowrap; }
-.tag.live { color: var(--success); border-color: rgba(34,195,122,.4); }
-.tag.off { color: var(--purple); border-color: rgba(154,125,255,.45); }
-.tag.brand { color: var(--brand-soft); border-color: rgba(255,125,64,.45); }
-.formula { font-family: var(--mono); font-size: .82rem; background: var(--bg2); border: 1px solid var(--line); border-radius: 10px; padding: .55em .75em; color: #dfe3ea; overflow-x: auto; white-space: nowrap; }
-.formula b { color: var(--brand-soft); font-weight: 500; }
-.chip { display: inline-flex; align-items: center; font-family: var(--mono); font-size: .78rem; padding: .3em .55em; border-radius: 8px; background: var(--panel2); border: 1px solid var(--line2); white-space: nowrap; }
-.btn { display: inline-flex; align-items: center; gap: .45em; padding: .45em .85em; border-radius: 999px; border: 1px solid var(--line2); background: var(--panel2); cursor: pointer; font-size: .78rem; font-weight: 600; }
-.btn:hover { border-color: rgba(255,255,255,.3); }
-.btn.on { background: var(--text); color: var(--bg); border-color: var(--text); }
-.btn.rec.on { background: var(--brand); color: #fff; border-color: var(--brand); }
-.seg { display: inline-flex; padding: 3px; border-radius: 999px; background: var(--bg2); border: 1px solid var(--line); gap: 2px; }
-.seg .btn { border: 0; background: transparent; }
-.seg .btn.on { background: var(--text); color: var(--bg); }
-ul.ticks { list-style: none; margin: 0; padding: 0; display: grid; gap: .6rem; }
-ul.ticks li { position: relative; padding-left: 1.3rem; color: var(--muted); font-size: .92rem; }
-ul.ticks li::before { content: ""; position: absolute; left: 0; top: .55em; width: .5rem; height: .5rem; border-radius: 2px; background: var(--brand); }
-ul.ticks li b { color: var(--text); font-weight: 600; }
+/* ---------- type ---------- */
+.eyebrow { font-size: .8rem; font-weight: 600; color: var(--label2); display: flex; gap: .45em; align-items: baseline; }
+.eyebrow b { color: var(--brand); font-weight: 700; }
+h1, h2 { font-family: var(--serif); font-weight: 700; margin: 0; letter-spacing: -.02em; }
+h1 { font-size: 3.9rem; line-height: 1.03; }
+h2 { font-size: 2.5rem; line-height: 1.08; margin-top: .3rem; }
+h3 { margin: 0; font-size: 1.02rem; font-weight: 700; letter-spacing: -.005em; display: flex; align-items: center; gap: .45rem; }
+.lede { font-size: 1.1rem; color: var(--label2); max-width: 56rem; margin: .6rem 0 0; }
+.body { flex: 1; min-height: 0; margin-top: 1.4rem; }
+
+/* ---------- surfaces ---------- */
+.card { background: var(--card); border-radius: var(--r); box-shadow: var(--shadow); padding: 1.15rem 1.3rem; }
+.card p { margin: .45rem 0 0; color: var(--label2); font-size: .88rem; }
+.inset { background: var(--elev); border-radius: var(--r-md); }
+.pill { display: inline-flex; align-items: center; gap: .35em; font-size: .7rem; font-weight: 700; padding: .28em .7em; border-radius: 999px; white-space: nowrap; color: var(--c, var(--label2)); background: color-mix(in srgb, var(--c, var(--label2)) 13%, transparent); }
+.pill i { width: .5em; height: .5em; border-radius: 50%; background: currentColor; }
+.capsule { display: inline-flex; align-items: center; font-family: var(--mono); font-size: .74rem; padding: .22em .6em; border-radius: 999px; background: var(--elev); color: var(--label); white-space: nowrap; font-variant-ligatures: none; }
+.formula { display: block; background: var(--elev); border-radius: 14px; padding: .55em .85em; overflow-x: auto; overflow-y: hidden; font-size: .95rem; color: var(--label); }
+.tex .katex { font-size: 1.04em; }
+.formula .katex-html { white-space: nowrap; }
+.fam .formula { font-size: .8rem; padding: .55em .7em; }
+.formula .katex-display { margin: 0; }
+.tex-inline { white-space: nowrap; }
+.btn { display: inline-flex; align-items: center; gap: .45em; padding: .5em 1em; border-radius: 999px; border: 0; background: var(--fill); cursor: pointer; font-size: .8rem; font-weight: 600; }
+.btn:hover { filter: brightness(.97); }
+.btn.primary { background: var(--brand); color: #fff; }
+.btn.primary.rec { background: var(--danger); }
+.seg { display: inline-flex; padding: 2px; border-radius: 999px; background: var(--fill); gap: 2px; }
+.seg button { border: 0; background: transparent; border-radius: 999px; padding: .42em .95em; font-size: .8rem; font-weight: 600; color: var(--label); cursor: pointer; }
+.seg button.on { background: var(--card); box-shadow: 0 3px 8px rgba(0,0,0,.12), 0 1px 1px rgba(0,0,0,.04); }
+:root[data-theme="dark"] .seg button.on { background: #636366; }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .seg button.on { background: #636366; } }
+ul.list { list-style: none; margin: 0; padding: 0; display: grid; gap: .65rem; }
+ul.list li { display: grid; grid-template-columns: 1.4rem 1fr; gap: .55rem; align-items: start; font-size: .9rem; color: var(--label2); }
+ul.list li .ic { margin-top: .12em; }
+ul.list li b { color: var(--label); font-weight: 650; }
 .notes { display: none; }
 
-/* ---------- 1 title ---------- */
-.title-wrap { flex: 1; display: grid; grid-template-columns: 1.15fr .85fr; gap: 3rem; align-items: center; }
-.byline { display: flex; align-items: center; gap: .9rem; margin-top: 2.2rem; }
-.byline img { width: 3.2rem; height: 3.2rem; border-radius: 22%; box-shadow: 0 8px 30px rgba(245,56,26,.25); }
-.byline b { display: block; font-size: 1.05rem; }
-.byline span { color: var(--muted); font-size: .85rem; }
-.hero { position: relative; height: 26rem; border-radius: 26px; border: 1px solid var(--line); background: linear-gradient(180deg, var(--panel), var(--bg2)); overflow: hidden; }
-.hero canvas { position: absolute; left: 0; right: 0; top: 2.2rem; width: 100%; height: 9rem; }
-.hero .stack { position: absolute; left: 1.4rem; right: 1.4rem; bottom: 1.4rem; display: grid; gap: .55rem; }
-.hero .row { display: flex; align-items: center; gap: .5rem; flex-wrap: wrap; }
-.hero .lbl { font-family: var(--mono); font-size: .62rem; color: var(--dim); letter-spacing: .1em; text-transform: uppercase; width: 5.2rem; flex: none; }
-.hero .chip { opacity: 0; transform: translateY(6px); animation: chipIn 6s infinite; }
-.hero .spk { color: #fff; border: 0; }
-@keyframes chipIn { 0% { opacity: 0; transform: translateY(6px); } 8%, 82% { opacity: 1; transform: none; } 92%, 100% { opacity: 0; transform: translateY(-4px); } }
-.hero .caption { font-size: 1.25rem; font-weight: 700; letter-spacing: -.01em; }
-.hero .caption .cursor { display: inline-block; width: .55em; height: 1.05em; vertical-align: -.15em; background: var(--brand); margin-left: 2px; animation: blink 1s steps(1) infinite; }
-@keyframes blink { 50% { opacity: 0; } }
+/* ---------- app icon ---------- */
+.appicon { position: relative; flex: none; border-radius: 22.37%; overflow: hidden; box-shadow: 0 0 0 .5px rgba(0,0,0,.08), 0 8px 24px rgba(17,24,39,.12); background: #fff; }
+.appicon img { display: block; width: 100%; height: 100%; }
+.appicon .dark { display: none; }
+:root[data-theme="dark"] .appicon .light { display: none; }
+:root[data-theme="dark"] .appicon .dark { display: block; }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .appicon .light { display: none; } :root:not([data-theme="light"]) .appicon .dark { display: block; } }
 
-/* ---------- 2 system lanes ---------- */
-.lanes { display: grid; gap: 1.2rem; }
-.lane { border: 1px solid var(--line); border-radius: 20px; background: var(--panel); padding: 1rem 1.1rem 1.1rem; }
-.lane-head { display: flex; align-items: center; gap: .7rem; margin-bottom: .8rem; }
-.lane-head h3 { font-size: 1.1rem; }
-.lane-head .budget { margin-left: auto; font-family: var(--mono); font-size: .72rem; color: var(--muted); }
-.flow { position: relative; display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; gap: 1.6rem; align-items: stretch; }
-.flow .node { position: relative; z-index: 1; background: var(--bg2); border: 1px solid var(--line2); border-radius: 14px; padding: .65rem .75rem; min-width: 0; }
-.flow .node .role { font-family: var(--mono); font-size: .58rem; letter-spacing: .12em; color: var(--dim); text-transform: uppercase; }
-.flow .node b { display: block; font-size: .9rem; margin-top: .15rem; }
-.flow .node small { display: block; color: var(--muted); font-size: .72rem; margin-top: .15rem; line-height: 1.3; }
-.flow .node.alt { border-style: dashed; }
-.flow .node:not(:last-child)::after { content: "→"; position: absolute; right: -1.25rem; top: 50%; transform: translateY(-50%); color: var(--dim); font-size: .9rem; }
-.flow .track { position: absolute; left: 0; right: 0; top: 50%; height: 2px; z-index: 0; background: linear-gradient(90deg, transparent, var(--line2), transparent); }
-.flow .pulse { position: absolute; top: calc(50% - 4px); left: 0; width: 8px; height: 8px; border-radius: 50%; z-index: 0; background: var(--success); box-shadow: 0 0 14px var(--success); animation: travel 3.2s linear infinite; }
-.lane.offline .pulse { background: var(--purple); box-shadow: 0 0 14px var(--purple); animation-duration: 5s; }
-@keyframes travel { from { left: 0; opacity: 0; } 6% { opacity: 1; } 94% { opacity: 1; } to { left: calc(100% - 8px); opacity: 0; } }
-.router-note { display: flex; align-items: center; gap: 1rem; margin-top: 1rem; }
+/* ---------- 1 title ---------- */
+.title-wrap { flex: 1; display: grid; grid-template-columns: 1.1fr .9fr; gap: 3.2rem; align-items: center; }
+.appmark { display: flex; align-items: center; gap: .9rem; margin-bottom: 2rem; }
+.appmark .appicon { width: 4.4rem; height: 4.4rem; }
+.appmark b { display: block; font-size: 1.15rem; }
+.appmark span { color: var(--label2); font-size: .85rem; }
+.byline { margin-top: 2rem; font-size: .95rem; color: var(--label2); }
+.byline b { color: var(--label); }
+.hero-card { padding: 1.2rem 1.3rem 1.1rem; }
+.hc-head { display: flex; align-items: center; gap: .5rem; }
+.hc-head h3 { font-size: 1.05rem; }
+.hc-head .pill { margin-left: auto; }
+.tr { margin-top: .9rem; display: grid; gap: .9rem; min-height: 15.5rem; align-content: start; }
+.tr-row .meta { display: flex; align-items: center; gap: .5rem; font-size: .78rem; font-weight: 700; color: var(--c); }
+.tr-row .meta .capsule { font-size: .68rem; color: var(--label2); font-weight: 500; }
+.tr-row p { margin: .25rem 0 0; font-size: 1.12rem; line-height: 1.35; color: var(--label); }
+.tr-row.interim p { color: var(--label3); }
+.tr-row.hidden { opacity: 0; }
+.tr-row { transition: opacity .3s; }
+.hc-foot { display: flex; gap: .4rem; flex-wrap: wrap; padding-top: .9rem; margin-top: .9rem; border-top: 1px solid var(--sep); }
+
+/* ---------- 2 lanes ---------- */
+.lanes { display: grid; grid-template-columns: minmax(0, 1fr); gap: 1.1rem; align-content: start; }
+.lane-head { display: flex; align-items: center; gap: .7rem; margin-bottom: .85rem; }
+.lane-head .budget { margin-left: auto; font-size: .78rem; color: var(--label2); }
+.flow { position: relative; display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; gap: 1.5rem; }
+.flow .node { position: relative; background: var(--elev); border-radius: var(--r-md); padding: .7rem .8rem; min-width: 0; }
+.flow .node .role { font-size: .66rem; font-weight: 700; color: var(--label2); text-transform: uppercase; letter-spacing: .06em; display: flex; align-items: center; gap: .35rem; }
+.flow .node .role .ic { color: var(--c, var(--label2)); width: 1.05rem; height: 1.05rem; }
+.flow .node b { display: block; font-size: .92rem; margin-top: .25rem; }
+.flow .node small { display: block; color: var(--label2); font-size: .74rem; margin-top: .15rem; line-height: 1.3; }
+.flow .node.opt { background: transparent; box-shadow: inset 0 0 0 1.5px var(--sep); }
+.flow .node:not(:last-child)::after { content: ""; position: absolute; right: -1.08rem; top: 50%; width: .62rem; height: .62rem; border-top: 2px solid var(--label3); border-right: 2px solid var(--label3); transform: translateY(-50%) rotate(45deg); }
+.router-note { display: flex; align-items: center; gap: 1rem; margin-top: .2rem; }
+.router-note .formula { flex: none; }
 
 /* ---------- 3 spectrogram ---------- */
-.spec-wrap { display: grid; grid-template-columns: 1.35fr 1fr; gap: 2rem; height: 100%; }
-.spec-card { display: flex; flex-direction: column; gap: .7rem; }
-.spec-canvas { position: relative; flex: 1; min-height: 14rem; border-radius: 16px; overflow: hidden; border: 1px solid var(--line); background: #07080b; }
+.spec-wrap { display: grid; grid-template-columns: 1.35fr 1fr; grid-template-rows: minmax(0, 1fr); gap: 1.6rem; height: 100%; }
+.spec-card { display: flex; flex-direction: column; gap: .8rem; }
+.spec-canvas { position: relative; flex: 1; min-height: 14rem; border-radius: var(--r-md); overflow: hidden; background: var(--elev); }
 .spec-canvas canvas { position: absolute; inset: 0; width: 100%; height: 100%; }
-.spec-canvas .axis { position: absolute; left: .6rem; top: 0; bottom: 0; font-family: var(--mono); font-size: .58rem; color: rgba(255,255,255,.6); pointer-events: none; }
-.spec-canvas .axis span { position: absolute; left: 0; transform: translateY(50%); white-space: nowrap; background: rgba(0,0,0,.55); padding: 0 .3em; border-radius: 4px; }
-.spec-canvas .shape { position: absolute; right: .7rem; top: .6rem; font-family: var(--mono); font-size: .7rem; background: rgba(0,0,0,.55); padding: .25em .55em; border-radius: 6px; }
-.spec-canvas .wave { position: absolute; left: 0; right: 0; bottom: 0; height: 18%; }
+.spec-canvas .axis { position: absolute; left: .6rem; top: 0; bottom: 0; font-size: .62rem; font-weight: 600; color: var(--label2); pointer-events: none; }
+.spec-canvas .axis span { position: absolute; left: 0; transform: translateY(50%); white-space: nowrap; background: color-mix(in srgb, var(--card) 82%, transparent); padding: .05em .45em; border-radius: 999px; }
+.spec-canvas .shape { position: absolute; right: .7rem; top: .6rem; background: color-mix(in srgb, var(--card) 86%, transparent); padding: .1em .6em; border-radius: 999px; font-size: .9rem; }
 .spec-controls { display: flex; gap: .6rem; align-items: center; flex-wrap: wrap; }
-.spec-controls .stat { margin-left: auto; font-family: var(--mono); font-size: .72rem; color: var(--muted); }
-.steps { display: grid; gap: .65rem; align-content: start; }
-.step { display: grid; grid-template-columns: 2rem 1fr; gap: .7rem; align-items: start; }
-.step .k { width: 2rem; height: 2rem; border-radius: 10px; display: grid; place-items: center; font-family: var(--mono); font-weight: 700; font-size: .8rem; background: var(--panel2); border: 1px solid var(--line2); }
-.step b { font-size: .95rem; }
-.step p { margin: .15rem 0 0; color: var(--muted); font-size: .82rem; }
-.callout { border-left: 3px solid var(--brand); padding: .5rem .9rem; background: linear-gradient(90deg, rgba(245,56,26,.10), transparent); border-radius: 0 12px 12px 0; color: #e8e9ec; font-size: .9rem; }
+.spec-controls .stat { margin-left: auto; font-size: .76rem; color: var(--label2); }
+.steps { display: grid; gap: .9rem; align-content: start; }
+.step { display: grid; grid-template-columns: 1.6rem 1fr; gap: .6rem; align-items: baseline; }
+.step .k { font-family: var(--serif); font-weight: 700; font-size: 1.25rem; color: var(--brand); }
+.step b { font-size: .98rem; }
+.step p { margin: .15rem 0 0; color: var(--label2); font-size: .84rem; }
+.callout { border-radius: var(--r-md); padding: .8rem 1rem; background: color-mix(in srgb, var(--brand) 8%, var(--card)); font-size: .9rem; color: var(--label); }
+.pipeline-mini { font-size: .78rem; color: var(--label2); }
+.pipeline-mini b { color: var(--label); }
 
 /* ---------- 4 families ---------- */
-.enc-strip { display: flex; align-items: center; gap: .6rem; flex-wrap: wrap; padding: .75rem 1rem; border-radius: 14px; border: 1px solid var(--line); background: var(--panel); }
-.enc-strip .arrow { color: var(--dim); }
-.fam { display: grid; grid-template-columns: repeat(4, 1fr); gap: 1rem; margin-top: .9rem; }
-.fam .card { display: flex; flex-direction: column; gap: .45rem; padding: .95rem 1.05rem; }
-.fam .card p { font-size: .82rem; margin-top: .1rem; }
-.fam .card h3 { font-size: 1.15rem; }
-.fam .card .motto { font-family: var(--mono); font-size: .74rem; color: var(--brand-soft); }
-.fam .card .who { margin-top: auto; padding-top: .6rem; border-top: 1px solid var(--line); display: flex; gap: .4rem; flex-wrap: wrap; }
-.fam svg { width: 100%; height: 3.7rem; }
-.side-notes { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-top: .8rem; }
+.enc-strip { display: flex; align-items: center; gap: .55rem; flex-wrap: wrap; padding: .75rem 1rem; }
+.enc-strip .arr { color: var(--label3); }
+.fam { display: grid; grid-template-columns: repeat(4, 1fr); gap: 1rem; margin-top: 1rem; }
+.fam .card { display: flex; flex-direction: column; gap: .5rem; padding: 1rem 1.1rem; }
+.fam .card h3 { font-size: 1.12rem; }
+.fam .card .motto { font-family: var(--serif); font-style: italic; font-size: .92rem; color: var(--label2); }
+.fam .card p { font-size: .82rem; margin-top: .05rem; }
+.fam .card .who { margin-top: auto; padding-top: .55rem; border-top: 1px solid var(--sep); display: flex; gap: .4rem; flex-wrap: wrap; }
+.fam svg.sk { width: 100%; height: 3.6rem; }
+.side-notes { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-top: 1rem; }
+.side-notes .card { padding: .8rem 1.1rem; }
+.side-notes .card p { margin-top: .2rem; }
 
 /* ---------- 5 lattice ---------- */
-.lat-wrap { display: grid; grid-template-columns: 1.3fr 1fr; grid-template-rows: minmax(0, 1fr); gap: 1.8rem; height: 100%; }
-.lat-wrap .card { padding: .8rem 1rem; }
-.lat-wrap .card p { font-size: .8rem; margin-top: .4rem; }
-.lat-wrap .formula { font-size: .76rem; }
-.doc .lat-wrap { grid-template-rows: auto; }
-.lat-card { display: flex; flex-direction: column; gap: .7rem; }
-.lat-canvas { position: relative; flex: 1; min-height: 12rem; border: 1px solid var(--line); border-radius: 16px; background: var(--bg2); }
+.lat-wrap { display: grid; grid-template-columns: 1.3fr 1fr; grid-template-rows: minmax(0, 1fr); gap: 1.6rem; height: 100%; }
+.lat-card { display: flex; flex-direction: column; gap: .75rem; }
+.lat-canvas { position: relative; flex: 1; min-height: 12rem; }
 .lat-canvas canvas { position: absolute; inset: 0; width: 100%; height: 100%; }
-.lat-log { font-family: var(--mono); font-size: .78rem; color: #dfe3ea; min-height: 1.4em; }
-.lat-log .cnt { float: right; color: var(--muted); }
-.chunks { display: flex; gap: 4px; height: 2.1rem; align-items: stretch; overflow: hidden; border-radius: 10px; padding: 4px; background: var(--bg2); border: 1px solid var(--line); }
-.chunks div { flex: 0 0 2.6rem; border-radius: 6px; background: #2a2f3b; transition: background .5s; display: grid; place-items: center; font-family: var(--mono); font-size: .55rem; color: rgba(255,255,255,.55); }
-.chunks div.new { background: var(--success); color: #04110a; font-weight: 700; animation: pop .4s ease; }
+.lat-log { font-size: .8rem; color: var(--label); min-height: 1.4em; display: flex; gap: 1rem; }
+.lat-log .txt { flex: 1; }
+.lat-log .cnt { color: var(--label2); white-space: nowrap; }
+.lat-side { display: grid; gap: .9rem; align-content: start; }
+.lat-side .card { padding: .9rem 1.1rem; }
+.lat-side .card p { font-size: .8rem; margin-top: .45rem; }
+.lat-side .formula { margin-top: .5rem; font-size: .85rem; }
+.chunks { display: flex; gap: 4px; height: 2rem; overflow: hidden; border-radius: 12px; padding: 4px; background: var(--elev); }
+.chunks div { flex: 0 0 2.7rem; border-radius: 8px; background: var(--fill); display: grid; place-items: center; font-size: .56rem; font-weight: 600; color: var(--label2); }
+.chunks div.new { background: var(--success); color: #fff; animation: pop .4s ease; }
 @keyframes pop { from { transform: scaleX(.2); opacity: 0; } to { transform: none; opacity: 1; } }
-.pipeline-mini { display: flex; gap: .35rem; flex-wrap: wrap; align-items: center; font-family: var(--mono); font-size: .7rem; color: var(--muted); }
-.pipeline-mini b { color: var(--text); font-weight: 500; }
 
 /* ---------- 6 autoregressive ---------- */
 .ar-top { display: flex; align-items: center; gap: 1rem; flex-wrap: wrap; }
-.ar-wrap { display: grid; grid-template-columns: 1.25fr 1fr; gap: 1.6rem; margin-top: 1rem; }
-.chain { display: flex; align-items: stretch; gap: .5rem; flex-wrap: wrap; }
-.chain .c { flex: 1 1 0; min-width: 7rem; background: var(--bg2); border: 1px solid var(--line2); border-radius: 12px; padding: .5rem .6rem; font-size: .78rem; }
-.chain .c i { display: block; font-style: normal; font-family: var(--mono); font-size: .58rem; color: var(--dim); letter-spacing: .1em; text-transform: uppercase; }
-.tokens { display: flex; flex-wrap: wrap; gap: .5rem; align-content: flex-start; min-height: 9rem; padding: 1rem; border-radius: 14px; background: var(--bg2); border: 1px solid var(--line); }
-.tok { font-family: var(--mono); font-size: 1.02rem; padding: .3em .55em; border-radius: 8px; border: 1px solid var(--line2); background: var(--panel2); transition: opacity .25s, transform .25s; }
-.tok.prompt { color: var(--dim); border-style: dashed; }
-.tok.ctl { color: var(--info); border-color: rgba(74,139,255,.45); }
-.tok.time { color: var(--warning); border-color: rgba(243,164,59,.45); }
-.tok.spk { color: #fff; background: var(--purple); border-color: var(--purple); }
-.tok.text { color: var(--text); border-color: rgba(255,255,255,.35); }
-.tok.eos { color: var(--brand-soft); border-color: rgba(255,125,64,.45); }
+.ar-top .formula { flex: 1; min-width: 0; }
+.chain { display: flex; gap: .55rem; margin-top: 1rem; }
+.chain .c { flex: 1 1 0; min-width: 0; padding: .6rem .75rem; font-size: .82rem; background: var(--card); border-radius: var(--r-md); box-shadow: var(--shadow); }
+.chain .c i { display: block; font-style: normal; font-size: .62rem; font-weight: 700; color: var(--label2); text-transform: uppercase; letter-spacing: .06em; }
+.ar-wrap { display: grid; grid-template-columns: 1.25fr 1fr; gap: 1.4rem; margin-top: 1rem; }
+.ar-wrap .card { padding: 1rem 1.15rem; }
+.subhead { font-size: .7rem; font-weight: 700; color: var(--label2); text-transform: uppercase; letter-spacing: .06em; margin-bottom: .6rem; }
+.subhead span { text-transform: none; letter-spacing: 0; font-weight: 500; color: var(--label3); }
+.tokens { display: flex; flex-wrap: wrap; gap: .45rem; align-content: flex-start; min-height: 8.2rem; }
+.tok { font-family: var(--mono); font-variant-ligatures: none; font-size: 1rem; padding: .28em .65em; border-radius: 999px; background: var(--elev); transition: opacity .25s, transform .25s, box-shadow .2s; }
+.tok.prompt { background: transparent; box-shadow: inset 0 0 0 1.5px var(--sep); color: var(--label2); }
+.tok.ctl { color: var(--info); background: color-mix(in srgb, var(--info) 12%, transparent); box-shadow: none; }
+.tok.time { color: var(--warning); background: color-mix(in srgb, var(--warning) 14%, transparent); }
+.tok.spk { color: #fff; background: var(--purple); }
+.tok.text { color: var(--label); }
+.tok.eos { color: var(--brand); background: color-mix(in srgb, var(--brand) 12%, transparent); }
 .tok.hidden { opacity: 0; transform: translateY(6px); }
 .tok.cur { box-shadow: 0 0 0 2px var(--brand); }
-.probs { display: grid; gap: .45rem; }
-.prob { display: grid; grid-template-columns: 9rem 1fr 3rem; gap: .7rem; align-items: center; font-family: var(--mono); font-size: .95rem; }
-.prob .k { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.prob .pbar { height: .85rem; border-radius: 99px; background: var(--panel2); overflow: hidden; }
+.probs { display: grid; gap: .55rem; }
+.prob { display: grid; grid-template-columns: 8.5rem 1fr 3rem; gap: .7rem; align-items: center; font-size: .95rem; }
+.prob .k { font-family: var(--mono); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-variant-ligatures: none; }
+.prob .pbar { height: .7rem; border-radius: 99px; background: var(--elev); overflow: hidden; }
 .prob .pbar span { display: block; height: 100%; width: 0; background: var(--brand); border-radius: 99px; transition: width .35s ease; }
-.prob:not(:first-child) .pbar span { background: #4a5163; }
-.prob .v { text-align: right; color: var(--muted); }
+.prob:not(:first-child) .pbar span { background: var(--label3); }
+.prob .v { text-align: right; color: var(--label2); font-size: .85rem; }
+.ar-note { font-size: .86rem; color: var(--label2); margin: .8rem 0 0; }
 
 /* ---------- 7 diarization ---------- */
-.dia-wrap { display: grid; grid-template-columns: 1.1fr 1fr; gap: 1.6rem; margin-top: 1.2rem; }
-.heat { position: relative; display: grid; grid-template-columns: 2.6rem 1fr; gap: .5rem; }
-.heat .labels { display: grid; grid-template-rows: repeat(4, 1fr); font-family: var(--mono); font-size: .75rem; align-items: center; }
-.heat .labels span::before { content: ""; display: inline-block; width: .55rem; height: .55rem; border-radius: 50%; margin-right: .35rem; background: var(--c); }
-.heat canvas { width: 100%; height: 9.6rem; border-radius: 10px; border: 1px solid var(--line); image-rendering: pixelated; background: #07080b; }
-.turns { display: flex; gap: .35rem; flex-wrap: wrap; min-height: 2rem; margin-top: .6rem; }
-.turns .chip { color: #fff; border: 0; }
-.vchain { display: grid; gap: .45rem; }
-.vchain .v { display: grid; grid-template-columns: 1fr auto; gap: .6rem; align-items: center; padding: .5rem .75rem; border-radius: 12px; background: var(--bg2); border: 1px solid var(--line); transition: border-color .3s, background .3s; }
-.vchain .v b { font-size: .88rem; }
-.vchain .v small { display: block; color: var(--muted); font-size: .74rem; }
-.vchain .v .mono { font-size: .72rem; color: var(--warning); }
-.vchain .v.on { border-color: var(--warning); background: rgba(243,164,59,.07); }
+.dia-wrap { display: grid; grid-template-columns: 1.1fr 1fr; gap: 1.4rem; margin-top: 1.2rem; }
+.heat { display: grid; grid-template-columns: 2.4rem 1fr; gap: .5rem; margin-top: .9rem; }
+.heat .labels { display: grid; grid-template-rows: repeat(4, 1fr); font-size: .78rem; font-weight: 700; align-items: center; }
+.heat .labels span { color: var(--c); }
+.heat canvas { width: 100%; height: 9.4rem; border-radius: 14px; image-rendering: pixelated; background: var(--elev); }
+.turns { display: flex; gap: .4rem; flex-wrap: wrap; min-height: 2rem; margin-top: .7rem; }
+.vchain { display: grid; gap: .45rem; margin-top: .8rem; }
+.vchain .v { display: grid; grid-template-columns: 1fr auto; gap: .6rem; align-items: center; padding: .55rem .85rem; border-radius: var(--r-md); background: var(--elev); transition: box-shadow .3s, background .3s; }
+.vchain .v b { font-size: .9rem; }
+.vchain .v small { display: block; color: var(--label2); font-size: .76rem; }
+.vchain .v .tex { color: var(--warning); font-size: .92rem; }
+.vchain .v.on { background: color-mix(in srgb, var(--warning) 10%, var(--card)); box-shadow: inset 0 0 0 1.5px var(--warning); }
 
 /* ---------- 8 text ai ---------- */
-.ai-wrap { display: grid; grid-template-columns: 1fr auto 1fr auto 1.1fr; gap: 1.1rem; align-items: center; margin-top: 1.4rem; }
-.ai-wrap .arrow { font-size: 1.6rem; color: var(--dim); }
-.transcript p { font-size: .86rem; color: #d9dce2; margin: .5rem 0 0; }
-.transcript p b { font-family: var(--mono); font-size: .66rem; padding: .15em .45em; border-radius: 6px; color: #fff; margin-right: .4em; font-weight: 500; }
+.ai-wrap { display: grid; grid-template-columns: 1fr auto 1fr auto 1.1fr; gap: 1rem; align-items: center; margin-top: 1.4rem; }
+.ai-wrap .arr { width: 1.6rem; height: 1.6rem; color: var(--label3); }
 .engines { display: grid; gap: .6rem; }
-.engine { padding: .65rem .8rem; border-radius: 14px; border: 1px solid var(--line2); background: var(--bg2); }
+.engine { padding: .7rem .9rem; border-radius: var(--r-md); background: var(--card); box-shadow: var(--shadow); transition: box-shadow .3s; }
 .engine b { display: block; font-size: .92rem; }
-.engine small { color: var(--muted); font-size: .74rem; }
-.engine.dim2 { opacity: .55; border-style: dashed; }
-.out .field { margin-top: .7rem; }
-.out .field i { font-style: normal; display: block; font-family: var(--mono); font-size: .6rem; letter-spacing: .1em; color: var(--dim); text-transform: uppercase; }
-.out .field .val { font-size: .95rem; min-height: 1.3em; }
-.out .title-val { font-size: 1.25rem; font-weight: 700; }
-.out .tags { display: flex; gap: .4rem; margin-top: .25rem; }
-.out .tags .chip { opacity: 0; transition: opacity .3s; }
-.out .tags .chip.show { opacity: 1; }
+.engine small { color: var(--label2); font-size: .75rem; }
+.engine.sel { box-shadow: inset 0 0 0 2px var(--purple), var(--shadow); }
+.engine.optin { background: transparent; box-shadow: inset 0 0 0 1.5px var(--sep); }
+.out .field { margin-top: .75rem; }
+.out .field i { font-style: normal; display: block; font-size: .66rem; font-weight: 700; letter-spacing: .06em; color: var(--label2); text-transform: uppercase; }
+.out .field .val { font-size: .95rem; min-height: 1.3em; margin-top: .1rem; }
+.out .title-val { font-family: var(--serif); font-size: 1.3rem; font-weight: 700; }
+.out .tags { display: flex; gap: .4rem; margin-top: .3rem; }
+.out .tags .pill { opacity: 0; transition: opacity .3s; }
+.out .tags .pill.show { opacity: 1; }
 
 /* ---------- 9 ship ---------- */
-.ship-wrap { display: grid; grid-template-columns: 1.55fr 1fr; gap: 1.8rem; margin-top: 1.2rem; }
-table.models { width: 100%; border-collapse: collapse; font-size: .8rem; }
-table.models th { text-align: left; font-family: var(--mono); font-weight: 500; font-size: .62rem; letter-spacing: .1em; text-transform: uppercase; color: var(--dim); padding: 0 .6rem .45rem; border-bottom: 1px solid var(--line2); }
-table.models td { padding: .42rem .6rem; border-bottom: 1px solid var(--line); vertical-align: top; }
-table.models td:first-child { font-weight: 600; white-space: nowrap; }
-table.models td.mono { font-size: .72rem; color: #cfd4dc; white-space: nowrap; }
-table.models .grp td { padding-top: .7rem; font-family: var(--mono); font-size: .6rem; letter-spacing: .12em; color: var(--brand-soft); text-transform: uppercase; border-bottom: 0; font-weight: 500; }
-.bignum { display: grid; grid-template-columns: 1fr 1fr; gap: .8rem; }
-.bignum .card b { display: block; font-size: 2rem; font-weight: 800; letter-spacing: -.03em; }
-.bignum .card span { color: var(--muted); font-size: .78rem; }
+.ship-wrap { display: grid; grid-template-columns: 1.55fr 1fr; gap: 1.6rem; margin-top: 1.2rem; align-items: start; }
+.ship-wrap .card.tbl { padding: .5rem 0 .3rem; }
+table.models { width: 100%; border-collapse: collapse; font-size: .82rem; }
+table.models th { text-align: left; font-weight: 700; font-size: .64rem; letter-spacing: .06em; text-transform: uppercase; color: var(--label2); padding: .5rem 1.1rem .4rem; }
+table.models td { padding: .42rem 1.1rem; border-top: 1px solid var(--sep); vertical-align: top; }
+table.models td:first-child { font-weight: 650; white-space: nowrap; }
+table.models td.mono { font-size: .74rem; color: var(--label2); white-space: nowrap; }
+table.models .grp td { padding-top: .65rem; font-size: .66rem; letter-spacing: .06em; color: var(--brand); text-transform: uppercase; font-weight: 700; }
+.bignum { display: grid; grid-template-columns: 1fr 1fr; gap: .9rem; }
+.bignum .card b { display: block; font-family: var(--serif); font-size: 2.4rem; line-height: 1; }
+.bignum .card span { display: block; margin-top: .35rem; color: var(--label2); font-size: .8rem; }
 
 /* ---------- 10 product ---------- */
 .prod-wrap { display: grid; grid-template-columns: 2.1fr 1fr; gap: 2rem; margin-top: 1.1rem; align-items: start; }
 .phones { display: flex; gap: .9rem; }
-.phones img { width: calc((100% - 3.6rem) / 5); aspect-ratio: 480 / 1040; object-fit: cover; border-radius: 16px; border: 1px solid var(--line2); background: #fff; box-shadow: 0 18px 40px rgba(0,0,0,.45); }
-.phones img:nth-child(odd) { transform: translateY(1.2rem); }
-.feat { display: grid; grid-template-columns: 1fr; gap: .55rem; }
-.feat div { display: grid; grid-template-columns: 1.6rem 1fr; gap: .6rem; align-items: start; font-size: .9rem; }
-.feat div span:first-child { font-size: 1rem; line-height: 1.3; }
-.feat div small { display: block; color: var(--muted); font-size: .76rem; }
+.phones img { width: calc((100% - 3.6rem) / 5); aspect-ratio: 480 / 1040; object-fit: cover; border-radius: 18px; background: #fff; box-shadow: var(--shadow); }
+.phones img:nth-child(odd) { transform: translateY(1.1rem); }
+.feat { display: grid; gap: .7rem; }
+.feat div { display: grid; grid-template-columns: 1.5rem 1fr; gap: .55rem; align-items: start; font-size: .92rem; font-weight: 650; }
+.feat div .ic { margin-top: .1em; }
+.feat div small { display: block; color: var(--label2); font-size: .78rem; font-weight: 400; }
 
 /* ---------- 11 demo ---------- */
 .demo-wrap { flex: 1; display: grid; grid-template-columns: 1fr 1fr; gap: 3rem; align-items: center; }
-.demo-big { font-size: 7rem; font-weight: 800; letter-spacing: -.05em; line-height: .9; }
-.demo-big .dot { display: inline-block; width: .22em; height: .22em; border-radius: 50%; background: var(--brand); vertical-align: .45em; margin-left: .08em; box-shadow: 0 0 0 0 rgba(245,56,26,.6); animation: rec 1.6s infinite; }
-@keyframes rec { 0% { box-shadow: 0 0 0 0 rgba(245,56,26,.6); } 70% { box-shadow: 0 0 0 .35em rgba(245,56,26,0); } 100% { box-shadow: 0 0 0 0 rgba(245,56,26,0); } }
-ol.watch { margin: 0; padding: 0; list-style: none; counter-reset: w; display: grid; gap: .8rem; }
-ol.watch li { counter-increment: w; display: grid; grid-template-columns: 2.2rem 1fr; gap: .8rem; align-items: start; font-size: 1.02rem; }
-ol.watch li::before { content: counter(w); width: 2.2rem; height: 2.2rem; display: grid; place-items: center; border-radius: 50%; border: 1px solid var(--line2); font-family: var(--mono); font-size: .85rem; color: var(--brand-soft); }
-ol.watch li small { display: block; color: var(--muted); font-size: .8rem; }
+.demo-big { font-family: var(--serif); font-weight: 700; font-size: 6.6rem; letter-spacing: -.035em; line-height: .95; }
+.recdot { display: inline-block; width: .32em; height: .32em; border-radius: 50%; background: var(--danger); vertical-align: .32em; margin-left: .12em; box-shadow: 0 0 0 .07em var(--card), 0 0 0 .11em color-mix(in srgb, var(--danger) 35%, transparent); animation: rec 1.6s ease-in-out infinite; }
+@keyframes rec { 50% { transform: scale(.86); opacity: .75; } }
+ol.watch { margin: 0; padding: 1.1rem 1.3rem; list-style: none; counter-reset: w; display: grid; gap: .95rem; }
+ol.watch li { counter-increment: w; display: grid; grid-template-columns: 1.8rem 1fr; gap: .5rem; align-items: baseline; font-size: 1.02rem; font-weight: 650; }
+ol.watch li::before { content: counter(w); font-family: var(--serif); font-size: 1.25rem; color: var(--brand); }
+ol.watch li small { display: block; color: var(--label2); font-size: .82rem; font-weight: 400; }
 
-/* ---------- 12 qr ---------- */
-.end-wrap { flex: 1; display: grid; grid-template-columns: auto 1fr; gap: 3.4rem; align-items: center; }
-.qr { width: 21rem; height: 21rem; padding: 1.2rem; background: #fff; border-radius: 26px; box-shadow: 0 30px 80px rgba(245,56,26,.18); }
+/* ---------- 12 end ---------- */
+.end-wrap { flex: 1; display: grid; grid-template-columns: auto 1fr; gap: 3.2rem; align-items: center; }
+.qr { width: 21rem; height: 21rem; padding: 1.3rem; background: #fff; border-radius: var(--r); box-shadow: var(--shadow); }
 .qr svg { width: 100%; height: 100%; display: block; }
-.links { display: grid; gap: .7rem; margin-top: 1.6rem; }
-.links a { display: grid; grid-template-columns: 9rem 1fr; gap: 1rem; align-items: baseline; padding: .7rem 1rem; border-radius: 14px; background: var(--panel); border: 1px solid var(--line); text-decoration: none; color: var(--text); }
-.links a span { font-family: var(--mono); font-size: .66rem; letter-spacing: .1em; text-transform: uppercase; color: var(--dim); }
-.links a b { font-weight: 600; font-size: .95rem; }
-.links a:hover { border-color: var(--line2); }
-.url { font-family: var(--mono); font-size: 1rem; color: var(--brand-soft); margin-top: .9rem; word-break: break-all; }
+.grouped { margin-top: 1.4rem; padding: 0; overflow: hidden; }
+.grouped a { display: grid; grid-template-columns: 1.5rem 1fr auto; gap: .8rem; align-items: center; padding: .8rem 1.2rem; text-decoration: none; color: var(--label); position: relative; }
+.grouped a + a::before { content: ""; position: absolute; left: 3.5rem; right: 0; top: 0; border-top: 1px solid var(--sep); }
+.grouped a b { font-weight: 650; font-size: .95rem; }
+.grouped a small { display: block; color: var(--label2); font-size: .78rem; font-weight: 400; }
+.grouped a .chev { color: var(--label3); width: .9rem; height: .9rem; }
+.url { font-size: .95rem; color: var(--brand); margin-top: .8rem; font-weight: 600; word-break: break-all; }
 
 /* ---------- chrome ---------- */
-.bar { position: fixed; left: 0; right: 0; bottom: 0; display: flex; align-items: center; gap: .6rem; padding: 10px 14px; z-index: 20; font-size: 13px; color: var(--muted); pointer-events: none; opacity: .0; transition: opacity .3s; }
-.deck .bar { opacity: .85; }
-.deck body:hover .bar, .deck .bar:focus-within { opacity: 1; }
-.bar > * { pointer-events: auto; }
-.bar .ib { width: 34px; height: 34px; display: grid; place-items: center; border-radius: 50%; border: 1px solid var(--line2); background: rgba(20,22,29,.8); cursor: pointer; font-size: 14px; }
-.bar .count { font-family: var(--mono); font-size: 12px; min-width: 4.5em; text-align: center; }
-.bar .spacer { flex: 1; }
-.bar .brandmark { font-family: var(--mono); font-size: 11px; letter-spacing: .1em; text-transform: uppercase; color: var(--dim); }
-.progress { position: fixed; left: 0; top: 0; height: 3px; background: linear-gradient(90deg, var(--brand), var(--brand-soft)); width: 0; z-index: 21; transition: width .35s ease; }
-.doc .bar, .doc .progress { display: none; }
-.notes-panel { position: fixed; left: 50%; bottom: 58px; transform: translateX(-50%); width: min(860px, calc(100% - 28px)); max-height: 34vh; overflow: auto; z-index: 22; background: rgba(15,17,23,.96); border: 1px solid var(--line2); border-radius: 16px; padding: 14px 18px; font-size: 15px; line-height: 1.5; color: #e7e9ee; display: none; box-shadow: 0 20px 60px rgba(0,0,0,.5); }
+.dock { position: fixed; bottom: 14px; z-index: 20; display: flex; align-items: center; gap: 2px; padding: 4px; border-radius: 999px; background: var(--glass); -webkit-backdrop-filter: blur(20px) saturate(180%); backdrop-filter: blur(20px) saturate(180%); box-shadow: inset 0 0 0 .5px var(--glass-edge), 0 8px 24px rgba(0,0,0,.12); font-size: 13px; transition: opacity .3s; opacity: .55; }
+.dock:hover, .dock:focus-within { opacity: 1; }
+.dock.left { left: 14px; }
+.dock.right { right: 14px; }
+.dock button { width: 34px; height: 34px; border: 0; border-radius: 50%; background: transparent; display: grid; place-items: center; cursor: pointer; color: var(--label); }
+.dock button:hover { background: var(--fill); }
+.dock button .ic { width: 17px; height: 17px; }
+.dock .count { min-width: 3.6em; text-align: center; font-weight: 600; color: var(--label2); }
+.progress { position: fixed; left: 0; top: 0; height: 3px; background: var(--brand); width: 0; z-index: 21; transition: width .35s ease; border-radius: 0 3px 3px 0; }
+.doc .dock, .doc .progress { display: none; }
+.notes-panel { position: fixed; left: 50%; bottom: 62px; transform: translateX(-50%); width: min(880px, calc(100% - 28px)); max-height: 34vh; overflow: auto; z-index: 22; background: var(--card); border-radius: 22px; padding: 14px 20px; font-size: 15px; line-height: 1.5; color: var(--label); display: none; box-shadow: 0 20px 60px rgba(0,0,0,.25); }
 .notes-panel.show { display: block; }
-.notes-panel h4 { margin: 0 0 6px; font-family: var(--mono); font-size: 11px; letter-spacing: .12em; text-transform: uppercase; color: var(--brand-soft); }
+.notes-panel h4 { margin: 0 0 6px; font-size: 12px; font-weight: 700; color: var(--brand); }
 .notes-panel ul { margin: 0; padding-left: 18px; }
 .doc-head { display: none; }
-.doc .doc-head { display: flex; position: sticky; top: 0; z-index: 30; align-items: center; gap: 10px; padding: 10px 16px; background: rgba(11,12,16,.86); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); border-bottom: 1px solid var(--line); font-size: 13px; }
-.doc .doc-head img { width: 26px; height: 26px; border-radius: 22%; }
+.doc .doc-head { display: flex; position: sticky; top: 0; z-index: 30; align-items: center; gap: 10px; padding: 10px 16px; background: var(--glass); -webkit-backdrop-filter: blur(20px) saturate(180%); backdrop-filter: blur(20px) saturate(180%); border-bottom: .5px solid var(--sep); font-size: 14px; }
+.doc .doc-head .appicon { width: 28px; height: 28px; }
 .doc .doc-head b { font-weight: 700; }
-.doc .tok { font-size: .85rem; }
-.doc .prob { grid-template-columns: 6.5rem 1fr 2.6rem; font-size: .8rem; }
-.doc .doc-head a { margin-left: auto; text-decoration: none; font-family: var(--mono); font-size: 11px; }
+.doc .doc-head a { margin-left: auto; text-decoration: none; font-weight: 600; font-size: 13px; }
+.doc .doc-head button { border: 0; background: var(--fill); width: 30px; height: 30px; border-radius: 50%; display: grid; place-items: center; cursor: pointer; }
 
 /* ---------- doc (phone) layout ---------- */
-.doc h1 { font-size: 2.5rem; }
+.doc h1 { font-size: 2.45rem; }
 .doc h2 { font-size: 1.85rem; }
-.doc .lede { font-size: 1.02rem; }
-.doc .title-wrap, .doc .spec-wrap, .doc .lat-wrap, .doc .ar-wrap, .doc .dia-wrap, .doc .ship-wrap, .doc .prod-wrap, .doc .demo-wrap, .doc .end-wrap, .doc .side-notes { grid-template-columns: 1fr; gap: 1.4rem; }
-.doc .fam { grid-template-columns: 1fr; }
-.doc .flow { grid-auto-flow: row; grid-auto-columns: auto; gap: 1.1rem; }
-.doc .flow .node:not(:last-child)::after { content: "↓"; right: auto; left: 1rem; top: auto; bottom: -1.1rem; transform: none; }
-.doc .flow .track, .doc .flow .pulse { display: none; }
-.doc .hero { height: 21rem; }
-.doc .spec-canvas { min-height: 15rem; }
-.doc .lat-canvas { min-height: 19rem; }
-.doc .ai-wrap { grid-template-columns: 1fr; }
-.doc .ai-wrap .arrow { transform: rotate(90deg); justify-self: center; }
-.doc .phones { overflow-x: auto; padding-bottom: 1.4rem; scroll-snap-type: x mandatory; }
-.doc .phones img { width: 42vw; flex: none; scroll-snap-align: start; }
-.doc .demo-big { font-size: 4.2rem; }
-.doc .qr { display: none; }
-.doc .links a { grid-template-columns: 1fr; gap: .2rem; }
-.doc table.models { font-size: .78rem; }
-.doc .table-scroll { overflow-x: auto; }
-.doc .bignum { grid-template-columns: 1fr 1fr; }
-.doc .body { margin-top: 1.2rem; }
+.doc .lede { font-size: 1rem; }
+.doc .body { margin-top: 1.1rem; }
 .doc body { overflow-x: hidden; }
+.doc .title-wrap, .doc .spec-wrap, .doc .lat-wrap, .doc .ar-wrap, .doc .dia-wrap, .doc .ship-wrap, .doc .prod-wrap, .doc .demo-wrap, .doc .end-wrap, .doc .side-notes { grid-template-columns: 1fr; grid-template-rows: auto; gap: 1.2rem; }
 .doc .title-wrap > *, .doc .spec-wrap > *, .doc .lat-wrap > *, .doc .ar-wrap > *, .doc .dia-wrap > *, .doc .ship-wrap > *, .doc .prod-wrap > *, .doc .demo-wrap > *, .doc .end-wrap > *, .doc .fam > *, .doc .ai-wrap > *, .doc .side-notes > *, .doc .lat-card, .doc .spec-card { min-width: 0; }
-.doc .seg { flex-wrap: wrap; border-radius: 18px; }
-.doc .router-note { flex-direction: column; align-items: flex-start; gap: .5rem; }
+.doc .fam { grid-template-columns: 1fr; }
+.doc .flow { grid-auto-flow: row; grid-auto-columns: auto; gap: 1.2rem; }
+.doc .flow .node:not(:last-child)::after { right: auto; left: 1.2rem; top: auto; bottom: -.95rem; transform: rotate(135deg); }
 .doc .lane-head { flex-wrap: wrap; }
 .doc .lane-head .budget { margin-left: 0; width: 100%; }
-.doc .formula { white-space: normal; }
-.doc .enc-strip .muted { margin-left: 0 !important; }
-.doc .chain .c { min-width: 42%; }
-@media (max-width: 520px) { .doc .doc-head .dim { display: none; } }
+.doc .router-note { flex-direction: column; align-items: flex-start; gap: .5rem; }
+.doc .router-note .formula { max-width: 100%; flex: 0 1 auto; }
+.doc .chain { flex-wrap: wrap; }
+.doc .chain .c { flex: 1 1 42%; }
+.doc .spec-canvas { min-height: 14rem; }
+.doc .lat-canvas { min-height: 19rem; }
+.doc .seg { flex-wrap: wrap; border-radius: 18px; }
+.doc .ai-wrap { grid-template-columns: 1fr; }
+.doc .ai-wrap .arr { transform: rotate(90deg); justify-self: center; }
+.doc .phones { overflow-x: auto; padding-bottom: 1.4rem; scroll-snap-type: x mandatory; }
+.doc .phones img { width: 42vw; flex: none; scroll-snap-align: start; }
+.doc .demo-big { font-size: 4rem; }
+.doc .qr { display: none; }
+.doc .table-scroll { overflow-x: auto; }
+.doc .tok { font-size: .85rem; }
+.doc .prob { grid-template-columns: 6rem 1fr 2.6rem; font-size: .82rem; }
+.doc .tr { min-height: 0; }
+@media (max-width: 520px) { .doc .doc-head .l2 { display: none; } }
 
 @media (prefers-reduced-motion: reduce) {
-  .hero .chip { animation: none; opacity: 1; transform: none; }
-  .flow .pulse, .demo-big .dot, .hero .caption .cursor { animation: none; }
+  .recdot { animation: none; }
   .deck .slide { transition: none; }
 }
 @media print {
   html.deck, html.deck body { height: auto; overflow: visible; }
   .deck .stage { position: static; transform: none; width: 1600px; height: auto; }
   .deck .slide { position: relative; opacity: 1; visibility: visible; transform: none; width: 1600px; height: 900px; page-break-after: always; }
-  .bar, .progress, .notes-panel { display: none !important; }
+  .dock, .progress, .notes-panel { display: none !important; }
   @page { size: 1600px 900px; margin: 0; }
 }
 </style>
 </head>
 <body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <symbol id="i-wave" viewBox="0 0 24 24"><path d="M3 10.5v3M7 7v10M11 3.5v17M15 6.5v11M19 10v4"/></symbol>
+  <symbol id="i-mic" viewBox="0 0 24 24"><rect x="9" y="2.5" width="6" height="11.5" rx="3"/><path d="M5.5 11a6.5 6.5 0 0 0 13 0M12 17.5V21M8.5 21h7"/></symbol>
+  <symbol id="i-route" viewBox="0 0 24 24"><path d="M3 12h5.5l4.5-6.5h5M8.5 12l4.5 6.5h5M16 3l2.5 2.5L16 8M16 16l2.5 2.5L16 21"/></symbol>
+  <symbol id="i-captions" viewBox="0 0 24 24"><rect x="2.5" y="5" width="19" height="14" rx="4"/><path d="M6.5 11h4.5M13.5 11h4M6.5 15h7.5"/></symbol>
+  <symbol id="i-people" viewBox="0 0 24 24"><circle cx="9" cy="8" r="3.3"/><path d="M3 19.5c.7-3.4 3-5.3 6-5.3s5.3 1.9 6 5.3"/><circle cx="17.2" cy="9" r="2.6"/><path d="M16 14.4c2.6-.3 4.5 1.4 5 4.6"/></symbol>
+  <symbol id="i-doc" viewBox="0 0 24 24"><path d="M6.5 2.5h7.5l4.5 4.5v14.5h-12z"/><path d="M13.5 2.5V7.5h5M9.5 12h6M9.5 16h6"/></symbol>
+  <symbol id="i-sparkles" viewBox="0 0 24 24"><path d="M11 3l1.7 4.8L17.5 9.5l-4.8 1.7L11 16l-1.7-4.8L4.5 9.5l4.8-1.7z"/><path d="M18.5 14.5l.8 2.2 2.2.8-2.2.8-.8 2.2-.8-2.2-2.2-.8 2.2-.8z"/></symbol>
+  <symbol id="i-chip" viewBox="0 0 24 24"><rect x="6" y="6" width="12" height="12" rx="2.5"/><path d="M9.5 2.5V6M14.5 2.5V6M9.5 18v3.5M14.5 18v3.5M2.5 9.5H6M2.5 14.5H6M18 9.5h3.5M18 14.5h3.5"/></symbol>
+  <symbol id="i-globe" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c2.7 2.8 2.7 15.2 0 18M12 3c-2.7 2.8-2.7 15.2 0 18"/></symbol>
+  <symbol id="i-island" viewBox="0 0 24 24"><rect x="6" y="2.5" width="12" height="19" rx="3.2"/><rect x="9" y="5" width="6" height="2.2" rx="1.1"/></symbol>
+  <symbol id="i-laptop" viewBox="0 0 24 24"><rect x="4.5" y="5" width="15" height="10.5" rx="1.6"/><path d="M2.5 19h19"/></symbol>
+  <symbol id="i-lock" viewBox="0 0 24 24"><rect x="5" y="10.5" width="14" height="10.5" rx="2.6"/><path d="M8 10.5V7.5a4 4 0 0 1 8 0v3"/></symbol>
+  <symbol id="i-bolt" viewBox="0 0 24 24"><path d="M13 2.5L4.5 13.5h6.5l-1 8 8.5-11h-6.5z"/></symbol>
+  <symbol id="i-target" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><circle cx="12" cy="12" r="4.5"/><circle cx="12" cy="12" r="1"/></symbol>
+  <symbol id="i-store" viewBox="0 0 24 24"><path d="M8.5 16.5l5.5-10M10 6.5l5.5 10M6 13.5h12"/></symbol>
+  <symbol id="i-flask" viewBox="0 0 24 24"><path d="M9.5 2.5h5M10.5 2.5v6l-5.5 10a2 2 0 0 0 1.8 3h10.4a2 2 0 0 0 1.8-3l-5.5-10v-6M7.5 15h9"/></symbol>
+  <symbol id="i-code" viewBox="0 0 24 24"><path d="M8.5 7L3.5 12l5 5M15.5 7l5 5-5 5"/></symbol>
+  <symbol id="i-person" viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4.5 21c.9-4 3.8-6.3 7.5-6.3s6.6 2.3 7.5 6.3"/></symbol>
+  <symbol id="i-chev" viewBox="0 0 24 24"><path d="M9 5l7 7-7 7"/></symbol>
+  <symbol id="i-arrow" viewBox="0 0 24 24"><path d="M4 12h15M13 6l6 6-6 6"/></symbol>
+  <symbol id="i-left" viewBox="0 0 24 24"><path d="M15 5l-7 7 7 7"/></symbol>
+  <symbol id="i-right" viewBox="0 0 24 24"><path d="M9 5l7 7-7 7"/></symbol>
+  <symbol id="i-notes" viewBox="0 0 24 24"><path d="M5 4.5h14M5 9.5h14M5 14.5h9M5 19.5h6"/></symbol>
+  <symbol id="i-expand" viewBox="0 0 24 24"><path d="M14.5 3.5h6v6M20.5 3.5l-7 7M9.5 20.5h-6v-6M3.5 20.5l7-7"/></symbol>
+  <symbol id="i-theme" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><path d="M12 3.5v17a8.5 8.5 0 0 0 0-17z" fill="currentColor"/></symbol>
+  <symbol id="i-plane" viewBox="0 0 24 24"><path d="M21 15.5l-8-5V4.5a1.5 1.5 0 0 0-3 0v6l-7 5v2l7-2.2V19l-2 1.5V22l3.5-1 3.5 1v-1.5L12 19v-3.7l9 2.2z" transform="translate(.5 0)"/></symbol>
+</svg>
+
 <div class="progress" id="progress"></div>
 <header class="doc-head">
-  <img src="img/icon.svg" alt="">
-  <b>How speech becomes text</b><span class="dim">· AI Tinkerers Toronto</span>
-  <a href="https://apps.apple.com/app/id6785515364">App Store ↗</a>
+  <span class="appicon"><img class="light" src="img/icon-light.jpg" alt=""><img class="dark" src="img/icon-dark.jpg" alt=""></span>
+  <b>How speech becomes text</b><span class="l2">· AI Tinkerers Toronto</span>
+  <a href="https://apps.apple.com/app/id6785515364">App Store</a>
+  <button type="button" class="theme-toggle" aria-label="Toggle light or dark appearance"><svg class="ic"><use href="#i-theme"/></svg></button>
 </header>
 
 <main class="stage" id="stage">
 
 <!-- 1 ─────────────────────────────── TITLE -->
 <section class="slide" data-widget="hero">
-  <div class="kicker"><span>AI Tinkerers Toronto</span><span class="n">·</span><span class="n">Oct 13, 2026 · Shopify</span></div>
   <div class="title-wrap">
     <div>
-      <h1>How speech becomes text — <span class="grad">on an iPhone, offline.</span></h1>
-      <p class="lede">What eight on‑device speech models actually compute: from PCM samples to log‑Mel frames, tokens, timestamps and speaker labels. Shown through <b style="color:var(--text)">LiveTranscriber</b>, the app I build.</p>
-      <div class="byline">
-        <img src="img/icon.svg" alt="LiveTranscriber icon">
-        <div><b>William (Chengqi) Li</b><span>LiveTranscriber · iOS &amp; macOS</span></div>
+      <div class="appmark">
+        <span class="appicon"><img class="light" src="img/icon-light.jpg" alt="LiveTranscriber app icon"><img class="dark" src="img/icon-dark.jpg" alt="LiveTranscriber app icon"></span>
+        <div><b>LiveTranscriber</b><span>AI Tinkerers Toronto · Oct 13, 2026 · Shopify</span></div>
       </div>
+      <h1>How speech becomes text, <mark>on an iPhone</mark>.</h1>
+      <p class="lede">What eight on‑device speech models actually compute: from PCM samples to log‑Mel frames, tokens, timestamps and speaker labels.</p>
+      <p class="byline"><b>William (Chengqi) Li</b> · I build LiveTranscriber for iPhone and Mac</p>
     </div>
-    <div class="hero" aria-hidden="true">
-      <canvas id="heroWave"></canvas>
-      <div class="stack">
-        <div class="row"><span class="lbl">tokens</span>
-          <span class="chip" style="animation-delay:.2s">▁Meet</span>
-          <span class="chip" style="animation-delay:.5s">ing</span>
-          <span class="chip" style="animation-delay:.8s">▁today</span>
-          <span class="chip" style="animation-delay:1.1s;color:var(--warning)">&lt;1.20&gt;</span>
-        </div>
-        <div class="row"><span class="lbl">speakers</span>
-          <span class="chip spk" style="animation-delay:1.4s;background:var(--brand)">S1 0:00–1:20</span>
-          <span class="chip spk" style="animation-delay:1.7s;background:var(--info)">S2 1:20–2:05</span>
-        </div>
-        <div class="row"><span class="lbl">text</span><span class="caption">Meeting today<span class="cursor"></span></span></div>
+    <div class="card hero-card" aria-hidden="true">
+      <div class="hc-head"><svg class="ic" style="color:var(--brand)"><use href="#i-captions"/></svg><h3>Transcript</h3><span class="pill" style="--c:var(--danger)"><i></i><span class="hero-clock">00:00</span></span></div>
+      <div class="tr">
+        <div class="tr-row" style="--c:var(--brand)"><div class="meta">Speaker 1 <span class="capsule">00:00</span></div><p>Are we still meeting today at three?</p></div>
+        <div class="tr-row" style="--c:var(--purple)"><div class="meta">Speaker 2 <span class="capsule">00:03</span></div><p class="r2"></p></div>
+        <div class="tr-row" style="--c:var(--brand)"><div class="meta">Speaker 1 <span class="capsule">00:07</span></div><p class="r3"></p></div>
+      </div>
+      <div class="hc-foot">
+        <span class="pill" style="--c:var(--success)">Nemotron 3.5 · 320 ms chunks</span>
+        <span class="pill" style="--c:var(--purple)">Sortformer · speakers</span>
+        <span class="pill hero-state" style="--c:var(--label2)">partial</span>
       </div>
     </div>
   </div>
   <aside class="notes">
     <li>Hi, I'm William. I build LiveTranscriber, an iPhone + Mac transcriber where every model runs on the device.</li>
-    <li>Six minutes, no pitch: I'll show what speech models actually compute, and the tricks that make them fit on a phone.</li>
+    <li>Six minutes, no pitch: what speech models actually compute, and the tricks that make them fit on a phone.</li>
     <li>The slides are a web page; QR at the end, so don't photograph anything.</li>
   </aside>
 </section>
 
 <!-- 2 ─────────────────────────────── SYSTEM -->
 <section class="slide">
-  <div class="kicker"><span class="n">01</span><span>The system</span></div>
-  <h2>Follow live. Finish offline.</h2>
+  <div class="eyebrow"><b>01</b> The system</div>
+  <h2>Follow live. <mark>Finish offline.</mark></h2>
   <p class="lede">Two latency budgets mean two different model families, and both run on the phone. Live captions must commit in about a third of a second. The final record can afford full context, timestamps and speaker labels.</p>
   <div class="body lanes">
-    <div class="lane live">
-      <div class="lane-head"><span class="tag live">● Live</span><h3>While you record</h3><span class="budget">budget ≈ 320 ms / step · streaming state</span></div>
+    <div class="card">
+      <div class="lane-head"><span class="pill" style="--c:var(--danger)"><i></i>Live</span><h3>While you record</h3><span class="budget">≈ 320 ms per step · streaming state</span></div>
       <div class="flow">
-        <div class="track"></div><div class="pulse"></div>
-        <div class="node"><div class="role">Input</div><b>Mic / system audio</b><small>AVCaptureSession stereo · 16 kHz PCM</small></div>
-        <div class="node"><div class="role">Router</div><b>“Automatic”</b><small>route(locale, device) → engine</small></div>
-        <div class="node"><div class="role">ASR</div><b>Apple SpeechAnalyzer</b><small>or Nemotron 3.5 streaming RNN‑T</small></div>
-        <div class="node alt"><div class="role">+ Speakers</div><b>Sortformer</b><small>4‑speaker streaming diarization</small></div>
-        <div class="node"><div class="role">Output</div><b>Live captions</b><small>translation · Dynamic Island</small></div>
+        <div class="node" style="--c:var(--brand)"><div class="role"><svg class="ic"><use href="#i-mic"/></svg>Input</div><b>Mic / system audio</b><small>AVCaptureSession stereo → 16 kHz PCM</small></div>
+        <div class="node" style="--c:var(--info)"><div class="role"><svg class="ic"><use href="#i-route"/></svg>Router</div><b>“Automatic”</b><small>picks an engine per language</small></div>
+        <div class="node" style="--c:var(--success)"><div class="role"><svg class="ic"><use href="#i-bolt"/></svg>ASR</div><b>Apple SpeechAnalyzer</b><small>or Nemotron 3.5 streaming RNN‑T</small></div>
+        <div class="node opt" style="--c:var(--purple)"><div class="role"><svg class="ic"><use href="#i-people"/></svg>Optional</div><b>Sortformer</b><small>4‑speaker streaming diarization</small></div>
+        <div class="node" style="--c:var(--brand)"><div class="role"><svg class="ic"><use href="#i-captions"/></svg>Output</div><b>Live captions</b><small>translation · Dynamic Island</small></div>
       </div>
     </div>
-    <div class="lane offline">
-      <div class="lane-head"><span class="tag off">● Offline</span><h3>After you stop</h3><span class="budget">full context · seconds to minutes</span></div>
+    <div class="card">
+      <div class="lane-head"><span class="pill" style="--c:var(--purple)"><i></i>Offline</span><h3>After you stop</h3><span class="budget">full context · seconds to minutes</span></div>
       <div class="flow">
-        <div class="track"></div><div class="pulse"></div>
-        <div class="node"><div class="role">Input</div><b>Saved recording</b><small>WAV / M4A / imported file</small></div>
-        <div class="node"><div class="role">ASR</div><b>Parakeet V3 · Qwen3‑ASR</b><small>Whisper · MOSS</small></div>
-        <div class="node alt"><div class="role">+ Speakers</div><b>Community‑1</b><small>embeddings + clustering</small></div>
-        <div class="node"><div class="role">Final record</div><b>Timed, labeled text</b><small>word timestamps · S1 / S2</small></div>
-        <div class="node"><div class="role">Text AI</div><b>Local LLM</b><small>title · summary · tags</small></div>
+        <div class="node" style="--c:var(--brand)"><div class="role"><svg class="ic"><use href="#i-wave"/></svg>Input</div><b>Saved recording</b><small>WAV / M4A / imported file</small></div>
+        <div class="node" style="--c:var(--success)"><div class="role"><svg class="ic"><use href="#i-doc"/></svg>ASR</div><b>Parakeet V3 · Qwen3‑ASR</b><small>Whisper · MOSS</small></div>
+        <div class="node opt" style="--c:var(--purple)"><div class="role"><svg class="ic"><use href="#i-people"/></svg>Optional</div><b>Community‑1</b><small>voiceprints + clustering</small></div>
+        <div class="node" style="--c:var(--warning)"><div class="role"><svg class="ic"><use href="#i-doc"/></svg>Final record</div><b>Timed, labeled text</b><small>word timestamps · Speaker 1 / 2</small></div>
+        <div class="node" style="--c:var(--purple)"><div class="role"><svg class="ic"><use href="#i-sparkles"/></svg>Text AI</div><b>Local LLM</b><small>title · summary · tags</small></div>
       </div>
     </div>
     <div class="router-note">
-      <span class="formula"><b>route</b>(locale, device) → Apple Speech <span class="dim">if supported</span> · else Nemotron</span>
-      <span class="muted small">“Automatic” is a router, not a model. It produces no tokens itself.</span>
+      <span class="formula tex" data-tex="\mathrm{route}(\text{locale},\ \text{device}) \;\to\; \begin{cases}\text{Apple Speech} & \text{if the locale is supported}\\ \text{Nemotron} & \text{otherwise}\end{cases}">route(locale, device) → Apple Speech if supported, else Nemotron</span>
+      <span class="l2" style="font-size:.88rem">“Automatic” is a router, not a model. It never produces a token itself.</span>
     </div>
   </div>
   <aside class="notes">
@@ -447,28 +510,28 @@ ol.watch li small { display: block; color: var(--muted); font-size: .8rem; }
 
 <!-- 3 ─────────────────────────────── FRONT END -->
 <section class="slide" data-widget="spectrogram">
-  <div class="kicker"><span class="n">02</span><span>Front end</span></div>
-  <h2>Models never hear sound. They read log‑Mel frames.</h2>
+  <div class="eyebrow"><b>02</b> Front end</div>
+  <h2>Models never hear sound. They read <mark>log‑Mel frames</mark>.</h2>
   <div class="body spec-wrap">
-    <div class="spec-card">
+    <div class="card spec-card">
       <div class="spec-canvas">
         <canvas class="spec" width="420" height="80"></canvas>
-        <div class="axis"><span style="bottom:calc(100% - .8rem)">8 kHz</span><span style="bottom:75.6%">4 kHz</span><span style="bottom:53.6%">2 kHz</span><span style="bottom:35.2%">1 kHz</span><span style="bottom:21.4%">500 Hz</span></div>
-        <div class="shape">Mel[<b>80</b> × T]</div>
+        <div class="axis"><span style="bottom:calc(100% - .9rem)">8 kHz</span><span style="bottom:75.6%">4 kHz</span><span style="bottom:53.6%">2 kHz</span><span style="bottom:35.2%">1 kHz</span><span style="bottom:21.4%">500 Hz</span></div>
+        <div class="shape tex" data-tex="\mathbf{X}\in\mathbb{R}^{80\times T}">X ∈ ℝ^(80×T)</div>
       </div>
       <div class="spec-controls">
-        <button class="btn rec mic" type="button">🎙 Use my mic</button>
-        <button class="btn demo on" type="button">Demo signal</button>
+        <button class="btn primary rec mic" type="button"><svg class="ic"><use href="#i-mic"/></svg><span>Use my mic</span></button>
+        <button class="btn demo" type="button">Demo signal</button>
         <span class="stat"><span class="frames">0</span> frames · <span class="secs">0.0</span> s · 10 ms hop</span>
       </div>
-      <div class="pipeline-mini"><b>1 s audio</b> = 16,000 samples → <b>100</b> frames → ×8 conv subsampling → <b>12.5</b> encoder steps (80 ms each)</div>
+      <div class="pipeline-mini"><b>1 s</b> of audio = 16,000 samples → <b>100</b> frames → conv subsampling ×8 → <b>12.5</b> encoder steps of 80 ms</div>
     </div>
     <div class="steps">
       <div class="step"><span class="k">1</span><div><b>16 kHz mono PCM</b><p>The mic delivers 48 kHz stereo. Every model wants 16,000 Float32 samples per second.</p></div></div>
-      <div class="step"><span class="k">2</span><div><b>Short‑time Fourier transform</b><p>25 ms windows, hopping every 10 ms, give 100 spectra per second.</p></div></div>
-      <div class="step"><span class="k">3</span><div><b>Mel filterbank + log</b><p>80 bins (Whisper) or 128 (Nemotron, Qwen3‑ASR, Whisper large‑v3). The bins are spaced like the cochlea: dense at low frequencies, sparse at high ones.</p></div></div>
-      <div class="step"><span class="k">4</span><div><b>Encoder</b><p>Conformer or Transformer blocks learn context: convolution captures local patterns, attention captures the whole utterance.</p></div></div>
-      <div class="callout">Nobody cuts speech into phonemes by hand. Short overlapping windows turn the waveform into frames. The encoder learns what the sounds mean, and the decoder chooses the next text token.</div>
+      <div class="step"><span class="k">2</span><div><b>Short‑time Fourier transform</b><p>25 ms windows, hopping every 10 ms: 100 spectra per second.</p></div></div>
+      <div class="step"><span class="k">3</span><div><b>Mel filterbank + log</b><p>80 bins (Whisper) or 128 (Nemotron, Qwen3‑ASR, Whisper large‑v3), spaced like the cochlea: dense at low frequencies, sparse at high ones.</p></div></div>
+      <div class="step"><span class="k">4</span><div><b>Encoder</b><p>Conformer or Transformer blocks learn context: convolution sees local patterns, attention sees the whole utterance.</p></div></div>
+      <div class="callout">Nobody cuts speech into phonemes by hand. Short overlapping windows turn the waveform into frames; the encoder learns what the sounds mean, and the decoder chooses the next text token.</div>
     </div>
   </div>
   <aside class="notes">
@@ -480,106 +543,106 @@ ol.watch li small { display: block; color: var(--muted); font-size: .8rem; }
 
 <!-- 4 ─────────────────────────────── FAMILIES -->
 <section class="slide">
-  <div class="kicker"><span class="n">03</span><span>Model families</span></div>
-  <h2>Similar encoders, four ways to decode</h2>
+  <div class="eyebrow"><b>03</b> Model families</div>
+  <h2>Similar encoders, <mark>four ways to decode</mark></h2>
   <div class="body">
-    <div class="enc-strip">
-      <span class="chip">Mel[F × T]</span><span class="arrow">→</span>
-      <span class="chip">conv subsample ×8</span><span class="arrow">→</span>
-      <span class="chip">Conformer / Transformer × N</span><span class="arrow">→</span>
-      <span class="chip" style="color:var(--success)">h₁ … h<sub>T′</sub></span>
-      <span class="muted small" style="margin-left:auto">what happens after h<sub>t</sub> is where the families split</span>
+    <div class="card enc-strip">
+      <span class="capsule">log‑Mel</span><svg class="ic arr"><use href="#i-arrow"/></svg>
+      <span class="capsule">conv subsample ×8</span><svg class="ic arr"><use href="#i-arrow"/></svg>
+      <span class="capsule">Conformer / Transformer × N</span><svg class="ic arr"><use href="#i-arrow"/></svg>
+      <span class="tex" data-tex="h_1,\dots,h_{T'}" style="color:var(--success)">h₁ … h_T′</span>
+      <span class="l2" style="margin-left:auto;font-size:.82rem">what happens after <span class="tex" data-tex="h_t">hₜ</span> is where the families split</span>
     </div>
     <div class="fam">
       <div class="card">
-        <span class="tag live">Streaming</span>
+        <span class="pill" style="--c:var(--danger)"><i></i>Live · streaming</span>
         <h3>RNN‑T transducer</h3>
         <span class="motto">“emit a token, or advance”</span>
-        <svg viewBox="0 0 200 80"><g fill="none" stroke-width="3" stroke-linecap="round">
-          <path d="M10 66 H50" stroke="#6e7b97"/><path d="M50 66 V46" stroke="#f5381a"/><path d="M50 46 H90 H130" stroke="#6e7b97"/><path d="M130 46 V26" stroke="#f5381a"/><path d="M130 26 H190" stroke="#6e7b97"/></g>
-          <g fill="#f4f5f7"><circle cx="10" cy="66" r="3"/><circle cx="50" cy="46" r="3"/><circle cx="130" cy="26" r="3"/><circle cx="190" cy="26" r="4"/></g></svg>
-        <div class="formula">Joint(h<sub>t</sub>, Pred(y<sub>u−1</sub>)) → <b>y</b> | ⟨blank⟩</div>
-        <p>Blank means “nothing new in this frame”. Naturally streaming.</p>
-        <div class="who"><span class="chip">Nemotron 3.5 · live</span></div>
+        <svg class="sk" viewBox="0 0 200 70"><g fill="none" stroke-width="3.5" stroke-linecap="round">
+          <path d="M10 58 H50" stroke="#8E8E93"/><path d="M50 58 V38" stroke="#F5381A"/><path d="M50 38 H130" stroke="#8E8E93"/><path d="M130 38 V18" stroke="#F5381A"/><path d="M130 18 H190" stroke="#8E8E93"/></g>
+          <g fill="#F5381A"><circle cx="50" cy="38" r="3.5"/><circle cx="130" cy="18" r="3.5"/><circle cx="190" cy="18" r="4.5"/></g></svg>
+        <span class="formula tex" data-tex="\mathrm{Joint}\big(h_t,\mathrm{Pred}(y_{u-1})\big)\to y_u\,|\,\varnothing">Joint(hₜ, Pred(yᵤ₋₁)) → yᵤ or ∅</span>
+        <p><span class="tex" data-tex="\varnothing">∅</span> (blank) means “nothing new in this frame”. Naturally streaming.</p>
+        <div class="who"><span class="capsule">Nemotron 3.5</span></div>
       </div>
       <div class="card">
-        <span class="tag off">Offline · fast</span>
+        <span class="pill" style="--c:var(--purple)"><i></i>Offline · fast</span>
         <h3>TDT transducer</h3>
         <span class="motto">“emit a token and skip Δt”</span>
-        <svg viewBox="0 0 200 80"><g fill="none" stroke-width="3" stroke-linecap="round">
-          <path d="M10 66 H50" stroke="#6e7b97"/><path d="M50 66 L90 46" stroke="#f5381a"/><path d="M90 46 L150 26" stroke="#f5381a"/><path d="M150 26 H190" stroke="#6e7b97"/></g>
-          <g fill="#f4f5f7"><circle cx="10" cy="66" r="3"/><circle cx="50" cy="66" r="3"/><circle cx="90" cy="46" r="3"/><circle cx="150" cy="26" r="3"/><circle cx="190" cy="26" r="4"/></g></svg>
-        <div class="formula">→ (<b>y</b><sub>u</sub>, <b>Δt</b> ∈ {0…4})</div>
-        <p>Predicts a duration too, so it skips frames and gets word timings for free.</p>
-        <div class="who"><span class="chip">Parakeet V3 · 25 EU langs</span></div>
+        <svg class="sk" viewBox="0 0 200 70"><g fill="none" stroke-width="3.5" stroke-linecap="round">
+          <path d="M10 58 H50" stroke="#8E8E93"/><path d="M50 58 L90 38" stroke="#F5381A"/><path d="M90 38 L150 18" stroke="#F5381A"/><path d="M150 18 H190" stroke="#8E8E93"/></g>
+          <g fill="#F5381A"><circle cx="90" cy="38" r="3.5"/><circle cx="150" cy="18" r="3.5"/><circle cx="190" cy="18" r="4.5"/></g></svg>
+        <span class="formula tex" data-tex="\to\ (y_u,\ \Delta t),\quad \Delta t\in\{0,\dots,4\}">→ (yᵤ, Δt), Δt ∈ {0…4}</span>
+        <p>Also predicts a duration, so it skips frames and gets word timings for free.</p>
+        <div class="who"><span class="capsule">Parakeet V3</span></div>
       </div>
       <div class="card">
-        <span class="tag off">Offline · 30 s windows</span>
+        <span class="pill" style="--c:var(--purple)"><i></i>Offline · 30 s windows</span>
         <h3>Encoder–decoder</h3>
         <span class="motto">“cross‑attend, then autoregress”</span>
-        <svg viewBox="0 0 200 80"><g font-family="JetBrains Mono" font-size="11">
-          <rect x="6" y="22" width="56" height="36" rx="8" fill="none" stroke="#22c37a" stroke-width="2"/><text x="34" y="44" fill="#22c37a" text-anchor="middle">enc</text>
-          <rect x="132" y="22" width="62" height="36" rx="8" fill="none" stroke="#9a7dff" stroke-width="2"/><text x="163" y="44" fill="#9a7dff" text-anchor="middle">dec</text>
-          <path d="M64 40 H128" stroke="#a2a9b6" stroke-width="2" stroke-dasharray="4 4"/><text x="96" y="34" fill="#a2a9b6" text-anchor="middle" font-size="9">x‑attn</text>
-          <path d="M175 60 C 175 76, 151 76, 151 60" fill="none" stroke="#f5381a" stroke-width="2"/></g></svg>
-        <div class="formula">P(<b>y</b><sub>i</sub> | Enc(X), y<sub>&lt;i</sub>)</div>
-        <p>Control tokens choose the language and task. Timestamps are tokens too.</p>
-        <div class="who"><span class="chip">Whisper tiny → large‑v3</span></div>
+        <svg class="sk" viewBox="0 0 200 70"><g font-family="Reddit Sans, sans-serif" font-size="12" font-weight="700">
+          <rect x="6" y="16" width="56" height="34" rx="12" fill="#149E5C" fill-opacity=".14"/><text x="34" y="37" fill="#149E5C" text-anchor="middle">enc</text>
+          <rect x="132" y="16" width="62" height="34" rx="12" fill="#7857DB" fill-opacity=".14"/><text x="163" y="37" fill="#7857DB" text-anchor="middle">dec</text>
+          <path d="M66 33 H128" stroke="#8E8E93" stroke-width="2" stroke-dasharray="4 4"/><text x="97" y="27" fill="#8E8E93" text-anchor="middle" font-size="10" font-weight="600">cross‑attn</text>
+          <path d="M175 52 C 175 68, 151 68, 151 52" fill="none" stroke="#F5381A" stroke-width="2.5" stroke-linecap="round"/></g></svg>
+        <span class="formula tex" data-tex="P\big(y_i \mid \mathrm{Enc}(X),\ y_{<i}\big)">P(yᵢ | Enc(X), y&lt;ᵢ)</span>
+        <p>Control tokens pick language and task; timestamps are tokens too.</p>
+        <div class="who"><span class="capsule">Whisper</span></div>
       </div>
       <div class="card">
-        <span class="tag off">Offline · LLM‑style</span>
+        <span class="pill" style="--c:var(--purple)"><i></i>Offline · LLM‑style</span>
         <h3>Audio‑LLM</h3>
         <span class="motto">“audio as tokens in a prompt”</span>
-        <svg viewBox="0 0 200 80"><g font-family="JetBrains Mono" font-size="10">
-          <rect x="6" y="28" width="30" height="24" rx="5" fill="none" stroke="#6c7380" stroke-dasharray="3 3"/><text x="21" y="44" fill="#a2a9b6" text-anchor="middle">sys</text>
-          <g fill="#22c37a"><rect x="42" y="28" width="16" height="24" rx="4"/><rect x="61" y="28" width="16" height="24" rx="4"/><rect x="80" y="28" width="16" height="24" rx="4"/><rect x="99" y="28" width="16" height="24" rx="4"/></g>
-          <g fill="none" stroke="#f4f5f7"><rect x="124" y="28" width="20" height="24" rx="4"/><rect x="148" y="28" width="20" height="24" rx="4"/></g>
-          <rect x="172" y="28" width="20" height="24" rx="4" fill="#f5381a"/><text x="78" y="20" fill="#22c37a" text-anchor="middle">audio embeddings</text></g></svg>
-        <div class="formula">P(<b>y</b><sub>i</sub> | [prompt; W·Enc(X)], y<sub>&lt;i</sub>)</div>
-        <p>A projector maps audio into the LLM's token space; then it's plain next‑token prediction.</p>
-        <div class="who"><span class="chip">Qwen3‑ASR</span><span class="chip">MOSS</span></div>
+        <svg class="sk" viewBox="0 0 200 70"><g font-family="Reddit Sans, sans-serif" font-size="10" font-weight="700">
+          <rect x="6" y="24" width="30" height="24" rx="12" fill="none" stroke="#8E8E93" stroke-dasharray="3 3"/><text x="21" y="40" fill="#8E8E93" text-anchor="middle">sys</text>
+          <g fill="#149E5C"><rect x="42" y="24" width="16" height="24" rx="8"/><rect x="61" y="24" width="16" height="24" rx="8"/><rect x="80" y="24" width="16" height="24" rx="8"/><rect x="99" y="24" width="16" height="24" rx="8"/></g>
+          <g fill="#8E8E93" fill-opacity=".3"><rect x="124" y="24" width="20" height="24" rx="10"/><rect x="148" y="24" width="20" height="24" rx="10"/></g>
+          <rect x="172" y="24" width="20" height="24" rx="10" fill="#F5381A"/><text x="78" y="16" fill="#149E5C" text-anchor="middle">audio embeddings</text></g></svg>
+        <span class="formula tex" data-tex="P\big(y_i \mid [\text{prompt};W\mathrm{Enc}(X)],\,y_{<i}\big)">P(yᵢ | [prompt; W·Enc(X)], y&lt;ᵢ)</span>
+        <p>A projector maps audio into the LLM's token space; the rest is next‑token prediction.</p>
+        <div class="who"><span class="capsule">Qwen3‑ASR</span><span class="capsule">MOSS</span></div>
       </div>
     </div>
     <div class="side-notes">
-      <div class="card" style="padding:.75rem 1rem"><h3 style="font-size:.95rem">Apple SpeechAnalyzer</h3><p style="margin-top:.25rem">A system black box: no app‑side tokens. You get <span class="mono">partial → revision → final</span> results with timing.</p></div>
-      <div class="card" style="padding:.75rem 1rem"><h3 style="font-size:.95rem">Sortformer · Community‑1</h3><p style="margin-top:.25rem">Diarization models output <i>no text at all</i>, only <span class="mono">who × when</span>. More on that in two slides.</p></div>
+      <div class="card"><h3><svg class="ic" style="color:var(--label2)"><use href="#i-chip"/></svg>Apple SpeechAnalyzer</h3><p>A system black box with no app‑side tokens: you get <b style="color:var(--label)">partial → revised → final</b> results with timing.</p></div>
+      <div class="card"><h3><svg class="ic" style="color:var(--purple)"><use href="#i-people"/></svg>Sortformer · Community‑1</h3><p>Diarization models output <i>no text at all</i>, only who and when. More on that in two slides.</p></div>
     </div>
   </div>
   <aside class="notes">
     <li>The encoders look alike. The decoder contract is what changes.</li>
-    <li>Transducers are streaming‑native; TDT is the fast offline variant. Whisper is the classic encoder‑decoder. The newest ones are audio‑LLMs: audio becomes embeddings in an LLM prompt.</li>
-    <li>The app ships all four, and picks one by language and by live vs offline.</li>
+    <li>Transducers are streaming‑native; TDT is the fast offline variant. Whisper is the classic encoder‑decoder. The newest are audio‑LLMs: audio becomes embeddings in an LLM prompt.</li>
+    <li>The app ships all four and picks one by language and by live vs offline.</li>
   </aside>
 </section>
 
 <!-- 5 ─────────────────────────────── TRANSDUCERS -->
 <section class="slide" data-widget="lattice">
-  <div class="kicker"><span class="n">04</span><span>Live path · transducers</span></div>
-  <h2>At every frame: emit a token, or move on</h2>
+  <div class="eyebrow"><b>04</b> Live path · transducers</div>
+  <h2>At every frame: <mark>emit a token, or move on</mark></h2>
   <div class="body lat-wrap">
-    <div class="lat-card">
+    <div class="card lat-card">
       <div style="display:flex;gap:.6rem;align-items:center;flex-wrap:wrap">
-        <div class="seg"><button class="btn on" data-mode="rnnt" type="button">RNN‑T · Nemotron</button><button class="btn" data-mode="tdt" type="button">TDT · Parakeet</button></div>
-        <button class="btn play" type="button">⏸ Pause</button>
-        <button class="btn stepb" type="button">Step →</button>
+        <div class="seg"><button class="on" data-mode="rnnt" type="button">RNN‑T · Nemotron</button><button data-mode="tdt" type="button">TDT · Parakeet</button></div>
+        <button class="btn play" type="button">Pause</button>
+        <button class="btn stepb" type="button">Step</button>
       </div>
       <div class="lat-canvas"><canvas></canvas></div>
-      <div class="lat-log"><span class="cnt"></span><span class="txt"></span></div>
+      <div class="lat-log"><span class="txt"></span><span class="cnt"></span></div>
     </div>
-    <div style="display:grid;gap:1rem;align-content:start">
+    <div class="lat-side">
       <div class="card">
         <h3>RNN‑T: blank advances time</h3>
-        <div class="formula" style="margin-top:.5rem">logits = Joint(h<sub>t</sub>, Pred(y<sub>u−1</sub>)) ∈ ℝ<sup>|V|+1</sup></div>
-        <p>⟨blank⟩ = go to the next frame, add nothing. A BPE token (<span class="mono">▁Meet</span>, <span class="mono">ing</span>) is appended and fed back, and the same frame is tried again. Calls = T + U.</p>
+        <span class="formula tex" data-tex="z_{t,u}=\mathrm{Joint}\big(h_t,\ \mathrm{Pred}(y_{u-1})\big)\in\mathbb{R}^{|V|+1}">z = Joint(hₜ, Pred(yᵤ₋₁)) ∈ ℝ^(|V|+1)</span>
+        <p><span class="tex" data-tex="\varnothing">∅</span> = go to the next frame, add nothing. A BPE token (<span class="mono">▁Meet</span>, <span class="mono">ing</span>) is appended and fed back, and the same frame is tried again. Calls = T + U.</p>
       </div>
       <div class="card">
         <h3>TDT: predict the jump, too</h3>
-        <div class="formula" style="margin-top:.5rem">(y<sub>u</sub>, Δt) = argmax P<sub>tok</sub> · argmax P<sub>dur</sub></div>
+        <span class="formula tex" data-tex="(\hat y_u,\ \widehat{\Delta t})=\big(\arg\max P_{\text{tok}},\ \arg\max P_{\text{dur}}\big)">(ŷ, Δt) = (argmax P_tok, argmax P_dur)</span>
         <p>Each call also picks how many frames to skip: far fewer calls, and the jumps add up to word timestamps.</p>
       </div>
       <div class="card">
-        <h3 style="display:flex;align-items:center;gap:.6rem">Cache‑aware streaming <span class="tag live">Nemotron 3.5 · 0.6B</span></h3>
-        <p style="margin-bottom:.55rem">Only the newest 320 ms is computed. Each layer caches attention K/V and conv state, so cost per step stays flat, even 2 hours into a meeting.</p>
+        <h3>Cache‑aware streaming <span class="pill" style="--c:var(--success)">Nemotron 3.5 · 0.6B</span></h3>
+        <p style="margin-bottom:.6rem">Only the newest 320 ms is computed. Each layer caches attention K/V and conv state, so cost per step stays flat, even two hours into a meeting.</p>
         <div class="chunks"></div>
         <div class="pipeline-mini" style="margin-top:.55rem"><b>320 ms</b> → 5,120 samples → <b>32</b> Mel frames → <b>4</b> encoder steps → <b>24</b> cached layers</div>
       </div>
@@ -595,22 +658,22 @@ ol.watch li small { display: block; color: var(--muted); font-size: .8rem; }
 
 <!-- 6 ─────────────────────────────── AUTOREGRESSIVE -->
 <section class="slide" data-widget="ar">
-  <div class="kicker"><span class="n">05</span><span>Offline path · autoregressive</span></div>
-  <h2>One token at a time, conditioned on all of the audio</h2>
+  <div class="eyebrow"><b>05</b> Offline path · autoregressive</div>
+  <h2>One token at a time, <mark>conditioned on all of the audio</mark></h2>
   <div class="body">
     <div class="ar-top">
-      <div class="seg"><button class="btn on" data-m="whisper" type="button">Whisper</button><button class="btn" data-m="qwen" type="button">Qwen3‑ASR</button><button class="btn" data-m="moss" type="button">MOSS</button></div>
-      <span class="formula ar-formula"></span>
+      <div class="seg"><button class="on" data-m="whisper" type="button">Whisper</button><button data-m="qwen" type="button">Qwen3‑ASR</button><button data-m="moss" type="button">MOSS</button></div>
+      <span class="formula tex ar-formula"></span>
     </div>
-    <div class="chain ar-chain" style="margin-top:1rem"></div>
+    <div class="chain ar-chain"></div>
     <div class="ar-wrap">
-      <div>
-        <div class="small dim mono" style="margin-bottom:.4rem;letter-spacing:.1em">TOKEN STREAM  <span style="color:var(--dim)">(dashed = prompt)</span></div>
+      <div class="card">
+        <div class="subhead">Token stream <span>· outlined = prompt</span></div>
         <div class="tokens ar-tokens"></div>
-        <p class="muted ar-note" style="font-size:.86rem;margin:.8rem 0 0"></p>
+        <p class="ar-note"></p>
       </div>
-      <div>
-        <div class="small dim mono" style="margin-bottom:.4rem;letter-spacing:.1em">NEXT‑TOKEN DISTRIBUTION <span style="color:var(--dim)">(illustrative)</span></div>
+      <div class="card">
+        <div class="subhead">Next‑token distribution <span>· illustrative</span></div>
         <div class="probs ar-probs"></div>
         <div class="ar-runtime" style="margin-top:1rem;display:flex;gap:.4rem;flex-wrap:wrap"></div>
       </div>
@@ -625,27 +688,27 @@ ol.watch li small { display: block; color: var(--muted); font-size: .8rem; }
 
 <!-- 7 ─────────────────────────────── DIARIZATION -->
 <section class="slide" data-widget="diar">
-  <div class="kicker"><span class="n">06</span><span>Who spoke when</span></div>
-  <h2>Speaker models output who and when, never words</h2>
+  <div class="eyebrow"><b>06</b> Who spoke when</div>
+  <h2>Speaker models output <mark>who and when</mark>, never words</h2>
   <div class="dia-wrap">
     <div class="card">
-      <div style="display:flex;align-items:center;gap:.6rem"><h3>Sortformer · live</h3><span class="tag live">streaming · 4 speakers</span></div>
-      <p>Per‑frame sigmoid <span class="mono">P(S<sub>k</sub> | t)</span> for four speaker slots. The slots are ordered by <b style="color:var(--text)">arrival time</b>, which removes the permutation ambiguity. An arrival‑order speaker cache keeps S1 as S1 across chunks.</p>
-      <div class="heat" style="margin-top:.9rem">
-        <div class="labels"><span style="--c:var(--brand)">S1</span><span style="--c:var(--info)">S2</span><span style="--c:var(--success)">S3</span><span style="--c:var(--purple)">S4</span></div>
+      <h3><svg class="ic" style="color:var(--purple)"><use href="#i-people"/></svg>Sortformer <span class="pill" style="--c:var(--danger)"><i></i>Live · 4 speakers</span></h3>
+      <p>A per‑frame sigmoid <span class="tex tex-inline" data-tex="P(S_k\mid t),\ k=1,\dots,4">P(Sₖ | t)</span> for four speaker slots. Slots are ordered by <b style="color:var(--label)">arrival time</b>, which removes the permutation ambiguity; an arrival‑order speaker cache keeps Speaker 1 stable across chunks.</p>
+      <div class="heat">
+        <div class="labels"><span style="--c:var(--brand)">S1</span><span style="--c:var(--purple)">S2</span><span style="--c:var(--info)">S3</span><span style="--c:var(--success)">S4</span></div>
         <canvas width="200" height="40"></canvas>
       </div>
       <div class="turns"></div>
-      <p class="small">Labels attach to whichever live ASR is running; it never decides any words.</p>
+      <p style="font-size:.8rem">Labels attach to whichever live ASR is running; Sortformer never decides any words.</p>
     </div>
     <div class="card">
-      <div style="display:flex;align-items:center;gap:.6rem"><h3>Pyannote Community‑1 · offline</h3><span class="tag off">Core ML</span></div>
-      <div class="vchain" style="margin-top:.8rem">
-        <div class="v"><div><b>10 s windows, 1 s hop</b><small>overlapping, 16 kHz</small></div><span class="mono">PCM[160,000]</span></div>
-        <div class="v"><div><b>Segmentation</b><small>local speakers, overlap‑aware</small></div><span class="mono">P[T × K]</span></div>
-        <div class="v"><div><b>Masked WeSpeaker</b><small>one voiceprint per local speaker</small></div><span class="mono">e ∈ ℝ²⁵⁶</span></div>
-        <div class="v"><div><b>PLDA + AHC + VBx</b><small>local voices → global speakers, count estimated</small></div><span class="mono">C<sub>k</sub></span></div>
-        <div class="v"><div><b>Join on time</b><small>each Parakeet word → speaker active at its timestamp</small></div><span class="mono">word → S<sub>k</sub></span></div>
+      <h3><svg class="ic" style="color:var(--purple)"><use href="#i-people"/></svg>Pyannote Community‑1 <span class="pill" style="--c:var(--purple)"><i></i>Offline</span></h3>
+      <div class="vchain">
+        <div class="v"><div><b>10 s windows, 1 s hop</b><small>overlapping, 16 kHz</small></div><span class="tex" data-tex="x\in\mathbb{R}^{160{,}000}">PCM[160,000]</span></div>
+        <div class="v"><div><b>Segmentation</b><small>local speakers, overlap‑aware</small></div><span class="tex" data-tex="P\in[0,1]^{T\times K}">P[T × K]</span></div>
+        <div class="v"><div><b>Masked WeSpeaker</b><small>one voiceprint per local speaker</small></div><span class="tex" data-tex="e\in\mathbb{R}^{256}">e ∈ ℝ²⁵⁶</span></div>
+        <div class="v"><div><b>PLDA + AHC + VBx</b><small>local voices → global speakers, count estimated</small></div><span class="tex" data-tex="\{C_1,\dots,C_K\}">C_k</span></div>
+        <div class="v"><div><b>Join on time</b><small>each Parakeet word → speaker active at its timestamp</small></div><span class="tex" data-tex="w_j\mapsto S_k">word → Sₖ</span></div>
       </div>
     </div>
   </div>
@@ -658,29 +721,31 @@ ol.watch li small { display: block; color: var(--muted); font-size: .8rem; }
 
 <!-- 8 ─────────────────────────────── TEXT AI -->
 <section class="slide" data-widget="textai">
-  <div class="kicker"><span class="n">07</span><span>After ASR</span></div>
-  <h2>The LLM reads the transcript, never the audio</h2>
-  <p class="lede">Once the text is final, a small local model writes the title, summary and tags. Apple Intelligence is used when the device has it. Everyone else (including China‑region iPhones) gets a GGUF model running through embedded llama.cpp.</p>
+  <div class="eyebrow"><b>07</b> After ASR</div>
+  <h2>The LLM reads the transcript, <mark>never the audio</mark></h2>
+  <p class="lede">Once the text is final, a small local model writes the title, summary and tags. Apple Intelligence is used when the device has it; everyone else, including China‑region iPhones, gets a GGUF model running through embedded llama.cpp.</p>
   <div class="ai-wrap">
-    <div class="card transcript">
-      <span class="tag">Final transcript</span>
-      <p><b style="background:var(--brand)">S1</b>We'll launch the beta next Friday,</p>
-      <p><b style="background:var(--info)">S2</b>then review early feedback after the first week.</p>
-      <p><b style="background:var(--brand)">S1</b>Can you own the TestFlight notes?</p>
+    <div class="card">
+      <h3><svg class="ic" style="color:var(--brand)"><use href="#i-captions"/></svg>Final transcript</h3>
+      <div class="tr" style="min-height:0;gap:.7rem">
+        <div class="tr-row" style="--c:var(--brand)"><div class="meta">Speaker 1 <span class="capsule">00:00</span></div><p style="font-size:.92rem">We'll launch the beta next Friday,</p></div>
+        <div class="tr-row" style="--c:var(--purple)"><div class="meta">Speaker 2 <span class="capsule">00:03</span></div><p style="font-size:.92rem">then review early feedback after the first week.</p></div>
+        <div class="tr-row" style="--c:var(--brand)"><div class="meta">Speaker 1 <span class="capsule">00:07</span></div><p style="font-size:.92rem">Can you own the TestFlight notes?</p></div>
+      </div>
     </div>
-    <div class="arrow">→</div>
+    <svg class="ic arr"><use href="#i-arrow"/></svg>
     <div class="engines">
-      <div class="engine"><b>Apple Foundation Models</b><small>system on‑device LLM · when available</small></div>
-      <div class="engine"><b>Qwen3.5 2B · Q3_K_M</b><small>llama.cpp · 201 languages &amp; dialects</small></div>
-      <div class="engine"><b>LFM2.5 1.2B · Q4_K_M</b><small>llama.cpp · smallest, fastest</small></div>
-      <div class="engine dim2"><b>Gemini (opt‑in)</b><small>your own key, explicit confirm only; Automatic never picks it</small></div>
+      <div class="engine"><b>Apple Foundation Models</b><small>system on‑device LLM, when available</small></div>
+      <div class="engine sel"><b>Qwen3.5 2B · Q3_K_M</b><small>llama.cpp · 201 languages &amp; dialects</small></div>
+      <div class="engine"><b>LFM2.5 1.2B · Q4_K_M</b><small>llama.cpp · smaller and faster</small></div>
+      <div class="engine optin"><b>Gemini (opt‑in)</b><small>your own key, explicit confirmation; Automatic never picks it</small></div>
     </div>
-    <div class="arrow">→</div>
+    <svg class="ic arr"><use href="#i-arrow"/></svg>
     <div class="card out">
-      <span class="tag brand">Generated on device</span>
+      <h3><svg class="ic" style="color:var(--purple)"><use href="#i-sparkles"/></svg>Generated on device</h3>
       <div class="field"><i>Title</i><div class="val title-val" data-type="Beta Launch Plan"></div></div>
-      <div class="field"><i>Summary</i><div class="val" data-type="The beta launches next Friday; early feedback is reviewed after one week. S2 owns the TestFlight notes."></div></div>
-      <div class="field"><i>Tags</i><div class="tags"><span class="chip">#launch</span><span class="chip">#follow‑up</span><span class="chip">#testflight</span></div></div>
+      <div class="field"><i>Summary</i><div class="val" data-type="The beta launches next Friday; early feedback is reviewed after one week. Speaker 2 owns the TestFlight notes."></div></div>
+      <div class="field"><i>Tags</i><div class="tags"><span class="pill" style="--c:var(--brand)">Launch</span><span class="pill" style="--c:var(--info)">Follow‑up</span><span class="pill" style="--c:var(--success)">TestFlight</span></div></div>
     </div>
   </div>
   <aside class="notes">
@@ -691,10 +756,10 @@ ol.watch li small { display: block; color: var(--muted); font-size: .8rem; }
 
 <!-- 9 ─────────────────────────────── SHIPPING -->
 <section class="slide">
-  <div class="kicker"><span class="n">08</span><span>Engineering</span></div>
-  <h2>Making it fit on a 6 GB iPhone</h2>
+  <div class="eyebrow"><b>08</b> Engineering</div>
+  <h2>Making it fit on a <mark>6 GB iPhone</mark></h2>
   <div class="ship-wrap">
-    <div class="table-scroll">
+    <div class="card tbl table-scroll">
       <table class="models">
         <thead><tr><th>Model</th><th>Job</th><th>Weights</th><th>Runtime</th></tr></thead>
         <tbody>
@@ -715,14 +780,16 @@ ol.watch li small { display: block; color: var(--muted); font-size: .8rem; }
     </div>
     <div style="display:grid;gap:1rem;align-content:start">
       <div class="bignum">
-        <div class="card"><b>4</b><span>ML runtimes in one app: Core ML, MLX, ggml, llama.cpp</span></div>
+        <div class="card"><b>4</b><span>ML runtimes in one app: Core ML, MLX, ggml and llama.cpp</span></div>
         <div class="card"><b>0</b><span>developer servers. Audio stays on the device by default.</span></div>
       </div>
-      <ul class="ticks">
-        <li><b>Quantize everything:</b> INT8 Core ML, 4‑bit MLX, Q5_0 and K‑quants. Memory, not FLOPs, is the real budget.</li>
-        <li><b>Models ship as Apple‑hosted on‑demand asset packs</b> (Background Assets): pinned upstream revisions, SHA‑256 verified, downloaded only when you choose a model.</li>
-        <li><b>One shared domain layer</b> for iPhone, Watch and a native Mac app that captures any meeting window via ScreenCaptureKit.</li>
-      </ul>
+      <div class="card">
+        <ul class="list">
+          <li><svg class="ic" style="color:var(--warning)"><use href="#i-chip"/></svg><span><b>Quantize everything.</b> INT8 Core ML, 4‑bit MLX, Q5_0 and K‑quants: memory, not FLOPs, is the real budget.</span></li>
+          <li><svg class="ic" style="color:var(--info)"><use href="#i-store"/></svg><span><b>Apple‑hosted asset packs.</b> Models ship through Background Assets: pinned upstream revisions, SHA‑256 verified, downloaded only when you pick one.</span></li>
+          <li><svg class="ic" style="color:var(--label2)"><use href="#i-laptop"/></svg><span><b>One domain layer</b> shared by iPhone, Watch and a native Mac app that captures any meeting window with ScreenCaptureKit.</span></li>
+        </ul>
+      </div>
     </div>
   </div>
   <aside class="notes">
@@ -734,7 +801,7 @@ ol.watch li small { display: block; color: var(--muted); font-size: .8rem; }
 
 <!-- 10 ─────────────────────────────── PRODUCT -->
 <section class="slide">
-  <div class="kicker"><span class="n">09</span><span>What it adds up to</span></div>
+  <div class="eyebrow"><b>09</b> What it adds up to</div>
   <h2>LiveTranscriber</h2>
   <p class="lede">A local‑first recorder for iPhone, with a native Mac companion. Every model on the previous slides is one tap away inside the app.</p>
   <div class="prod-wrap">
@@ -745,13 +812,14 @@ ol.watch li small { display: block; color: var(--muted); font-size: .8rem; }
       <img src="img/app-08.jpg" alt="Translate audio from other apps" loading="lazy">
       <img src="img/app-09.jpg" alt="Offline summaries and highlights" loading="lazy">
     </div>
-    <div class="feat">
-      <div><span>💬</span><span><b>Live captions + live translation</b><small>Apple Translation on confirmed lines, while recording</small></span></div>
-      <div><span>👥</span><span><b>Speaker labels, live and offline</b><small>Sortformer while recording; Community‑1 or MOSS afterwards</small></span></div>
-      <div><span>🏝️</span><span><b>Dynamic Island &amp; Live Activity</b><small>follow the transcript without opening the app</small></span></div>
-      <div><span>🎯</span><span><b>Right model per language</b><small>Parakeet for Europe, Qwen3‑ASR for Chinese dialects, Whisper for the long tail</small></span></div>
-      <div><span>✨</span><span><b>Local summaries, titles, tags, search</b><small>works without Apple Intelligence</small></span></div>
-      <div><span>💻</span><span><b>Mac companion</b><small>capture Zoom / Teams / Meet windows + mic, synced via private iCloud</small></span></div>
+    <div class="card feat">
+      <div><svg class="ic" style="color:var(--brand)"><use href="#i-captions"/></svg><span>Live captions + live translation<small>Apple Translation on confirmed lines, while recording</small></span></div>
+      <div><svg class="ic" style="color:var(--purple)"><use href="#i-people"/></svg><span>Speaker labels, live and offline<small>Sortformer while recording; Community‑1 or MOSS afterwards</small></span></div>
+      <div><svg class="ic" style="color:var(--info)"><use href="#i-island"/></svg><span>Dynamic Island &amp; Live Activity<small>follow the transcript without opening the app</small></span></div>
+      <div><svg class="ic" style="color:var(--warning)"><use href="#i-globe"/></svg><span>Right model per language<small>Parakeet for Europe, Qwen3‑ASR for Chinese dialects, Whisper for the long tail</small></span></div>
+      <div><svg class="ic" style="color:var(--purple)"><use href="#i-sparkles"/></svg><span>Local summaries, titles, tags, search<small>works without Apple Intelligence</small></span></div>
+      <div><svg class="ic" style="color:var(--label2)"><use href="#i-laptop"/></svg><span>Mac companion<small>capture Zoom, Teams or Meet windows plus mic, synced via private iCloud</small></span></div>
+      <div><svg class="ic" style="color:var(--privacy)"><use href="#i-lock"/></svg><span>Local‑first by default<small>no developer servers, no tracking</small></span></div>
     </div>
   </div>
   <aside class="notes">
@@ -761,40 +829,40 @@ ol.watch li small { display: block; color: var(--muted); font-size: .8rem; }
 
 <!-- 11 ─────────────────────────────── DEMO -->
 <section class="slide">
-  <div class="kicker"><span class="n">10</span><span>Running code</span></div>
+  <div class="eyebrow"><b>10</b> Running code</div>
   <div class="demo-wrap">
     <div>
-      <div class="demo-big">Live<br>demo<span class="dot"></span></div>
-      <p class="lede" style="margin-top:1.2rem">Works in airplane mode: everything you'll see runs on the phone.</p>
+      <div class="demo-big">Live<br>demo<span class="recdot"></span></div>
+      <p class="lede" style="margin-top:1.2rem;display:flex;gap:.5rem;align-items:center"><svg class="ic" style="color:var(--info)"><use href="#i-plane"/></svg>Works in airplane mode: everything you'll see runs on the phone.</p>
     </div>
-    <ol class="watch">
+    <ol class="card watch">
       <li><span>Partial → final<small>live text rewrites itself as context arrives</small></span></li>
-      <li><span>Speaker chips appear<small>Sortformer tags turns while I talk</small></span></li>
-      <li><span>Dynamic Island<small>transcript follows me to the Lock Screen</small></span></li>
+      <li><span>Speaker labels appear<small>Sortformer tags turns while I talk</small></span></li>
+      <li><span>Dynamic Island<small>the transcript follows me to the Lock Screen</small></span></li>
       <li><span>Re‑transcribe offline<small>Parakeet V3 + Community‑1: word timestamps and speakers</small></span></li>
       <li><span>One‑tap local summary<small>a 2B LLM, on device</small></span></li>
     </ol>
   </div>
   <aside class="notes">
-    <li>Switch to the phone mirror. Turn on airplane mode first to make the point.</li>
-    <li>Record ~20 s with a second voice, show speaker chips, stop, re‑transcribe with Parakeet + speakers, tap Analyze.</li>
+    <li>Switch to the phone mirror. Turn on airplane mode first to make the point (re‑enable Wi‑Fi if mirroring over AirPlay).</li>
+    <li>Record ~20 s with a second voice, show speaker labels, stop, re‑transcribe with Parakeet + speakers, tap Analyze.</li>
   </aside>
 </section>
 
 <!-- 12 ─────────────────────────────── END -->
 <section class="slide">
-  <div class="kicker"><span class="n">11</span><span>Thanks</span></div>
+  <div class="eyebrow"><b>11</b> Thanks</div>
   <div class="end-wrap">
     <div class="qr" role="img" aria-label="QR code linking to these slides"><svg xmlns="http://www.w3.org/2000/svg" viewBox="-1 -1 35 35" shape-rendering="crispEdges"><path fill="#0b0c10" d="M0 0h7v1h-7zM9 0h3v1h-3zM14 0h2v1h-2zM18 0h2v1h-2zM22 0h2v1h-2zM26 0h7v1h-7zM0 1h1v1h-1zM6 1h1v1h-1zM15 1h1v1h-1zM21 1h1v1h-1zM23 1h2v1h-2zM26 1h1v1h-1zM32 1h1v1h-1zM0 2h1v1h-1zM2 2h3v1h-3zM6 2h1v1h-1zM12 2h1v1h-1zM14 2h1v1h-1zM16 2h5v1h-5zM23 2h2v1h-2zM26 2h1v1h-1zM28 2h3v1h-3zM32 2h1v1h-1zM0 3h1v1h-1zM2 3h3v1h-3zM6 3h1v1h-1zM9 3h1v1h-1zM12 3h2v1h-2zM18 3h1v1h-1zM20 3h1v1h-1zM22 3h1v1h-1zM26 3h1v1h-1zM28 3h3v1h-3zM32 3h1v1h-1zM0 4h1v1h-1zM2 4h3v1h-3zM6 4h1v1h-1zM10 4h3v1h-3zM16 4h1v1h-1zM18 4h1v1h-1zM21 4h3v1h-3zM26 4h1v1h-1zM28 4h3v1h-3zM32 4h1v1h-1zM0 5h1v1h-1zM6 5h1v1h-1zM8 5h1v1h-1zM12 5h1v1h-1zM17 5h3v1h-3zM21 5h2v1h-2zM26 5h1v1h-1zM32 5h1v1h-1zM0 6h7v1h-7zM8 6h1v1h-1zM10 6h1v1h-1zM12 6h1v1h-1zM14 6h1v1h-1zM16 6h1v1h-1zM18 6h1v1h-1zM20 6h1v1h-1zM22 6h1v1h-1zM24 6h1v1h-1zM26 6h7v1h-7zM11 7h2v1h-2zM14 7h1v1h-1zM17 7h2v1h-2zM20 7h3v1h-3zM0 8h1v1h-1zM3 8h1v1h-1zM5 8h2v1h-2zM8 8h2v1h-2zM11 8h1v1h-1zM13 8h1v1h-1zM15 8h2v1h-2zM21 8h1v1h-1zM23 8h3v1h-3zM27 8h1v1h-1zM0 9h1v1h-1zM4 9h2v1h-2zM7 9h4v1h-4zM12 9h1v1h-1zM16 9h2v1h-2zM21 9h1v1h-1zM24 9h4v1h-4zM32 9h1v1h-1zM1 10h2v1h-2zM6 10h2v1h-2zM11 10h2v1h-2zM19 10h1v1h-1zM21 10h1v1h-1zM27 10h2v1h-2zM30 10h1v1h-1zM32 10h1v1h-1zM2 11h4v1h-4zM7 11h2v1h-2zM14 11h1v1h-1zM16 11h1v1h-1zM18 11h4v1h-4zM23 11h3v1h-3zM28 11h2v1h-2zM32 11h1v1h-1zM1 12h1v1h-1zM3 12h2v1h-2zM6 12h1v1h-1zM8 12h5v1h-5zM15 12h1v1h-1zM17 12h1v1h-1zM19 12h4v1h-4zM24 12h3v1h-3zM29 12h1v1h-1zM0 13h2v1h-2zM4 13h1v1h-1zM9 13h5v1h-5zM15 13h2v1h-2zM18 13h3v1h-3zM22 13h1v1h-1zM24 13h3v1h-3zM28 13h1v1h-1zM31 13h2v1h-2zM3 14h1v1h-1zM5 14h3v1h-3zM9 14h2v1h-2zM12 14h2v1h-2zM17 14h2v1h-2zM20 14h1v1h-1zM23 14h1v1h-1zM25 14h5v1h-5zM31 14h1v1h-1zM1 15h1v1h-1zM4 15h1v1h-1zM8 15h1v1h-1zM14 15h2v1h-2zM17 15h2v1h-2zM21 15h1v1h-1zM23 15h1v1h-1zM26 15h2v1h-2zM31 15h1v1h-1zM0 16h3v1h-3zM5 16h2v1h-2zM8 16h1v1h-1zM11 16h1v1h-1zM13 16h1v1h-1zM17 16h1v1h-1zM20 16h4v1h-4zM26 16h1v1h-1zM28 16h1v1h-1zM31 16h1v1h-1zM1 17h1v1h-1zM9 17h3v1h-3zM14 17h1v1h-1zM18 17h1v1h-1zM23 17h3v1h-3zM27 17h1v1h-1zM29 17h1v1h-1zM31 17h1v1h-1zM0 18h3v1h-3zM4 18h4v1h-4zM12 18h1v1h-1zM14 18h1v1h-1zM16 18h3v1h-3zM20 18h2v1h-2zM26 18h1v1h-1zM30 18h3v1h-3zM1 19h1v1h-1zM4 19h1v1h-1zM8 19h1v1h-1zM12 19h1v1h-1zM16 19h2v1h-2zM20 19h2v1h-2zM23 19h5v1h-5zM0 20h1v1h-1zM5 20h2v1h-2zM8 20h5v1h-5zM14 20h1v1h-1zM16 20h1v1h-1zM19 20h1v1h-1zM21 20h1v1h-1zM24 20h2v1h-2zM31 20h2v1h-2zM3 21h1v1h-1zM5 21h1v1h-1zM9 21h1v1h-1zM15 21h4v1h-4zM20 21h1v1h-1zM22 21h1v1h-1zM24 21h3v1h-3zM31 21h2v1h-2zM0 22h2v1h-2zM6 22h3v1h-3zM10 22h3v1h-3zM15 22h1v1h-1zM19 22h2v1h-2zM24 22h2v1h-2zM28 22h3v1h-3zM32 22h1v1h-1zM1 23h2v1h-2zM4 23h1v1h-1zM9 23h1v1h-1zM11 23h2v1h-2zM16 23h1v1h-1zM21 23h3v1h-3zM26 23h2v1h-2zM29 23h1v1h-1zM32 23h1v1h-1zM0 24h1v1h-1zM3 24h1v1h-1zM6 24h1v1h-1zM9 24h9v1h-9zM19 24h3v1h-3zM24 24h7v1h-7zM8 25h1v1h-1zM10 25h1v1h-1zM14 25h1v1h-1zM17 25h1v1h-1zM19 25h6v1h-6zM28 25h2v1h-2zM0 26h7v1h-7zM9 26h1v1h-1zM12 26h1v1h-1zM14 26h1v1h-1zM18 26h1v1h-1zM20 26h1v1h-1zM24 26h1v1h-1zM26 26h1v1h-1zM28 26h4v1h-4zM0 27h1v1h-1zM6 27h1v1h-1zM8 27h1v1h-1zM11 27h1v1h-1zM15 27h7v1h-7zM24 27h1v1h-1zM28 27h1v1h-1zM32 27h1v1h-1zM0 28h1v1h-1zM2 28h3v1h-3zM6 28h1v1h-1zM10 28h2v1h-2zM13 28h2v1h-2zM17 28h2v1h-2zM20 28h3v1h-3zM24 28h6v1h-6zM0 29h1v1h-1zM2 29h3v1h-3zM6 29h1v1h-1zM8 29h1v1h-1zM11 29h1v1h-1zM13 29h3v1h-3zM17 29h1v1h-1zM21 29h1v1h-1zM23 29h1v1h-1zM26 29h1v1h-1zM28 29h2v1h-2zM0 30h1v1h-1zM2 30h3v1h-3zM6 30h1v1h-1zM9 30h2v1h-2zM13 30h2v1h-2zM18 30h1v1h-1zM22 30h1v1h-1zM24 30h1v1h-1zM28 30h1v1h-1zM30 30h1v1h-1zM32 30h1v1h-1zM0 31h1v1h-1zM6 31h1v1h-1zM10 31h2v1h-2zM13 31h1v1h-1zM17 31h1v1h-1zM21 31h1v1h-1zM24 31h1v1h-1zM0 32h7v1h-7zM8 32h1v1h-1zM10 32h2v1h-2zM15 32h1v1h-1zM19 32h1v1h-1zM21 32h1v1h-1zM24 32h3v1h-3zM28 32h1v1h-1zM31 32h1v1h-1z"/></svg></div>
     <div>
-      <h2 style="font-size:3rem">Take the slides with you</h2>
+      <h2 style="font-size:3rem">Take the slides <mark>with you</mark></h2>
       <p class="lede">Every widget here is live: try the mic spectrogram and the lattice on your phone.</p>
       <div class="url">iamwilliamli.github.io/LiveTranscriber/tinkerers</div>
-      <div class="links">
-        <a href="https://apps.apple.com/app/id6785515364"><span>App Store</span><b>LiveTranscriber for iPhone ↗</b></a>
-        <a href="https://testflight.apple.com/join/gsu9xa9k"><span>TestFlight</span><b>Join the beta ↗</b></a>
-        <a href="https://github.com/iamwilliamli/LiveTranscriber"><span>Source</span><b>github.com/iamwilliamli/LiveTranscriber ↗</b></a>
-        <a href="https://chengqili.com/"><span>Me</span><b>William (Chengqi) Li · chengqili.com ↗</b></a>
+      <div class="card grouped">
+        <a href="https://apps.apple.com/app/id6785515364"><svg class="ic" style="color:var(--info)"><use href="#i-store"/></svg><span><b>LiveTranscriber on the App Store</b><small>iPhone · iPad · Mac</small></span><svg class="ic chev"><use href="#i-chev"/></svg></a>
+        <a href="https://testflight.apple.com/join/gsu9xa9k"><svg class="ic" style="color:var(--warning)"><use href="#i-flask"/></svg><span><b>Join the TestFlight beta</b><small>newest models first</small></span><svg class="ic chev"><use href="#i-chev"/></svg></a>
+        <a href="https://github.com/iamwilliamli/LiveTranscriber"><svg class="ic" style="color:var(--label)"><use href="#i-code"/></svg><span><b>Source on GitHub</b><small>github.com/iamwilliamli/LiveTranscriber</small></span><svg class="ic chev"><use href="#i-chev"/></svg></a>
+        <a href="https://chengqili.com/"><svg class="ic" style="color:var(--brand)"><use href="#i-person"/></svg><span><b>William (Chengqi) Li</b><small>chengqili.com</small></span><svg class="ic chev"><use href="#i-chev"/></svg></a>
       </div>
     </div>
   </div>
@@ -806,14 +874,15 @@ ol.watch li small { display: block; color: var(--muted); font-size: .8rem; }
 </main>
 
 <div class="notes-panel" id="notesPanel"><h4>Speaker notes · <span id="notesNum"></span></h4><ul id="notesBody"></ul></div>
-<nav class="bar" aria-label="Slide navigation">
-  <button class="ib" id="prevBtn" type="button" aria-label="Previous slide">‹</button>
+<nav class="dock left" aria-label="Slide navigation">
+  <button id="prevBtn" type="button" aria-label="Previous slide"><svg class="ic"><use href="#i-left"/></svg></button>
   <span class="count" id="count">1 / 12</span>
-  <button class="ib" id="nextBtn" type="button" aria-label="Next slide">›</button>
-  <span class="spacer"></span>
-  <span class="brandmark">LiveTranscriber · AI Tinkerers</span>
-  <button class="ib" id="notesBtn" type="button" aria-label="Toggle speaker notes" title="Speaker notes (N)">✎</button>
-  <button class="ib" id="fsBtn" type="button" aria-label="Toggle fullscreen" title="Fullscreen (F)">⤢</button>
+  <button id="nextBtn" type="button" aria-label="Next slide"><svg class="ic"><use href="#i-right"/></svg></button>
+</nav>
+<nav class="dock right" aria-label="Presentation controls">
+  <button class="theme-toggle" type="button" aria-label="Toggle light or dark appearance" title="Appearance (T)"><svg class="ic"><use href="#i-theme"/></svg></button>
+  <button id="notesBtn" type="button" aria-label="Toggle speaker notes" title="Speaker notes (N)"><svg class="ic"><use href="#i-notes"/></svg></button>
+  <button id="fsBtn" type="button" aria-label="Toggle fullscreen" title="Fullscreen (F)"><svg class="ic"><use href="#i-expand"/></svg></button>
 </nav>
 
 <script>
@@ -822,17 +891,57 @@ ol.watch li small { display: block; color: var(--muted); font-size: .8rem; }
 const root = document.documentElement;
 const stage = document.getElementById('stage');
 const slides = [...document.querySelectorAll('.slide')];
-const css = getComputedStyle(root);
-const C = name => css.getPropertyValue(name).trim();
+const live = getComputedStyle(root);
+const C = name => live.getPropertyValue(name).trim();
 let SCALE = 1;
 let index = 0;
 let mode = null;
 
+/* ------------------------------------------------ appearance */
+const THEME_KEY = 'lt-tinkerers-theme';
+const darkMQ = matchMedia('(prefers-color-scheme: dark)');
+function storedTheme() { try { return localStorage.getItem(THEME_KEY); } catch { return null; } }
+function isDark() { return root.dataset.theme ? root.dataset.theme === 'dark' : darkMQ.matches; }
+function setTheme(t) {
+  if (t) root.dataset.theme = t; else delete root.dataset.theme;
+  dispatchEvent(new Event('themechange'));
+}
+function toggleTheme() {
+  const next = isDark() ? 'light' : 'dark';
+  try { localStorage.setItem(THEME_KEY, next); } catch {}
+  setTheme(next);
+}
+const saved = storedTheme();
+if (saved === 'light' || saved === 'dark') root.dataset.theme = saved;
+darkMQ.addEventListener?.('change', () => { if (!root.dataset.theme) dispatchEvent(new Event('themechange')); });
+document.querySelectorAll('.theme-toggle').forEach(b => b.onclick = toggleTheme);
+function rgb(hex) { hex = hex.replace('#', ''); return [0, 2, 4].map(i => parseInt(hex.slice(i, i + 2), 16)); }
+
+/* ------------------------------------------------ math (KaTeX) */
+function renderTex(scope) {
+  if (!window.katex) return;
+  scope.querySelectorAll('[data-tex]').forEach(el => {
+    if (el.dataset.rendered === el.dataset.tex) return;
+    try {
+      katex.render(el.dataset.tex, el, { throwOnError: false, displayMode: false, output: 'html' });
+      el.dataset.rendered = el.dataset.tex;
+    } catch (e) { /* keep the plain-text fallback */ }
+  });
+}
+(() => {
+  const s = document.createElement('script');
+  s.src = 'https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/katex.min.js';
+  s.crossOrigin = 'anonymous';
+  s.onload = () => { renderTex(document); widgets.forEach(w => w.resize && w.resize()); };
+  document.head.appendChild(s);
+})();
+
 /* ------------------------------------------------ layout mode */
 function wantDoc() {
+  const q = new URLSearchParams(location.search).get('view');
+  if (q === 'slides') return false;
+  if (q === 'page') return true;
   const w = innerWidth, h = innerHeight;
-  if (new URLSearchParams(location.search).get('view') === 'slides') return false;
-  if (new URLSearchParams(location.search).get('view') === 'page') return true;
   return w < 900 || h < 520 || w / h < 1.05;
 }
 function applyMode() {
@@ -841,15 +950,11 @@ function applyMode() {
     mode = next;
     root.classList.toggle('doc', mode === 'doc');
     root.classList.toggle('deck', mode === 'deck');
-    if (mode === 'doc') { slides.forEach(s => s.classList.remove('active', 'prev')); startObserver(); }
+    if (mode === 'doc') { slides.forEach(s => s.classList.remove('active')); startObserver(); }
     else { stopObserver(); go(index, true); }
   }
-  if (mode === 'deck') {
-    SCALE = Math.min(innerWidth / 1600, innerHeight / 900);
-    stage.style.setProperty('--s', SCALE);
-  } else {
-    SCALE = 1;
-  }
+  SCALE = mode === 'deck' ? Math.min(innerWidth / 1600, innerHeight / 900) : 1;
+  if (mode === 'deck') stage.style.setProperty('--s', SCALE);
   widgets.forEach(w => w.resize && w.resize());
 }
 
@@ -861,10 +966,7 @@ function go(i, force) {
   if (i === index && !force) return;
   const prevIdx = index;
   index = i;
-  slides.forEach((s, k) => {
-    s.classList.toggle('active', k === i);
-    s.classList.toggle('prev', k < i);
-  });
+  slides.forEach((s, k) => s.classList.toggle('active', k === i));
   countEl.textContent = `${i + 1} / ${slides.length}`;
   progress.style.width = `${(i + 1) / slides.length * 100}%`;
   history.replaceState(null, '', `#${i + 1}`);
@@ -883,8 +985,10 @@ function toggleFs() {
   else document.exitFullscreen?.();
 }
 addEventListener('keydown', e => {
-  if (mode !== 'deck' || e.metaKey || e.ctrlKey || e.altKey) return;
+  if (e.metaKey || e.ctrlKey || e.altKey) return;
   const k = e.key;
+  if (k === 't' || k === 'T') { toggleTheme(); return; }
+  if (mode !== 'deck') return;
   if (k === 'ArrowRight' || k === 'PageDown' || (k === ' ' && !(e.target instanceof HTMLButtonElement))) { e.preventDefault(); go(index + 1); }
   else if (k === 'ArrowLeft' || k === 'PageUp') { e.preventDefault(); go(index - 1); }
   else if (k === 'Home') go(0);
@@ -948,32 +1052,34 @@ function register(name, factory) {
   });
 }
 
-/* ================================================ hero waveform */
+/* ================================================ hero: live transcript card */
 register('hero', s => {
-  const cv = s.querySelector('#heroWave');
-  let t = 0;
-  const l = loop((now, dt) => {
-    t += dt / 1000;
-    const f = fitCanvas(cv); if (!f) return;
-    const { ctx, w, h } = f;
-    ctx.clearRect(0, 0, w, h);
-    const mid = h / 2;
-    const g = ctx.createLinearGradient(0, 0, w, 0);
-    g.addColorStop(0, C('--brand')); g.addColorStop(.6, C('--brand-soft')); g.addColorStop(1, C('--purple'));
-    ctx.strokeStyle = g; ctx.lineWidth = 2;
-    ctx.beginPath();
-    for (let x = 0; x <= w; x += 2) {
-      const u = x / w;
-      const env = Math.pow(Math.sin(Math.PI * ((u * 3 + t * .35) % 1)), 2) * (0.35 + 0.65 * Math.abs(Math.sin(u * 7 + t)));
-      const y = Math.sin(x * .09 + t * 9) * .55 + Math.sin(x * .23 + t * 5) * .3 + Math.sin(x * .41 - t * 3) * .15;
-      ctx.lineTo(x, mid + y * env * h * .42);
-    }
-    ctx.stroke();
-    // frame grid hint
-    ctx.fillStyle = 'rgba(255,255,255,.06)';
-    for (let x = (t * 60) % 24; x < w; x += 24) ctx.fillRect(x, h - 6, 12, 3);
-  });
-  return { start: l.start, stop: l.stop };
+  const r2 = s.querySelector('.r2'), r3 = s.querySelector('.r3');
+  const row2 = r2.closest('.tr-row'), row3 = r3.closest('.tr-row');
+  const clock = s.querySelector('.hero-clock'), state = s.querySelector('.hero-state');
+  // partial hypotheses revise themselves, then commit as final
+  const script = [
+    [row2, r2, ['Yes', 'Yes, I', "Yes, I'll bring", "Yes, I'll bring the beta", "Yes, I'll bring the beta note", "Yes, I'll bring the beta notes."]],
+    [row3, r3, ['Great', 'Great, see', 'Great, see you in', 'Great, see you in room for', 'Great, see you in room four.']],
+  ];
+  let timers = [], secs = 0, tick = 0;
+  function clear() { timers.forEach(clearTimeout); timers = []; clearInterval(tick); }
+  function setState(txt, c) { state.textContent = txt; state.style.setProperty('--c', c); }
+  function run() {
+    clear();
+    secs = 0; clock.textContent = '00:00';
+    tick = setInterval(() => { secs++; clock.textContent = `00:${String(secs).padStart(2, '0')}`; }, 1000);
+    script.forEach(([row, p]) => { row.classList.add('hidden'); row.classList.remove('interim'); p.textContent = ''; });
+    let t = 600;
+    script.forEach(([row, p, steps]) => {
+      timers.push(setTimeout(() => { row.classList.remove('hidden'); row.classList.add('interim'); setState('partial', C('--label2')); }, t));
+      steps.forEach(txt => { timers.push(setTimeout(() => { p.textContent = txt; }, t)); t += 420; });
+      timers.push(setTimeout(() => { row.classList.remove('interim'); setState('final', C('--success')); }, t + 200));
+      t += 1300;
+    });
+    timers.push(setTimeout(run, t + 3500));
+  }
+  return { start: run, stop: clear };
 });
 
 /* ================================================ spectrogram */
@@ -981,22 +1087,25 @@ register('spectrogram', s => {
   const cv = s.querySelector('canvas.spec');
   const ctx = cv.getContext('2d');
   const W = cv.width, MEL = 80, H = cv.height;
-  const micBtn = s.querySelector('.mic'), demoBtn = s.querySelector('.demo');
+  const micBtn = s.querySelector('.mic'), micLabel = micBtn.querySelector('span'), demoBtn = s.querySelector('.demo');
   const framesEl = s.querySelector('.frames'), secsEl = s.querySelector('.secs');
   let source = 'demo', frames = 0, t = 0, acc = 0;
-  let audio = null; // {ctx, stream, analyser, buf, filters}
+  let audio = null;
   const melOf = f => 2595 * Math.log10(1 + f / 700);
   const hzOf = m => 700 * (Math.pow(10, m / 2595) - 1);
   const melCenters = []; { const lo = melOf(0), hi = melOf(8000); for (let i = 0; i < MEL + 2; i++) melCenters.push(hzOf(lo + (hi - lo) * i / (MEL + 1))); }
-  // magma-ish colormap
-  const stops = [[0, [4, 4, 12]], [.25, [70, 16, 110]], [.5, [182, 54, 95]], [.72, [245, 105, 50]], [.9, [252, 190, 80]], [1, [252, 253, 191]]];
   const cmap = new Uint8ClampedArray(256 * 3);
-  for (let i = 0; i < 256; i++) {
-    const v = i / 255; let k = 0; while (k < stops.length - 2 && v > stops[k + 1][0]) k++;
-    const [a, ca] = stops[k], [b, cb] = stops[k + 1]; const u = (v - a) / (b - a);
-    for (let j = 0; j < 3; j++) cmap[i * 3 + j] = ca[j] + (cb[j] - ca[j]) * u;
+  function buildColormap() {
+    // low energy = inset surface, high energy follows the icon's waveform gradient (orange → brand red → crimson)
+    const stops = isDark()
+      ? [[0, rgb(C('--elev'))], [.32, [64, 42, 46]], [.56, [156, 42, 28]], [.78, rgb(C('--brand'))], [.92, rgb(C('--brand-soft'))], [1, [255, 233, 220]]]
+      : [[0, rgb(C('--elev'))], [.32, [250, 228, 218]], [.56, rgb(C('--brand-soft'))], [.78, rgb(C('--brand'))], [1, [150, 16, 40]]];
+    for (let i = 0; i < 256; i++) {
+      const v = i / 255; let k = 0; while (k < stops.length - 2 && v > stops[k + 1][0]) k++;
+      const [a, ca] = stops[k], [b, cb] = stops[k + 1]; const u = (v - a) / (b - a);
+      for (let j = 0; j < 3; j++) cmap[i * 3 + j] = ca[j] + (cb[j] - ca[j]) * u;
+    }
   }
-  ctx.fillStyle = '#04040c'; ctx.fillRect(0, 0, W, H);
   const col = ctx.createImageData(1, H);
   function drawColumn(vals) {
     ctx.drawImage(cv, -1, 0);
@@ -1007,9 +1116,7 @@ register('spectrogram', s => {
     }
     ctx.putImageData(col, W - 1, 0);
     frames++;
-    if (frames % 8 === 0) { ctx.fillStyle = 'rgba(34,195,122,.9)'; ctx.fillRect(W - 1, H - 2, 1, 2); }
   }
-  // synthetic speech-like frame in the mel domain
   const syll = [];
   function demoColumn(time) {
     const cycle = time % 6.4;
@@ -1027,7 +1134,7 @@ register('spectrogram', s => {
       const tilt = Math.exp(-f / 2400);
       let v = env * harm * (0.25 + formant) * (0.4 + tilt) * 1.25;
       if (S.fric && ph > .5) v += env * (f > 3500 ? .55 : .05) * Math.random();
-      v += .05 * Math.random();
+      v += .04 * Math.random();
       vals[m] = Math.pow(Math.min(1, v), .55);
     }
     return vals;
@@ -1039,8 +1146,7 @@ register('spectrogram', s => {
     for (let m = 0; m < MEL; m++) {
       let e = 0; const F = filters[m];
       for (let j = 0; j < F.idx.length; j++) e += Math.pow(10, buf[F.idx[j]] / 10) * F.w[j];
-      const db = 10 * Math.log10(e + 1e-12);
-      vals[m] = (db + 95) / 70;
+      vals[m] = (10 * Math.log10(e + 1e-12) + 95) / 70;
     }
     return vals;
   }
@@ -1058,7 +1164,7 @@ register('spectrogram', s => {
         const lo = melCenters[m], c = melCenters[m + 1], hi = melCenters[m + 2];
         const idx = [], w = [];
         for (let b = Math.floor(lo / binHz); b <= Math.ceil(hi / binHz); b++) {
-          const f = b * binHz; let wt = f < c ? (f - lo) / (c - lo) : (hi - f) / (hi - c);
+          const f = b * binHz; const wt = f < c ? (f - lo) / (c - lo) : (hi - f) / (hi - c);
           if (wt > 0 && b < buf.length) { idx.push(b); w.push(wt); }
         }
         if (!idx.length) { idx.push(Math.min(buf.length - 1, Math.round(c / binHz))); w.push(1); }
@@ -1066,24 +1172,23 @@ register('spectrogram', s => {
       }
       audio = { ctx: actx, stream, analyser, buf, filters };
       source = 'mic';
-      micBtn.classList.add('on'); demoBtn.classList.remove('on'); micBtn.textContent = '● Listening';
+      micLabel.textContent = 'Listening'; demoBtn.classList.remove('on');
     } catch (err) {
-      micBtn.textContent = 'Mic unavailable';
-      setTimeout(() => { micBtn.textContent = '🎙 Use my mic'; }, 2400);
+      micLabel.textContent = 'Mic unavailable';
+      setTimeout(() => { micLabel.textContent = 'Use my mic'; }, 2400);
     }
   }
   function stopMic() {
     if (audio) { audio.stream.getTracks().forEach(tr => tr.stop()); audio.ctx.close(); audio = null; }
-    source = 'demo'; micBtn.classList.remove('on'); demoBtn.classList.add('on'); micBtn.textContent = '🎙 Use my mic';
+    source = 'demo'; micLabel.textContent = 'Use my mic';
   }
-  // pre-fill so the slide never opens on an empty canvas
-  for (let k = 0; k < W; k++) { t += 0.01; drawColumn(demoColumn(t)); }
-  frames = 0;
   micBtn.onclick = () => (source === 'mic' ? stopMic() : startMic());
   demoBtn.onclick = () => stopMic();
+  function prefill() { for (let k = 0; k < W; k++) { t += 0.01; drawColumn(demoColumn(t)); } frames = 0; }
+  buildColormap(); prefill();
+  addEventListener('themechange', () => { buildColormap(); prefill(); });
   const l = loop((now, dt) => {
     acc += dt; t += dt / 1000;
-    // ~100 frames/s like a real 10 ms hop, capped per paint
     let n = 0;
     while (acc >= 10 && n < 4) { acc -= 10; n++; drawColumn(source === 'mic' && audio ? micColumn() : demoColumn(t)); }
     if (n === 4) acc = 0;
@@ -1104,68 +1209,73 @@ register('lattice', s => {
     rnnt: 'b b t b t b b b b t b b b b b'.split(' ').map(k => [k, k === 'b' ? 1 : 0]),
     tdt: [['b', 2], ['t', 1], ['t', 4], ['t', 3], ['b', 2]],
   };
-  let m = 'rnnt', step = 0, prog = 0, playing = true, hold = 0, chunkTimer = 0, chunkCount = 0;
+  let m = 'rnnt', step = 0, prog = 0, playing = true, hold = 0, chunkTimer = 0;
   function path() {
     const pts = [[0, 0]]; let t = 0, u = 0;
-    for (const [k, d] of OPS[m]) { if (k === 'b') t += d; else { t += d; u += 1; } pts.push([t, u]); }
+    for (const [k, d] of OPS[m]) { t += d; if (k === 't') u += 1; pts.push([t, u]); }
     return pts;
   }
   function describe(i) {
     const pts = path(); const [t, u] = pts[i]; const [k, d] = OPS[m][i];
     const prev = u === 0 ? '⟨s⟩' : TOK[u - 1];
-    if (m === 'rnnt') return k === 'b' ? `t=${t}: Joint(h${t}, ${prev}) → ⟨blank⟩ · advance 1 frame` : `t=${t}: Joint(h${t}, ${prev}) → “${TOK[u]}” · emit, stay on h${t}`;
-    return k === 'b' ? `t=${t}: → (⟨blank⟩, Δt=${d}) · skip ${d} frames` : `t=${t}: → (“${TOK[u]}”, Δt=${d}) · emit + jump ${d}`;
+    if (m === 'rnnt') return k === 'b' ? `t = ${t}: Joint(h${t}, ${prev}) → ∅ (blank), advance one frame` : `t = ${t}: Joint(h${t}, ${prev}) → “${TOK[u]}”, emit and stay on h${t}`;
+    return k === 'b' ? `t = ${t}: → (∅, Δt = ${d}), skip ${d} frames` : `t = ${t}: → (“${TOK[u]}”, Δt = ${d}), emit and jump ${d}`;
   }
   function setMode(nm) {
     m = nm; step = 0; prog = 0; hold = 0;
     s.querySelectorAll('[data-mode]').forEach(b => b.classList.toggle('on', b.dataset.mode === nm));
   }
   s.querySelectorAll('[data-mode]').forEach(b => b.onclick = () => setMode(b.dataset.mode));
-  playBtn.onclick = () => { playing = !playing; playBtn.textContent = playing ? '⏸ Pause' : '▶ Play'; };
+  playBtn.onclick = () => { playing = !playing; playBtn.textContent = playing ? 'Pause' : 'Play'; };
   stepBtn.onclick = () => {
-    playing = false; playBtn.textContent = '▶ Play';
+    playing = false; playBtn.textContent = 'Play';
     if (step >= OPS[m].length) { step = 0; prog = 0; } else { step++; prog = 0; }
   };
   function addChunk() {
-    chunkCount++;
     chunksEl.querySelectorAll('.new').forEach(d => { d.classList.remove('new'); d.textContent = 'cache'; });
-    const d = document.createElement('div'); d.className = 'new'; d.textContent = '+320ms';
+    const d = document.createElement('div'); d.className = 'new'; d.textContent = '+320 ms';
     chunksEl.appendChild(d);
     while (chunksEl.children.length > 11) chunksEl.removeChild(chunksEl.firstChild);
+  }
+  function roundRect(ctx, x, y, w, h, r) { ctx.beginPath(); ctx.moveTo(x + r, y); ctx.arcTo(x + w, y, x + w, y + h, r); ctx.arcTo(x + w, y + h, x, y + h, r); ctx.arcTo(x, y + h, x, y, r); ctx.arcTo(x, y, x + w, y, r); ctx.closePath(); }
+  function hSub(ctx, x, y, n, color, size) { // draws h with a numeric subscript, centred at x
+    ctx.font = `italic 600 ${size}px ${getComputedStyle(document.body).fontFamily}`;
+    const w1 = ctx.measureText('h').width;
+    ctx.font = `600 ${size * .68}px ${getComputedStyle(document.body).fontFamily}`;
+    const w2 = ctx.measureText(String(n)).width;
+    const x0 = x - (w1 + w2) / 2;
+    ctx.fillStyle = color; ctx.textAlign = 'left';
+    ctx.font = `italic 600 ${size}px ${getComputedStyle(document.body).fontFamily}`; ctx.fillText('h', x0, y);
+    ctx.font = `600 ${size * .68}px ${getComputedStyle(document.body).fontFamily}`; ctx.fillText(String(n), x0 + w1 + .5, y + size * .3);
   }
   function draw() {
     const f = fitCanvas(cv); if (!f) return;
     const { ctx, w, h } = f;
     ctx.clearRect(0, 0, w, h);
-    const padL = 78, padR = 22, padT = 22, padB = 70;
+    const sans = getComputedStyle(document.body).fontFamily;
+    const mono = getComputedStyle(document.documentElement).getPropertyValue('--mono');
+    const padL = 74, padR = 18, padT = 16, padB = 66;
     const gx = t => padL + t * (w - padL - padR) / T;
     const gy = u => h - padB - u * (h - padB - padT) / U;
-    const mono = px => `500 ${px}px "JetBrains Mono", ui-monospace, monospace`;
-    // y labels
-    ctx.font = mono(12); ctx.textAlign = 'right'; ctx.textBaseline = 'middle';
-    ['∅', ...TOK].forEach((lb, u) => { ctx.fillStyle = u === 0 ? C('--dim') : C('--muted'); ctx.fillText(lb, padL - 14, gy(u)); });
-    // grid
-    for (let u = 0; u <= U; u++) for (let t = 0; t <= T; t++) {
-      ctx.fillStyle = 'rgba(255,255,255,.16)'; ctx.beginPath(); ctx.arc(gx(t), gy(u), 2, 0, 7); ctx.fill();
-    }
-    // frames row
+    ctx.textBaseline = 'middle';
+    ctx.font = `500 13px ${mono}`; ctx.textAlign = 'right';
+    ['∅', ...TOK].forEach((lb, u) => { ctx.fillStyle = u === 0 ? C('--label3') : C('--label2'); ctx.fillText(lb, padL - 14, gy(u)); });
+    ctx.fillStyle = C('--label3');
+    for (let u = 0; u <= U; u++) for (let t = 0; t <= T; t++) { ctx.beginPath(); ctx.arc(gx(t), gy(u), 2, 0, 7); ctx.fill(); }
     const pts = path(); const ops = OPS[m];
     const visited = new Set(); for (let i = 0; i < Math.min(step + (prog > 0 ? 1 : 0), ops.length); i++) visited.add(pts[i][0]);
-    const allVisited = new Set(pts.slice(0, -1).map(p => p[0]));
-    const fy = h - padB + 24, fw = (w - padL - padR) / T * .78;
-    ctx.textAlign = 'center';
+    const used = new Set(pts.slice(0, -1).map(p => p[0]));
+    const cw = (w - padL - padR) / T, fw = cw * .8, fy = h - padB + 22;
     for (let t = 0; t < T; t++) {
-      const x = gx(t) + ((w - padL - padR) / T - fw) / 2 + 0;
-      const on = visited.has(t); const skip = m === 'tdt' && !allVisited.has(t);
-      ctx.fillStyle = on ? 'rgba(34,195,122,.9)' : skip ? 'rgba(255,255,255,.03)' : 'rgba(255,255,255,.08)';
-      ctx.strokeStyle = skip ? 'rgba(255,255,255,.12)' : 'transparent';
-      roundRect(ctx, x, fy, fw, 22, 5); ctx.fill(); if (skip) { ctx.setLineDash([3, 3]); ctx.stroke(); ctx.setLineDash([]); }
-      ctx.fillStyle = on ? '#04110a' : 'rgba(255,255,255,.45)'; ctx.font = mono(10);
-      ctx.fillText(`h${t}`, x + fw / 2, fy + 11.5);
+      const x = gx(t) + (cw - fw) / 2;
+      const on = visited.has(t), skip = m === 'tdt' && !used.has(t);
+      ctx.fillStyle = on ? C('--success') : skip ? 'transparent' : C('--elev');
+      roundRect(ctx, x, fy, fw, 22, 11); ctx.fill();
+      if (skip) { ctx.setLineDash([3, 3]); ctx.strokeStyle = C('--label3'); ctx.lineWidth = 1; ctx.stroke(); ctx.setLineDash([]); }
+      hSub(ctx, x + fw / 2, fy + 11, t, on ? '#fff' : C('--label2'), 12);
     }
-    ctx.textAlign = 'left'; ctx.fillStyle = C('--dim'); ctx.font = mono(10);
-    ctx.fillText(m === 'tdt' ? 'encoder frames · dashed = skipped by Δt' : 'encoder frames (80 ms each)', padL, fy + 38);
-    // path
+    ctx.textAlign = 'left'; ctx.fillStyle = C('--label2'); ctx.font = `500 11px ${sans}`;
+    ctx.fillText(m === 'tdt' ? 'encoder frames · dashed = skipped by Δt' : 'encoder frames, 80 ms each', padL, fy + 38);
     const ease = x => 1 - Math.pow(1 - x, 3);
     const n = Math.min(step, ops.length);
     for (let i = 0; i <= n && i < ops.length; i++) {
@@ -1175,42 +1285,36 @@ register('lattice', s => {
       ctx.strokeStyle = isTok ? C('--brand') : C('--blank'); ctx.lineWidth = isTok ? 4 : 3; ctx.lineCap = 'round';
       ctx.beginPath(); ctx.moveTo(x0, y0); ctx.lineTo(x0 + (x1 - x0) * p, y0 + (y1 - y0) * p); ctx.stroke();
       if (m === 'tdt' && p > .6) {
-        ctx.fillStyle = isTok ? C('--brand-soft') : C('--muted'); ctx.font = mono(11); ctx.textAlign = 'center';
-        ctx.fillText(`Δ${ops[i][1]}`, (x0 + x1) / 2, (y0 + y1) / 2 - 12);
+        ctx.fillStyle = isTok ? C('--brand') : C('--label2'); ctx.font = `700 12px ${sans}`; ctx.textAlign = 'center';
+        ctx.fillText(`Δt = ${ops[i][1]}`, (x0 + x1) / 2, (y0 + y1) / 2 - 13);
       }
       if (isTok && p > .9) {
-        const label = TOK[u0]; ctx.font = mono(12); const tw = ctx.measureText(label).width + 14;
-        const lx = x1 + 10, ly = y1 - 13;
-        ctx.fillStyle = 'rgba(245,56,26,.16)'; roundRect(ctx, lx, ly, tw, 24, 6); ctx.fill();
-        ctx.fillStyle = '#ffd9cf'; ctx.textAlign = 'left'; ctx.fillText(label, lx + 7, ly + 12.5);
+        const label = TOK[u0]; ctx.font = `500 12px ${mono}`; const tw = ctx.measureText(label).width + 16;
+        const lx = x1 + 10, ly = y1 - 12;
+        ctx.fillStyle = C('--brand'); ctx.globalAlpha = .13; roundRect(ctx, lx, ly, tw, 24, 12); ctx.fill(); ctx.globalAlpha = 1;
+        ctx.fillStyle = C('--brand'); ctx.textAlign = 'left'; ctx.fillText(label, lx + 8, ly + 12.5);
       }
     }
-    // head
     const hi = Math.min(n, ops.length);
     let hx, hy;
     if (hi < ops.length && prog > 0) { const [t0, u0] = pts[hi], [t1, u1] = pts[hi + 1]; const p = ease(prog); hx = gx(t0 + (t1 - t0) * p); hy = gy(u0 + (u1 - u0) * p); }
     else { const [t0, u0] = pts[hi]; hx = gx(t0); hy = gy(u0); }
-    ctx.fillStyle = 'rgba(245,56,26,.25)'; ctx.beginPath(); ctx.arc(hx, hy, 11, 0, 7); ctx.fill();
-    ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.arc(hx, hy, 5, 0, 7); ctx.fill();
-    // text
+    ctx.fillStyle = C('--brand'); ctx.globalAlpha = .18; ctx.beginPath(); ctx.arc(hx, hy, 11, 0, 7); ctx.fill(); ctx.globalAlpha = 1;
+    ctx.fillStyle = C('--brand'); ctx.beginPath(); ctx.arc(hx, hy, 5.5, 0, 7); ctx.fill();
     const done = Math.min(step, ops.length);
-    logCnt.textContent = `decoder calls ${done}/${ops.length}` + (m === 'tdt' ? ' (RNN‑T needs 15)' : '');
-    logTxt.textContent = done === 0 && prog === 0 ? (m === 'rnnt' ? 'start at (h0, ∅) …' : 'start at (h0, ∅) …') : step >= ops.length ? `done → “Meeting today” in ${ops.length} calls` : describe(Math.max(0, Math.min(ops.length - 1, step)));
+    logCnt.textContent = `decoder calls ${done} / ${ops.length}` + (m === 'tdt' ? ' (RNN‑T: 15)' : '');
+    logTxt.textContent = done === 0 && prog === 0 ? 'start at (h0, ∅)' : step >= ops.length ? `done: “Meeting today” in ${ops.length} calls` : describe(Math.max(0, Math.min(ops.length - 1, step)));
   }
-  function roundRect(ctx, x, y, w, h, r) { ctx.beginPath(); ctx.moveTo(x + r, y); ctx.arcTo(x + w, y, x + w, y + h, r); ctx.arcTo(x + w, y + h, x, y + h, r); ctx.arcTo(x, y + h, x, y, r); ctx.arcTo(x, y, x + w, y, r); ctx.closePath(); }
   const l = loop((now, dt) => {
     chunkTimer += dt; if (chunkTimer > 700) { chunkTimer = 0; addChunk(); }
     if (playing) {
-      if (step < OPS[m].length) {
-        prog += dt / (m === 'tdt' ? 700 : 420);
-        if (prog >= 1) { step++; prog = 0; }
-      } else {
-        hold += dt; if (hold > 1800) { hold = 0; setMode(m === 'rnnt' ? 'tdt' : 'rnnt'); }
-      }
-    } else if (prog > 0 && prog < 1) { prog = Math.min(1, prog + dt / 300); if (prog >= 1) { prog = 0; } }
+      if (step < OPS[m].length) { prog += dt / (m === 'tdt' ? 700 : 420); if (prog >= 1) { step++; prog = 0; } }
+      else { hold += dt; if (hold > 1800) { hold = 0; setMode(m === 'rnnt' ? 'tdt' : 'rnnt'); } }
+    } else if (prog > 0 && prog < 1) { prog = Math.min(1, prog + dt / 300); if (prog >= 1) prog = 0; }
     draw();
   });
-  if (!chunksEl.children.length) for (let i = 0; i < 6; i++) addChunk();
+  for (let i = 0; i < 6; i++) addChunk();
+  addEventListener('themechange', draw);
   return { start: l.start, stop: l.stop, resize: draw };
 });
 
@@ -1218,8 +1322,8 @@ register('lattice', s => {
 register('ar', s => {
   const M = {
     whisper: {
-      formula: 'P(y<sub>i</sub> | <b>Enc(Mel[80×3000])</b>, y<sub>&lt;i</sub>) · cross‑attention',
-      chain: [['Input', '30 s PCM window, pad / trim'], ['Features', 'log‑Mel 80 × 3000'], ['Encoder', 'conv ↓2 → 1,500 × d'], ['Decoder', 'causal + cross‑attn'], ['Output', 'timed segments']],
+      tex: 'P\\big(y_i \\mid \\mathrm{Enc}(\\mathbf{X}_{80\\times3000}),\\ y_{<i}\\big)\\quad\\text{via cross-attention}',
+      chain: [['Input', '30 s PCM window, padded or trimmed'], ['Features', 'log‑Mel 80 × 3000'], ['Encoder', 'conv ↓2 → 1,500 frames'], ['Decoder', 'causal + cross‑attention'], ['Output', 'timed segments']],
       prompt: [['<|startoftranscript|>', 'ctl'], ['<|en|>', 'ctl'], ['<|transcribe|>', 'ctl']],
       out: [
         ['<|0.00|>', 'time', [['<|0.00|>', .94], ['<|0.02|>', .04], ['<|nospeech|>', .01]]],
@@ -1229,12 +1333,12 @@ register('ar', s => {
         ['<|1.20|>', 'time', [['<|1.20|>', .62], ['<|1.18|>', .21], ['.', .09]]],
         ['<|endoftext|>', 'eos', [['<|endoftext|>', .88], ['<|1.22|>', .07], [' and', .02]]],
       ],
-      note: 'Language and task are prompt tokens. Timestamps are vocabulary tokens too, so Whisper writes its own subtitles. The 30 s window is fixed: shorter audio is padded and longer audio is chunked.',
+      note: 'Language and task are prompt tokens. Timestamps are vocabulary tokens too, so Whisper writes its own subtitles. The 30 s window is fixed: shorter audio is padded, longer audio is chunked.',
       rt: ['whisper.cpp · ggml · Metal', 'tiny 39M → large‑v3 1.55B', 'large‑v3: 128 Mel bins, Q5_0'],
     },
     qwen: {
-      formula: 'P(y<sub>i</sub> | [prompt ; <b>W·AudioEnc(Mel[128×T])</b>], y<sub>&lt;i</sub>) · KV cache',
-      chain: [['Gate', 'Silero VAD speech segments'], ['Features', 'log‑Mel 128 × T, ≤30 s'], ['Encoder', 'audio Transformer + projector'], ['Prefill', '⟨audio⟩ slots ← embeddings'], ['Decoder', 'Qwen3 LLM + KV cache']],
+      tex: 'P\\big(y_i \\mid [\\,\\text{prompt};\\ W\\,\\mathrm{AudioEnc}(\\mathbf{X}_{128\\times T})\\,],\\ y_{<i}\\big)\\quad\\text{with a KV cache}',
+      chain: [['Gate', 'Silero VAD speech segments'], ['Features', 'log‑Mel 128 × T, ≤ 30 s'], ['Encoder', 'audio Transformer + projector'], ['Prefill', 'audio slots ← embeddings'], ['Decoder', 'Qwen3 LLM + KV cache']],
       prompt: [['⟨system⟩', 'prompt'], ['⟨audio_start⟩', 'ctl'], ['⟨audio⟩ × T′', 'prompt'], ['⟨audio_end⟩', 'ctl'], ['⟨asr⟩', 'ctl']],
       out: [
         ['今', 'text', [['今', .93], ['金', .04], ['近', .01]]],
@@ -1243,12 +1347,12 @@ register('ar', s => {
         ['会', 'text', [['会', .90], ['汇', .05], ['绘', .02]]],
         ['⟨eos⟩', 'eos', [['⟨eos⟩', .91], ['，', .05], ['吧', .02]]],
       ],
-      note: '今 / 金 / 近 sound almost identical. The acoustic evidence is ambiguous, so the language model settles it from context. That is why this family is strong on Chinese dialects and code‑switching.',
+      note: '今 / 金 / 近 sound almost identical. When the acoustic evidence is ambiguous, the language model settles it from context, which is why this family is strong on Chinese dialects and code‑switching.',
       rt: ['Qwen3‑ASR 0.6B', 'MLX · 4‑bit', 'Silero VAD v6'],
     },
     moss: {
-      formula: 'P(y<sub>i</sub> | [<b>WhisperEnc(30 s)</b> ≈ 12.5 tok/s ; prompt], y<sub>&lt;i</sub>) → text · time · speaker',
-      chain: [['Input', 'fixed 30 s blocks'], ['Encoder', 'Whisper encoder, cached & reused'], ['Audio tokens', '≈ 12.5 per second'], ['Decoder', 'Qwen3‑style, autoregressive'], ['Parse', 'lines with time + speaker']],
+      tex: 'P\\big(y_i \\mid [\\,W\\,\\mathrm{WhisperEnc}(\\mathbf{X}_{30\\,\\mathrm{s}});\\ \\text{prompt}\\,],\\ y_{<i}\\big),\\quad y_i\\in\\{\\text{text},\\text{time},\\text{speaker}\\}',
+      chain: [['Input', 'fixed 30 s blocks'], ['Encoder', 'Whisper encoder, cached and reused'], ['Audio tokens', '≈ 12.5 per second'], ['Decoder', 'Qwen3‑style, autoregressive'], ['Parse', 'lines with time + speaker']],
       prompt: [['⟨audio⟩ × 375', 'prompt'], ['“transcribe with speakers”', 'prompt']],
       out: [
         ['[0.00]', 'time', [['[0.00]', .97], ['[0.08]', .02], ['[S01]', .01]]],
@@ -1261,7 +1365,7 @@ register('ar', s => {
         [' good', 'text', [[' good', .95], [' great', .03], [' good.', .01]]],
         ['⟨eos⟩', 'eos', [['⟨eos⟩', .9], ['[2.05]', .07], ['!', .02]]],
       ],
-      note: 'One token stream carries words, time markers and speaker tags. Transcription and diarization come from a single autoregressive model: the most accurate multi‑speaker path in the app, and the slowest.',
+      note: 'One token stream carries words, time markers and speaker tags, so transcription and diarization come from a single autoregressive model: the most accurate multi‑speaker path in the app, and the slowest.',
       rt: ['MOSS Transcribe‑Diarize', 'MLX · 4‑bit', '≈ 1 GB on disk'],
     },
   };
@@ -1269,27 +1373,28 @@ register('ar', s => {
   const formulaEl = s.querySelector('.ar-formula'), chainEl = s.querySelector('.ar-chain'), tokEl = s.querySelector('.ar-tokens');
   const probsEl = s.querySelector('.ar-probs'), noteEl = s.querySelector('.ar-note'), rtEl = s.querySelector('.ar-runtime');
   let cur = 'whisper', i = 0, timer = 0, auto = true;
-  function esc(x) { return x.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); }
+  const esc = x => x.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
   function build() {
     const d = M[cur];
     segBtns.forEach(b => b.classList.toggle('on', b.dataset.m === cur));
-    formulaEl.innerHTML = d.formula;
+    formulaEl.dataset.tex = d.tex; delete formulaEl.dataset.rendered; formulaEl.textContent = d.tex.replace(/\\[a-z]+|[{}]/gi, ' ');
+    renderTex(s);
     chainEl.innerHTML = d.chain.map(([a, b]) => `<div class="c"><i>${a}</i>${esc(b)}</div>`).join('');
-    tokEl.innerHTML = d.prompt.map(([t, k]) => `<span class="tok ${k === 'ctl' ? 'ctl prompt' : 'prompt'}">${esc(t)}</span>`).join('') +
+    tokEl.innerHTML = d.prompt.map(([t, k]) => `<span class="tok ${k === 'ctl' ? 'ctl' : 'prompt'}">${esc(t)}</span>`).join('') +
       d.out.map(([t, k]) => `<span class="tok ${k} hidden">${esc(t)}</span>`).join('');
     noteEl.textContent = d.note;
-    rtEl.innerHTML = d.rt.map(x => `<span class="chip">${esc(x)}</span>`).join('');
+    rtEl.innerHTML = d.rt.map(x => `<span class="capsule">${esc(x)}</span>`).join('');
     probsEl.innerHTML = [0, 1, 2].map(() => `<div class="prob"><span class="k">–</span><div class="pbar"><span></span></div><span class="v"></span></div>`).join('');
     i = 0; timer = 0;
   }
   function reveal() {
-    const d = M[cur]; const outs = tokEl.querySelectorAll('.tok:not(.prompt)');
+    const d = M[cur]; const outs = tokEl.querySelectorAll('.tok:not(.prompt):not(.ctl)');
     outs.forEach((el, k) => { el.classList.toggle('hidden', k > i); el.classList.toggle('cur', k === i); });
-    const top = d.out[i][2];
-    probsEl.querySelectorAll('.prob').forEach((row, k) => {
-      row.querySelector('.k').textContent = top[k][0];
-      row.querySelector('.pbar span').style.width = `${top[k][1] * 100}%`;
-      row.querySelector('.v').textContent = top[k][1].toFixed(2);
+    d.out[i][2].forEach(([tok, p], k) => {
+      const row = probsEl.children[k];
+      row.querySelector('.k').textContent = tok;
+      row.querySelector('.pbar span').style.width = `${p * 100}%`;
+      row.querySelector('.v').textContent = p.toFixed(2);
     });
   }
   segBtns.forEach(b => b.onclick = () => { cur = b.dataset.m; auto = false; build(); reveal(); });
@@ -1300,12 +1405,11 @@ register('ar', s => {
     if (timer < (last ? 3200 : 900)) return;
     timer = 0;
     if (!last) { i++; reveal(); return; }
-    // hold on the finished stream, then replay (and rotate models until someone clicks a tab)
     if (auto) cur = order[(order.indexOf(cur) + 1) % order.length];
     build(); reveal();
   });
   build(); reveal();
-  return { start() { l.start(); }, stop: l.stop };
+  return { start: l.start, stop: l.stop };
 });
 
 /* ================================================ diarization */
@@ -1315,13 +1419,11 @@ register('diar', s => {
   const W = cv.width, H = cv.height, ROW = H / 4;
   const turnsEl = s.querySelector('.turns');
   const vs = [...s.querySelectorAll('.vchain .v')];
-  const cols = ['--brand', '--info', '--success', '--purple'].map(v => hex(C(v)));
-  const bg = [7, 8, 11];
-  const script = [
-    [0, 0.2, 3.2], [1, 3.0, 6.0], [2, 6.2, 8.8], [0, 9.0, 11.5], [1, 11.3, 13.0], [3, 13.3, 14.6], [0, 15.0, 17.0], [2, 17.2, 19.5],
-  ];
+  const tokens = ['--brand', '--purple', '--info', '--success'];
+  let cols = [], bg = [0, 0, 0];
+  function readColors() { cols = tokens.map(v => rgb(C(v))); bg = rgb(C('--elev')); }
+  const script = [[0, 0.2, 3.2], [1, 3.0, 6.0], [2, 6.2, 8.8], [0, 9.0, 11.5], [1, 11.3, 13.0], [3, 13.3, 14.6], [0, 15.0, 17.0], [2, 17.2, 19.5]];
   const LOOP = 20;
-  function hex(h) { h = h.replace('#', ''); return [parseInt(h.slice(0, 2), 16), parseInt(h.slice(2, 4), 16), parseInt(h.slice(4, 6), 16)]; }
   function prob(k, t) {
     let p = 0.03 + 0.05 * Math.random();
     for (const [sk, a, b] of script) if (sk === k) {
@@ -1330,17 +1432,15 @@ register('diar', s => {
     }
     return Math.min(1, p);
   }
-  ctx.fillStyle = `rgb(${bg})`; ctx.fillRect(0, 0, W, H);
   let t = 0, acc = 0, lastSpk = -1, vIdx = 0, vAcc = 0;
   const img = ctx.createImageData(1, H);
   function column() {
     ctx.drawImage(cv, -1, 0);
     const ps = [0, 1, 2, 3].map(k => prob(k, t % LOOP));
     for (let k = 0; k < 4; k++) {
-      const p = ps[k]; const c = cols[k];
+      const p = ps[k], c = cols[k];
       for (let y = Math.round(k * ROW); y < Math.round((k + 1) * ROW); y++) {
-        const o = y * 4; const edge = y === Math.round((k + 1) * ROW) - 1;
-        const a = edge ? 0 : p;
+        const o = y * 4; const a = y === Math.round((k + 1) * ROW) - 1 ? 0 : p;
         img.data[o] = bg[0] + (c[0] - bg[0]) * a; img.data[o + 1] = bg[1] + (c[1] - bg[1]) * a; img.data[o + 2] = bg[2] + (c[2] - bg[2]) * a; img.data[o + 3] = 255;
       }
     }
@@ -1348,19 +1448,21 @@ register('diar', s => {
     let best = -1, bp = .5; ps.forEach((p, k) => { if (p > bp) { bp = p; best = k; } });
     if (best >= 0 && best !== lastSpk) {
       lastSpk = best;
-      const chip = document.createElement('span'); chip.className = 'chip';
-      chip.style.background = `rgb(${cols[best]})`;
-      chip.textContent = `S${best + 1} @ ${(t % LOOP).toFixed(1)} s`;
+      const chip = document.createElement('span'); chip.className = 'pill';
+      chip.style.setProperty('--c', `var(${tokens[best]})`);
+      chip.textContent = `Speaker ${best + 1} · ${(t % LOOP).toFixed(1)} s`;
       turnsEl.appendChild(chip);
-      while (turnsEl.children.length > 6) turnsEl.removeChild(turnsEl.firstChild);
+      while (turnsEl.children.length > 5) turnsEl.removeChild(turnsEl.firstChild);
     }
   }
+  function prefill() { for (let k = 0; k < W; k++) { t += 0.08; column(); } }
+  readColors(); prefill();
+  addEventListener('themechange', () => { readColors(); prefill(); });
   const l = loop((now, dt) => {
     acc += dt; vAcc += dt;
     while (acc >= 80) { acc -= 80; t += 0.08; column(); }
     if (vAcc > 1100) { vAcc = 0; vIdx = (vIdx + 1) % vs.length; vs.forEach((v, k) => v.classList.toggle('on', k === vIdx)); }
   });
-  for (let k = 0; k < W; k++) { t += 0.08; column(); }
   vs[0].classList.add('on');
   return { start: l.start, stop: l.stop };
 });
@@ -1368,14 +1470,12 @@ register('diar', s => {
 /* ================================================ text ai */
 register('textai', s => {
   const fields = [...s.querySelectorAll('[data-type]')];
-  const tags = [...s.querySelectorAll('.out .tags .chip')];
-  const engines = [...s.querySelectorAll('.engine')];
+  const tags = [...s.querySelectorAll('.out .tags .pill')];
   let timers = [];
   function clear() { timers.forEach(clearTimeout); timers = []; }
   function run() {
     clear();
     fields.forEach(f => f.textContent = ''); tags.forEach(t => t.classList.remove('show'));
-    engines.forEach((e, k) => e.style.borderColor = k === 1 ? 'var(--brand)' : '');
     let delay = 500;
     fields.forEach(f => {
       const txt = f.dataset.type;
@@ -1400,6 +1500,7 @@ index = Number.isFinite(fromHash) ? Math.max(0, Math.min(slides.length - 1, from
 applyMode();
 if (mode === 'doc' && Number.isFinite(fromHash) && fromHash > 1) slides[index].scrollIntoView();
 document.fonts?.ready.then(() => widgets.forEach(w => w.resize && w.resize()));
+requestAnimationFrame(() => requestAnimationFrame(() => root.classList.add('ready')));
 })();
 </script>
 </body>
