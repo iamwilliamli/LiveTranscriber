@@ -659,10 +659,6 @@ ol.watch li small { display: block; color: var(--label2); font-size: .82rem; fon
         <div class="node" style="--c:var(--warning)"><div class="role"><svg class="ic"><use href="#i-doc"/></svg>Documents</div><b>Word · PDF · Markdown</b><small>timed, speaker‑labeled</small></div>
       </div>
     </div>
-    <div class="router-note">
-      <span class="formula tex" data-tex="\mathrm{route}(\ell)=\begin{cases}\text{Nemotron} & \ell=\text{Auto, multilingual model installed}\\ \text{Apple On-Device} & \text{Apple supports }\ell\\ \text{Nemotron} & \text{installed for }\ell\text{, else Apple}\end{cases}">route(ℓ): Nemotron if Automatic + multilingual installed; else Apple if it supports ℓ; else Nemotron for ℓ</span>
-      <span class="l2" style="font-size:.88rem">“Automatic” is a router, not a model. It never produces a token itself.</span>
-    </div>
   </div>
   <aside class="notes">
     <li>Two latency budgets, two model families. Live: text has to keep up chunk by chunk. Saved: we can afford full context, word timestamps and speakers.</li>
