@@ -354,7 +354,8 @@ ul.list li b { color: var(--label); font-weight: 650; }
 .cl-steps div::before { content: counter(st); position: absolute; left: .8rem; top: .45rem; font-family: var(--serif); font-weight: 700; color: var(--brand); }
 .cl-steps b { font-size: .86rem; }
 .cl-steps small { display: block; font-size: .76rem; color: var(--label2); }
-.cl-names { font-size: .74rem !important; }
+.cl-names { display: flex; flex-wrap: wrap; gap: .3rem; margin-top: .7rem; }
+.cl-names .capsule { font-family: var(--sans); font-size: .66rem; font-weight: 600; }
 .cl-side { display: grid; gap: 1rem; }
 
 /* ---------- documents ---------- */
@@ -386,7 +387,8 @@ table.models td.mono { font-size: .7rem; color: var(--label2); white-space: nowr
 table.models .grp td { padding-top: .5rem; font-size: .66rem; letter-spacing: .06em; color: var(--brand); text-transform: uppercase; font-weight: 700; }
 .bignum { display: grid; grid-template-columns: 1fr 1fr; gap: .9rem; }
 .bignum .card b { display: block; font-family: var(--serif); font-size: 2.4rem; line-height: 1; }
-.bignum .card span { display: block; margin-top: .35rem; color: var(--label2); font-size: .8rem; }
+.bignum .card em { display: block; margin-top: .35rem; font-style: normal; font-weight: 700; font-size: .95rem; }
+.bignum .card span { display: block; margin-top: .25rem; color: var(--label2); font-size: .8rem; }
 
 /* ---------- 10 product ---------- */
 .prod-wrap { display: grid; grid-template-columns: 2.1fr 1fr; gap: 2rem; margin-top: 1.1rem; align-items: start; }
@@ -428,6 +430,50 @@ ol.watch li small { display: block; color: var(--label2); font-size: .82rem; fon
 .dl-name b { font-size: .9rem; font-weight: 700; letter-spacing: -.01em; }
 .dl-badge small { font-size: .72rem; font-weight: 600; color: var(--label2); }
 .doc .dl-badge { display: none; }
+
+/* ---------- presentation mode: hide explanatory text (it lives in the speaker notes) ---------- */
+.deck .fine, .deck .lede, .deck .eyebrow, .deck .card > p, .deck .node small, .deck .lane-head .budget,
+.deck .router-note > .l2, .deck .enc-strip > .l2, .deck .motto, .deck .step p, .deck .callout, .deck .pipeline-mini,
+.deck .chain, .deck .ar-note, .deck .subhead span, .deck .nl-speed, .deck .vchain small, .deck .engine small,
+.deck .cl-api small, .deck .cl-steps small, .deck .dc-blocks small, .deck .feat small, .deck ol.watch small,
+.deck .grouped small, .deck .dia-desc { display: none !important; }
+.deck .cl-api div, .deck .dc-blocks div { grid-template-columns: auto; }
+.deck .lanes { align-content: center; gap: 1.4rem; }
+.deck .flow .node { padding: 1rem 1.05rem; }
+.deck .flow .node b { font-size: 1.08rem; }
+.deck .router-note .formula { font-size: .95rem; }
+.deck .slide:has(.fam) > .body, .deck .slide[data-widget="ar"] > .body { display: flex; flex-direction: column; justify-content: center; }
+.deck .dia-wrap, .deck .ai-wrap, .deck .dc-wrap, .deck .ship-wrap, .deck .prod-wrap { margin-top: auto; margin-bottom: auto; }
+.deck .cl-wrap, .deck .steps, .deck .lat-side, .deck .nl-side { align-content: center; }
+.deck .fam .card h3 { font-size: 1.3rem; }
+.deck .fam svg.sk { height: 5rem; }
+.deck .side-notes h3 { font-size: 1.1rem; }
+.deck .tok { font-size: 1.2rem; }
+.deck .tokens { min-height: 11rem; }
+.deck .prob { font-size: 1.1rem; grid-template-columns: 10rem 1fr 3.4rem; }
+.deck .nl-text { font-size: 1.4rem; }
+.deck .nl-track { height: 4.2rem; }
+.deck .nl-side h3, .deck .lat-side h3 { font-size: 1.15rem; }
+.deck .heat canvas { height: 12rem; }
+.deck .vchain .v { padding: .75rem .95rem; }
+.deck .vchain .v b { font-size: 1.02rem; }
+.deck .engine b { font-size: 1.05rem; }
+.deck .cl-api .capsule { font-size: .85rem; }
+.deck .cl-steps div { padding: .75rem .85rem .75rem 2.3rem; }
+.deck .cl-steps b { font-size: 1.02rem; }
+.deck .dc-md { font-size: .9rem; }
+.deck .dc-blocks div { padding: .55rem .7rem; }
+.deck .dc-blocks .capsule { font-size: .85rem; }
+.deck .dc-out ul.list li { font-size: .98rem; }
+.deck table.models { font-size: .84rem; }
+.deck table.models td { padding: .38rem .9rem; }
+.deck .ship-wrap ul.list li { font-size: 1rem; }
+.deck .feat { gap: .85rem; }
+.deck .feat div { font-size: 1rem; }
+.deck ol.watch li { font-size: 1.25rem; }
+.deck .grouped a b { font-size: 1.05rem; }
+.deck .steps { gap: 1.1rem; }
+.deck .step b { font-size: 1.15rem; }
 
 /* ---------- chrome ---------- */
 .dock { position: fixed; bottom: 14px; z-index: 20; display: flex; align-items: center; gap: 2px; padding: 4px; border-radius: 999px; background: var(--glass); -webkit-backdrop-filter: blur(20px) saturate(180%); backdrop-filter: blur(20px) saturate(180%); box-shadow: inset 0 0 0 .5px var(--glass-edge), 0 8px 24px rgba(0,0,0,.12); font-size: 13px; transition: opacity .3s; opacity: .55; }
@@ -581,9 +627,9 @@ ol.watch li small { display: block; color: var(--label2); font-size: .82rem; fon
     </figure>
   </div>
   <aside class="notes">
-    <li>Hi, I'm William. I build LiveTranscriber, an iPhone + Mac transcriber where every model runs on the device.</li>
-    <li>Six minutes, no pitch: what speech models actually compute, and the tricks that make them fit on a phone.</li>
-    <li>The slides are a web page; QR at the end, so don't photograph anything.</li>
+    <li>Hi, I'm William. I build LiveTranscriber: an iPhone and Mac transcriber where every model runs on the device, no network needed.</li>
+    <li>On the right is the app's own Picture‑in‑Picture demo: Japanese speech, live captions and translation, all local.</li>
+    <li>Six minutes, no pitch: what these speech models actually compute. The slides are a web page; there's a QR at the end.</li>
   </aside>
 </section>
 
@@ -619,9 +665,9 @@ ol.watch li small { display: block; color: var(--label2); font-size: .82rem; fon
     </div>
   </div>
   <aside class="notes">
-    <li>The core design: follow live, finish offline.</li>
-    <li>Live path: ~320 ms per step, streaming state. A router picks Apple's SpeechAnalyzer when your language is supported, otherwise NVIDIA's Nemotron streaming model.</li>
-    <li>Offline path: after you stop recording, a bigger model sees the whole file and adds word timestamps and speaker labels. Then a small local LLM writes the title and summary.</li>
+    <li>Two latency budgets, two model families. Live: text has to keep up chunk by chunk. Saved: we can afford full context, word timestamps and speakers.</li>
+    <li>“Automatic” is a router, not a model: multilingual Nemotron if installed, otherwise Apple's on‑device recognizer when it supports the language, otherwise a Nemotron for that language.</li>
+    <li>Speakers are a second, optional model on both paths. The LLM only reads text, and documents come out the end.</li>
   </aside>
 </section>
 
@@ -652,9 +698,10 @@ ol.watch li small { display: block; color: var(--label2); font-size: .82rem; fon
     </div>
   </div>
   <aside class="notes">
-    <li>Click “Use my mic” and say something. This is a real log‑Mel spectrogram computed in the browser.</li>
-    <li>That 80 × T picture is literally the input tensor. 100 columns per second; the encoder then merges every 8 into one step, so the model “thinks” at 12.5 Hz.</li>
-    <li>From here on, all the models differ only in how they decode.</li>
+    <li>Every model starts from the same picture. The mic gives 48 kHz stereo; we resample to 16 kHz mono floats, 16,000 numbers per second.</li>
+    <li>A 25 ms window slides every 10 ms, so 100 spectra per second. Each is squeezed into 128 Mel bands, spaced like the cochlea, then log‑compressed. That heat map is literally the input tensor.</li>
+    <li>[Click “Use my mic” and say a sentence.] Vowels show as stacked harmonics, fricatives as high‑frequency noise.</li>
+    <li>The encoder's first convolutions merge every 8 columns, so the model thinks in 80 ms steps, 12.5 per second. Nobody segments phonemes by hand; from here on, models differ only in how they decode.</li>
   </aside>
 </section>
 
@@ -726,9 +773,12 @@ ol.watch li small { display: block; color: var(--label2); font-size: .82rem; fon
     </div>
   </div>
   <aside class="notes">
-    <li>The encoders look alike. The decoder contract is what changes.</li>
-    <li>Transducers are streaming‑native; TDT is the fast offline variant. Whisper is the classic encoder‑decoder. The newest are audio‑LLMs: audio becomes embeddings in an LLM prompt.</li>
-    <li>The app ships all four and picks one by language and by live vs offline.</li>
+    <li>After the encoder, every model holds a sequence h_t of 80 ms vectors. The difference is the decoding contract.</li>
+    <li>RNN‑T: at each frame emit a word piece, or a blank that advances time. Streaming by construction.</li>
+    <li>TDT: the same, but it also predicts how many frames to skip, so it's faster and gives timings.</li>
+    <li>Encoder–decoder, Whisper: the decoder cross‑attends to all frames and writes tokens one by one, timestamps included.</li>
+    <li>Audio‑LLM: a projector maps audio into an LLM's embedding space; then it's ordinary next‑token prediction.</li>
+    <li>Apple's SpeechAnalyzer is a black box. Diarization models output no text at all, only who and when.</li>
   </aside>
 </section>
 
@@ -766,10 +816,10 @@ ol.watch li small { display: block; color: var(--label2); font-size: .82rem; fon
     </div>
   </div>
   <aside class="notes">
-    <li>This is the decoding lattice: x is audio frames, y is tokens emitted so far.</li>
-    <li>RNN‑T: at each frame the joint network says either blank (go right) or a token (go up). 12 frames + 3 tokens = 15 decoder calls.</li>
-    <li>Toggle TDT: the model also predicts a duration and jumps. 5 calls instead of 15, and the jumps are the timestamps.</li>
-    <li>Bottom right: Nemotron only computes the new 320 ms; the rest comes from cache. That's why it runs live on a 6 GB iPhone.</li>
+    <li>This is the decoding lattice: x is encoder frames, y is tokens emitted so far.</li>
+    <li>RNN‑T: the joint network combines the current frame with the prediction network's state for the last token, and outputs a distribution over the vocabulary plus blank. Blank moves right; a token moves up and the same frame is tried again. So calls = frames + tokens. Nemotron makes 43 decisions for 32 frames and never takes a token back.</li>
+    <li>[Toggle TDT.] Parakeet also predicts a duration of 0 to 4 frames, so it jumps: 16 steps instead of 43, and the jumps are the word timestamps.</li>
+    <li>Bottom right: Nemotron is cache‑aware. Each of its 24 FastConformer layers keeps attention and convolution state, so every 320 ms (or 1,120 ms) chunk costs the same, two minutes or two hours into a meeting. That's what makes it live on a phone.</li>
   </aside>
 </section>
 
@@ -807,9 +857,10 @@ ol.watch li small { display: block; color: var(--label2); font-size: .82rem; fon
     </div>
   </div>
   <aside class="notes">
-    <li>Parakeet is an offline model, but we can still use it live: re-decode the active window every half second.</li>
-    <li>Watch the gray draft change as more audio arrives; once the window hits 15 s, everything up to a sentence that ended 2 s ago is committed and the window slides.</li>
-    <li>Trade-off vs Nemotron: more compute, but better accuracy and the draft can fix itself.</li>
+    <li>Parakeet is an offline model: bidirectional attention over its whole window. To use it live, every 0.5 s we decode the entire active window again, from scratch.</li>
+    <li>Each pass hears more right context, so the gray draft fixes itself: “my a” becomes “Maya”, “much” becomes “Dutch”.</li>
+    <li>To keep the cost bounded: when the window reaches 15 s, we commit everything up to the last sentence that ended at least 2 s ago. That 2‑second margin is where words are still unstable. The window then restarts at the commit point, so a pass never sees more than 15 s.</li>
+    <li>Trade‑off versus Nemotron: more compute, but better accuracy and a draft that corrects itself. Or record now and tap Catch Up later: 30‑second windows, much faster than real time.</li>
   </aside>
 </section>
 
@@ -837,9 +888,10 @@ ol.watch li small { display: block; color: var(--label2); font-size: .82rem; fon
     </div>
   </div>
   <aside class="notes">
-    <li>Whisper: control tokens say language and task; timestamps are just tokens in the vocabulary.</li>
-    <li>Qwen3‑ASR: audio embeddings literally replace placeholder tokens in an LLM prompt. Look at the Chinese probabilities: 今 vs 金 vs 近 sound alike; the language model resolves them from context. That's why it handles dialects well.</li>
-    <li>MOSS goes further: one token stream carries text, time markers and speaker tags at once.</li>
+    <li>These decode one token at a time, conditioned on all of the audio.</li>
+    <li>Whisper: a fixed 30 s window, 3,000 Mel frames halved to 1,500 encoder positions. The prompt is start, language and task tokens, and timestamps are just tokens in the vocabulary, so it writes its own subtitles.</li>
+    <li>[Qwen3‑ASR tab.] Silero VAD cuts speech chunks of up to 10 s. Three stride‑2 convolutions give about 13 audio tokens per second; they fill placeholders in a chat prompt, and a 28‑layer Qwen3 decoder scores 151,936 tokens at every step. It first names the language, then writes the text. The language‑model prior is why 今, 金 and 近, which sound alike, come out right.</li>
+    <li>[MOSS tab.] One stream carries time markers, speaker tags and words, so transcription and diarization are a single model. Tags restart every window; the app links them with voiceprints.</li>
   </aside>
 </section>
 
@@ -871,10 +923,10 @@ ol.watch li small { display: block; color: var(--label2); font-size: .82rem; fon
     </div>
   </div>
   <aside class="notes">
-    <li>Diarization is its own model family; it never transcribes.</li>
-    <li>Sortformer, live: four sigmoid slots per 80 ms frame, numbered by who spoke first, so the labels are unambiguous; on above 0.5, off below 0.3.</li>
-    <li>Toggle Nemotron 3: NVIDIA's successor, eight slots at 10 ms resolution, live or on saved recordings; each Parakeet word goes to whoever is most active in its first 0.6 s.</li>
-    <li>Community-1, offline: windows, voiceprints, clustering, then a join on time.</li>
+    <li>Diarization answers who spoke when, never what.</li>
+    <li>Sortformer: four sigmoid outputs per 80 ms frame. The hard part is permutation: which voice is “speaker 1”? Sortformer sorts slots by arrival time, and a speaker cache keeps each voice in its slot across chunks. Hysteresis turns a speaker on above 0.5 and off below 0.3. Results trail the audio by about a second.</li>
+    <li>[Toggle Nemotron 3.] NVIDIA's successor: about 100M parameters, eight slots at 10 ms resolution, live in 0.72 s steps or on saved recordings in 10.24 s steps. With Parakeet, each word goes to the speaker most active in its first 0.6 s.</li>
+    <li>Community‑1 is the classic pipeline: 10 s windows every 2 s, local segmentation with overlap, 256‑number voiceprints, PLDA down to 128, then AHC and VBx clustering, with the rule that two voices from the same window never merge.</li>
   </aside>
 </section>
 
@@ -908,8 +960,8 @@ ol.watch li small { display: block; color: var(--label2); font-size: .82rem; fon
     </div>
   </div>
   <aside class="notes">
-    <li>Separation of concerns: speech models make text, a text model makes meaning.</li>
-    <li>Apple Intelligence when available; otherwise a 2B Qwen at 3‑bit through llama.cpp, so summaries also work where Apple Intelligence doesn't ship.</li>
+    <li>Speech models make text; a text model makes meaning. Titles, summaries and Skills only ever read the transcript.</li>
+    <li>An ordered engine list runs until one succeeds: Apple Intelligence, then a local GGUF model through llama.cpp, a 2B Qwen at 3‑bit, so it works where Apple Intelligence doesn't ship. Private Cloud Compute and cloud keys exist, but only if you add them.</li>
   </aside>
 </section>
 
@@ -937,7 +989,7 @@ ol.watch li small { display: block; color: var(--label2); font-size: .82rem; fon
         <div><b>Upload</b><small>multipart streamed from disk; async jobs polled, then the remote copy deleted</small></div>
         <div><b>Assemble</b><small>timed words → lines: new line on speaker change, 1.2 s pause, 30 s or 320 characters</small></div>
       </div>
-      <p class="cl-names">Deepgram · AssemblyAI · Speechmatics · Soniox · ElevenLabs · Groq Whisper · Mistral Voxtral · xAI · Meta · Cartesia · MOSS</p>
+      <div class="cl-names"><span class="capsule">Deepgram</span><span class="capsule">AssemblyAI</span><span class="capsule">Speechmatics</span><span class="capsule">Soniox</span><span class="capsule">ElevenLabs</span><span class="capsule">Groq Whisper</span><span class="capsule">Mistral Voxtral</span><span class="capsule">xAI</span><span class="capsule">Meta</span><span class="capsule">Cartesia</span><span class="capsule">MOSS</span></div>
     </div>
     <div class="cl-side">
       <div class="card"><h3><svg class="ic" style="color:var(--privacy)"><use href="#i-lock"/></svg>Keys</h3><p>One Keychain item per provider, this device only, never synced. Verified with a free authenticated <span class="mono">GET /v1/models</span>; requests use an ephemeral session with keys masked in errors.</p></div>
@@ -945,9 +997,9 @@ ol.watch li small { display: block; color: var(--label2); font-size: .82rem; fon
     </div>
   </div>
   <aside class="notes">
-    <li>Everything so far is on device. Cloud is strictly opt-in, bring your own key, in an order you choose.</li>
-    <li>Three API dialects behind one interface, with structured output degrading gracefully from strict JSON Schema.</li>
-    <li>Audio uploads only after a confirmation that names the provider and model; the transcript comes back as the same timed, speaker-labeled lines as the local models.</li>
+    <li>Cloud is strictly opt‑in, with your own key, in the order you choose. Automatic never picks it.</li>
+    <li>Three API dialects behind one interface: OpenAI Responses, Gemini Interactions, Anthropic Messages, and Chat Completions for everyone else. Structured output degrades from strict JSON Schema to JSON mode to plain instructions.</li>
+    <li>For audio there are 11 speech‑to‑text adapters: a confirmation names the provider and model, audio is re‑encoded and split at the quietest point, uploaded, then deleted remotely, and the result becomes the same timed, speaker‑labeled lines as the local models.</li>
   </aside>
 </section>
 
@@ -984,17 +1036,18 @@ ol.watch li small { display: block; color: var(--label2); font-size: .82rem; fon
     <div class="card dc-out">
       <h3><svg class="ic" style="color:var(--warning)"><use href="#i-doc"/></svg>3 · Rendered on device</h3>
       <ul class="list">
-        <li><svg class="ic" style="color:var(--info)"><use href="#i-doc"/></svg><span><b>Word .docx</b>: WordprocessingML written by hand, zipped by an in‑house ZIP writer (CRC‑32, DEFLATE)</span></li>
-        <li><svg class="ic" style="color:var(--brand)"><use href="#i-doc"/></svg><span><b>PDF</b>: CoreText layout, tagged PDF, running headers, page numbers, right‑to‑left text</span></li>
+        <li><svg class="ic" style="color:var(--info)"><use href="#i-doc"/></svg><span><b>Word .docx</b><span class="fine">: WordprocessingML written by hand, zipped by an in‑house ZIP writer (CRC‑32, DEFLATE)</span></span></li>
+        <li><svg class="ic" style="color:var(--brand)"><use href="#i-doc"/></svg><span><b>PDF</b><span class="fine">: CoreText layout, tagged PDF, running headers, page numbers, right‑to‑left text</span></span></li>
         <li><svg class="ic" style="color:var(--success)"><use href="#i-code"/></svg><span><b>Markdown, text, SRT, VTT, JSON</b></span></li>
-        <li><svg class="ic" style="color:var(--purple)"><use href="#i-people"/></svg><span><b>Report</b>: summary, meeting analysis, speaker overview and a timed transcript in 6 speaker colors</span></li>
-        <li><svg class="ic" style="color:var(--warning)"><use href="#i-globe"/></svg><span><b>Locale‑aware</b>: Letter or A4 by region, CJK fonts, language detected per document</span></li>
+        <li><svg class="ic" style="color:var(--purple)"><use href="#i-people"/></svg><span><b>Report</b><span class="fine">: summary, meeting analysis, speaker overview and a timed transcript in 6 speaker colors</span></span></li>
+        <li><svg class="ic" style="color:var(--warning)"><use href="#i-globe"/></svg><span><b>Locale‑aware</b><span class="fine">: Letter or A4 by region, CJK fonts, language detected per document</span></span></li>
       </ul>
     </div>
   </div>
   <aside class="notes">
-    <li>Skills: the LLM writes Markdown, never final layout. A codec parses it into typed blocks: decisions, action items, open questions, tables, citations.</li>
-    <li>Then the app renders Word and PDF itself: OOXML written by hand, our own ZIP writer, CoreText for PDF. Zero dependencies, fully on device.</li>
+    <li>Skills turn transcripts into documents. The model writes Markdown, never layout.</li>
+    <li>One codec parses it into typed blocks: decisions, action items, open questions, tables, citations. Every renderer uses those blocks, so Word and PDF always agree.</li>
+    <li>Then we render it ourselves: WordprocessingML written by hand with our own ZIP writer, and CoreText for tagged PDF. No third‑party libraries, all on device.</li>
   </aside>
 </section>
 
@@ -1025,22 +1078,21 @@ ol.watch li small { display: block; color: var(--label2); font-size: .82rem; fon
     </div>
     <div style="display:grid;gap:1rem;align-content:start">
       <div class="bignum">
-        <div class="card"><b>4</b><span>ML runtimes in one app: Core ML, MLX, ggml and llama.cpp</span></div>
-        <div class="card"><b>0</b><span>developer servers. Audio stays on the device by default.</span></div>
+        <div class="card"><b>4</b><em>ML runtimes</em><span class="fine">Core ML, MLX, ggml and llama.cpp in one app</span></div>
+        <div class="card"><b>0</b><em>developer servers</em><span class="fine">Audio stays on the device by default.</span></div>
       </div>
       <div class="card">
         <ul class="list">
-          <li><svg class="ic" style="color:var(--warning)"><use href="#i-chip"/></svg><span><b>Quantize everything.</b> INT8 Core ML, 4‑bit MLX, Q5_0 and K‑quants: memory, not FLOPs, is the real budget.</span></li>
-          <li><svg class="ic" style="color:var(--info)"><use href="#i-store"/></svg><span><b>Apple‑hosted asset packs.</b> Models ship through Background Assets: pinned upstream revisions, SHA‑256 verified, downloaded only when you pick one.</span></li>
-          <li><svg class="ic" style="color:var(--label2)"><use href="#i-laptop"/></svg><span><b>One domain layer</b> shared by iPhone, Watch and a native Mac app that captures any meeting window with ScreenCaptureKit.</span></li>
+          <li><svg class="ic" style="color:var(--warning)"><use href="#i-chip"/></svg><span><b>Quantize everything.</b><span class="fine"> INT8 Core ML, 4‑bit MLX, Q5_0 and K‑quants: memory, not FLOPs, is the real budget.</span></span></li>
+          <li><svg class="ic" style="color:var(--info)"><use href="#i-store"/></svg><span><b>Apple‑hosted asset packs.</b><span class="fine"> Models ship through Background Assets: pinned upstream revisions, SHA‑256 verified, downloaded only when you pick one.</span></span></li>
+          <li><svg class="ic" style="color:var(--label2)"><use href="#i-laptop"/></svg><span><b>One domain layer</b><span class="fine"> shared by iPhone, Watch and a native Mac app that captures any meeting window with ScreenCaptureKit.</span></span></li>
         </ul>
       </div>
     </div>
   </div>
   <aside class="notes">
-    <li>The hard part isn't the models; it's memory. Everything is quantized, and only one big model is resident at a time.</li>
-    <li>Four runtimes, because the best port of each model lives in a different one.</li>
-    <li>Models are distributed through Apple's own asset‑pack CDN, verified by checksum. No server of mine ever sees audio.</li>
+    <li>The hard part isn't the models, it's memory. Everything is quantized: INT8 Core ML, 4‑bit MLX, Q5 and K‑quants, and only one large model is resident at a time.</li>
+    <li>Four runtimes, because the best port of each model lives in a different one. Models ship as Apple‑hosted asset packs, checksum‑verified, downloaded only when you pick one.</li>
   </aside>
 </section>
 
@@ -1079,7 +1131,8 @@ ol.watch li small { display: block; color: var(--label2); font-size: .82rem; fon
   <div class="demo-wrap">
     <div>
       <div class="demo-big">Live<br>demo<span class="recdot"></span></div>
-      <p class="lede" style="margin-top:1.2rem;display:flex;gap:.5rem;align-items:center"><svg class="ic" style="color:var(--info)"><use href="#i-plane"/></svg>Works in airplane mode: everything you'll see runs on the phone.</p>
+      <p style="margin-top:1.4rem"><span class="pill" style="--c:var(--info);font-size:.95rem"><svg class="ic"><use href="#i-plane"/></svg>Airplane mode</span></p>
+      <p class="lede fine">Works in airplane mode: everything you'll see runs on the phone.</p>
     </div>
     <ol class="card watch">
       <li><span>Partial → final<small>live text rewrites itself as context arrives</small></span></li>
