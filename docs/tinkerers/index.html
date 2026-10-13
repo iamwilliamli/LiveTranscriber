@@ -1,0 +1,1406 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>How Speech Becomes Text on an iPhone · LiveTranscriber</title>
+<meta name="description" content="AI Tinkerers Toronto demo: what eight on-device speech models compute, from PCM samples to tokens, timestamps and speaker labels. By William (Chengqi) Li.">
+<meta property="og:title" content="How speech becomes text — on an iPhone, offline">
+<meta property="og:description" content="Transducers, TDT, Whisper, audio-LLMs and speaker diarization, explained through LiveTranscriber. AI Tinkerers Toronto, Oct 2026.">
+<meta property="og:type" content="website">
+<meta property="og:url" content="https://iamwilliamli.github.io/LiveTranscriber/tinkerers/">
+<meta name="theme-color" content="#0b0c10">
+<link rel="icon" type="image/svg+xml" href="img/icon.svg">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=Reddit+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg: #0b0c10;
+  --bg2: #101219;
+  --panel: #14161d;
+  --panel2: #1b1e27;
+  --line: rgba(255,255,255,.09);
+  --line2: rgba(255,255,255,.16);
+  --text: #f4f5f7;
+  --muted: #a2a9b6;
+  --dim: #6c7380;
+  --brand: #f5381a;
+  --brand-soft: #ff7d40;
+  --info: #4a8bff;
+  --success: #22c37a;
+  --warning: #f3a43b;
+  --purple: #9a7dff;
+  --blank: #6e7b97;
+  --sans: "Reddit Sans", -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", sans-serif;
+  --mono: "JetBrains Mono", ui-monospace, "SF Mono", Menlo, monospace;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; background: var(--bg); color: var(--text); font-family: var(--sans); -webkit-font-smoothing: antialiased; }
+html.deck { font-size: 20px; }
+html.doc { font-size: 16px; }
+html.deck, html.deck body { height: 100%; overflow: hidden; }
+body { line-height: 1.4; }
+button { font: inherit; color: inherit; }
+.mono, .formula, .chip, .tok, .tag, .kicker, .prob, .lat-log, .pipeline-mini, .url, table.models td.mono { font-variant-ligatures: none; font-feature-settings: "liga" 0, "calt" 0; }
+a { color: var(--brand-soft); text-underline-offset: 3px; }
+
+/* ---------- stage ---------- */
+.stage { position: relative; }
+.deck .stage {
+  position: absolute; left: 50%; top: 50%; width: 1600px; height: 900px;
+  transform: translate(-50%, -50%) scale(var(--s, 1)); transform-origin: 50% 50%;
+}
+.slide { position: relative; display: flex; flex-direction: column; overflow: hidden; }
+.deck .slide {
+  position: absolute; inset: 0; padding: 3.1rem 4.2rem 3.6rem;
+  opacity: 0; visibility: hidden; transform: translateX(18px);
+  transition: opacity .38s ease, transform .38s ease, visibility 0s linear .38s;
+}
+.deck .slide.active { opacity: 1; visibility: visible; transform: none; transition: opacity .38s ease, transform .38s ease; }
+.deck .slide.prev { transform: translateX(-18px); }
+.doc .slide { padding: 3.4rem max(16px, env(safe-area-inset-left)) 3rem; border-bottom: 1px solid var(--line); }
+.slide::before {
+  content: ""; position: absolute; inset: 0; pointer-events: none; z-index: 0;
+  background: radial-gradient(900px 500px at 92% -10%, rgba(245,56,26,.10), transparent 60%),
+              radial-gradient(800px 500px at -10% 110%, rgba(74,139,255,.08), transparent 60%);
+}
+.slide > * { position: relative; z-index: 1; }
+
+.kicker { font-family: var(--mono); font-size: .72rem; letter-spacing: .14em; text-transform: uppercase; color: var(--brand-soft); display: flex; gap: .8em; align-items: center; }
+.kicker .n { color: var(--dim); }
+h1, h2, h3 { margin: 0; letter-spacing: -.025em; }
+h1 { font-size: 4.1rem; line-height: 1.02; font-weight: 800; }
+h2 { font-size: 2.45rem; line-height: 1.08; font-weight: 800; margin-top: .45rem; }
+h3 { font-size: 1.05rem; font-weight: 700; letter-spacing: -.01em; }
+.lede { font-size: 1.12rem; color: var(--muted); max-width: 54rem; margin: .7rem 0 0; }
+.grad { background: linear-gradient(92deg, var(--brand) 0%, var(--brand-soft) 45%, var(--purple) 100%); -webkit-background-clip: text; background-clip: text; color: transparent; }
+.mono { font-family: var(--mono); }
+.muted { color: var(--muted); }
+.dim { color: var(--dim); }
+.small { font-size: .8rem; }
+.body { flex: 1; min-height: 0; margin-top: 1.5rem; }
+.cols { display: grid; gap: 1.6rem; }
+.card { background: var(--panel); border: 1px solid var(--line); border-radius: 18px; padding: 1.1rem 1.2rem; }
+.card p { margin: .45rem 0 0; color: var(--muted); font-size: .9rem; }
+.tag { display: inline-flex; align-items: center; gap: .35em; font-family: var(--mono); font-size: .66rem; letter-spacing: .08em; text-transform: uppercase; padding: .28em .6em; border-radius: 999px; border: 1px solid var(--line2); color: var(--muted); white-space: nowrap; }
+.tag.live { color: var(--success); border-color: rgba(34,195,122,.4); }
+.tag.off { color: var(--purple); border-color: rgba(154,125,255,.45); }
+.tag.brand { color: var(--brand-soft); border-color: rgba(255,125,64,.45); }
+.formula { font-family: var(--mono); font-size: .82rem; background: var(--bg2); border: 1px solid var(--line); border-radius: 10px; padding: .55em .75em; color: #dfe3ea; overflow-x: auto; white-space: nowrap; }
+.formula b { color: var(--brand-soft); font-weight: 500; }
+.chip { display: inline-flex; align-items: center; font-family: var(--mono); font-size: .78rem; padding: .3em .55em; border-radius: 8px; background: var(--panel2); border: 1px solid var(--line2); white-space: nowrap; }
+.btn { display: inline-flex; align-items: center; gap: .45em; padding: .45em .85em; border-radius: 999px; border: 1px solid var(--line2); background: var(--panel2); cursor: pointer; font-size: .78rem; font-weight: 600; }
+.btn:hover { border-color: rgba(255,255,255,.3); }
+.btn.on { background: var(--text); color: var(--bg); border-color: var(--text); }
+.btn.rec.on { background: var(--brand); color: #fff; border-color: var(--brand); }
+.seg { display: inline-flex; padding: 3px; border-radius: 999px; background: var(--bg2); border: 1px solid var(--line); gap: 2px; }
+.seg .btn { border: 0; background: transparent; }
+.seg .btn.on { background: var(--text); color: var(--bg); }
+ul.ticks { list-style: none; margin: 0; padding: 0; display: grid; gap: .6rem; }
+ul.ticks li { position: relative; padding-left: 1.3rem; color: var(--muted); font-size: .92rem; }
+ul.ticks li::before { content: ""; position: absolute; left: 0; top: .55em; width: .5rem; height: .5rem; border-radius: 2px; background: var(--brand); }
+ul.ticks li b { color: var(--text); font-weight: 600; }
+.notes { display: none; }
+
+/* ---------- 1 title ---------- */
+.title-wrap { flex: 1; display: grid; grid-template-columns: 1.15fr .85fr; gap: 3rem; align-items: center; }
+.byline { display: flex; align-items: center; gap: .9rem; margin-top: 2.2rem; }
+.byline img { width: 3.2rem; height: 3.2rem; border-radius: 22%; box-shadow: 0 8px 30px rgba(245,56,26,.25); }
+.byline b { display: block; font-size: 1.05rem; }
+.byline span { color: var(--muted); font-size: .85rem; }
+.hero { position: relative; height: 26rem; border-radius: 26px; border: 1px solid var(--line); background: linear-gradient(180deg, var(--panel), var(--bg2)); overflow: hidden; }
+.hero canvas { position: absolute; left: 0; right: 0; top: 2.2rem; width: 100%; height: 9rem; }
+.hero .stack { position: absolute; left: 1.4rem; right: 1.4rem; bottom: 1.4rem; display: grid; gap: .55rem; }
+.hero .row { display: flex; align-items: center; gap: .5rem; flex-wrap: wrap; }
+.hero .lbl { font-family: var(--mono); font-size: .62rem; color: var(--dim); letter-spacing: .1em; text-transform: uppercase; width: 5.2rem; flex: none; }
+.hero .chip { opacity: 0; transform: translateY(6px); animation: chipIn 6s infinite; }
+.hero .spk { color: #fff; border: 0; }
+@keyframes chipIn { 0% { opacity: 0; transform: translateY(6px); } 8%, 82% { opacity: 1; transform: none; } 92%, 100% { opacity: 0; transform: translateY(-4px); } }
+.hero .caption { font-size: 1.25rem; font-weight: 700; letter-spacing: -.01em; }
+.hero .caption .cursor { display: inline-block; width: .55em; height: 1.05em; vertical-align: -.15em; background: var(--brand); margin-left: 2px; animation: blink 1s steps(1) infinite; }
+@keyframes blink { 50% { opacity: 0; } }
+
+/* ---------- 2 system lanes ---------- */
+.lanes { display: grid; gap: 1.2rem; }
+.lane { border: 1px solid var(--line); border-radius: 20px; background: var(--panel); padding: 1rem 1.1rem 1.1rem; }
+.lane-head { display: flex; align-items: center; gap: .7rem; margin-bottom: .8rem; }
+.lane-head h3 { font-size: 1.1rem; }
+.lane-head .budget { margin-left: auto; font-family: var(--mono); font-size: .72rem; color: var(--muted); }
+.flow { position: relative; display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; gap: 1.6rem; align-items: stretch; }
+.flow .node { position: relative; z-index: 1; background: var(--bg2); border: 1px solid var(--line2); border-radius: 14px; padding: .65rem .75rem; min-width: 0; }
+.flow .node .role { font-family: var(--mono); font-size: .58rem; letter-spacing: .12em; color: var(--dim); text-transform: uppercase; }
+.flow .node b { display: block; font-size: .9rem; margin-top: .15rem; }
+.flow .node small { display: block; color: var(--muted); font-size: .72rem; margin-top: .15rem; line-height: 1.3; }
+.flow .node.alt { border-style: dashed; }
+.flow .node:not(:last-child)::after { content: "→"; position: absolute; right: -1.25rem; top: 50%; transform: translateY(-50%); color: var(--dim); font-size: .9rem; }
+.flow .track { position: absolute; left: 0; right: 0; top: 50%; height: 2px; z-index: 0; background: linear-gradient(90deg, transparent, var(--line2), transparent); }
+.flow .pulse { position: absolute; top: calc(50% - 4px); left: 0; width: 8px; height: 8px; border-radius: 50%; z-index: 0; background: var(--success); box-shadow: 0 0 14px var(--success); animation: travel 3.2s linear infinite; }
+.lane.offline .pulse { background: var(--purple); box-shadow: 0 0 14px var(--purple); animation-duration: 5s; }
+@keyframes travel { from { left: 0; opacity: 0; } 6% { opacity: 1; } 94% { opacity: 1; } to { left: calc(100% - 8px); opacity: 0; } }
+.router-note { display: flex; align-items: center; gap: 1rem; margin-top: 1rem; }
+
+/* ---------- 3 spectrogram ---------- */
+.spec-wrap { display: grid; grid-template-columns: 1.35fr 1fr; gap: 2rem; height: 100%; }
+.spec-card { display: flex; flex-direction: column; gap: .7rem; }
+.spec-canvas { position: relative; flex: 1; min-height: 14rem; border-radius: 16px; overflow: hidden; border: 1px solid var(--line); background: #07080b; }
+.spec-canvas canvas { position: absolute; inset: 0; width: 100%; height: 100%; }
+.spec-canvas .axis { position: absolute; left: .6rem; top: 0; bottom: 0; font-family: var(--mono); font-size: .58rem; color: rgba(255,255,255,.6); pointer-events: none; }
+.spec-canvas .axis span { position: absolute; left: 0; transform: translateY(50%); white-space: nowrap; background: rgba(0,0,0,.55); padding: 0 .3em; border-radius: 4px; }
+.spec-canvas .shape { position: absolute; right: .7rem; top: .6rem; font-family: var(--mono); font-size: .7rem; background: rgba(0,0,0,.55); padding: .25em .55em; border-radius: 6px; }
+.spec-canvas .wave { position: absolute; left: 0; right: 0; bottom: 0; height: 18%; }
+.spec-controls { display: flex; gap: .6rem; align-items: center; flex-wrap: wrap; }
+.spec-controls .stat { margin-left: auto; font-family: var(--mono); font-size: .72rem; color: var(--muted); }
+.steps { display: grid; gap: .65rem; align-content: start; }
+.step { display: grid; grid-template-columns: 2rem 1fr; gap: .7rem; align-items: start; }
+.step .k { width: 2rem; height: 2rem; border-radius: 10px; display: grid; place-items: center; font-family: var(--mono); font-weight: 700; font-size: .8rem; background: var(--panel2); border: 1px solid var(--line2); }
+.step b { font-size: .95rem; }
+.step p { margin: .15rem 0 0; color: var(--muted); font-size: .82rem; }
+.callout { border-left: 3px solid var(--brand); padding: .5rem .9rem; background: linear-gradient(90deg, rgba(245,56,26,.10), transparent); border-radius: 0 12px 12px 0; color: #e8e9ec; font-size: .9rem; }
+
+/* ---------- 4 families ---------- */
+.enc-strip { display: flex; align-items: center; gap: .6rem; flex-wrap: wrap; padding: .75rem 1rem; border-radius: 14px; border: 1px solid var(--line); background: var(--panel); }
+.enc-strip .arrow { color: var(--dim); }
+.fam { display: grid; grid-template-columns: repeat(4, 1fr); gap: 1rem; margin-top: .9rem; }
+.fam .card { display: flex; flex-direction: column; gap: .45rem; padding: .95rem 1.05rem; }
+.fam .card p { font-size: .82rem; margin-top: .1rem; }
+.fam .card h3 { font-size: 1.15rem; }
+.fam .card .motto { font-family: var(--mono); font-size: .74rem; color: var(--brand-soft); }
+.fam .card .who { margin-top: auto; padding-top: .6rem; border-top: 1px solid var(--line); display: flex; gap: .4rem; flex-wrap: wrap; }
+.fam svg { width: 100%; height: 3.7rem; }
+.side-notes { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-top: .8rem; }
+
+/* ---------- 5 lattice ---------- */
+.lat-wrap { display: grid; grid-template-columns: 1.3fr 1fr; grid-template-rows: minmax(0, 1fr); gap: 1.8rem; height: 100%; }
+.lat-wrap .card { padding: .8rem 1rem; }
+.lat-wrap .card p { font-size: .8rem; margin-top: .4rem; }
+.lat-wrap .formula { font-size: .76rem; }
+.doc .lat-wrap { grid-template-rows: auto; }
+.lat-card { display: flex; flex-direction: column; gap: .7rem; }
+.lat-canvas { position: relative; flex: 1; min-height: 12rem; border: 1px solid var(--line); border-radius: 16px; background: var(--bg2); }
+.lat-canvas canvas { position: absolute; inset: 0; width: 100%; height: 100%; }
+.lat-log { font-family: var(--mono); font-size: .78rem; color: #dfe3ea; min-height: 1.4em; }
+.lat-log .cnt { float: right; color: var(--muted); }
+.chunks { display: flex; gap: 4px; height: 2.1rem; align-items: stretch; overflow: hidden; border-radius: 10px; padding: 4px; background: var(--bg2); border: 1px solid var(--line); }
+.chunks div { flex: 0 0 2.6rem; border-radius: 6px; background: #2a2f3b; transition: background .5s; display: grid; place-items: center; font-family: var(--mono); font-size: .55rem; color: rgba(255,255,255,.55); }
+.chunks div.new { background: var(--success); color: #04110a; font-weight: 700; animation: pop .4s ease; }
+@keyframes pop { from { transform: scaleX(.2); opacity: 0; } to { transform: none; opacity: 1; } }
+.pipeline-mini { display: flex; gap: .35rem; flex-wrap: wrap; align-items: center; font-family: var(--mono); font-size: .7rem; color: var(--muted); }
+.pipeline-mini b { color: var(--text); font-weight: 500; }
+
+/* ---------- 6 autoregressive ---------- */
+.ar-top { display: flex; align-items: center; gap: 1rem; flex-wrap: wrap; }
+.ar-wrap { display: grid; grid-template-columns: 1.25fr 1fr; gap: 1.6rem; margin-top: 1rem; }
+.chain { display: flex; align-items: stretch; gap: .5rem; flex-wrap: wrap; }
+.chain .c { flex: 1 1 0; min-width: 7rem; background: var(--bg2); border: 1px solid var(--line2); border-radius: 12px; padding: .5rem .6rem; font-size: .78rem; }
+.chain .c i { display: block; font-style: normal; font-family: var(--mono); font-size: .58rem; color: var(--dim); letter-spacing: .1em; text-transform: uppercase; }
+.tokens { display: flex; flex-wrap: wrap; gap: .5rem; align-content: flex-start; min-height: 9rem; padding: 1rem; border-radius: 14px; background: var(--bg2); border: 1px solid var(--line); }
+.tok { font-family: var(--mono); font-size: 1.02rem; padding: .3em .55em; border-radius: 8px; border: 1px solid var(--line2); background: var(--panel2); transition: opacity .25s, transform .25s; }
+.tok.prompt { color: var(--dim); border-style: dashed; }
+.tok.ctl { color: var(--info); border-color: rgba(74,139,255,.45); }
+.tok.time { color: var(--warning); border-color: rgba(243,164,59,.45); }
+.tok.spk { color: #fff; background: var(--purple); border-color: var(--purple); }
+.tok.text { color: var(--text); border-color: rgba(255,255,255,.35); }
+.tok.eos { color: var(--brand-soft); border-color: rgba(255,125,64,.45); }
+.tok.hidden { opacity: 0; transform: translateY(6px); }
+.tok.cur { box-shadow: 0 0 0 2px var(--brand); }
+.probs { display: grid; gap: .45rem; }
+.prob { display: grid; grid-template-columns: 9rem 1fr 3rem; gap: .7rem; align-items: center; font-family: var(--mono); font-size: .95rem; }
+.prob .k { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.prob .pbar { height: .85rem; border-radius: 99px; background: var(--panel2); overflow: hidden; }
+.prob .pbar span { display: block; height: 100%; width: 0; background: var(--brand); border-radius: 99px; transition: width .35s ease; }
+.prob:not(:first-child) .pbar span { background: #4a5163; }
+.prob .v { text-align: right; color: var(--muted); }
+
+/* ---------- 7 diarization ---------- */
+.dia-wrap { display: grid; grid-template-columns: 1.1fr 1fr; gap: 1.6rem; margin-top: 1.2rem; }
+.heat { position: relative; display: grid; grid-template-columns: 2.6rem 1fr; gap: .5rem; }
+.heat .labels { display: grid; grid-template-rows: repeat(4, 1fr); font-family: var(--mono); font-size: .75rem; align-items: center; }
+.heat .labels span::before { content: ""; display: inline-block; width: .55rem; height: .55rem; border-radius: 50%; margin-right: .35rem; background: var(--c); }
+.heat canvas { width: 100%; height: 9.6rem; border-radius: 10px; border: 1px solid var(--line); image-rendering: pixelated; background: #07080b; }
+.turns { display: flex; gap: .35rem; flex-wrap: wrap; min-height: 2rem; margin-top: .6rem; }
+.turns .chip { color: #fff; border: 0; }
+.vchain { display: grid; gap: .45rem; }
+.vchain .v { display: grid; grid-template-columns: 1fr auto; gap: .6rem; align-items: center; padding: .5rem .75rem; border-radius: 12px; background: var(--bg2); border: 1px solid var(--line); transition: border-color .3s, background .3s; }
+.vchain .v b { font-size: .88rem; }
+.vchain .v small { display: block; color: var(--muted); font-size: .74rem; }
+.vchain .v .mono { font-size: .72rem; color: var(--warning); }
+.vchain .v.on { border-color: var(--warning); background: rgba(243,164,59,.07); }
+
+/* ---------- 8 text ai ---------- */
+.ai-wrap { display: grid; grid-template-columns: 1fr auto 1fr auto 1.1fr; gap: 1.1rem; align-items: center; margin-top: 1.4rem; }
+.ai-wrap .arrow { font-size: 1.6rem; color: var(--dim); }
+.transcript p { font-size: .86rem; color: #d9dce2; margin: .5rem 0 0; }
+.transcript p b { font-family: var(--mono); font-size: .66rem; padding: .15em .45em; border-radius: 6px; color: #fff; margin-right: .4em; font-weight: 500; }
+.engines { display: grid; gap: .6rem; }
+.engine { padding: .65rem .8rem; border-radius: 14px; border: 1px solid var(--line2); background: var(--bg2); }
+.engine b { display: block; font-size: .92rem; }
+.engine small { color: var(--muted); font-size: .74rem; }
+.engine.dim2 { opacity: .55; border-style: dashed; }
+.out .field { margin-top: .7rem; }
+.out .field i { font-style: normal; display: block; font-family: var(--mono); font-size: .6rem; letter-spacing: .1em; color: var(--dim); text-transform: uppercase; }
+.out .field .val { font-size: .95rem; min-height: 1.3em; }
+.out .title-val { font-size: 1.25rem; font-weight: 700; }
+.out .tags { display: flex; gap: .4rem; margin-top: .25rem; }
+.out .tags .chip { opacity: 0; transition: opacity .3s; }
+.out .tags .chip.show { opacity: 1; }
+
+/* ---------- 9 ship ---------- */
+.ship-wrap { display: grid; grid-template-columns: 1.55fr 1fr; gap: 1.8rem; margin-top: 1.2rem; }
+table.models { width: 100%; border-collapse: collapse; font-size: .8rem; }
+table.models th { text-align: left; font-family: var(--mono); font-weight: 500; font-size: .62rem; letter-spacing: .1em; text-transform: uppercase; color: var(--dim); padding: 0 .6rem .45rem; border-bottom: 1px solid var(--line2); }
+table.models td { padding: .42rem .6rem; border-bottom: 1px solid var(--line); vertical-align: top; }
+table.models td:first-child { font-weight: 600; white-space: nowrap; }
+table.models td.mono { font-size: .72rem; color: #cfd4dc; white-space: nowrap; }
+table.models .grp td { padding-top: .7rem; font-family: var(--mono); font-size: .6rem; letter-spacing: .12em; color: var(--brand-soft); text-transform: uppercase; border-bottom: 0; font-weight: 500; }
+.bignum { display: grid; grid-template-columns: 1fr 1fr; gap: .8rem; }
+.bignum .card b { display: block; font-size: 2rem; font-weight: 800; letter-spacing: -.03em; }
+.bignum .card span { color: var(--muted); font-size: .78rem; }
+
+/* ---------- 10 product ---------- */
+.prod-wrap { display: grid; grid-template-columns: 2.1fr 1fr; gap: 2rem; margin-top: 1.1rem; align-items: start; }
+.phones { display: flex; gap: .9rem; }
+.phones img { width: calc((100% - 3.6rem) / 5); aspect-ratio: 480 / 1040; object-fit: cover; border-radius: 16px; border: 1px solid var(--line2); background: #fff; box-shadow: 0 18px 40px rgba(0,0,0,.45); }
+.phones img:nth-child(odd) { transform: translateY(1.2rem); }
+.feat { display: grid; grid-template-columns: 1fr; gap: .55rem; }
+.feat div { display: grid; grid-template-columns: 1.6rem 1fr; gap: .6rem; align-items: start; font-size: .9rem; }
+.feat div span:first-child { font-size: 1rem; line-height: 1.3; }
+.feat div small { display: block; color: var(--muted); font-size: .76rem; }
+
+/* ---------- 11 demo ---------- */
+.demo-wrap { flex: 1; display: grid; grid-template-columns: 1fr 1fr; gap: 3rem; align-items: center; }
+.demo-big { font-size: 7rem; font-weight: 800; letter-spacing: -.05em; line-height: .9; }
+.demo-big .dot { display: inline-block; width: .22em; height: .22em; border-radius: 50%; background: var(--brand); vertical-align: .45em; margin-left: .08em; box-shadow: 0 0 0 0 rgba(245,56,26,.6); animation: rec 1.6s infinite; }
+@keyframes rec { 0% { box-shadow: 0 0 0 0 rgba(245,56,26,.6); } 70% { box-shadow: 0 0 0 .35em rgba(245,56,26,0); } 100% { box-shadow: 0 0 0 0 rgba(245,56,26,0); } }
+ol.watch { margin: 0; padding: 0; list-style: none; counter-reset: w; display: grid; gap: .8rem; }
+ol.watch li { counter-increment: w; display: grid; grid-template-columns: 2.2rem 1fr; gap: .8rem; align-items: start; font-size: 1.02rem; }
+ol.watch li::before { content: counter(w); width: 2.2rem; height: 2.2rem; display: grid; place-items: center; border-radius: 50%; border: 1px solid var(--line2); font-family: var(--mono); font-size: .85rem; color: var(--brand-soft); }
+ol.watch li small { display: block; color: var(--muted); font-size: .8rem; }
+
+/* ---------- 12 qr ---------- */
+.end-wrap { flex: 1; display: grid; grid-template-columns: auto 1fr; gap: 3.4rem; align-items: center; }
+.qr { width: 21rem; height: 21rem; padding: 1.2rem; background: #fff; border-radius: 26px; box-shadow: 0 30px 80px rgba(245,56,26,.18); }
+.qr svg { width: 100%; height: 100%; display: block; }
+.links { display: grid; gap: .7rem; margin-top: 1.6rem; }
+.links a { display: grid; grid-template-columns: 9rem 1fr; gap: 1rem; align-items: baseline; padding: .7rem 1rem; border-radius: 14px; background: var(--panel); border: 1px solid var(--line); text-decoration: none; color: var(--text); }
+.links a span { font-family: var(--mono); font-size: .66rem; letter-spacing: .1em; text-transform: uppercase; color: var(--dim); }
+.links a b { font-weight: 600; font-size: .95rem; }
+.links a:hover { border-color: var(--line2); }
+.url { font-family: var(--mono); font-size: 1rem; color: var(--brand-soft); margin-top: .9rem; word-break: break-all; }
+
+/* ---------- chrome ---------- */
+.bar { position: fixed; left: 0; right: 0; bottom: 0; display: flex; align-items: center; gap: .6rem; padding: 10px 14px; z-index: 20; font-size: 13px; color: var(--muted); pointer-events: none; opacity: .0; transition: opacity .3s; }
+.deck .bar { opacity: .85; }
+.deck body:hover .bar, .deck .bar:focus-within { opacity: 1; }
+.bar > * { pointer-events: auto; }
+.bar .ib { width: 34px; height: 34px; display: grid; place-items: center; border-radius: 50%; border: 1px solid var(--line2); background: rgba(20,22,29,.8); cursor: pointer; font-size: 14px; }
+.bar .count { font-family: var(--mono); font-size: 12px; min-width: 4.5em; text-align: center; }
+.bar .spacer { flex: 1; }
+.bar .brandmark { font-family: var(--mono); font-size: 11px; letter-spacing: .1em; text-transform: uppercase; color: var(--dim); }
+.progress { position: fixed; left: 0; top: 0; height: 3px; background: linear-gradient(90deg, var(--brand), var(--brand-soft)); width: 0; z-index: 21; transition: width .35s ease; }
+.doc .bar, .doc .progress { display: none; }
+.notes-panel { position: fixed; left: 50%; bottom: 58px; transform: translateX(-50%); width: min(860px, calc(100% - 28px)); max-height: 34vh; overflow: auto; z-index: 22; background: rgba(15,17,23,.96); border: 1px solid var(--line2); border-radius: 16px; padding: 14px 18px; font-size: 15px; line-height: 1.5; color: #e7e9ee; display: none; box-shadow: 0 20px 60px rgba(0,0,0,.5); }
+.notes-panel.show { display: block; }
+.notes-panel h4 { margin: 0 0 6px; font-family: var(--mono); font-size: 11px; letter-spacing: .12em; text-transform: uppercase; color: var(--brand-soft); }
+.notes-panel ul { margin: 0; padding-left: 18px; }
+.doc-head { display: none; }
+.doc .doc-head { display: flex; position: sticky; top: 0; z-index: 30; align-items: center; gap: 10px; padding: 10px 16px; background: rgba(11,12,16,.86); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); border-bottom: 1px solid var(--line); font-size: 13px; }
+.doc .doc-head img { width: 26px; height: 26px; border-radius: 22%; }
+.doc .doc-head b { font-weight: 700; }
+.doc .tok { font-size: .85rem; }
+.doc .prob { grid-template-columns: 6.5rem 1fr 2.6rem; font-size: .8rem; }
+.doc .doc-head a { margin-left: auto; text-decoration: none; font-family: var(--mono); font-size: 11px; }
+
+/* ---------- doc (phone) layout ---------- */
+.doc h1 { font-size: 2.5rem; }
+.doc h2 { font-size: 1.85rem; }
+.doc .lede { font-size: 1.02rem; }
+.doc .title-wrap, .doc .spec-wrap, .doc .lat-wrap, .doc .ar-wrap, .doc .dia-wrap, .doc .ship-wrap, .doc .prod-wrap, .doc .demo-wrap, .doc .end-wrap, .doc .side-notes { grid-template-columns: 1fr; gap: 1.4rem; }
+.doc .fam { grid-template-columns: 1fr; }
+.doc .flow { grid-auto-flow: row; grid-auto-columns: auto; gap: 1.1rem; }
+.doc .flow .node:not(:last-child)::after { content: "↓"; right: auto; left: 1rem; top: auto; bottom: -1.1rem; transform: none; }
+.doc .flow .track, .doc .flow .pulse { display: none; }
+.doc .hero { height: 21rem; }
+.doc .spec-canvas { min-height: 15rem; }
+.doc .lat-canvas { min-height: 19rem; }
+.doc .ai-wrap { grid-template-columns: 1fr; }
+.doc .ai-wrap .arrow { transform: rotate(90deg); justify-self: center; }
+.doc .phones { overflow-x: auto; padding-bottom: 1.4rem; scroll-snap-type: x mandatory; }
+.doc .phones img { width: 42vw; flex: none; scroll-snap-align: start; }
+.doc .demo-big { font-size: 4.2rem; }
+.doc .qr { display: none; }
+.doc .links a { grid-template-columns: 1fr; gap: .2rem; }
+.doc table.models { font-size: .78rem; }
+.doc .table-scroll { overflow-x: auto; }
+.doc .bignum { grid-template-columns: 1fr 1fr; }
+.doc .body { margin-top: 1.2rem; }
+.doc body { overflow-x: hidden; }
+.doc .title-wrap > *, .doc .spec-wrap > *, .doc .lat-wrap > *, .doc .ar-wrap > *, .doc .dia-wrap > *, .doc .ship-wrap > *, .doc .prod-wrap > *, .doc .demo-wrap > *, .doc .end-wrap > *, .doc .fam > *, .doc .ai-wrap > *, .doc .side-notes > *, .doc .lat-card, .doc .spec-card { min-width: 0; }
+.doc .seg { flex-wrap: wrap; border-radius: 18px; }
+.doc .router-note { flex-direction: column; align-items: flex-start; gap: .5rem; }
+.doc .lane-head { flex-wrap: wrap; }
+.doc .lane-head .budget { margin-left: 0; width: 100%; }
+.doc .formula { white-space: normal; }
+.doc .enc-strip .muted { margin-left: 0 !important; }
+.doc .chain .c { min-width: 42%; }
+@media (max-width: 520px) { .doc .doc-head .dim { display: none; } }
+
+@media (prefers-reduced-motion: reduce) {
+  .hero .chip { animation: none; opacity: 1; transform: none; }
+  .flow .pulse, .demo-big .dot, .hero .caption .cursor { animation: none; }
+  .deck .slide { transition: none; }
+}
+@media print {
+  html.deck, html.deck body { height: auto; overflow: visible; }
+  .deck .stage { position: static; transform: none; width: 1600px; height: auto; }
+  .deck .slide { position: relative; opacity: 1; visibility: visible; transform: none; width: 1600px; height: 900px; page-break-after: always; }
+  .bar, .progress, .notes-panel { display: none !important; }
+  @page { size: 1600px 900px; margin: 0; }
+}
+</style>
+</head>
+<body>
+<div class="progress" id="progress"></div>
+<header class="doc-head">
+  <img src="img/icon.svg" alt="">
+  <b>How speech becomes text</b><span class="dim">· AI Tinkerers Toronto</span>
+  <a href="https://apps.apple.com/app/id6785515364">App Store ↗</a>
+</header>
+
+<main class="stage" id="stage">
+
+<!-- 1 ─────────────────────────────── TITLE -->
+<section class="slide" data-widget="hero">
+  <div class="kicker"><span>AI Tinkerers Toronto</span><span class="n">·</span><span class="n">Oct 13, 2026 · Shopify</span></div>
+  <div class="title-wrap">
+    <div>
+      <h1>How speech becomes text — <span class="grad">on an iPhone, offline.</span></h1>
+      <p class="lede">What eight on‑device speech models actually compute: from PCM samples to log‑Mel frames, tokens, timestamps and speaker labels. Shown through <b style="color:var(--text)">LiveTranscriber</b>, the app I build.</p>
+      <div class="byline">
+        <img src="img/icon.svg" alt="LiveTranscriber icon">
+        <div><b>William (Chengqi) Li</b><span>LiveTranscriber · iOS &amp; macOS</span></div>
+      </div>
+    </div>
+    <div class="hero" aria-hidden="true">
+      <canvas id="heroWave"></canvas>
+      <div class="stack">
+        <div class="row"><span class="lbl">tokens</span>
+          <span class="chip" style="animation-delay:.2s">▁Meet</span>
+          <span class="chip" style="animation-delay:.5s">ing</span>
+          <span class="chip" style="animation-delay:.8s">▁today</span>
+          <span class="chip" style="animation-delay:1.1s;color:var(--warning)">&lt;1.20&gt;</span>
+        </div>
+        <div class="row"><span class="lbl">speakers</span>
+          <span class="chip spk" style="animation-delay:1.4s;background:var(--brand)">S1 0:00–1:20</span>
+          <span class="chip spk" style="animation-delay:1.7s;background:var(--info)">S2 1:20–2:05</span>
+        </div>
+        <div class="row"><span class="lbl">text</span><span class="caption">Meeting today<span class="cursor"></span></span></div>
+      </div>
+    </div>
+  </div>
+  <aside class="notes">
+    <li>Hi, I'm William. I build LiveTranscriber, an iPhone + Mac transcriber where every model runs on the device.</li>
+    <li>Six minutes, no pitch: I'll show what speech models actually compute, and the tricks that make them fit on a phone.</li>
+    <li>The slides are a web page; QR at the end, so don't photograph anything.</li>
+  </aside>
+</section>
+
+<!-- 2 ─────────────────────────────── SYSTEM -->
+<section class="slide">
+  <div class="kicker"><span class="n">01</span><span>The system</span></div>
+  <h2>Follow live. Finish offline.</h2>
+  <p class="lede">Two latency budgets mean two different model families, and both run on the phone. Live captions must commit in about a third of a second. The final record can afford full context, timestamps and speaker labels.</p>
+  <div class="body lanes">
+    <div class="lane live">
+      <div class="lane-head"><span class="tag live">● Live</span><h3>While you record</h3><span class="budget">budget ≈ 320 ms / step · streaming state</span></div>
+      <div class="flow">
+        <div class="track"></div><div class="pulse"></div>
+        <div class="node"><div class="role">Input</div><b>Mic / system audio</b><small>AVCaptureSession stereo · 16 kHz PCM</small></div>
+        <div class="node"><div class="role">Router</div><b>“Automatic”</b><small>route(locale, device) → engine</small></div>
+        <div class="node"><div class="role">ASR</div><b>Apple SpeechAnalyzer</b><small>or Nemotron 3.5 streaming RNN‑T</small></div>
+        <div class="node alt"><div class="role">+ Speakers</div><b>Sortformer</b><small>4‑speaker streaming diarization</small></div>
+        <div class="node"><div class="role">Output</div><b>Live captions</b><small>translation · Dynamic Island</small></div>
+      </div>
+    </div>
+    <div class="lane offline">
+      <div class="lane-head"><span class="tag off">● Offline</span><h3>After you stop</h3><span class="budget">full context · seconds to minutes</span></div>
+      <div class="flow">
+        <div class="track"></div><div class="pulse"></div>
+        <div class="node"><div class="role">Input</div><b>Saved recording</b><small>WAV / M4A / imported file</small></div>
+        <div class="node"><div class="role">ASR</div><b>Parakeet V3 · Qwen3‑ASR</b><small>Whisper · MOSS</small></div>
+        <div class="node alt"><div class="role">+ Speakers</div><b>Community‑1</b><small>embeddings + clustering</small></div>
+        <div class="node"><div class="role">Final record</div><b>Timed, labeled text</b><small>word timestamps · S1 / S2</small></div>
+        <div class="node"><div class="role">Text AI</div><b>Local LLM</b><small>title · summary · tags</small></div>
+      </div>
+    </div>
+    <div class="router-note">
+      <span class="formula"><b>route</b>(locale, device) → Apple Speech <span class="dim">if supported</span> · else Nemotron</span>
+      <span class="muted small">“Automatic” is a router, not a model. It produces no tokens itself.</span>
+    </div>
+  </div>
+  <aside class="notes">
+    <li>The core design: follow live, finish offline.</li>
+    <li>Live path: ~320 ms per step, streaming state. A router picks Apple's SpeechAnalyzer when your language is supported, otherwise NVIDIA's Nemotron streaming model.</li>
+    <li>Offline path: after you stop recording, a bigger model sees the whole file and adds word timestamps and speaker labels. Then a small local LLM writes the title and summary.</li>
+  </aside>
+</section>
+
+<!-- 3 ─────────────────────────────── FRONT END -->
+<section class="slide" data-widget="spectrogram">
+  <div class="kicker"><span class="n">02</span><span>Front end</span></div>
+  <h2>Models never hear sound. They read log‑Mel frames.</h2>
+  <div class="body spec-wrap">
+    <div class="spec-card">
+      <div class="spec-canvas">
+        <canvas class="spec" width="420" height="80"></canvas>
+        <div class="axis"><span style="bottom:calc(100% - .8rem)">8 kHz</span><span style="bottom:75.6%">4 kHz</span><span style="bottom:53.6%">2 kHz</span><span style="bottom:35.2%">1 kHz</span><span style="bottom:21.4%">500 Hz</span></div>
+        <div class="shape">Mel[<b>80</b> × T]</div>
+      </div>
+      <div class="spec-controls">
+        <button class="btn rec mic" type="button">🎙 Use my mic</button>
+        <button class="btn demo on" type="button">Demo signal</button>
+        <span class="stat"><span class="frames">0</span> frames · <span class="secs">0.0</span> s · 10 ms hop</span>
+      </div>
+      <div class="pipeline-mini"><b>1 s audio</b> = 16,000 samples → <b>100</b> frames → ×8 conv subsampling → <b>12.5</b> encoder steps (80 ms each)</div>
+    </div>
+    <div class="steps">
+      <div class="step"><span class="k">1</span><div><b>16 kHz mono PCM</b><p>The mic delivers 48 kHz stereo. Every model wants 16,000 Float32 samples per second.</p></div></div>
+      <div class="step"><span class="k">2</span><div><b>Short‑time Fourier transform</b><p>25 ms windows, hopping every 10 ms, give 100 spectra per second.</p></div></div>
+      <div class="step"><span class="k">3</span><div><b>Mel filterbank + log</b><p>80 bins (Whisper) or 128 (Nemotron, Qwen3‑ASR, Whisper large‑v3). The bins are spaced like the cochlea: dense at low frequencies, sparse at high ones.</p></div></div>
+      <div class="step"><span class="k">4</span><div><b>Encoder</b><p>Conformer or Transformer blocks learn context: convolution captures local patterns, attention captures the whole utterance.</p></div></div>
+      <div class="callout">Nobody cuts speech into phonemes by hand. Short overlapping windows turn the waveform into frames. The encoder learns what the sounds mean, and the decoder chooses the next text token.</div>
+    </div>
+  </div>
+  <aside class="notes">
+    <li>Click “Use my mic” and say something. This is a real log‑Mel spectrogram computed in the browser.</li>
+    <li>That 80 × T picture is literally the input tensor. 100 columns per second; the encoder then merges every 8 into one step, so the model “thinks” at 12.5 Hz.</li>
+    <li>From here on, all the models differ only in how they decode.</li>
+  </aside>
+</section>
+
+<!-- 4 ─────────────────────────────── FAMILIES -->
+<section class="slide">
+  <div class="kicker"><span class="n">03</span><span>Model families</span></div>
+  <h2>Similar encoders, four ways to decode</h2>
+  <div class="body">
+    <div class="enc-strip">
+      <span class="chip">Mel[F × T]</span><span class="arrow">→</span>
+      <span class="chip">conv subsample ×8</span><span class="arrow">→</span>
+      <span class="chip">Conformer / Transformer × N</span><span class="arrow">→</span>
+      <span class="chip" style="color:var(--success)">h₁ … h<sub>T′</sub></span>
+      <span class="muted small" style="margin-left:auto">what happens after h<sub>t</sub> is where the families split</span>
+    </div>
+    <div class="fam">
+      <div class="card">
+        <span class="tag live">Streaming</span>
+        <h3>RNN‑T transducer</h3>
+        <span class="motto">“emit a token, or advance”</span>
+        <svg viewBox="0 0 200 80"><g fill="none" stroke-width="3" stroke-linecap="round">
+          <path d="M10 66 H50" stroke="#6e7b97"/><path d="M50 66 V46" stroke="#f5381a"/><path d="M50 46 H90 H130" stroke="#6e7b97"/><path d="M130 46 V26" stroke="#f5381a"/><path d="M130 26 H190" stroke="#6e7b97"/></g>
+          <g fill="#f4f5f7"><circle cx="10" cy="66" r="3"/><circle cx="50" cy="46" r="3"/><circle cx="130" cy="26" r="3"/><circle cx="190" cy="26" r="4"/></g></svg>
+        <div class="formula">Joint(h<sub>t</sub>, Pred(y<sub>u−1</sub>)) → <b>y</b> | ⟨blank⟩</div>
+        <p>Blank means “nothing new in this frame”. Naturally streaming.</p>
+        <div class="who"><span class="chip">Nemotron 3.5 · live</span></div>
+      </div>
+      <div class="card">
+        <span class="tag off">Offline · fast</span>
+        <h3>TDT transducer</h3>
+        <span class="motto">“emit a token and skip Δt”</span>
+        <svg viewBox="0 0 200 80"><g fill="none" stroke-width="3" stroke-linecap="round">
+          <path d="M10 66 H50" stroke="#6e7b97"/><path d="M50 66 L90 46" stroke="#f5381a"/><path d="M90 46 L150 26" stroke="#f5381a"/><path d="M150 26 H190" stroke="#6e7b97"/></g>
+          <g fill="#f4f5f7"><circle cx="10" cy="66" r="3"/><circle cx="50" cy="66" r="3"/><circle cx="90" cy="46" r="3"/><circle cx="150" cy="26" r="3"/><circle cx="190" cy="26" r="4"/></g></svg>
+        <div class="formula">→ (<b>y</b><sub>u</sub>, <b>Δt</b> ∈ {0…4})</div>
+        <p>Predicts a duration too, so it skips frames and gets word timings for free.</p>
+        <div class="who"><span class="chip">Parakeet V3 · 25 EU langs</span></div>
+      </div>
+      <div class="card">
+        <span class="tag off">Offline · 30 s windows</span>
+        <h3>Encoder–decoder</h3>
+        <span class="motto">“cross‑attend, then autoregress”</span>
+        <svg viewBox="0 0 200 80"><g font-family="JetBrains Mono" font-size="11">
+          <rect x="6" y="22" width="56" height="36" rx="8" fill="none" stroke="#22c37a" stroke-width="2"/><text x="34" y="44" fill="#22c37a" text-anchor="middle">enc</text>
+          <rect x="132" y="22" width="62" height="36" rx="8" fill="none" stroke="#9a7dff" stroke-width="2"/><text x="163" y="44" fill="#9a7dff" text-anchor="middle">dec</text>
+          <path d="M64 40 H128" stroke="#a2a9b6" stroke-width="2" stroke-dasharray="4 4"/><text x="96" y="34" fill="#a2a9b6" text-anchor="middle" font-size="9">x‑attn</text>
+          <path d="M175 60 C 175 76, 151 76, 151 60" fill="none" stroke="#f5381a" stroke-width="2"/></g></svg>
+        <div class="formula">P(<b>y</b><sub>i</sub> | Enc(X), y<sub>&lt;i</sub>)</div>
+        <p>Control tokens choose the language and task. Timestamps are tokens too.</p>
+        <div class="who"><span class="chip">Whisper tiny → large‑v3</span></div>
+      </div>
+      <div class="card">
+        <span class="tag off">Offline · LLM‑style</span>
+        <h3>Audio‑LLM</h3>
+        <span class="motto">“audio as tokens in a prompt”</span>
+        <svg viewBox="0 0 200 80"><g font-family="JetBrains Mono" font-size="10">
+          <rect x="6" y="28" width="30" height="24" rx="5" fill="none" stroke="#6c7380" stroke-dasharray="3 3"/><text x="21" y="44" fill="#a2a9b6" text-anchor="middle">sys</text>
+          <g fill="#22c37a"><rect x="42" y="28" width="16" height="24" rx="4"/><rect x="61" y="28" width="16" height="24" rx="4"/><rect x="80" y="28" width="16" height="24" rx="4"/><rect x="99" y="28" width="16" height="24" rx="4"/></g>
+          <g fill="none" stroke="#f4f5f7"><rect x="124" y="28" width="20" height="24" rx="4"/><rect x="148" y="28" width="20" height="24" rx="4"/></g>
+          <rect x="172" y="28" width="20" height="24" rx="4" fill="#f5381a"/><text x="78" y="20" fill="#22c37a" text-anchor="middle">audio embeddings</text></g></svg>
+        <div class="formula">P(<b>y</b><sub>i</sub> | [prompt; W·Enc(X)], y<sub>&lt;i</sub>)</div>
+        <p>A projector maps audio into the LLM's token space; then it's plain next‑token prediction.</p>
+        <div class="who"><span class="chip">Qwen3‑ASR</span><span class="chip">MOSS</span></div>
+      </div>
+    </div>
+    <div class="side-notes">
+      <div class="card" style="padding:.75rem 1rem"><h3 style="font-size:.95rem">Apple SpeechAnalyzer</h3><p style="margin-top:.25rem">A system black box: no app‑side tokens. You get <span class="mono">partial → revision → final</span> results with timing.</p></div>
+      <div class="card" style="padding:.75rem 1rem"><h3 style="font-size:.95rem">Sortformer · Community‑1</h3><p style="margin-top:.25rem">Diarization models output <i>no text at all</i>, only <span class="mono">who × when</span>. More on that in two slides.</p></div>
+    </div>
+  </div>
+  <aside class="notes">
+    <li>The encoders look alike. The decoder contract is what changes.</li>
+    <li>Transducers are streaming‑native; TDT is the fast offline variant. Whisper is the classic encoder‑decoder. The newest ones are audio‑LLMs: audio becomes embeddings in an LLM prompt.</li>
+    <li>The app ships all four, and picks one by language and by live vs offline.</li>
+  </aside>
+</section>
+
+<!-- 5 ─────────────────────────────── TRANSDUCERS -->
+<section class="slide" data-widget="lattice">
+  <div class="kicker"><span class="n">04</span><span>Live path · transducers</span></div>
+  <h2>At every frame: emit a token, or move on</h2>
+  <div class="body lat-wrap">
+    <div class="lat-card">
+      <div style="display:flex;gap:.6rem;align-items:center;flex-wrap:wrap">
+        <div class="seg"><button class="btn on" data-mode="rnnt" type="button">RNN‑T · Nemotron</button><button class="btn" data-mode="tdt" type="button">TDT · Parakeet</button></div>
+        <button class="btn play" type="button">⏸ Pause</button>
+        <button class="btn stepb" type="button">Step →</button>
+      </div>
+      <div class="lat-canvas"><canvas></canvas></div>
+      <div class="lat-log"><span class="cnt"></span><span class="txt"></span></div>
+    </div>
+    <div style="display:grid;gap:1rem;align-content:start">
+      <div class="card">
+        <h3>RNN‑T: blank advances time</h3>
+        <div class="formula" style="margin-top:.5rem">logits = Joint(h<sub>t</sub>, Pred(y<sub>u−1</sub>)) ∈ ℝ<sup>|V|+1</sup></div>
+        <p>⟨blank⟩ = go to the next frame, add nothing. A BPE token (<span class="mono">▁Meet</span>, <span class="mono">ing</span>) is appended and fed back, and the same frame is tried again. Calls = T + U.</p>
+      </div>
+      <div class="card">
+        <h3>TDT: predict the jump, too</h3>
+        <div class="formula" style="margin-top:.5rem">(y<sub>u</sub>, Δt) = argmax P<sub>tok</sub> · argmax P<sub>dur</sub></div>
+        <p>Each call also picks how many frames to skip: far fewer calls, and the jumps add up to word timestamps.</p>
+      </div>
+      <div class="card">
+        <h3 style="display:flex;align-items:center;gap:.6rem">Cache‑aware streaming <span class="tag live">Nemotron 3.5 · 0.6B</span></h3>
+        <p style="margin-bottom:.55rem">Only the newest 320 ms is computed. Each layer caches attention K/V and conv state, so cost per step stays flat, even 2 hours into a meeting.</p>
+        <div class="chunks"></div>
+        <div class="pipeline-mini" style="margin-top:.55rem"><b>320 ms</b> → 5,120 samples → <b>32</b> Mel frames → <b>4</b> encoder steps → <b>24</b> cached layers</div>
+      </div>
+    </div>
+  </div>
+  <aside class="notes">
+    <li>This is the decoding lattice: x is audio frames, y is tokens emitted so far.</li>
+    <li>RNN‑T: at each frame the joint network says either blank (go right) or a token (go up). 12 frames + 3 tokens = 15 decoder calls.</li>
+    <li>Toggle TDT: the model also predicts a duration and jumps. 5 calls instead of 15, and the jumps are the timestamps.</li>
+    <li>Bottom right: Nemotron only computes the new 320 ms; the rest comes from cache. That's why it runs live on a 6 GB iPhone.</li>
+  </aside>
+</section>
+
+<!-- 6 ─────────────────────────────── AUTOREGRESSIVE -->
+<section class="slide" data-widget="ar">
+  <div class="kicker"><span class="n">05</span><span>Offline path · autoregressive</span></div>
+  <h2>One token at a time, conditioned on all of the audio</h2>
+  <div class="body">
+    <div class="ar-top">
+      <div class="seg"><button class="btn on" data-m="whisper" type="button">Whisper</button><button class="btn" data-m="qwen" type="button">Qwen3‑ASR</button><button class="btn" data-m="moss" type="button">MOSS</button></div>
+      <span class="formula ar-formula"></span>
+    </div>
+    <div class="chain ar-chain" style="margin-top:1rem"></div>
+    <div class="ar-wrap">
+      <div>
+        <div class="small dim mono" style="margin-bottom:.4rem;letter-spacing:.1em">TOKEN STREAM  <span style="color:var(--dim)">(dashed = prompt)</span></div>
+        <div class="tokens ar-tokens"></div>
+        <p class="muted ar-note" style="font-size:.86rem;margin:.8rem 0 0"></p>
+      </div>
+      <div>
+        <div class="small dim mono" style="margin-bottom:.4rem;letter-spacing:.1em">NEXT‑TOKEN DISTRIBUTION <span style="color:var(--dim)">(illustrative)</span></div>
+        <div class="probs ar-probs"></div>
+        <div class="ar-runtime" style="margin-top:1rem;display:flex;gap:.4rem;flex-wrap:wrap"></div>
+      </div>
+    </div>
+  </div>
+  <aside class="notes">
+    <li>Whisper: control tokens say language and task; timestamps are just tokens in the vocabulary.</li>
+    <li>Qwen3‑ASR: audio embeddings literally replace placeholder tokens in an LLM prompt. Look at the Chinese probabilities: 今 vs 金 vs 近 sound alike; the language model resolves them from context. That's why it handles dialects well.</li>
+    <li>MOSS goes further: one token stream carries text, time markers and speaker tags at once.</li>
+  </aside>
+</section>
+
+<!-- 7 ─────────────────────────────── DIARIZATION -->
+<section class="slide" data-widget="diar">
+  <div class="kicker"><span class="n">06</span><span>Who spoke when</span></div>
+  <h2>Speaker models output who and when, never words</h2>
+  <div class="dia-wrap">
+    <div class="card">
+      <div style="display:flex;align-items:center;gap:.6rem"><h3>Sortformer · live</h3><span class="tag live">streaming · 4 speakers</span></div>
+      <p>Per‑frame sigmoid <span class="mono">P(S<sub>k</sub> | t)</span> for four speaker slots. The slots are ordered by <b style="color:var(--text)">arrival time</b>, which removes the permutation ambiguity. An arrival‑order speaker cache keeps S1 as S1 across chunks.</p>
+      <div class="heat" style="margin-top:.9rem">
+        <div class="labels"><span style="--c:var(--brand)">S1</span><span style="--c:var(--info)">S2</span><span style="--c:var(--success)">S3</span><span style="--c:var(--purple)">S4</span></div>
+        <canvas width="200" height="40"></canvas>
+      </div>
+      <div class="turns"></div>
+      <p class="small">Labels attach to whichever live ASR is running; it never decides any words.</p>
+    </div>
+    <div class="card">
+      <div style="display:flex;align-items:center;gap:.6rem"><h3>Pyannote Community‑1 · offline</h3><span class="tag off">Core ML</span></div>
+      <div class="vchain" style="margin-top:.8rem">
+        <div class="v"><div><b>10 s windows, 1 s hop</b><small>overlapping, 16 kHz</small></div><span class="mono">PCM[160,000]</span></div>
+        <div class="v"><div><b>Segmentation</b><small>local speakers, overlap‑aware</small></div><span class="mono">P[T × K]</span></div>
+        <div class="v"><div><b>Masked WeSpeaker</b><small>one voiceprint per local speaker</small></div><span class="mono">e ∈ ℝ²⁵⁶</span></div>
+        <div class="v"><div><b>PLDA + AHC + VBx</b><small>local voices → global speakers, count estimated</small></div><span class="mono">C<sub>k</sub></span></div>
+        <div class="v"><div><b>Join on time</b><small>each Parakeet word → speaker active at its timestamp</small></div><span class="mono">word → S<sub>k</sub></span></div>
+      </div>
+    </div>
+  </div>
+  <aside class="notes">
+    <li>Diarization is a separate model family. It never transcribes.</li>
+    <li>Sortformer, live: four sigmoid outputs per frame. The trick is that speakers are sorted by who spoke first, so the training labels are unambiguous.</li>
+    <li>Community‑1, offline: windows → voiceprints → clustering, and then a join on time with Parakeet's word timestamps. That join is why TDT timing mattered.</li>
+  </aside>
+</section>
+
+<!-- 8 ─────────────────────────────── TEXT AI -->
+<section class="slide" data-widget="textai">
+  <div class="kicker"><span class="n">07</span><span>After ASR</span></div>
+  <h2>The LLM reads the transcript, never the audio</h2>
+  <p class="lede">Once the text is final, a small local model writes the title, summary and tags. Apple Intelligence is used when the device has it. Everyone else (including China‑region iPhones) gets a GGUF model running through embedded llama.cpp.</p>
+  <div class="ai-wrap">
+    <div class="card transcript">
+      <span class="tag">Final transcript</span>
+      <p><b style="background:var(--brand)">S1</b>We'll launch the beta next Friday,</p>
+      <p><b style="background:var(--info)">S2</b>then review early feedback after the first week.</p>
+      <p><b style="background:var(--brand)">S1</b>Can you own the TestFlight notes?</p>
+    </div>
+    <div class="arrow">→</div>
+    <div class="engines">
+      <div class="engine"><b>Apple Foundation Models</b><small>system on‑device LLM · when available</small></div>
+      <div class="engine"><b>Qwen3.5 2B · Q3_K_M</b><small>llama.cpp · 201 languages &amp; dialects</small></div>
+      <div class="engine"><b>LFM2.5 1.2B · Q4_K_M</b><small>llama.cpp · smallest, fastest</small></div>
+      <div class="engine dim2"><b>Gemini (opt‑in)</b><small>your own key, explicit confirm only; Automatic never picks it</small></div>
+    </div>
+    <div class="arrow">→</div>
+    <div class="card out">
+      <span class="tag brand">Generated on device</span>
+      <div class="field"><i>Title</i><div class="val title-val" data-type="Beta Launch Plan"></div></div>
+      <div class="field"><i>Summary</i><div class="val" data-type="The beta launches next Friday; early feedback is reviewed after one week. S2 owns the TestFlight notes."></div></div>
+      <div class="field"><i>Tags</i><div class="tags"><span class="chip">#launch</span><span class="chip">#follow‑up</span><span class="chip">#testflight</span></div></div>
+    </div>
+  </div>
+  <aside class="notes">
+    <li>Separation of concerns: speech models make text, a text model makes meaning.</li>
+    <li>Apple Intelligence when available; otherwise a 2B Qwen at 3‑bit through llama.cpp, so summaries also work where Apple Intelligence doesn't ship.</li>
+  </aside>
+</section>
+
+<!-- 9 ─────────────────────────────── SHIPPING -->
+<section class="slide">
+  <div class="kicker"><span class="n">08</span><span>Engineering</span></div>
+  <h2>Making it fit on a 6 GB iPhone</h2>
+  <div class="ship-wrap">
+    <div class="table-scroll">
+      <table class="models">
+        <thead><tr><th>Model</th><th>Job</th><th>Weights</th><th>Runtime</th></tr></thead>
+        <tbody>
+          <tr class="grp"><td colspan="4">Live</td></tr>
+          <tr><td>Apple SpeechAnalyzer</td><td>streaming ASR</td><td class="mono">system</td><td class="mono">Speech.framework</td></tr>
+          <tr><td>Nemotron 3.5 Streaming</td><td>cache‑aware RNN‑T</td><td class="mono">0.6B · INT8</td><td class="mono">Core ML</td></tr>
+          <tr><td>NVIDIA Sortformer</td><td>4‑speaker diarization</td><td class="mono">streaming</td><td class="mono">Core ML</td></tr>
+          <tr class="grp"><td colspan="4">Offline</td></tr>
+          <tr><td>Parakeet TDT V3</td><td>ASR + word timing</td><td class="mono">0.6B · INT8</td><td class="mono">Core ML</td></tr>
+          <tr><td>Pyannote Community‑1</td><td>offline diarization</td><td class="mono">pipeline</td><td class="mono">Core ML</td></tr>
+          <tr><td>Qwen3‑ASR + Silero VAD</td><td>audio‑LLM ASR</td><td class="mono">0.6B · 4‑bit</td><td class="mono">MLX</td></tr>
+          <tr><td>MOSS Transcribe‑Diarize</td><td>ASR + speakers</td><td class="mono">4‑bit · ~1 GB</td><td class="mono">MLX</td></tr>
+          <tr><td>Whisper tiny → large‑v3</td><td>encoder–decoder ASR</td><td class="mono">39M–1.55B · Q5_0</td><td class="mono">whisper.cpp</td></tr>
+          <tr class="grp"><td colspan="4">Text</td></tr>
+          <tr><td>Qwen3.5 2B / LFM2.5 1.2B</td><td>title · summary · tags</td><td class="mono">GGUF Q3_K_M / Q4_K_M</td><td class="mono">llama.cpp</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div style="display:grid;gap:1rem;align-content:start">
+      <div class="bignum">
+        <div class="card"><b>4</b><span>ML runtimes in one app: Core ML, MLX, ggml, llama.cpp</span></div>
+        <div class="card"><b>0</b><span>developer servers. Audio stays on the device by default.</span></div>
+      </div>
+      <ul class="ticks">
+        <li><b>Quantize everything:</b> INT8 Core ML, 4‑bit MLX, Q5_0 and K‑quants. Memory, not FLOPs, is the real budget.</li>
+        <li><b>Models ship as Apple‑hosted on‑demand asset packs</b> (Background Assets): pinned upstream revisions, SHA‑256 verified, downloaded only when you choose a model.</li>
+        <li><b>One shared domain layer</b> for iPhone, Watch and a native Mac app that captures any meeting window via ScreenCaptureKit.</li>
+      </ul>
+    </div>
+  </div>
+  <aside class="notes">
+    <li>The hard part isn't the models; it's memory. Everything is quantized, and only one big model is resident at a time.</li>
+    <li>Four runtimes, because the best port of each model lives in a different one.</li>
+    <li>Models are distributed through Apple's own asset‑pack CDN, verified by checksum. No server of mine ever sees audio.</li>
+  </aside>
+</section>
+
+<!-- 10 ─────────────────────────────── PRODUCT -->
+<section class="slide">
+  <div class="kicker"><span class="n">09</span><span>What it adds up to</span></div>
+  <h2>LiveTranscriber</h2>
+  <p class="lede">A local‑first recorder for iPhone, with a native Mac companion. Every model on the previous slides is one tap away inside the app.</p>
+  <div class="prod-wrap">
+    <div class="phones">
+      <img src="img/app-01.jpg" alt="Live transcription while recording" loading="lazy">
+      <img src="img/app-05.jpg" alt="Live Activity on the Lock Screen" loading="lazy">
+      <img src="img/app-04.jpg" alt="Choosing the right model for every language" loading="lazy">
+      <img src="img/app-08.jpg" alt="Translate audio from other apps" loading="lazy">
+      <img src="img/app-09.jpg" alt="Offline summaries and highlights" loading="lazy">
+    </div>
+    <div class="feat">
+      <div><span>💬</span><span><b>Live captions + live translation</b><small>Apple Translation on confirmed lines, while recording</small></span></div>
+      <div><span>👥</span><span><b>Speaker labels, live and offline</b><small>Sortformer while recording; Community‑1 or MOSS afterwards</small></span></div>
+      <div><span>🏝️</span><span><b>Dynamic Island &amp; Live Activity</b><small>follow the transcript without opening the app</small></span></div>
+      <div><span>🎯</span><span><b>Right model per language</b><small>Parakeet for Europe, Qwen3‑ASR for Chinese dialects, Whisper for the long tail</small></span></div>
+      <div><span>✨</span><span><b>Local summaries, titles, tags, search</b><small>works without Apple Intelligence</small></span></div>
+      <div><span>💻</span><span><b>Mac companion</b><small>capture Zoom / Teams / Meet windows + mic, synced via private iCloud</small></span></div>
+    </div>
+  </div>
+  <aside class="notes">
+    <li>Here's what all of that becomes in the app. Quickly, then the live demo.</li>
+  </aside>
+</section>
+
+<!-- 11 ─────────────────────────────── DEMO -->
+<section class="slide">
+  <div class="kicker"><span class="n">10</span><span>Running code</span></div>
+  <div class="demo-wrap">
+    <div>
+      <div class="demo-big">Live<br>demo<span class="dot"></span></div>
+      <p class="lede" style="margin-top:1.2rem">Works in airplane mode: everything you'll see runs on the phone.</p>
+    </div>
+    <ol class="watch">
+      <li><span>Partial → final<small>live text rewrites itself as context arrives</small></span></li>
+      <li><span>Speaker chips appear<small>Sortformer tags turns while I talk</small></span></li>
+      <li><span>Dynamic Island<small>transcript follows me to the Lock Screen</small></span></li>
+      <li><span>Re‑transcribe offline<small>Parakeet V3 + Community‑1: word timestamps and speakers</small></span></li>
+      <li><span>One‑tap local summary<small>a 2B LLM, on device</small></span></li>
+    </ol>
+  </div>
+  <aside class="notes">
+    <li>Switch to the phone mirror. Turn on airplane mode first to make the point.</li>
+    <li>Record ~20 s with a second voice, show speaker chips, stop, re‑transcribe with Parakeet + speakers, tap Analyze.</li>
+  </aside>
+</section>
+
+<!-- 12 ─────────────────────────────── END -->
+<section class="slide">
+  <div class="kicker"><span class="n">11</span><span>Thanks</span></div>
+  <div class="end-wrap">
+    <div class="qr" role="img" aria-label="QR code linking to these slides"><svg xmlns="http://www.w3.org/2000/svg" viewBox="-1 -1 35 35" shape-rendering="crispEdges"><path fill="#0b0c10" d="M0 0h7v1h-7zM9 0h3v1h-3zM14 0h2v1h-2zM18 0h2v1h-2zM22 0h2v1h-2zM26 0h7v1h-7zM0 1h1v1h-1zM6 1h1v1h-1zM15 1h1v1h-1zM21 1h1v1h-1zM23 1h2v1h-2zM26 1h1v1h-1zM32 1h1v1h-1zM0 2h1v1h-1zM2 2h3v1h-3zM6 2h1v1h-1zM12 2h1v1h-1zM14 2h1v1h-1zM16 2h5v1h-5zM23 2h2v1h-2zM26 2h1v1h-1zM28 2h3v1h-3zM32 2h1v1h-1zM0 3h1v1h-1zM2 3h3v1h-3zM6 3h1v1h-1zM9 3h1v1h-1zM12 3h2v1h-2zM18 3h1v1h-1zM20 3h1v1h-1zM22 3h1v1h-1zM26 3h1v1h-1zM28 3h3v1h-3zM32 3h1v1h-1zM0 4h1v1h-1zM2 4h3v1h-3zM6 4h1v1h-1zM10 4h3v1h-3zM16 4h1v1h-1zM18 4h1v1h-1zM21 4h3v1h-3zM26 4h1v1h-1zM28 4h3v1h-3zM32 4h1v1h-1zM0 5h1v1h-1zM6 5h1v1h-1zM8 5h1v1h-1zM12 5h1v1h-1zM17 5h3v1h-3zM21 5h2v1h-2zM26 5h1v1h-1zM32 5h1v1h-1zM0 6h7v1h-7zM8 6h1v1h-1zM10 6h1v1h-1zM12 6h1v1h-1zM14 6h1v1h-1zM16 6h1v1h-1zM18 6h1v1h-1zM20 6h1v1h-1zM22 6h1v1h-1zM24 6h1v1h-1zM26 6h7v1h-7zM11 7h2v1h-2zM14 7h1v1h-1zM17 7h2v1h-2zM20 7h3v1h-3zM0 8h1v1h-1zM3 8h1v1h-1zM5 8h2v1h-2zM8 8h2v1h-2zM11 8h1v1h-1zM13 8h1v1h-1zM15 8h2v1h-2zM21 8h1v1h-1zM23 8h3v1h-3zM27 8h1v1h-1zM0 9h1v1h-1zM4 9h2v1h-2zM7 9h4v1h-4zM12 9h1v1h-1zM16 9h2v1h-2zM21 9h1v1h-1zM24 9h4v1h-4zM32 9h1v1h-1zM1 10h2v1h-2zM6 10h2v1h-2zM11 10h2v1h-2zM19 10h1v1h-1zM21 10h1v1h-1zM27 10h2v1h-2zM30 10h1v1h-1zM32 10h1v1h-1zM2 11h4v1h-4zM7 11h2v1h-2zM14 11h1v1h-1zM16 11h1v1h-1zM18 11h4v1h-4zM23 11h3v1h-3zM28 11h2v1h-2zM32 11h1v1h-1zM1 12h1v1h-1zM3 12h2v1h-2zM6 12h1v1h-1zM8 12h5v1h-5zM15 12h1v1h-1zM17 12h1v1h-1zM19 12h4v1h-4zM24 12h3v1h-3zM29 12h1v1h-1zM0 13h2v1h-2zM4 13h1v1h-1zM9 13h5v1h-5zM15 13h2v1h-2zM18 13h3v1h-3zM22 13h1v1h-1zM24 13h3v1h-3zM28 13h1v1h-1zM31 13h2v1h-2zM3 14h1v1h-1zM5 14h3v1h-3zM9 14h2v1h-2zM12 14h2v1h-2zM17 14h2v1h-2zM20 14h1v1h-1zM23 14h1v1h-1zM25 14h5v1h-5zM31 14h1v1h-1zM1 15h1v1h-1zM4 15h1v1h-1zM8 15h1v1h-1zM14 15h2v1h-2zM17 15h2v1h-2zM21 15h1v1h-1zM23 15h1v1h-1zM26 15h2v1h-2zM31 15h1v1h-1zM0 16h3v1h-3zM5 16h2v1h-2zM8 16h1v1h-1zM11 16h1v1h-1zM13 16h1v1h-1zM17 16h1v1h-1zM20 16h4v1h-4zM26 16h1v1h-1zM28 16h1v1h-1zM31 16h1v1h-1zM1 17h1v1h-1zM9 17h3v1h-3zM14 17h1v1h-1zM18 17h1v1h-1zM23 17h3v1h-3zM27 17h1v1h-1zM29 17h1v1h-1zM31 17h1v1h-1zM0 18h3v1h-3zM4 18h4v1h-4zM12 18h1v1h-1zM14 18h1v1h-1zM16 18h3v1h-3zM20 18h2v1h-2zM26 18h1v1h-1zM30 18h3v1h-3zM1 19h1v1h-1zM4 19h1v1h-1zM8 19h1v1h-1zM12 19h1v1h-1zM16 19h2v1h-2zM20 19h2v1h-2zM23 19h5v1h-5zM0 20h1v1h-1zM5 20h2v1h-2zM8 20h5v1h-5zM14 20h1v1h-1zM16 20h1v1h-1zM19 20h1v1h-1zM21 20h1v1h-1zM24 20h2v1h-2zM31 20h2v1h-2zM3 21h1v1h-1zM5 21h1v1h-1zM9 21h1v1h-1zM15 21h4v1h-4zM20 21h1v1h-1zM22 21h1v1h-1zM24 21h3v1h-3zM31 21h2v1h-2zM0 22h2v1h-2zM6 22h3v1h-3zM10 22h3v1h-3zM15 22h1v1h-1zM19 22h2v1h-2zM24 22h2v1h-2zM28 22h3v1h-3zM32 22h1v1h-1zM1 23h2v1h-2zM4 23h1v1h-1zM9 23h1v1h-1zM11 23h2v1h-2zM16 23h1v1h-1zM21 23h3v1h-3zM26 23h2v1h-2zM29 23h1v1h-1zM32 23h1v1h-1zM0 24h1v1h-1zM3 24h1v1h-1zM6 24h1v1h-1zM9 24h9v1h-9zM19 24h3v1h-3zM24 24h7v1h-7zM8 25h1v1h-1zM10 25h1v1h-1zM14 25h1v1h-1zM17 25h1v1h-1zM19 25h6v1h-6zM28 25h2v1h-2zM0 26h7v1h-7zM9 26h1v1h-1zM12 26h1v1h-1zM14 26h1v1h-1zM18 26h1v1h-1zM20 26h1v1h-1zM24 26h1v1h-1zM26 26h1v1h-1zM28 26h4v1h-4zM0 27h1v1h-1zM6 27h1v1h-1zM8 27h1v1h-1zM11 27h1v1h-1zM15 27h7v1h-7zM24 27h1v1h-1zM28 27h1v1h-1zM32 27h1v1h-1zM0 28h1v1h-1zM2 28h3v1h-3zM6 28h1v1h-1zM10 28h2v1h-2zM13 28h2v1h-2zM17 28h2v1h-2zM20 28h3v1h-3zM24 28h6v1h-6zM0 29h1v1h-1zM2 29h3v1h-3zM6 29h1v1h-1zM8 29h1v1h-1zM11 29h1v1h-1zM13 29h3v1h-3zM17 29h1v1h-1zM21 29h1v1h-1zM23 29h1v1h-1zM26 29h1v1h-1zM28 29h2v1h-2zM0 30h1v1h-1zM2 30h3v1h-3zM6 30h1v1h-1zM9 30h2v1h-2zM13 30h2v1h-2zM18 30h1v1h-1zM22 30h1v1h-1zM24 30h1v1h-1zM28 30h1v1h-1zM30 30h1v1h-1zM32 30h1v1h-1zM0 31h1v1h-1zM6 31h1v1h-1zM10 31h2v1h-2zM13 31h1v1h-1zM17 31h1v1h-1zM21 31h1v1h-1zM24 31h1v1h-1zM0 32h7v1h-7zM8 32h1v1h-1zM10 32h2v1h-2zM15 32h1v1h-1zM19 32h1v1h-1zM21 32h1v1h-1zM24 32h3v1h-3zM28 32h1v1h-1zM31 32h1v1h-1z"/></svg></div>
+    <div>
+      <h2 style="font-size:3rem">Take the slides with you</h2>
+      <p class="lede">Every widget here is live: try the mic spectrogram and the lattice on your phone.</p>
+      <div class="url">iamwilliamli.github.io/LiveTranscriber/tinkerers</div>
+      <div class="links">
+        <a href="https://apps.apple.com/app/id6785515364"><span>App Store</span><b>LiveTranscriber for iPhone ↗</b></a>
+        <a href="https://testflight.apple.com/join/gsu9xa9k"><span>TestFlight</span><b>Join the beta ↗</b></a>
+        <a href="https://github.com/iamwilliamli/LiveTranscriber"><span>Source</span><b>github.com/iamwilliamli/LiveTranscriber ↗</b></a>
+        <a href="https://chengqili.com/"><span>Me</span><b>William (Chengqi) Li · chengqili.com ↗</b></a>
+      </div>
+    </div>
+  </div>
+  <aside class="notes">
+    <li>Thanks! Scan for the slides. Happy to talk transducers at the science fair.</li>
+  </aside>
+</section>
+
+</main>
+
+<div class="notes-panel" id="notesPanel"><h4>Speaker notes · <span id="notesNum"></span></h4><ul id="notesBody"></ul></div>
+<nav class="bar" aria-label="Slide navigation">
+  <button class="ib" id="prevBtn" type="button" aria-label="Previous slide">‹</button>
+  <span class="count" id="count">1 / 12</span>
+  <button class="ib" id="nextBtn" type="button" aria-label="Next slide">›</button>
+  <span class="spacer"></span>
+  <span class="brandmark">LiveTranscriber · AI Tinkerers</span>
+  <button class="ib" id="notesBtn" type="button" aria-label="Toggle speaker notes" title="Speaker notes (N)">✎</button>
+  <button class="ib" id="fsBtn" type="button" aria-label="Toggle fullscreen" title="Fullscreen (F)">⤢</button>
+</nav>
+
+<script>
+(() => {
+'use strict';
+const root = document.documentElement;
+const stage = document.getElementById('stage');
+const slides = [...document.querySelectorAll('.slide')];
+const css = getComputedStyle(root);
+const C = name => css.getPropertyValue(name).trim();
+let SCALE = 1;
+let index = 0;
+let mode = null;
+
+/* ------------------------------------------------ layout mode */
+function wantDoc() {
+  const w = innerWidth, h = innerHeight;
+  if (new URLSearchParams(location.search).get('view') === 'slides') return false;
+  if (new URLSearchParams(location.search).get('view') === 'page') return true;
+  return w < 900 || h < 520 || w / h < 1.05;
+}
+function applyMode() {
+  const next = wantDoc() ? 'doc' : 'deck';
+  if (next !== mode) {
+    mode = next;
+    root.classList.toggle('doc', mode === 'doc');
+    root.classList.toggle('deck', mode === 'deck');
+    if (mode === 'doc') { slides.forEach(s => s.classList.remove('active', 'prev')); startObserver(); }
+    else { stopObserver(); go(index, true); }
+  }
+  if (mode === 'deck') {
+    SCALE = Math.min(innerWidth / 1600, innerHeight / 900);
+    stage.style.setProperty('--s', SCALE);
+  } else {
+    SCALE = 1;
+  }
+  widgets.forEach(w => w.resize && w.resize());
+}
+
+/* ------------------------------------------------ navigation */
+const countEl = document.getElementById('count');
+const progress = document.getElementById('progress');
+function go(i, force) {
+  i = Math.max(0, Math.min(slides.length - 1, i));
+  if (i === index && !force) return;
+  const prevIdx = index;
+  index = i;
+  slides.forEach((s, k) => {
+    s.classList.toggle('active', k === i);
+    s.classList.toggle('prev', k < i);
+  });
+  countEl.textContent = `${i + 1} / ${slides.length}`;
+  progress.style.width = `${(i + 1) / slides.length * 100}%`;
+  history.replaceState(null, '', `#${i + 1}`);
+  if (mode === 'deck') {
+    if (prevIdx !== i) hideSlide(slides[prevIdx]);
+    showSlide(slides[i]);
+  }
+  renderNotes();
+}
+document.getElementById('prevBtn').onclick = () => go(index - 1);
+document.getElementById('nextBtn').onclick = () => go(index + 1);
+document.getElementById('fsBtn').onclick = toggleFs;
+document.getElementById('notesBtn').onclick = toggleNotes;
+function toggleFs() {
+  if (!document.fullscreenElement) document.documentElement.requestFullscreen?.().catch(() => {});
+  else document.exitFullscreen?.();
+}
+addEventListener('keydown', e => {
+  if (mode !== 'deck' || e.metaKey || e.ctrlKey || e.altKey) return;
+  const k = e.key;
+  if (k === 'ArrowRight' || k === 'PageDown' || (k === ' ' && !(e.target instanceof HTMLButtonElement))) { e.preventDefault(); go(index + 1); }
+  else if (k === 'ArrowLeft' || k === 'PageUp') { e.preventDefault(); go(index - 1); }
+  else if (k === 'Home') go(0);
+  else if (k === 'End') go(slides.length - 1);
+  else if (k === 'f' || k === 'F') toggleFs();
+  else if (k === 'n' || k === 'N') toggleNotes();
+});
+let tx = null, ty = null;
+addEventListener('touchstart', e => { if (mode === 'deck') { tx = e.touches[0].clientX; ty = e.touches[0].clientY; } }, { passive: true });
+addEventListener('touchend', e => {
+  if (mode !== 'deck' || tx === null) return;
+  const dx = e.changedTouches[0].clientX - tx, dy = e.changedTouches[0].clientY - ty;
+  if (Math.abs(dx) > 50 && Math.abs(dx) > Math.abs(dy) * 1.5) go(index + (dx < 0 ? 1 : -1));
+  tx = null;
+}, { passive: true });
+
+/* ------------------------------------------------ notes */
+const notesPanel = document.getElementById('notesPanel');
+function toggleNotes() { notesPanel.classList.toggle('show'); renderNotes(); }
+function renderNotes() {
+  if (!notesPanel.classList.contains('show')) return;
+  const aside = slides[index].querySelector('.notes');
+  document.getElementById('notesNum').textContent = `slide ${index + 1}`;
+  document.getElementById('notesBody').innerHTML = aside ? aside.innerHTML : '';
+}
+
+/* ------------------------------------------------ widget lifecycle */
+const widgets = [];
+const widgetBySlide = new Map();
+function showSlide(s) { const w = widgetBySlide.get(s); if (w && !w.on) { w.on = true; w.start(); } }
+function hideSlide(s) { const w = widgetBySlide.get(s); if (w && w.on) { w.on = false; w.stop(); } }
+let observer = null;
+function startObserver() {
+  observer = new IntersectionObserver(entries => {
+    entries.forEach(en => (en.isIntersecting ? showSlide : hideSlide)(en.target));
+  }, { threshold: 0.25 });
+  slides.forEach(s => widgetBySlide.has(s) && observer.observe(s));
+}
+function stopObserver() { if (observer) { observer.disconnect(); observer = null; } slides.forEach(hideSlide); }
+function fitCanvas(cv) {
+  const dpr = Math.min(2.5, (devicePixelRatio || 1) * SCALE);
+  const w = cv.offsetWidth, h = cv.offsetHeight;
+  if (!w || !h) return null;
+  const W = Math.round(w * dpr), H = Math.round(h * dpr);
+  if (cv.width !== W || cv.height !== H) { cv.width = W; cv.height = H; }
+  const ctx = cv.getContext('2d');
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  return { ctx, w, h };
+}
+function loop(fn) {
+  let raf = 0, last = 0;
+  const tick = t => { raf = requestAnimationFrame(tick); fn(t, last ? Math.min(64, t - last) : 16); last = t; };
+  return { start() { if (!raf) { last = 0; raf = requestAnimationFrame(tick); } }, stop() { cancelAnimationFrame(raf); raf = 0; } };
+}
+function register(name, factory) {
+  document.querySelectorAll(`.slide[data-widget="${name}"]`).forEach(s => {
+    const w = factory(s);
+    w.on = false;
+    widgets.push(w);
+    widgetBySlide.set(s, w);
+  });
+}
+
+/* ================================================ hero waveform */
+register('hero', s => {
+  const cv = s.querySelector('#heroWave');
+  let t = 0;
+  const l = loop((now, dt) => {
+    t += dt / 1000;
+    const f = fitCanvas(cv); if (!f) return;
+    const { ctx, w, h } = f;
+    ctx.clearRect(0, 0, w, h);
+    const mid = h / 2;
+    const g = ctx.createLinearGradient(0, 0, w, 0);
+    g.addColorStop(0, C('--brand')); g.addColorStop(.6, C('--brand-soft')); g.addColorStop(1, C('--purple'));
+    ctx.strokeStyle = g; ctx.lineWidth = 2;
+    ctx.beginPath();
+    for (let x = 0; x <= w; x += 2) {
+      const u = x / w;
+      const env = Math.pow(Math.sin(Math.PI * ((u * 3 + t * .35) % 1)), 2) * (0.35 + 0.65 * Math.abs(Math.sin(u * 7 + t)));
+      const y = Math.sin(x * .09 + t * 9) * .55 + Math.sin(x * .23 + t * 5) * .3 + Math.sin(x * .41 - t * 3) * .15;
+      ctx.lineTo(x, mid + y * env * h * .42);
+    }
+    ctx.stroke();
+    // frame grid hint
+    ctx.fillStyle = 'rgba(255,255,255,.06)';
+    for (let x = (t * 60) % 24; x < w; x += 24) ctx.fillRect(x, h - 6, 12, 3);
+  });
+  return { start: l.start, stop: l.stop };
+});
+
+/* ================================================ spectrogram */
+register('spectrogram', s => {
+  const cv = s.querySelector('canvas.spec');
+  const ctx = cv.getContext('2d');
+  const W = cv.width, MEL = 80, H = cv.height;
+  const micBtn = s.querySelector('.mic'), demoBtn = s.querySelector('.demo');
+  const framesEl = s.querySelector('.frames'), secsEl = s.querySelector('.secs');
+  let source = 'demo', frames = 0, t = 0, acc = 0;
+  let audio = null; // {ctx, stream, analyser, buf, filters}
+  const melOf = f => 2595 * Math.log10(1 + f / 700);
+  const hzOf = m => 700 * (Math.pow(10, m / 2595) - 1);
+  const melCenters = []; { const lo = melOf(0), hi = melOf(8000); for (let i = 0; i < MEL + 2; i++) melCenters.push(hzOf(lo + (hi - lo) * i / (MEL + 1))); }
+  // magma-ish colormap
+  const stops = [[0, [4, 4, 12]], [.25, [70, 16, 110]], [.5, [182, 54, 95]], [.72, [245, 105, 50]], [.9, [252, 190, 80]], [1, [252, 253, 191]]];
+  const cmap = new Uint8ClampedArray(256 * 3);
+  for (let i = 0; i < 256; i++) {
+    const v = i / 255; let k = 0; while (k < stops.length - 2 && v > stops[k + 1][0]) k++;
+    const [a, ca] = stops[k], [b, cb] = stops[k + 1]; const u = (v - a) / (b - a);
+    for (let j = 0; j < 3; j++) cmap[i * 3 + j] = ca[j] + (cb[j] - ca[j]) * u;
+  }
+  ctx.fillStyle = '#04040c'; ctx.fillRect(0, 0, W, H);
+  const col = ctx.createImageData(1, H);
+  function drawColumn(vals) {
+    ctx.drawImage(cv, -1, 0);
+    for (let m = 0; m < MEL; m++) {
+      const v = Math.max(0, Math.min(1, vals[m]));
+      const y = MEL - 1 - m; const c = Math.round(v * 255) * 3; const o = y * 4;
+      col.data[o] = cmap[c]; col.data[o + 1] = cmap[c + 1]; col.data[o + 2] = cmap[c + 2]; col.data[o + 3] = 255;
+    }
+    ctx.putImageData(col, W - 1, 0);
+    frames++;
+    if (frames % 8 === 0) { ctx.fillStyle = 'rgba(34,195,122,.9)'; ctx.fillRect(W - 1, H - 2, 1, 2); }
+  }
+  // synthetic speech-like frame in the mel domain
+  const syll = [];
+  function demoColumn(time) {
+    const cycle = time % 6.4;
+    const sy = Math.floor(cycle / .26);
+    if (!syll[sy]) syll[sy] = { on: Math.random() > .22, f0: 110 + Math.random() * 90, f1: 300 + Math.random() * 500, f2: 900 + Math.random() * 1500, fric: Math.random() > .75 };
+    const S = syll[sy]; const ph = (cycle % .26) / .26;
+    const env = S.on && cycle < 5.6 ? Math.sin(Math.PI * ph) ** .6 : 0;
+    const f0 = S.f0 * (1 + .12 * Math.sin(time * 3));
+    const vals = new Array(MEL);
+    for (let m = 0; m < MEL; m++) {
+      const f = melCenters[m + 1], bw = (melCenters[m + 2] - melCenters[m]) * .5;
+      const k = Math.round(f / f0); const d = Math.abs(f - k * f0);
+      const harm = Math.exp(-(d * d) / (2 * Math.max(18, bw * .5) ** 2));
+      const formant = Math.exp(-((f - S.f1) ** 2) / (2 * 160 ** 2)) + .8 * Math.exp(-((f - S.f2) ** 2) / (2 * 280 ** 2)) + .35 * Math.exp(-((f - 2800) ** 2) / (2 * 500 ** 2));
+      const tilt = Math.exp(-f / 2400);
+      let v = env * harm * (0.25 + formant) * (0.4 + tilt) * 1.25;
+      if (S.fric && ph > .5) v += env * (f > 3500 ? .55 : .05) * Math.random();
+      v += .05 * Math.random();
+      vals[m] = Math.pow(Math.min(1, v), .55);
+    }
+    return vals;
+  }
+  function micColumn() {
+    const { analyser, buf, filters } = audio;
+    analyser.getFloatFrequencyData(buf);
+    const vals = new Array(MEL);
+    for (let m = 0; m < MEL; m++) {
+      let e = 0; const F = filters[m];
+      for (let j = 0; j < F.idx.length; j++) e += Math.pow(10, buf[F.idx[j]] / 10) * F.w[j];
+      const db = 10 * Math.log10(e + 1e-12);
+      vals[m] = (db + 95) / 70;
+    }
+    return vals;
+  }
+  async function startMic() {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: true } });
+      const actx = new (window.AudioContext || window.webkitAudioContext)();
+      const src = actx.createMediaStreamSource(stream);
+      const analyser = actx.createAnalyser(); analyser.fftSize = 2048; analyser.smoothingTimeConstant = 0;
+      src.connect(analyser);
+      const buf = new Float32Array(analyser.frequencyBinCount);
+      const binHz = actx.sampleRate / analyser.fftSize;
+      const filters = [];
+      for (let m = 0; m < MEL; m++) {
+        const lo = melCenters[m], c = melCenters[m + 1], hi = melCenters[m + 2];
+        const idx = [], w = [];
+        for (let b = Math.floor(lo / binHz); b <= Math.ceil(hi / binHz); b++) {
+          const f = b * binHz; let wt = f < c ? (f - lo) / (c - lo) : (hi - f) / (hi - c);
+          if (wt > 0 && b < buf.length) { idx.push(b); w.push(wt); }
+        }
+        if (!idx.length) { idx.push(Math.min(buf.length - 1, Math.round(c / binHz))); w.push(1); }
+        filters.push({ idx, w });
+      }
+      audio = { ctx: actx, stream, analyser, buf, filters };
+      source = 'mic';
+      micBtn.classList.add('on'); demoBtn.classList.remove('on'); micBtn.textContent = '● Listening';
+    } catch (err) {
+      micBtn.textContent = 'Mic unavailable';
+      setTimeout(() => { micBtn.textContent = '🎙 Use my mic'; }, 2400);
+    }
+  }
+  function stopMic() {
+    if (audio) { audio.stream.getTracks().forEach(tr => tr.stop()); audio.ctx.close(); audio = null; }
+    source = 'demo'; micBtn.classList.remove('on'); demoBtn.classList.add('on'); micBtn.textContent = '🎙 Use my mic';
+  }
+  // pre-fill so the slide never opens on an empty canvas
+  for (let k = 0; k < W; k++) { t += 0.01; drawColumn(demoColumn(t)); }
+  frames = 0;
+  micBtn.onclick = () => (source === 'mic' ? stopMic() : startMic());
+  demoBtn.onclick = () => stopMic();
+  const l = loop((now, dt) => {
+    acc += dt; t += dt / 1000;
+    // ~100 frames/s like a real 10 ms hop, capped per paint
+    let n = 0;
+    while (acc >= 10 && n < 4) { acc -= 10; n++; drawColumn(source === 'mic' && audio ? micColumn() : demoColumn(t)); }
+    if (n === 4) acc = 0;
+    framesEl.textContent = frames.toLocaleString();
+    secsEl.textContent = (frames / 100).toFixed(1);
+  });
+  return { start: l.start, stop() { l.stop(); stopMic(); } };
+});
+
+/* ================================================ lattice */
+register('lattice', s => {
+  const cv = s.querySelector('.lat-canvas canvas');
+  const logTxt = s.querySelector('.lat-log .txt'), logCnt = s.querySelector('.lat-log .cnt');
+  const playBtn = s.querySelector('.play'), stepBtn = s.querySelector('.stepb');
+  const chunksEl = s.querySelector('.chunks');
+  const T = 12, U = 3, TOK = ['▁Meet', 'ing', '▁today'];
+  const OPS = {
+    rnnt: 'b b t b t b b b b t b b b b b'.split(' ').map(k => [k, k === 'b' ? 1 : 0]),
+    tdt: [['b', 2], ['t', 1], ['t', 4], ['t', 3], ['b', 2]],
+  };
+  let m = 'rnnt', step = 0, prog = 0, playing = true, hold = 0, chunkTimer = 0, chunkCount = 0;
+  function path() {
+    const pts = [[0, 0]]; let t = 0, u = 0;
+    for (const [k, d] of OPS[m]) { if (k === 'b') t += d; else { t += d; u += 1; } pts.push([t, u]); }
+    return pts;
+  }
+  function describe(i) {
+    const pts = path(); const [t, u] = pts[i]; const [k, d] = OPS[m][i];
+    const prev = u === 0 ? '⟨s⟩' : TOK[u - 1];
+    if (m === 'rnnt') return k === 'b' ? `t=${t}: Joint(h${t}, ${prev}) → ⟨blank⟩ · advance 1 frame` : `t=${t}: Joint(h${t}, ${prev}) → “${TOK[u]}” · emit, stay on h${t}`;
+    return k === 'b' ? `t=${t}: → (⟨blank⟩, Δt=${d}) · skip ${d} frames` : `t=${t}: → (“${TOK[u]}”, Δt=${d}) · emit + jump ${d}`;
+  }
+  function setMode(nm) {
+    m = nm; step = 0; prog = 0; hold = 0;
+    s.querySelectorAll('[data-mode]').forEach(b => b.classList.toggle('on', b.dataset.mode === nm));
+  }
+  s.querySelectorAll('[data-mode]').forEach(b => b.onclick = () => setMode(b.dataset.mode));
+  playBtn.onclick = () => { playing = !playing; playBtn.textContent = playing ? '⏸ Pause' : '▶ Play'; };
+  stepBtn.onclick = () => {
+    playing = false; playBtn.textContent = '▶ Play';
+    if (step >= OPS[m].length) { step = 0; prog = 0; } else { step++; prog = 0; }
+  };
+  function addChunk() {
+    chunkCount++;
+    chunksEl.querySelectorAll('.new').forEach(d => { d.classList.remove('new'); d.textContent = 'cache'; });
+    const d = document.createElement('div'); d.className = 'new'; d.textContent = '+320ms';
+    chunksEl.appendChild(d);
+    while (chunksEl.children.length > 11) chunksEl.removeChild(chunksEl.firstChild);
+  }
+  function draw() {
+    const f = fitCanvas(cv); if (!f) return;
+    const { ctx, w, h } = f;
+    ctx.clearRect(0, 0, w, h);
+    const padL = 78, padR = 22, padT = 22, padB = 70;
+    const gx = t => padL + t * (w - padL - padR) / T;
+    const gy = u => h - padB - u * (h - padB - padT) / U;
+    const mono = px => `500 ${px}px "JetBrains Mono", ui-monospace, monospace`;
+    // y labels
+    ctx.font = mono(12); ctx.textAlign = 'right'; ctx.textBaseline = 'middle';
+    ['∅', ...TOK].forEach((lb, u) => { ctx.fillStyle = u === 0 ? C('--dim') : C('--muted'); ctx.fillText(lb, padL - 14, gy(u)); });
+    // grid
+    for (let u = 0; u <= U; u++) for (let t = 0; t <= T; t++) {
+      ctx.fillStyle = 'rgba(255,255,255,.16)'; ctx.beginPath(); ctx.arc(gx(t), gy(u), 2, 0, 7); ctx.fill();
+    }
+    // frames row
+    const pts = path(); const ops = OPS[m];
+    const visited = new Set(); for (let i = 0; i < Math.min(step + (prog > 0 ? 1 : 0), ops.length); i++) visited.add(pts[i][0]);
+    const allVisited = new Set(pts.slice(0, -1).map(p => p[0]));
+    const fy = h - padB + 24, fw = (w - padL - padR) / T * .78;
+    ctx.textAlign = 'center';
+    for (let t = 0; t < T; t++) {
+      const x = gx(t) + ((w - padL - padR) / T - fw) / 2 + 0;
+      const on = visited.has(t); const skip = m === 'tdt' && !allVisited.has(t);
+      ctx.fillStyle = on ? 'rgba(34,195,122,.9)' : skip ? 'rgba(255,255,255,.03)' : 'rgba(255,255,255,.08)';
+      ctx.strokeStyle = skip ? 'rgba(255,255,255,.12)' : 'transparent';
+      roundRect(ctx, x, fy, fw, 22, 5); ctx.fill(); if (skip) { ctx.setLineDash([3, 3]); ctx.stroke(); ctx.setLineDash([]); }
+      ctx.fillStyle = on ? '#04110a' : 'rgba(255,255,255,.45)'; ctx.font = mono(10);
+      ctx.fillText(`h${t}`, x + fw / 2, fy + 11.5);
+    }
+    ctx.textAlign = 'left'; ctx.fillStyle = C('--dim'); ctx.font = mono(10);
+    ctx.fillText(m === 'tdt' ? 'encoder frames · dashed = skipped by Δt' : 'encoder frames (80 ms each)', padL, fy + 38);
+    // path
+    const ease = x => 1 - Math.pow(1 - x, 3);
+    const n = Math.min(step, ops.length);
+    for (let i = 0; i <= n && i < ops.length; i++) {
+      const p = i < n ? 1 : ease(prog); if (p <= 0) continue;
+      const [t0, u0] = pts[i], [t1, u1] = pts[i + 1]; const isTok = ops[i][0] === 't';
+      const x0 = gx(t0), y0 = gy(u0), x1 = gx(t1), y1 = gy(u1);
+      ctx.strokeStyle = isTok ? C('--brand') : C('--blank'); ctx.lineWidth = isTok ? 4 : 3; ctx.lineCap = 'round';
+      ctx.beginPath(); ctx.moveTo(x0, y0); ctx.lineTo(x0 + (x1 - x0) * p, y0 + (y1 - y0) * p); ctx.stroke();
+      if (m === 'tdt' && p > .6) {
+        ctx.fillStyle = isTok ? C('--brand-soft') : C('--muted'); ctx.font = mono(11); ctx.textAlign = 'center';
+        ctx.fillText(`Δ${ops[i][1]}`, (x0 + x1) / 2, (y0 + y1) / 2 - 12);
+      }
+      if (isTok && p > .9) {
+        const label = TOK[u0]; ctx.font = mono(12); const tw = ctx.measureText(label).width + 14;
+        const lx = x1 + 10, ly = y1 - 13;
+        ctx.fillStyle = 'rgba(245,56,26,.16)'; roundRect(ctx, lx, ly, tw, 24, 6); ctx.fill();
+        ctx.fillStyle = '#ffd9cf'; ctx.textAlign = 'left'; ctx.fillText(label, lx + 7, ly + 12.5);
+      }
+    }
+    // head
+    const hi = Math.min(n, ops.length);
+    let hx, hy;
+    if (hi < ops.length && prog > 0) { const [t0, u0] = pts[hi], [t1, u1] = pts[hi + 1]; const p = ease(prog); hx = gx(t0 + (t1 - t0) * p); hy = gy(u0 + (u1 - u0) * p); }
+    else { const [t0, u0] = pts[hi]; hx = gx(t0); hy = gy(u0); }
+    ctx.fillStyle = 'rgba(245,56,26,.25)'; ctx.beginPath(); ctx.arc(hx, hy, 11, 0, 7); ctx.fill();
+    ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.arc(hx, hy, 5, 0, 7); ctx.fill();
+    // text
+    const done = Math.min(step, ops.length);
+    logCnt.textContent = `decoder calls ${done}/${ops.length}` + (m === 'tdt' ? ' (RNN‑T needs 15)' : '');
+    logTxt.textContent = done === 0 && prog === 0 ? (m === 'rnnt' ? 'start at (h0, ∅) …' : 'start at (h0, ∅) …') : step >= ops.length ? `done → “Meeting today” in ${ops.length} calls` : describe(Math.max(0, Math.min(ops.length - 1, step)));
+  }
+  function roundRect(ctx, x, y, w, h, r) { ctx.beginPath(); ctx.moveTo(x + r, y); ctx.arcTo(x + w, y, x + w, y + h, r); ctx.arcTo(x + w, y + h, x, y + h, r); ctx.arcTo(x, y + h, x, y, r); ctx.arcTo(x, y, x + w, y, r); ctx.closePath(); }
+  const l = loop((now, dt) => {
+    chunkTimer += dt; if (chunkTimer > 700) { chunkTimer = 0; addChunk(); }
+    if (playing) {
+      if (step < OPS[m].length) {
+        prog += dt / (m === 'tdt' ? 700 : 420);
+        if (prog >= 1) { step++; prog = 0; }
+      } else {
+        hold += dt; if (hold > 1800) { hold = 0; setMode(m === 'rnnt' ? 'tdt' : 'rnnt'); }
+      }
+    } else if (prog > 0 && prog < 1) { prog = Math.min(1, prog + dt / 300); if (prog >= 1) { prog = 0; } }
+    draw();
+  });
+  if (!chunksEl.children.length) for (let i = 0; i < 6; i++) addChunk();
+  return { start: l.start, stop: l.stop, resize: draw };
+});
+
+/* ================================================ autoregressive */
+register('ar', s => {
+  const M = {
+    whisper: {
+      formula: 'P(y<sub>i</sub> | <b>Enc(Mel[80×3000])</b>, y<sub>&lt;i</sub>) · cross‑attention',
+      chain: [['Input', '30 s PCM window, pad / trim'], ['Features', 'log‑Mel 80 × 3000'], ['Encoder', 'conv ↓2 → 1,500 × d'], ['Decoder', 'causal + cross‑attn'], ['Output', 'timed segments']],
+      prompt: [['<|startoftranscript|>', 'ctl'], ['<|en|>', 'ctl'], ['<|transcribe|>', 'ctl']],
+      out: [
+        ['<|0.00|>', 'time', [['<|0.00|>', .94], ['<|0.02|>', .04], ['<|nospeech|>', .01]]],
+        [' Meet', 'text', [[' Meet', .86], [' Meat', .07], [' Me', .03]]],
+        ['ing', 'text', [['ing', .97], ['s', .01], ['er', .01]]],
+        [' today', 'text', [[' today', .91], [' to', .05], [' Tuesday', .02]]],
+        ['<|1.20|>', 'time', [['<|1.20|>', .62], ['<|1.18|>', .21], ['.', .09]]],
+        ['<|endoftext|>', 'eos', [['<|endoftext|>', .88], ['<|1.22|>', .07], [' and', .02]]],
+      ],
+      note: 'Language and task are prompt tokens. Timestamps are vocabulary tokens too, so Whisper writes its own subtitles. The 30 s window is fixed: shorter audio is padded and longer audio is chunked.',
+      rt: ['whisper.cpp · ggml · Metal', 'tiny 39M → large‑v3 1.55B', 'large‑v3: 128 Mel bins, Q5_0'],
+    },
+    qwen: {
+      formula: 'P(y<sub>i</sub> | [prompt ; <b>W·AudioEnc(Mel[128×T])</b>], y<sub>&lt;i</sub>) · KV cache',
+      chain: [['Gate', 'Silero VAD speech segments'], ['Features', 'log‑Mel 128 × T, ≤30 s'], ['Encoder', 'audio Transformer + projector'], ['Prefill', '⟨audio⟩ slots ← embeddings'], ['Decoder', 'Qwen3 LLM + KV cache']],
+      prompt: [['⟨system⟩', 'prompt'], ['⟨audio_start⟩', 'ctl'], ['⟨audio⟩ × T′', 'prompt'], ['⟨audio_end⟩', 'ctl'], ['⟨asr⟩', 'ctl']],
+      out: [
+        ['今', 'text', [['今', .93], ['金', .04], ['近', .01]]],
+        ['天', 'text', [['天', .95], ['添', .02], ['田', .01]]],
+        ['开', 'text', [['开', .96], ['凯', .02], ['该', .01]]],
+        ['会', 'text', [['会', .90], ['汇', .05], ['绘', .02]]],
+        ['⟨eos⟩', 'eos', [['⟨eos⟩', .91], ['，', .05], ['吧', .02]]],
+      ],
+      note: '今 / 金 / 近 sound almost identical. The acoustic evidence is ambiguous, so the language model settles it from context. That is why this family is strong on Chinese dialects and code‑switching.',
+      rt: ['Qwen3‑ASR 0.6B', 'MLX · 4‑bit', 'Silero VAD v6'],
+    },
+    moss: {
+      formula: 'P(y<sub>i</sub> | [<b>WhisperEnc(30 s)</b> ≈ 12.5 tok/s ; prompt], y<sub>&lt;i</sub>) → text · time · speaker',
+      chain: [['Input', 'fixed 30 s blocks'], ['Encoder', 'Whisper encoder, cached & reused'], ['Audio tokens', '≈ 12.5 per second'], ['Decoder', 'Qwen3‑style, autoregressive'], ['Parse', 'lines with time + speaker']],
+      prompt: [['⟨audio⟩ × 375', 'prompt'], ['“transcribe with speakers”', 'prompt']],
+      out: [
+        ['[0.00]', 'time', [['[0.00]', .97], ['[0.08]', .02], ['[S01]', .01]]],
+        ['[S01]', 'spk', [['[S01]', .98], ['[S02]', .01], ['Meeting', .01]]],
+        ['Meeting', 'text', [['Meeting', .89], ['Meet', .06], ['Eating', .02]]],
+        [' today', 'text', [[' today', .92], [' to', .04], [' Tuesday', .02]]],
+        ['[1.20]', 'time', [['[1.20]', .74], ['[1.16]', .15], ['.', .06]]],
+        ['[S02]', 'spk', [['[S02]', .71], ['[S01]', .24], ['[S03]', .03]]],
+        ['Sounds', 'text', [['Sounds', .84], ['Sound', .09], ['So', .04]]],
+        [' good', 'text', [[' good', .95], [' great', .03], [' good.', .01]]],
+        ['⟨eos⟩', 'eos', [['⟨eos⟩', .9], ['[2.05]', .07], ['!', .02]]],
+      ],
+      note: 'One token stream carries words, time markers and speaker tags. Transcription and diarization come from a single autoregressive model: the most accurate multi‑speaker path in the app, and the slowest.',
+      rt: ['MOSS Transcribe‑Diarize', 'MLX · 4‑bit', '≈ 1 GB on disk'],
+    },
+  };
+  const segBtns = s.querySelectorAll('[data-m]');
+  const formulaEl = s.querySelector('.ar-formula'), chainEl = s.querySelector('.ar-chain'), tokEl = s.querySelector('.ar-tokens');
+  const probsEl = s.querySelector('.ar-probs'), noteEl = s.querySelector('.ar-note'), rtEl = s.querySelector('.ar-runtime');
+  let cur = 'whisper', i = 0, timer = 0, auto = true;
+  function esc(x) { return x.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); }
+  function build() {
+    const d = M[cur];
+    segBtns.forEach(b => b.classList.toggle('on', b.dataset.m === cur));
+    formulaEl.innerHTML = d.formula;
+    chainEl.innerHTML = d.chain.map(([a, b]) => `<div class="c"><i>${a}</i>${esc(b)}</div>`).join('');
+    tokEl.innerHTML = d.prompt.map(([t, k]) => `<span class="tok ${k === 'ctl' ? 'ctl prompt' : 'prompt'}">${esc(t)}</span>`).join('') +
+      d.out.map(([t, k]) => `<span class="tok ${k} hidden">${esc(t)}</span>`).join('');
+    noteEl.textContent = d.note;
+    rtEl.innerHTML = d.rt.map(x => `<span class="chip">${esc(x)}</span>`).join('');
+    probsEl.innerHTML = [0, 1, 2].map(() => `<div class="prob"><span class="k">–</span><div class="pbar"><span></span></div><span class="v"></span></div>`).join('');
+    i = 0; timer = 0;
+  }
+  function reveal() {
+    const d = M[cur]; const outs = tokEl.querySelectorAll('.tok:not(.prompt)');
+    outs.forEach((el, k) => { el.classList.toggle('hidden', k > i); el.classList.toggle('cur', k === i); });
+    const top = d.out[i][2];
+    probsEl.querySelectorAll('.prob').forEach((row, k) => {
+      row.querySelector('.k').textContent = top[k][0];
+      row.querySelector('.pbar span').style.width = `${top[k][1] * 100}%`;
+      row.querySelector('.v').textContent = top[k][1].toFixed(2);
+    });
+  }
+  segBtns.forEach(b => b.onclick = () => { cur = b.dataset.m; auto = false; build(); reveal(); });
+  const order = ['whisper', 'qwen', 'moss'];
+  const l = loop((now, dt) => {
+    timer += dt;
+    const last = i >= M[cur].out.length - 1;
+    if (timer < (last ? 3200 : 900)) return;
+    timer = 0;
+    if (!last) { i++; reveal(); return; }
+    // hold on the finished stream, then replay (and rotate models until someone clicks a tab)
+    if (auto) cur = order[(order.indexOf(cur) + 1) % order.length];
+    build(); reveal();
+  });
+  build(); reveal();
+  return { start() { l.start(); }, stop: l.stop };
+});
+
+/* ================================================ diarization */
+register('diar', s => {
+  const cv = s.querySelector('.heat canvas');
+  const ctx = cv.getContext('2d');
+  const W = cv.width, H = cv.height, ROW = H / 4;
+  const turnsEl = s.querySelector('.turns');
+  const vs = [...s.querySelectorAll('.vchain .v')];
+  const cols = ['--brand', '--info', '--success', '--purple'].map(v => hex(C(v)));
+  const bg = [7, 8, 11];
+  const script = [
+    [0, 0.2, 3.2], [1, 3.0, 6.0], [2, 6.2, 8.8], [0, 9.0, 11.5], [1, 11.3, 13.0], [3, 13.3, 14.6], [0, 15.0, 17.0], [2, 17.2, 19.5],
+  ];
+  const LOOP = 20;
+  function hex(h) { h = h.replace('#', ''); return [parseInt(h.slice(0, 2), 16), parseInt(h.slice(2, 4), 16), parseInt(h.slice(4, 6), 16)]; }
+  function prob(k, t) {
+    let p = 0.03 + 0.05 * Math.random();
+    for (const [sk, a, b] of script) if (sk === k) {
+      const edge = Math.min(t - a, b - t);
+      if (edge > -0.25) p = Math.max(p, 1 / (1 + Math.exp(-edge * 14)) * (0.86 + 0.12 * Math.random()));
+    }
+    return Math.min(1, p);
+  }
+  ctx.fillStyle = `rgb(${bg})`; ctx.fillRect(0, 0, W, H);
+  let t = 0, acc = 0, lastSpk = -1, vIdx = 0, vAcc = 0;
+  const img = ctx.createImageData(1, H);
+  function column() {
+    ctx.drawImage(cv, -1, 0);
+    const ps = [0, 1, 2, 3].map(k => prob(k, t % LOOP));
+    for (let k = 0; k < 4; k++) {
+      const p = ps[k]; const c = cols[k];
+      for (let y = Math.round(k * ROW); y < Math.round((k + 1) * ROW); y++) {
+        const o = y * 4; const edge = y === Math.round((k + 1) * ROW) - 1;
+        const a = edge ? 0 : p;
+        img.data[o] = bg[0] + (c[0] - bg[0]) * a; img.data[o + 1] = bg[1] + (c[1] - bg[1]) * a; img.data[o + 2] = bg[2] + (c[2] - bg[2]) * a; img.data[o + 3] = 255;
+      }
+    }
+    ctx.putImageData(img, W - 1, 0);
+    let best = -1, bp = .5; ps.forEach((p, k) => { if (p > bp) { bp = p; best = k; } });
+    if (best >= 0 && best !== lastSpk) {
+      lastSpk = best;
+      const chip = document.createElement('span'); chip.className = 'chip';
+      chip.style.background = `rgb(${cols[best]})`;
+      chip.textContent = `S${best + 1} @ ${(t % LOOP).toFixed(1)} s`;
+      turnsEl.appendChild(chip);
+      while (turnsEl.children.length > 6) turnsEl.removeChild(turnsEl.firstChild);
+    }
+  }
+  const l = loop((now, dt) => {
+    acc += dt; vAcc += dt;
+    while (acc >= 80) { acc -= 80; t += 0.08; column(); }
+    if (vAcc > 1100) { vAcc = 0; vIdx = (vIdx + 1) % vs.length; vs.forEach((v, k) => v.classList.toggle('on', k === vIdx)); }
+  });
+  for (let k = 0; k < W; k++) { t += 0.08; column(); }
+  vs[0].classList.add('on');
+  return { start: l.start, stop: l.stop };
+});
+
+/* ================================================ text ai */
+register('textai', s => {
+  const fields = [...s.querySelectorAll('[data-type]')];
+  const tags = [...s.querySelectorAll('.out .tags .chip')];
+  const engines = [...s.querySelectorAll('.engine')];
+  let timers = [];
+  function clear() { timers.forEach(clearTimeout); timers = []; }
+  function run() {
+    clear();
+    fields.forEach(f => f.textContent = ''); tags.forEach(t => t.classList.remove('show'));
+    engines.forEach((e, k) => e.style.borderColor = k === 1 ? 'var(--brand)' : '');
+    let delay = 500;
+    fields.forEach(f => {
+      const txt = f.dataset.type;
+      for (let k = 1; k <= txt.length; k++) { timers.push(setTimeout(() => { f.textContent = txt.slice(0, k); }, delay)); delay += f.classList.contains('title-val') ? 45 : 18; }
+      delay += 250;
+    });
+    tags.forEach(t => { timers.push(setTimeout(() => t.classList.add('show'), delay)); delay += 180; });
+    timers.push(setTimeout(run, delay + 4000));
+  }
+  return { start: run, stop: clear };
+});
+
+/* ------------------------------------------------ boot */
+addEventListener('resize', applyMode);
+addEventListener('hashchange', () => {
+  const n = parseInt(location.hash.slice(1), 10);
+  if (!Number.isFinite(n)) return;
+  if (mode === 'deck') go(n - 1); else slides[Math.max(0, Math.min(slides.length - 1, n - 1))].scrollIntoView();
+});
+const fromHash = parseInt(location.hash.slice(1), 10);
+index = Number.isFinite(fromHash) ? Math.max(0, Math.min(slides.length - 1, fromHash - 1)) : 0;
+applyMode();
+if (mode === 'doc' && Number.isFinite(fromHash) && fromHash > 1) slides[index].scrollIntoView();
+document.fonts?.ready.then(() => widgets.forEach(w => w.resize && w.resize()));
+})();
+</script>
+</body>
+</html>
