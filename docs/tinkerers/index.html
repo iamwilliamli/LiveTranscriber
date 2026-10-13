@@ -3,9 +3,9 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>How Speech Becomes Text on an iPhone · LiveTranscriber</title>
+<title>How Speech Becomes Text on an iPhone Without Internet · LiveTranscriber</title>
 <meta name="description" content="AI Tinkerers Toronto demo: what eight on-device speech models compute, from PCM samples to tokens, timestamps and speaker labels. By William (Chengqi) Li.">
-<meta property="og:title" content="How speech becomes text, on an iPhone">
+<meta property="og:title" content="How speech becomes text, on an iPhone without internet">
 <meta property="og:description" content="Transducers, TDT, Whisper, audio-LLMs and speaker diarization, explained through LiveTranscriber. AI Tinkerers Toronto, Oct 2026.">
 <meta property="og:type" content="website">
 <meta property="og:url" content="https://iamwilliamli.github.io/LiveTranscriber/tinkerers/">
@@ -147,18 +147,37 @@ ul.list li b { color: var(--label); font-weight: 650; }
 .appmark span { color: var(--label2); font-size: .85rem; }
 .byline { margin-top: 2rem; font-size: .95rem; color: var(--label2); }
 .byline b { color: var(--label); }
-.hero-card { padding: 1.2rem 1.3rem 1.1rem; }
-.hc-head { display: flex; align-items: center; gap: .5rem; }
-.hc-head h3 { font-size: 1.05rem; }
-.hc-head .pill { margin-left: auto; }
-.tr { margin-top: .9rem; display: grid; gap: .9rem; min-height: 15.5rem; align-content: start; }
+/* hero mirrors OnboardingPiPTranslationDemo: video stage + overlapping caption window */
+.pip { margin: 0; }
+.pip-video { cursor: pointer; position: relative; aspect-ratio: 16 / 9; border-radius: var(--r); overflow: hidden; background: #000; box-shadow: inset 0 0 0 1px rgba(127,127,127,.12), 0 6px 20px rgba(0,0,0,.10); }
+.pip-video video { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; display: block; }
+.pip-shade { position: absolute; inset: 0; background: rgba(0,0,0,.28); transition: opacity .3s; }
+.pip-video.ready .pip-shade { opacity: 0; }
+.pip-controls { position: absolute; left: 0; right: 0; bottom: 0; padding: 1.2rem 1rem 1.9rem; background: linear-gradient(transparent, rgba(0,0,0,.64)); color: #fff; }
+.pip-progress { height: 4px; border-radius: 99px; background: rgba(255,255,255,.34); overflow: hidden; }
+.pip-progress span { display: block; height: 100%; width: 0; min-width: 6px; border-radius: 99px; background: var(--info); }
+.pip-row { display: flex; align-items: center; gap: .6rem; margin-top: .45rem; font-size: .78rem; font-weight: 600; font-variant-numeric: tabular-nums; }
+.pip-row .ic { width: .95rem; height: .95rem; }
+.pip-sound { margin-left: auto; width: 2.4rem; height: 2.4rem; border: 0; border-radius: 50%; background: transparent; color: #fff; display: grid; place-items: center; cursor: pointer; }
+.pip-sound .ic { width: 1.15rem; height: 1.15rem; }
+.pip-captions { position: relative; margin: -1.3rem .85rem 0; border-radius: 24px; overflow: hidden; background: #06080D; box-shadow: inset 0 0 0 1px rgba(255,255,255,.12), 0 8px 20px rgba(0,0,0,.22); }
+.pip-captions::before { content: ""; position: absolute; left: 0; top: 0; bottom: 0; width: 5px; background: rgba(31,112,242,.76); }
+.cap-row { display: grid; grid-template-columns: 2.4rem 1fr; gap: .7rem; align-items: start; padding: .8rem 1rem; }
+.cap-lang { height: 1.75rem; display: grid; place-items: center; border-radius: 7px; background: rgba(31,112,242,.18); color: #73ADFF; font-size: .66rem; font-weight: 700; }
+.cap-row p { margin: 0; color: #fff; font-size: 1.02rem; line-height: 1.38; min-height: 1.4em; transition: opacity .2s; }
+.cap-orig { font-weight: 600; }
+.cap-trans { font-weight: 500; color: rgba(255,255,255,.84) !important; }
+.cap-row p.placeholder { color: rgba(255,255,255,.44) !important; }
+.cap-div { height: 1px; margin-left: 1rem; background: rgba(255,255,255,.12); }
+.pip-benefits { display: grid; grid-template-columns: repeat(3, 1fr); gap: .8rem; margin-top: 1.3rem; }
+.pip-benefits div { display: grid; justify-items: center; gap: .35rem; font-size: .8rem; font-weight: 600; color: var(--label2); text-align: center; }
+.pip-benefits .ic { width: 1.05rem; height: 1.05rem; }
+
+/* transcript rows (shared with the app's live transcript card) */
+.tr { margin-top: .9rem; display: grid; gap: .9rem; align-content: start; }
 .tr-row .meta { display: flex; align-items: center; gap: .5rem; font-size: .78rem; font-weight: 700; color: var(--c); }
 .tr-row .meta .capsule { font-size: .68rem; color: var(--label2); font-weight: 500; }
 .tr-row p { margin: .25rem 0 0; font-size: 1.12rem; line-height: 1.35; color: var(--label); }
-.tr-row.interim p { color: var(--label3); }
-.tr-row.hidden { opacity: 0; }
-.tr-row { transition: opacity .3s; }
-.hc-foot { display: flex; gap: .4rem; flex-wrap: wrap; padding-top: .9rem; margin-top: .9rem; border-top: 1px solid var(--sep); }
 
 /* ---------- 2 lanes ---------- */
 .lanes { display: grid; grid-template-columns: minmax(0, 1fr); gap: 1.1rem; align-content: start; }
@@ -382,6 +401,7 @@ ol.watch li small { display: block; color: var(--label2); font-size: .82rem; fon
 .doc .tok { font-size: .85rem; }
 .doc .prob { grid-template-columns: 6rem 1fr 2.6rem; font-size: .82rem; }
 .doc .tr { min-height: 0; }
+.doc .cap-row p { font-size: .92rem; }
 @media (max-width: 520px) { .doc .doc-head .l2 { display: none; } }
 
 @media (prefers-reduced-motion: reduce) {
@@ -424,6 +444,11 @@ ol.watch li small { display: block; color: var(--label2); font-size: .82rem; fon
   <symbol id="i-notes" viewBox="0 0 24 24"><path d="M5 4.5h14M5 9.5h14M5 14.5h9M5 19.5h6"/></symbol>
   <symbol id="i-expand" viewBox="0 0 24 24"><path d="M14.5 3.5h6v6M20.5 3.5l-7 7M9.5 20.5h-6v-6M3.5 20.5l7-7"/></symbol>
   <symbol id="i-theme" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><path d="M12 3.5v17a8.5 8.5 0 0 0 0-17z" fill="currentColor"/></symbol>
+  <symbol id="i-pause" viewBox="0 0 24 24"><rect x="6.5" y="5" width="3.5" height="14" rx="1" fill="currentColor" stroke="none"/><rect x="14" y="5" width="3.5" height="14" rx="1" fill="currentColor" stroke="none"/></symbol>
+  <symbol id="i-play" viewBox="0 0 24 24"><path d="M7.5 5.2v13.6a.8.8 0 0 0 1.2.7l11-6.8a.8.8 0 0 0 0-1.4l-11-6.8a.8.8 0 0 0-1.2.7z" fill="currentColor" stroke="none"/></symbol>
+  <symbol id="i-mute" viewBox="0 0 24 24"><path d="M4 9.5h3.5L12 5.5v13l-4.5-4H4z" fill="currentColor"/><path d="M16 9.5l5 5M21 9.5l-5 5"/></symbol>
+  <symbol id="i-sound" viewBox="0 0 24 24"><path d="M4 9.5h3.5L12 5.5v13l-4.5-4H4z" fill="currentColor"/><path d="M15.5 9a4 4 0 0 1 0 6M18.5 6.5a7.5 7.5 0 0 1 0 11"/></symbol>
+  <symbol id="i-infinity" viewBox="0 0 24 24"><path d="M12 12c-2-2.6-3.6-4-5.5-4a4 4 0 0 0 0 8c1.9 0 3.5-1.4 5.5-4zm0 0c2 2.6 3.6 4 5.5 4a4 4 0 0 0 0-8c-1.9 0-3.5 1.4-5.5 4z"/></symbol>
   <symbol id="i-plane" viewBox="0 0 24 24"><path d="M21 15.5l-8-5V4.5a1.5 1.5 0 0 0-3 0v6l-7 5v2l7-2.2V19l-2 1.5V22l3.5-1 3.5 1v-1.5L12 19v-3.7l9 2.2z" transform="translate(.5 0)"/></symbol>
 </svg>
 
@@ -445,23 +470,34 @@ ol.watch li small { display: block; color: var(--label2); font-size: .82rem; fon
         <span class="appicon"><img class="light" src="img/icon-light.jpg" alt="LiveTranscriber app icon"><img class="dark" src="img/icon-dark.jpg" alt="LiveTranscriber app icon"></span>
         <div><b>LiveTranscriber</b><span>AI Tinkerers Toronto · Oct 13, 2026 · Shopify</span></div>
       </div>
-      <h1>How speech becomes text, <mark>on an iPhone</mark>.</h1>
-      <p class="lede">What eight on‑device speech models actually compute: from PCM samples to log‑Mel frames, tokens, timestamps and speaker labels.</p>
+      <h1>How speech becomes text, on an iPhone <mark>without internet</mark>.</h1>
+      <p class="lede">What eight on‑device speech models actually compute, from PCM samples to log‑Mel frames, tokens, timestamps and speaker labels, with no network involved.</p>
       <p class="byline"><b>William (Chengqi) Li</b> · I build LiveTranscriber for iPhone and Mac</p>
     </div>
-    <div class="card hero-card" aria-hidden="true">
-      <div class="hc-head"><svg class="ic" style="color:var(--brand)"><use href="#i-captions"/></svg><h3>Transcript</h3><span class="pill" style="--c:var(--danger)"><i></i><span class="hero-clock">00:00</span></span></div>
-      <div class="tr">
-        <div class="tr-row" style="--c:var(--brand)"><div class="meta">Speaker 1 <span class="capsule">00:00</span></div><p>Are we still meeting today at three?</p></div>
-        <div class="tr-row" style="--c:var(--purple)"><div class="meta">Speaker 2 <span class="capsule">00:03</span></div><p class="r2"></p></div>
-        <div class="tr-row" style="--c:var(--brand)"><div class="meta">Speaker 1 <span class="capsule">00:07</span></div><p class="r3"></p></div>
+    <figure class="pip" aria-label="LiveTranscriber Picture in Picture translation demo: a Japanese video with live Japanese captions and English translation">
+      <div class="pip-video">
+        <video muted playsinline preload="auto" src="media/pip-translation-demo.mp4"></video>
+        <div class="pip-shade"></div>
+        <div class="pip-controls">
+          <div class="pip-progress"><span></span></div>
+          <div class="pip-row">
+            <svg class="ic pip-state"><use href="#i-pause"/></svg>
+            <span class="pip-time">0:00 / 0:10</span>
+            <button class="pip-sound" type="button" aria-label="Turn video sound on"><svg class="ic"><use href="#i-mute"/></svg></button>
+          </div>
+        </div>
       </div>
-      <div class="hc-foot">
-        <span class="pill" style="--c:var(--success)">Nemotron 3.5 · 320 ms chunks</span>
-        <span class="pill" style="--c:var(--purple)">Sortformer · speakers</span>
-        <span class="pill hero-state" style="--c:var(--label2)">partial</span>
+      <div class="pip-captions">
+        <div class="cap-row"><span class="cap-lang">JA</span><p class="cap-orig placeholder">Waiting for speech…</p></div>
+        <div class="cap-div"></div>
+        <div class="cap-row"><span class="cap-lang">EN</span><p class="cap-trans placeholder">Waiting for translation…</p></div>
       </div>
-    </div>
+      <div class="pip-benefits">
+        <div><svg class="ic" style="color:var(--info)"><use href="#i-chip"/></svg><span>On‑Device</span></div>
+        <div><svg class="ic" style="color:var(--success)"><use href="#i-lock"/></svg><span>Private</span></div>
+        <div><svg class="ic" style="color:var(--purple)"><use href="#i-infinity"/></svg><span>No time limit</span></div>
+      </div>
+    </figure>
   </div>
   <aside class="notes">
     <li>Hi, I'm William. I build LiveTranscriber, an iPhone + Mac transcriber where every model runs on the device.</li>
@@ -1052,34 +1088,69 @@ function register(name, factory) {
   });
 }
 
-/* ================================================ hero: live transcript card */
+/* ================================================ hero: app's PiP translation demo */
 register('hero', s => {
-  const r2 = s.querySelector('.r2'), r3 = s.querySelector('.r3');
-  const row2 = r2.closest('.tr-row'), row3 = r3.closest('.tr-row');
-  const clock = s.querySelector('.hero-clock'), state = s.querySelector('.hero-state');
-  // partial hypotheses revise themselves, then commit as final
-  const script = [
-    [row2, r2, ['Yes', 'Yes, I', "Yes, I'll bring", "Yes, I'll bring the beta", "Yes, I'll bring the beta note", "Yes, I'll bring the beta notes."]],
-    [row3, r3, ['Great', 'Great, see', 'Great, see you in', 'Great, see you in room for', 'Great, see you in room four.']],
+  // timings mirror OnboardingPiPTranslationDemo (10.005 s clip, cues at 1.33 s and 8.45 s, translation 0.45 s later)
+  const DURATION = 10.005, CUES = [1.33, 8.45], DELAY = 0.45;
+  const TEXT = [
+    ['ねえ、景色がすごく綺麗だよ。本当だ。写真撮ってもいい？', "Hey, the scenery is really beautiful. You're right. Can I take a picture?"],
+    ['お弁当も楽しみだね。', "I'm looking forward to the boxed lunch too."],
   ];
-  let timers = [], secs = 0, tick = 0;
-  function clear() { timers.forEach(clearTimeout); timers = []; clearInterval(tick); }
-  function setState(txt, c) { state.textContent = txt; state.style.setProperty('--c', c); }
-  function run() {
-    clear();
-    secs = 0; clock.textContent = '00:00';
-    tick = setInterval(() => { secs++; clock.textContent = `00:${String(secs).padStart(2, '0')}`; }, 1000);
-    script.forEach(([row, p]) => { row.classList.add('hidden'); row.classList.remove('interim'); p.textContent = ''; });
-    let t = 600;
-    script.forEach(([row, p, steps]) => {
-      timers.push(setTimeout(() => { row.classList.remove('hidden'); row.classList.add('interim'); setState('partial', C('--label2')); }, t));
-      steps.forEach(txt => { timers.push(setTimeout(() => { p.textContent = txt; }, t)); t += 420; });
-      timers.push(setTimeout(() => { row.classList.remove('interim'); setState('final', C('--success')); }, t + 200));
-      t += 1300;
-    });
-    timers.push(setTimeout(run, t + 3500));
+  const stage = s.querySelector('.pip-video'), video = stage.querySelector('video');
+  const bar = s.querySelector('.pip-progress span'), time = s.querySelector('.pip-time');
+  const stateIcon = s.querySelector('.pip-state use'), soundBtn = s.querySelector('.pip-sound'), soundIcon = soundBtn.querySelector('use');
+  const orig = s.querySelector('.cap-orig'), trans = s.querySelector('.cap-trans');
+  const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  let raf = 0, failed = false;
+  video.loop = true;
+  video.addEventListener('loadeddata', () => stage.classList.add('ready'));
+  video.addEventListener('error', () => { failed = true; render(CUES[0] + 1); });
+  function setText(el, text, placeholder) {
+    if (el.textContent !== text) el.textContent = text;
+    el.classList.toggle('placeholder', placeholder);
   }
-  return { start: run, stop: clear };
+  function render(t) {
+    const cue = t >= CUES[1] ? 1 : t >= CUES[0] ? 0 : -1;
+    if (cue < 0) {
+      setText(orig, 'Waiting for speech…', true);
+      setText(trans, 'Waiting for translation…', true);
+    } else {
+      setText(orig, TEXT[cue][0], false);
+      const shown = t >= CUES[cue] + DELAY;
+      setText(trans, shown ? TEXT[cue][1] : 'Waiting for translation…', !shown);
+    }
+    bar.style.width = `${Math.min(1, t / DURATION) * 100}%`;
+    time.textContent = `0:${String(Math.min(10, Math.floor(t))).padStart(2, '0')} / 0:10`;
+  }
+  function setMuted(m) {
+    video.muted = m;
+    soundIcon.setAttribute('href', m ? '#i-mute' : '#i-sound');
+    soundBtn.setAttribute('aria-label', m ? 'Turn video sound on' : 'Turn video sound off');
+  }
+  soundBtn.onclick = e => { e.stopPropagation(); setMuted(!video.muted); };
+  // tap the stage to play/pause (also recovers if the browser refused muted autoplay)
+  stage.addEventListener('click', () => { if (video.paused) video.play().catch(() => {}); else video.pause(); });
+  video.addEventListener('play', () => stateIcon.setAttribute('href', '#i-pause'));
+  video.addEventListener('pause', () => stateIcon.setAttribute('href', '#i-play'));
+  function tick() { raf = requestAnimationFrame(tick); render(video.currentTime || 0); }
+  function start() {
+    setMuted(true);
+    if (reduce || failed) { // static translated frame, as the app does under Reduce Motion
+      video.currentTime = 2; render(2); stateIcon.setAttribute('href', '#i-play'); return;
+    }
+    video.currentTime = 0;
+    const p = video.play();
+    if (p && p.catch) p.catch(() => { stateIcon.setAttribute('href', '#i-play'); });
+    stateIcon.setAttribute('href', '#i-pause');
+    cancelAnimationFrame(raf); tick();
+  }
+  function stop() {
+    cancelAnimationFrame(raf); raf = 0;
+    video.pause(); setMuted(true);
+    stateIcon.setAttribute('href', '#i-play');
+  }
+  render(0);
+  return { start, stop };
 });
 
 /* ================================================ spectrogram */
